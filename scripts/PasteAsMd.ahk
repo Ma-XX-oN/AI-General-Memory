@@ -379,7 +379,6 @@ class PasteMd {
    * @returns {string} Text with entities decoded
    */
   static DecodeBasicHtmlEntities(s) {
-    s := StrReplace(s, Chr(160), " ")
     s := StrReplace(s, "&nbsp;", Chr(160))
     s := StrReplace(s, "&#160;", Chr(160))
     s := StrReplace(s, "&quot;", '"')
