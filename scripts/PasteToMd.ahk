@@ -17,26 +17,40 @@ global gPasteMenu := Menu()
 gPasteMenu.Add("Paste as md", PasteAsMd)
 gPasteMenu.Add("Paste as md quoted", PasteAsMdQuoted)
 
-; Show the markdown paste menu at the current cursor position.
+/**
+ * Shows the markdown paste menu at the current cursor position.
+ */
 ShowPasteMenu() {
   global gPasteMenu
   gPasteMenu.Show()
 }
 
-; Menu callback: paste clipboard content as markdown.
+/**
+ * Menu callback: pastes clipboard content as markdown.
+ * @param {string} ItemName - Menu item label
+ * @param {number} ItemPos - Menu item position
+ * @param {object} MenuObj - Menu object
+ */
 PasteAsMd(ItemName, ItemPos, MenuObj) {
   PasteMd.PasteMarkdown(false)
 }
 
-; Menu callback: paste clipboard content as quoted markdown.
+/**
+ * Menu callback: pastes clipboard content as quoted markdown (blockquote).
+ * @param {string} ItemName - Menu item label
+ * @param {number} ItemPos - Menu item position
+ * @param {object} MenuObj - Menu object
+ */
 PasteAsMdQuoted(ItemName, ItemPos, MenuObj) {
   PasteMd.PasteMarkdown(true)
 }
 
 class PasteMd {
-  ; Convert current clipboard content to markdown (or quoted markdown) and paste.
-  ; Prefer CF_HTML -> pandoc conversion, with plain-text fallback.
-  ; asQuoted: true to prefix every line with markdown blockquote syntax.
+  /**
+   * Converts clipboard content to markdown (or quoted markdown) and pastes it.
+   * Prefers CF_HTML → pandoc conversion, with plain-text fallback.
+   * @param {boolean} asQuoted - If true, prefixes every line with blockquote syntax (>).
+   */
   static PasteMarkdown(asQuoted) {
   global PANDOC_EXE, PASTE_DELAY_MS
 
@@ -74,8 +88,12 @@ class PasteMd {
   }
   }
 
-  ; Run pandoc to convert HTML content into GitHub-flavored markdown.
-  ; Returns markdown text or "" on conversion/read failure.
+  /**
+   * Runs pandoc to convert HTML content to GitHub-flavored markdown.
+   * @param {string} html - HTML content to convert
+   * @param {string} pandocExe - Path to pandoc executable
+   * @returns {string} Markdown text, or empty string on conversion/read failure
+   */
   static HtmlToGfmViaPandoc(html, pandocExe) {
   tmpBase := A_Temp "\chatgpt_md_" A_TickCount
   tmpHtml := tmpBase ".html"
@@ -113,8 +131,12 @@ class PasteMd {
   return md
   }
 
-  ; Normalize plain text for markdown-safe paste:
-  ; remove CR, trim trailing horizontal whitespace, trim edge blank lines.
+  /**
+   * Normalizes plain text for markdown-safe paste.
+   * Removes CR, trims trailing whitespace, and removes edge blank lines.
+   * @param {string} s - Text to normalize
+   * @returns {string} Normalized text
+   */
   static CleanPlainText(s) {
   s := StrReplace(s, "`r", "")
   lines := StrSplit(s, "`n")
@@ -126,8 +148,12 @@ class PasteMd {
   return Trim(out, "`n")
   }
 
-  ; Normalize markdown lines and simplify inline HTML where safe.
-  ; Preserves fenced code blocks.
+  /**
+   * Normalizes markdown lines and simplifies inline HTML.
+   * Preserves fenced code blocks. Removes empty headings.
+   * @param {string} md - Markdown text to clean
+   * @returns {string} Cleaned markdown
+   */
   static CleanMarkdown(md) {
   md := StrReplace(md, "`r", "")
   lines := StrSplit(md, "`n")
@@ -165,6 +191,11 @@ class PasteMd {
   return Trim(out, "`n")
   }
 
+  /**
+   * PCRE regex pattern for matching HTML tags and quoted strings.
+   * Includes recursive subroutines for robust HTML parsing.
+   * Used as a component in SimplifyMarkdownInlineHtml pattern matching.
+   */
   static re_htags := "
 (
   |(?x)(?!)
@@ -183,8 +214,13 @@ class PasteMd {
   `)
   )"
 
-  ; Convert common inline HTML constructs into markdown equivalents and
-  ; strip residual non-escaped tags that reduce readability.
+  /**
+   * Converts common inline HTML constructs to markdown equivalents.
+   * Strips residual non-escaped tags that reduce readability.
+   * Handles <span>, <code>, <strong>, <b>, <em>, <i>, and <a> tags.
+   * @param {string} line - Text line containing HTML
+   * @returns {string} Line with HTML converted to markdown
+   */
   static SimplifyMarkdownInlineHtml(line) {
     line := PasteMd.DecodeBasicHtmlEntities(line)
 
@@ -249,7 +285,12 @@ class PasteMd {
   return line
   }
 
-  ; Decode a minimal set of common HTML entities used in copied fragments.
+  /**
+   * Decodes common HTML entities used in clipboard fragments.
+   * Handles &nbsp;, &quot;, &apos;, &lt;, &gt;, &amp;, and numeric entity references.
+   * @param {string} s - Text containing HTML entities
+   * @returns {string} Text with entities decoded
+   */
   static DecodeBasicHtmlEntities(s) {
     s := StrReplace(s, Chr(160), " ")
     s := StrReplace(s, "&nbsp;", Chr(160))
@@ -264,7 +305,12 @@ class PasteMd {
     return s
   }
 
-  ; Convert markdown to blockquote form by prefixing each line with ">".
+  /**
+   * Converts markdown to blockquote form by prefixing each line with ">".
+   * Blank lines become ">" with no trailing space.
+   * @param {string} md - Markdown text to quote
+   * @returns {string} Quoted markdown
+   */
   static QuoteMarkdown(md) {
     ; Prefix each line.  Blank lines become ">" (no trailing space).
     md := StrReplace(md, "`r", "")
