@@ -13,6 +13,10 @@ PANDOC_EXE := "C:\Users\adria\AppData\Local\Pandoc\pandoc.exe"
 
 PASTE_DELAY_MS := 50
 
+; Set to true to dump pipeline stages to a log file for debugging.
+DEBUG_PASTE_MD := false
+DEBUG_PASTE_MD_LOG := A_ScriptDir "\PasteAsMd_debug.log"
+
 global gPasteMenu := Menu()
 gPasteMenu.Add("Paste as md", PasteAsMd)
 gPasteMenu.Add("Paste as md quoted", PasteAsMdQuoted)
@@ -46,28 +50,84 @@ PasteAsMdQuoted(ItemName, ItemPos, MenuObj) {
 }
 
 class PasteMd {
+
+  /**
+   * Writes a labelled debug section to the log file.
+   * Replaces CR/LF with visible markers so EOL issues are obvious.
+   * @param {object} f - FileOpen handle (already open for writing)
+   * @param {string} label - Section heading
+   * @param {string} s - Raw string to dump
+   */
+  static _DbgSection(f, label, s) {
+    f.Write("=== " . label . " (len=" . StrLen(s) . ") ===`r`n")
+    ; Show EOL characters visibly.
+    vis := StrReplace(s, "`r`n", "⏎¶`r`n")   ; CRLF → visible + real CRLF
+    vis := StrReplace(vis, "`r", "⏎`r`n")      ; lone CR
+    vis := StrReplace(vis, "`n", "¶`r`n")       ; lone LF
+    f.Write(vis)
+    f.Write("`r`n`r`n")
+  }
+
   /**
    * Converts clipboard content to markdown (or quoted markdown) and pastes it.
    * Prefers CF_HTML → pandoc conversion, with plain-text fallback.
    * @param {boolean} asQuoted - If true, prefixes every line with blockquote syntax (>).
    */
   static PasteMarkdown(asQuoted) {
-  global PANDOC_EXE, PASTE_DELAY_MS
+  global PANDOC_EXE, PASTE_DELAY_MS, DEBUG_PASTE_MD, DEBUG_PASTE_MD_LOG
+
+  dbg := DEBUG_PASTE_MD
+  if (dbg) {
+    dbgF := FileOpen(DEBUG_PASTE_MD_LOG, "w", "UTF-8")
+    dbgF.Write("PasteAsMd debug — " . FormatTime(, "yyyy-MM-dd HH:mm:ss") . "`r`n`r`n")
+  }
 
   clipSaved := ClipboardAll()
   plain := StrReplace(A_Clipboard, "`r", "")
   try {
     htmlFrag := ClipboardWaiter.GetHtmlSection()
+
+    if (dbg) {
+      PasteMd._DbgSection(dbgF, "1. plain (A_Clipboard minus CR)", plain)
+      PasteMd._DbgSection(dbgF, "2. htmlFrag (CF_HTML fragment)", htmlFrag)
+    }
+
     if (htmlFrag = "") {
       md := PasteMd.CleanPlainText(plain)
+      if (dbg)
+        PasteMd._DbgSection(dbgF, "3. md (CleanPlainText – no HTML path)", md)
     } else {
-      md := PasteMd.HtmlToGfmViaPandoc(htmlFrag, PANDOC_EXE)
-      md := PasteMd.CleanMarkdown(md)
-      md := StrReplace(md, "`r", "")
+      htmlPrep := PasteMd.PreprocessHtmlCodeBlocks(htmlFrag)
+      if (dbg)
+        PasteMd._DbgSection(dbgF, "3. htmlPrep (after PreprocessHtmlCodeBlocks)", htmlPrep)
+
+      ; If no meaningful HTML tags remain after preprocessing (just styled
+      ; spans wrapping plain text, or <p> wrappers around plain lines as
+      ; in ProseMirror/Codex), skip pandoc — plain text already has
+      ; correct whitespace and indentation that pandoc would destroy.
+      stripped := RegExReplace(htmlPrep, "i)<br\b[^>]*>", "")
+      stripped := RegExReplace(stripped, "i)</?p\b[^>]*>", "")
+      if !RegExMatch(stripped, "<[^>]++>") {
+        md := PasteMd.CleanPlainText(plain)
+        if (dbg)
+          PasteMd._DbgSection(dbgF, "3b. md (no HTML tags → plain text path)", md)
+      } else {
+        mdRaw := PasteMd.HtmlToGfmViaPandoc(htmlPrep, PANDOC_EXE)
+        if (dbg)
+          PasteMd._DbgSection(dbgF, "4. mdRaw (pandoc output)", mdRaw)
+
+        md := PasteMd.CleanMarkdown(mdRaw)
+        if (dbg)
+          PasteMd._DbgSection(dbgF, "5. md (after CleanMarkdown)", md)
+
+        md := StrReplace(md, "`r", "")
+      }
 
       ; Never paste empty.  If conversion failed/empty, use plain text.
       if (Trim(md, " `t`n") = "" && Trim(plain, " `t`n") != "") {
         md := PasteMd.CleanPlainText(plain)
+        if (dbg)
+          PasteMd._DbgSection(dbgF, "5b. md (empty→plain fallback)", md)
       }
     }
 
@@ -78,10 +138,21 @@ class PasteMd {
     ; Remove CR unconditionally (LF-only).
     md := StrReplace(md, "`r", "")
 
+    if (dbg) {
+      PasteMd._DbgSection(dbgF, "6. FINAL md (pasted)", md)
+      dbgF.Close()
+    }
+
     A_Clipboard := md
     Send "^v"
     Sleep PASTE_DELAY_MS
   } catch as e {
+    if (dbg) {
+      try {
+        dbgF.Write("!!! EXCEPTION: " . e.File . ":" . e.Line . " — " . e.Message . "`r`n")
+        dbgF.Close()
+      }
+    }
     MsgBox "Paste-as-markdown " e.File ":" e.Line " failed:`n`n" e.Message
   } finally {
     A_Clipboard := clipSaved
@@ -156,6 +227,28 @@ class PasteMd {
    */
   static CleanMarkdown(md) {
   md := StrReplace(md, "`r", "")
+
+  ; Strip <span> tags (presentational wrappers that cause backtick accumulation).
+  md := RegExReplace(md, "i)</?span\b[^>]*>", "")
+
+  ; Convert <br> tags to newlines so line breaks are preserved.
+  md := RegExReplace(md, "i)<br\b[^>]*>", "`n")
+
+  ; Convert block-level <code> elements (multi-line) to fenced code blocks.
+  pos := 1
+  while RegExMatch(md, "s)<code\b[^>]*>(.*?)</code>", &m, pos) {
+    if InStr(m[1], "`n") {
+      inner := RegExReplace(m[1], "<[^>]++>", "")
+      inner := PasteMd.DecodeBasicHtmlEntities(inner)
+      inner := Trim(inner, " `t`n")
+      replacement := "``````" . "`n" . inner . "`n" . "``````"
+      md := SubStr(md, 1, m.Pos - 1) . replacement . SubStr(md, m.Pos + m.Len)
+      pos := m.Pos + StrLen(replacement)
+    } else {
+      pos := m.Pos + m.Len
+    }
+  }
+
   lines := StrSplit(md, "`n")
 
   out := ""
@@ -188,6 +281,9 @@ class PasteMd {
     out .= (out = "" ? "" : "`n") . outLine
   }
 
+  ; Collapse runs of 3+ newlines to 2 (at most one blank line).
+  out := RegExReplace(out, "\n{3,}", "`n`n")
+
   return Trim(out, "`n")
   }
 
@@ -217,21 +313,12 @@ class PasteMd {
   /**
    * Converts common inline HTML constructs to markdown equivalents.
    * Strips residual non-escaped tags that reduce readability.
-   * Handles <span>, <code>, <strong>, <b>, <em>, <i>, and <a> tags.
+   * Handles <code>, <strong>, <b>, <em>, <i>, and <a> tags.
    * @param {string} line - Text line containing HTML
    * @returns {string} Line with HTML converted to markdown
    */
   static SimplifyMarkdownInlineHtml(line) {
     line := PasteMd.DecodeBasicHtmlEntities(line)
-
-    ; Chat/app UI exports often wrap inline code in styled spans.
-    while RegExMatch(line, "<span\b[^>]*>((?&inside_htag))</span>" PasteMd.re_htags, &m) {
-      inner := PasteMd.DecodeBasicHtmlEntities(m[1])
-      inner := StrReplace(inner, "`r", "")
-      inner := StrReplace(inner, "`n", " ")
-      replacement := (inner = "") ? "" : ("``" . inner . "``")
-      line := SubStr(line, 1, m.Pos - 1) . replacement . SubStr(line, m.Pos + m.Len)
-    }
 
     while RegExMatch(line, "<code\b[^>]*+>((?&inside_htag))</code>" PasteMd.re_htags, &m) {
       inner := PasteMd.DecodeBasicHtmlEntities(m[1])
@@ -303,6 +390,66 @@ class PasteMd {
     s := StrReplace(s, "&gt;", ">")
     s := StrReplace(s, "&amp;", "&")
     return s
+  }
+
+  /**
+   * Preprocesses HTML code blocks before pandoc conversion.
+   * Strips <span> tags, normalizes line breaks inside <code> elements,
+   * and ensures multi-line <code> blocks are wrapped in <pre>.
+   * @param {string} html - HTML fragment from clipboard
+   * @returns {string} Preprocessed HTML
+   */
+  static PreprocessHtmlCodeBlocks(html) {
+    ; Strip <span> tags globally (presentational wrappers).
+    html := RegExReplace(html, "i)</?span\b[^>]*>", "")
+
+    ; Process <code> elements: normalize line breaks and wrap in <pre> if multi-line.
+    pos := 1
+    while RegExMatch(html, "is)<code\b([^>]*)>(.*?)</code>", &m, pos) {
+      content := m[2]
+      attrs := m[1]
+
+      ; Convert <br> tags to newlines.
+      content := RegExReplace(content, "i)<br\b[^>]*>", "`n")
+
+      ; Convert </div><div> sequences to newlines (VS Code line rendering).
+      content := RegExReplace(content, "i)</div>\s*<div\b[^>]*>", "`n")
+
+      ; Strip remaining HTML tags inside the code block.
+      content := RegExReplace(content, "<[^>]++>", "")
+
+      ; Decode entities so pandoc sees clean text.
+      content := PasteMd.DecodeBasicHtmlEntities(content)
+
+      ; Clean up: remove CR, collapse consecutive blank lines.
+      content := StrReplace(content, "`r", "")
+      content := RegExReplace(content, "\n{2,}", "`n")
+
+      if InStr(content, "`n") {
+        ; Multi-line: check if already inside <pre>.
+        beforeSnippet := SubStr(html, Max(1, m.Pos - 100), Min(100, m.Pos - 1))
+
+        ; Only preserve class="language-xxx"; drop CSS classes like "whitespace-pre!".
+        langAttr := ""
+        if RegExMatch(attrs, "i)language-(\w+)", &langM) {
+          langAttr := ' class="language-' . langM[1] . '"'
+        }
+
+        if RegExMatch(beforeSnippet, "i)<pre\b[^>]*>\s*$") {
+          replacement := "<code" . langAttr . ">" . content . "</code>"
+        } else {
+          replacement := "<pre><code" . langAttr . ">" . content . "</code></pre>"
+        }
+      } else {
+        ; Single-line: leave as inline <code> for pandoc.
+        replacement := "<code" . attrs . ">" . content . "</code>"
+      }
+
+      html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
+      pos := m.Pos + StrLen(replacement)
+    }
+
+    return html
   }
 
   /**
