@@ -14,7 +14,7 @@ PANDOC_EXE := "C:\Users\adria\AppData\Local\Pandoc\pandoc.exe"
 PASTE_DELAY_MS := 50
 
 ; Set to true to dump pipeline stages to a log file for debugging.
-DEBUG_PASTE_MD := false
+DEBUG_PASTE_MD := true
 DEBUG_PASTE_MD_LOG := A_ScriptDir "\PasteAsMd_debug.log"
 
 global gPasteMenu := Menu()
@@ -392,13 +392,17 @@ class PasteMd {
   }
 
   /**
-   * Preprocesses HTML code blocks before pandoc conversion.
-   * Strips <span> tags, normalizes line breaks inside <code> elements,
-   * and ensures multi-line <code> blocks are wrapped in <pre>.
+   * Preprocesses HTML before pandoc conversion.
+   * Strips UI artifacts (buttons), converts code-like spans to <code>,
+   * strips presentational spans, normalizes line breaks inside <code>,
+   * and wraps multi-line code in <pre>.
    * @param {string} html - HTML fragment from clipboard
    * @returns {string} Preprocessed HTML
    */
   static PreprocessHtmlCodeBlocks(html) {
+    ; Strip UI artifacts that don't belong in markdown output.
+    html := RegExReplace(html, "is)<button\b[^>]*>.*?</button>", "")
+
     ; Convert code-like <span> elements to <code> before stripping generic spans.
     ; Matches spans with inline-markdown/font-mono class (e.g., Codex/Claude Code).
     html := RegExReplace(html, "is)<span\b[^>]*\bclass=`"[^`"]*\b(?:inline-markdown|font-mono)\b[^`"]*`"[^>]*>(.*?)</span>", "<code>$1</code>")
