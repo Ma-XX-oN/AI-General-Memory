@@ -14,7 +14,7 @@ PANDOC_EXE := "C:\Users\adria\AppData\Local\Pandoc\pandoc.exe"
 PASTE_DELAY_MS := 50
 
 ; Set to true to dump pipeline stages to a log file for debugging.
-DEBUG_PASTE_MD := false
+DEBUG_PASTE_MD := true
 DEBUG_PASTE_MD_LOG := A_ScriptDir "\PasteAsMd_debug.log"
 
 global gPasteMenu := Menu()
@@ -399,7 +399,11 @@ class PasteMd {
    * @returns {string} Preprocessed HTML
    */
   static PreprocessHtmlCodeBlocks(html) {
-    ; Strip <span> tags globally (presentational wrappers).
+    ; Convert code-like <span> elements to <code> before stripping generic spans.
+    ; Matches spans with inline-markdown/font-mono class (e.g., Codex/Claude Code).
+    html := RegExReplace(html, "is)<span\b[^>]*\bclass=`"[^`"]*\b(?:inline-markdown|font-mono)\b[^`"]*`"[^>]*>(.*?)</span>", "<code>$1</code>")
+
+    ; Strip remaining <span> tags globally (presentational wrappers).
     html := RegExReplace(html, "i)</?span\b[^>]*>", "")
 
     ; Process <code> elements: normalize line breaks and wrap in <pre> if multi-line.
@@ -417,14 +421,13 @@ class PasteMd {
       ; Strip remaining HTML tags inside the code block.
       content := RegExReplace(content, "<[^>]++>", "")
 
-      ; Decode entities so pandoc sees clean text.
-      content := PasteMd.DecodeBasicHtmlEntities(content)
-
       ; Clean up: remove CR, collapse consecutive blank lines.
       content := StrReplace(content, "`r", "")
       content := RegExReplace(content, "\n{2,}", "`n")
 
       if InStr(content, "`n") {
+        ; Decode entities for fenced block (markdown output, not HTML).
+        content := PasteMd.DecodeBasicHtmlEntities(content)
         ; Multi-line: check if already inside <pre>.
         beforeSnippet := SubStr(html, Max(1, m.Pos - 100), Min(100, m.Pos - 1))
 
