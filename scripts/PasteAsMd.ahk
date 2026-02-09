@@ -14,7 +14,7 @@ PANDOC_EXE := "C:\Users\adria\AppData\Local\Pandoc\pandoc.exe"
 PASTE_DELAY_MS := 50
 
 ; Set to true to dump pipeline stages to a log file for debugging.
-DEBUG_PASTE_MD := true
+DEBUG_PASTE_MD := false
 DEBUG_PASTE_MD_LOG := A_ScriptDir "\PasteAsMd_debug.log"
 
 global gPasteMenu := Menu()
