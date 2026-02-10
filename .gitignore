@@ -1,0 +1,8 @@
+# Ignore everything
+*
+
+# Except knowledge files
+!.gitignore
+!CLAUDE.md
+!regex-patterns.md
+!README.md
