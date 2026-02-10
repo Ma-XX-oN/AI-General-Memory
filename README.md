@@ -21,7 +21,7 @@ recommended approach is to initialise git in the existing directory:
 ```bash
 cd ~/.claude
 git init
-git remote add origin <repo-url>
+git remote add origin https://github.com/Ma-XX-oN/Claude-General-Memory.git
 git fetch origin
 git checkout -b master origin/master
 ```
@@ -38,7 +38,7 @@ ignored.
 If `~/.claude/` doesn't exist yet, a direct clone works:
 
 ```bash
-git clone <repo-url> ~/.claude/
+git clone https://github.com/Ma-XX-oN/Claude-General-Memory.git ~/.claude/
 ```
 
 ## Adding new knowledge files
