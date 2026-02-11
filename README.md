@@ -11,7 +11,7 @@ Shared knowledge files for Claude Code and Codex.
     - [Fresh machine (no existing `CLAUDE_DIR`)](#fresh-machine-no-existing-claude_dir)
   - [How global and project-specific Claude Code memory works](#how-global-and-project-specific-claude-code-memory-works)
 - [Codex](#codex)
-  - [How to install for Codex](#how-to-install-for-codex)
+  - [How to Install for Codex](#how-to-install-for-codex)
     - [Resolve `CODEX_DIR`](#resolve-codex_dir)
     - [Existing `CODEX_DIR` directory](#existing-codex_dir-directory)
     - [Fresh machine (no existing `CODEX_DIR`)](#fresh-machine-no-existing-codex_dir)
@@ -20,7 +20,9 @@ Shared knowledge files for Claude Code and Codex.
 
 ## Purpose
 
-The thing with Claude Code and Codex is that they don't have some basic "common knowledge", making them do odd things.  Codex doesn't even have a common memory store for all projects.  This repo is to fill that gap.
+The thing with Claude Code and Codex is that they don't have some basic "common
+knowledge", making them do odd things.  Codex doesn't even have a common memory
+store for all projects.  This repo is to fill that gap.
 
 ## Contents
 
@@ -34,17 +36,15 @@ The thing with Claude Code and Codex is that they don't have some basic "common 
 
 ## Claude Code
 
-When `$CLAUDE_CONFIG_DIR` is not set, Claude Code uses `~/.claude/` automatically.
-
 Claude Code stores local data at `~/.claude` (on Windows it's at
 `$USERPROFILE/.claude`). This can be overridden by specifying the
 `$CLAUDE_CONFIG_DIR` environment variable.
 
 ### How to Install For Claude Code
 
-This repo is designed to be used from existing tool directories (`~/.claude/`
-or `$CLAUDE_CONFIG_DIR`, `$CODEX_HOME`) or as a central source repo with
-copied/synced files.
+This repo is designed to be used from existing tool directories (`~/.claude/` or
+`$CLAUDE_CONFIG_DIR`).  When mentioning `~/.claude` directory, this is actually
+referencing that or the override.
 
 #### Resolve `CLAUDE_DIR`
 
@@ -81,10 +81,11 @@ git clone https://github.com/Ma-XX-oN/AI-General-Memory.git "$CLAUDE_DIR/"
 
 ### How global and project-specific Claude Code memory works
 
-1. Keep cross-project lessons in `$CODEX_HOME/CODEX.md`.
-2. Put project-specific rules in `<project>/CODEX.md`.
+1. Keep cross-project lessons in `~/.claude/CLAUDE.md`.
+2. Put project-specific rules in `<project>/CLAUDE.md`.
 
-There's no need to copy anything into the project directory to tell Claude Code to look elsewhere for a central memory store as it is already done by default.
+There's no need to copy anything into the project directory to tell Claude Code
+to look elsewhere for a central memory store, as it is already done by default.
 
 ## Codex
 
@@ -92,7 +93,11 @@ Codex stores local data at `~/.codex` (on Windows it's at
 `$USERPROFILE/.codex`). This can be overridden by specifying the `$CODEX_HOME`
 environment variable.
 
-### How to install for Codex
+### How to Install for Codex
+
+This repo is designed to be used from existing tool directories (`~/.codex/` or
+`$CODEX_HOME`).  When mentioning `~/.codex` directory, this is actually
+referencing that or the override.
 
 #### Resolve `CODEX_DIR`
 
@@ -130,7 +135,7 @@ git clone https://github.com/Ma-XX-oN/AI-General-Memory.git "$CODEX_DIR/"
 ### How global and project-specific Codex memory works
 
 1. Copy this repo's `AGENTS.md` into each project root.
-2. Keep cross-project lessons in `$CODEX_HOME/CODEX.md`.
+2. Keep cross-project lessons in `~/.codex/CODEX.md`.
 3. Put project-specific rules in `<project>/CODEX.md`.
 
 ## Adding new knowledge files
