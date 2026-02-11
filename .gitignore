@@ -3,6 +3,9 @@
 
 # Except knowledge files
 !.gitignore
-!CLAUDE.md
-!regex-patterns.md
 !README.md
+!CLAUDE.md
+!CODEX.md
+!AGENTS.md
+!CODEX_PROJ.md
+!regex-patterns.md
