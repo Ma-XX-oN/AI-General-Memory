@@ -1,6 +1,18 @@
-# AI General Memory
+# AI General Memory <!-- omit in toc -->
 
 Shared knowledge files for Claude Code and Codex.
+
+- [Contents](#contents)
+- [Installation](#installation)
+- [Claude Code](#claude-code)
+  - [Existing `~/.claude/` directory](#existing-claude-directory)
+  - [Fresh machine (no existing `~/.claude/`)](#fresh-machine-no-existing-claude)
+- [Codex](#codex)
+  - [Resolve `CODEX_DIR`](#resolve-codex_dir)
+  - [Existing `CODEX_DIR` directory](#existing-codex_dir-directory)
+  - [Fresh machine (no existing `CODEX_DIR`)](#fresh-machine-no-existing-codex_dir)
+  - [How project-specific Codex memory works](#how-project-specific-codex-memory-works)
+- [Adding new knowledge files](#adding-new-knowledge-files)
 
 ## Contents
 
@@ -44,26 +56,36 @@ git clone https://github.com/Ma-XX-oN/AI-General-Memory.git ~/.claude/
 
 Codex global memory is stored at `$CODEX_HOME/CODEX.md`.
 
-When `$CODEX_HOME` is not set, Codex uses these defaults automatically:
+When `$CODEX_HOME` is not set, Codex uses defaults automatically.
 
-- Linux/macOS: `~/.codex`
-- Windows cmd: `%USERPROFILE%\.codex`
-- Windows PowerShell: `$env:USERPROFILE\.codex`
+### Resolve `CODEX_DIR`
 
-### Existing `$CODEX_HOME` directory
+POSIX shells (Linux/macOS):
 
 ```bash
-cd "${CODEX_HOME:-$HOME/.codex}"
+CODEX_DIR="${CODEX_HOME:-${XDG_CONFIG_HOME:-$HOME/.codex}}"
+```
+
+Git Bash on Windows:
+
+```bash
+CODEX_DIR="${CODEX_HOME:-$(cygpath "$USERPROFILE")/.codex}"
+```
+
+### Existing `CODEX_DIR` directory
+
+```bash
+cd "$CODEX_DIR"
 git init
 git remote add origin https://github.com/Ma-XX-oN/AI-General-Memory.git
 git fetch origin
 git checkout -b master origin/master
 ```
 
-### Fresh machine (no existing `$CODEX_HOME`)
+### Fresh machine (no existing `CODEX_DIR`)
 
 ```bash
-git clone https://github.com/Ma-XX-oN/AI-General-Memory.git "${CODEX_HOME:-$HOME/.codex}/"
+git clone https://github.com/Ma-XX-oN/AI-General-Memory.git "$CODEX_DIR/"
 ```
 
 ### How project-specific Codex memory works
