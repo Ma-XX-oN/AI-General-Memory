@@ -14,3 +14,4 @@ At the start of each task:
 
 - Cross-project lessons go in `$CODEX_HOME/CODEX.md`.
 - Project-specific lessons go in `<project>/CODEX.md`.
+- Do not modify this `AGENTS.md` for memory/rules updates; persist memory only in local/global `CODEX.md` files.

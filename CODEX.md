@@ -32,6 +32,7 @@
 - Use definitive language when facts are certain; if uncertain, state uncertainty explicitly.
 - For timing output in chat responses, always use a fenced code block (not inline/backtick list items) to prevent webview auto-link artifacts.
 - Before sending any response, run a definitiveness pass to remove unjustified hedging and use direct language for confirmed facts.
+- In Markdown text, when you DO NOT intend the literal sequence `>=`, write it with whitespace as `> =` to prevent auto-conversion to `≥`.
 
 ## Useful Patterns
 
