@@ -5,6 +5,7 @@
 - Regex debugging: test quantifier behavior (`*`, `+`, `?`) on the first concrete match/counterexample before considering line-ending or engine-specific explanations.
 - If the user says to "remember" something, add it to the project's `CODEX_PROJ.md`; if it is a rule that applies generally, add it to `~/.codex/CODEX.md`.
 - For Conventional Commit messages with detail lines, format details as bullet points with no blank lines between bullets.
+- When composing git commit bodies with bullet detail lines, generate contiguous bullet lines with no blank separator lines (for example avoid multiple `-m` paragraphs that insert empty lines).
 - Always use Conventional Commit format for every git commit message.
 - For each user question/task: capture start time before doing work, capture end time after completion, and report elapsed time in minutes and seconds.
 - For timing, use a stable timer file workflow (write start time to a fixed file, then read it later) rather than embedding changing timestamp literals in command strings.
