@@ -36,3 +36,16 @@
 ## Useful Patterns
 
 - [Generalized bracketed-text regex](regex-patterns.md#generalized-bracketed-text-matching)
+
+## Design Lessons
+
+- Generalize before optimizing: extract domain-specific parsing into a reusable spec API.
+- Put shape in data, not code: declare parameters/defaults once, reuse everywhere.
+- Keep semantics separate from structure: helper normalizes shape; caller validates meaning/types.
+- Prefer explicit canonical outputs (fixed slots plus variadic tail) over ad-hoc branching.
+- Preserve diagnostics while simplifying APIs: keep provenance internally and caller API simple.
+- Make defaults declarative in spec definitions instead of scattering defaults in function bodies.
+- Extend capability only for real use-cases (for example a named variadic block) and keep scope narrow.
+- Use clear namespace/type names that read naturally at call sites.
+- Treat documentation and examples as part of correctness, not optional polish.
+- Verify incrementally with build/tests during refactors to preserve behavior.
