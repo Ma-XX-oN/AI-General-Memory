@@ -1,16 +1,57 @@
 # Regex Patterns
 
+## General techniques
+
+### Possessive quantifiers and atomic groups
+
+Use possessive quantifiers (`++`) or atomic groups (`(?>...)`) to
+prevent catastrophic backtracking wherever the engine doesn't need to
+revisit a subexpression.  Always prefer them unless the flavour doesn't
+support them or backtracking is intentionally needed for the match.
+
+- **Possessive quantifiers** (`++`): supported by PCRE, Java,
+  Oniguruma, and others.
+- **Atomic groups** (`(?>...)`): equivalent mechanism, available in
+  .NET and other flavours that lack possessive quantifiers.
+- **Neither available** (e.g. JavaScript): restructure alternatives to
+  match exactly one character per iteration so that there is only one
+  possible decomposition, eliminating exponential backtracking.  The
+  engine can still backtrack (e.g. into a greedy quantifier on an
+  earlier group), so be aware of semantic differences.
+
+### Lazy quantifiers
+
+Lazy (reluctant) quantifiers (`+?`, `*?`) match as little as possible,
+extending only when the rest of the pattern fails.  They control match
+*semantics* (shortest vs longest match), not backtracking *safety* —
+the engine still explores alternatives and can degrade on adversarial
+input.  Use lazy quantifiers when you want to stop at the first
+occurrence of an unambiguous, fixed terminator (e.g. `.*?-->` for HTML
+comments).  Do not use them as a substitute for possessive/atomic when
+the goal is to prevent catastrophic backtracking.
+
+### Subroutines and inlining
+
+Subroutines (e.g. PCRE `(?&name)`, Oniguruma `\g<name>`) allow a
+named subpattern to be reused and called recursively.  In flavours
+without subroutines:
+
+- The pattern can be inlined at each call site.
+- For recursive matching (e.g. balanced parentheses), the pattern must
+  be manually nested to a fixed depth — each level requires another
+  copy of the pattern embedded inside itself.  This works but is
+  harder to maintain and limits matching to the chosen nesting depth.
+- It can be easier to design and reason about the pattern using
+  subroutines first, then mechanically inline them for the target
+  flavour.
+
 ## Generalized bracketed-text matching
 
 A generic pattern for matching text delimited by a repeated character
 (e.g. backticks for markdown code spans, or any similar bracket style where
 the opening/closing delimiter is N repetitions of the same character).
 
-Requires a regex flavour that supports named backreferences
-(`\k<name>`).  Possessive quantifiers (`++`) or atomic groups
-(`(?>...)`) are strongly recommended — always use them unless the
-flavour doesn't support them or backtracking into the delimiter is
-intentionally desired.
+Requires named backreferences (`\k<name>`).
 
 ### Pattern (possessive)
 
@@ -18,8 +59,7 @@ intentionally desired.
 (?<open>CHAR++)(?:[^CHAR]++|(?!\k<open>).)++\k<open>
 ```
 
-Best form.  Requires possessive quantifiers (`++`), supported by
-PCRE, Java, Oniguruma, and others.
+Best form.  Requires possessive quantifiers (`++`).
 
 ### Pattern (atomic groups)
 
@@ -28,7 +68,7 @@ PCRE, Java, Oniguruma, and others.
 ```
 
 Equivalent to the possessive form.  Use in flavours that support
-atomic groups but not possessive quantifiers (e.g. .NET).
+atomic groups but not possessive quantifiers.
 
 ### Pattern (no possessive / no atomic)
 
@@ -58,7 +98,7 @@ may not matter depending on the use case.
 | `[^CHAR]++`             | Match non-delimiter characters (possessive)               |
 | `(?!\k<open>).`         | Match a single CHAR only if it doesn't start a closing    |
 |                         | delimiter sequence equal to the opening                   |
-| `\k<open>`              | Closing delimiter must exactly match the opening           |
+| `\k<open>`              | Closing delimiter must exactly match the opening          |
 
 The `++` possessive quantifiers prevent catastrophic backtracking.
 In the non-possessive fallback, single-character alternatives achieve
@@ -82,14 +122,5 @@ length is captured and the closing must match exactly.
 - Content group uses `++` (one or more), so empty delimited spans like
   `` ` ` `` won't match.  This is fine when protecting content from
   destructive transforms — empty spans have nothing to protect.
-- Works as a subroutine (in flavours that support them, e.g. PCRE)
-  when wrapped in a named group and placed in a dead-alternation
-  library (`|(?!)...`).
-- In flavours without subroutines, the pattern can be inlined at each
-  call site.  For recursive matching (e.g. balanced parentheses), the
-  pattern must be manually nested to a fixed depth — each level
-  requires another copy of the pattern embedded inside itself.  This
-  works but is harder to maintain and limits matching to the chosen
-  nesting depth.  It can be easier to design and reason about the
-  pattern using subroutines first, then mechanically inline them for
-  the target flavour.
+- Can be used as a subroutine when wrapped in a named group and placed
+  in a dead-alternation library (`|(?!)...`).
