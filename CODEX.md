@@ -8,6 +8,7 @@
 - When composing git commit bodies with bullet detail lines, generate contiguous bullet lines with no blank separator lines (for example avoid multiple `-m` paragraphs that insert empty lines).
 - Always use Conventional Commit format for every git commit message.
 - For each user question/task: capture start time before doing work, capture end time after completion, and report elapsed time in minutes and seconds.
+- When a user asks a direct question, answer it before making any code or documentation modifications.
 - For timing, use a stable timer file workflow (write start time to a fixed file, then read it later) rather than embedding changing timestamp literals in command strings.
 - Preserve each file's existing line endings (CRLF/LF) when editing; do not change line endings unless explicitly requested.
 - Before editing any file, check its line-ending status; if mixed, notify before editing and abort; if non-mixed, keep all edits consistent with the original style.
