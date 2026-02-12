@@ -9,3 +9,5 @@
 !AGENTS.md
 !CODEX_PROJ.md
 !regex-patterns.md
+!scripts/
+!scripts/normalize-eol.ps1

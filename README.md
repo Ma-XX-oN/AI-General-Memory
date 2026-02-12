@@ -32,6 +32,7 @@ store for all projects.  This repo is to fill that gap.
 | [`CODEX.md`](CODEX.md) | Global instructions and lessons for Codex |
 | [`AGENTS.md`](AGENTS.md) | Project-level bootstrap template for Codex projects |
 | [`regex-patterns.md`](regex-patterns.md) | Reusable regex patterns referenced from CLAUDE.md / CODEX.md |
+| [`scripts/normalize-eol.ps1`](scripts/normalize-eol.ps1) | Utility to normalize file EOL style (`CRLF` or `LF`) |
 | [`.gitignore`](.gitignore) | Deny-all with explicit exceptions for knowledge files |
 
 ## Claude Code

@@ -11,6 +11,7 @@
 - Preserve each file's existing line endings (CRLF/LF) when editing; do not change line endings unless explicitly requested.
 - Before editing any file, check its line-ending status; if mixed, notify before editing and abort; if non-mixed, keep all edits consistent with the original style.
 - For any non-mixed file, after editing, every line must still use that original line ending style; if that cannot be guaranteed, normalize to the original style and report.
+- For EOL normalization, use `~/.codex/scripts/normalize-eol.ps1` and pass an explicit target EOL (`CRLF` or `LF`) instead of ad-hoc replacement commands.
 - Do independent transformations first; do dependent or lossy transformations last.
 - Preserve semantic meaning before simplifying representation.
 - Encode invariants in code (for example, matching open/close tags with backreferences) rather than relying on assumptions.
@@ -22,6 +23,7 @@
 - Do not use custom script workflows when an approved command set can do the job.
 - Never use custom file-read utilities when `rg` can be used.
 - For simple checks, use only `rg` or already-approved command prefixes; avoid ad-hoc command strings that trigger approval prompts.
+- Before running build/test/tool commands, perform an execution-rule preflight: identify applicable project/global `CODEX.md` command prerequisites and include them directly in the command line/environment.
 - For file edits, use approved editing tools and keep one consistent editing method per session/task unless explicitly asked to change.
 - For EOL detection, use `rg` and keep one consistent `rg` method unless explicitly asked to change.
 - Universal rule: for repeated tasks, use one approved method consistently and do not switch variations unless explicitly requested.
