@@ -13,7 +13,7 @@
 - Preserve each file's existing line endings (CRLF/LF) when editing; do not change line endings unless explicitly requested.
 - Before editing any file, check its line-ending status; if mixed, notify before editing and abort; if non-mixed, keep all edits consistent with the original style.
 - For any non-mixed file, after editing, every line must still use that original line ending style; if that cannot be guaranteed, normalize to the original style and report.
-- For EOL normalization, use `~/.codex/scripts/normalize-eol.ps1` and pass an explicit target EOL (`CRLF` or `LF`) instead of ad-hoc replacement commands.
+- For PowerShell workflows, use `~/.codex/scripts/show-eol.ps1` (detect) and `~/.codex/scripts/normalize-eol.ps1` (normalize) with an explicit target EOL (`CRLF` or `LF`) instead of ad-hoc EOL commands.
 - For non-PowerShell workflows, use `~/.codex/scripts/show-eol.pl` (detect) and `~/.codex/scripts/normalize-eol.pl` (normalize) instead of ad-hoc EOL commands.
 - Do independent transformations first; do dependent or lossy transformations last.
 - Preserve semantic meaning before simplifying representation.
@@ -36,6 +36,7 @@
 - For timing output in chat responses, always use a fenced code block (not inline/backtick list items) to prevent webview auto-link artifacts.
 - Before sending any response, run a definitiveness pass to remove unjustified hedging and use direct language for confirmed facts.
 - In Markdown text, when you DO NOT intend the literal sequence `>=`, write it with whitespace as `> =` to prevent auto-conversion to `≥`.
+- For any question about current file contents, perform a fresh read of the target file in the same turn before answering; do not answer from cached context alone.
 
 ## Useful Patterns
 
