@@ -11,3 +11,6 @@
 !regex-patterns.md
 !scripts/
 !scripts/normalize-eol.ps1
+!scripts/show-eol.ps1
+!scripts/show-eol.pl
+!scripts/normalize-eol.pl

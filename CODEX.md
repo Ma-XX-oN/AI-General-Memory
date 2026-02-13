@@ -14,6 +14,7 @@
 - Before editing any file, check its line-ending status; if mixed, notify before editing and abort; if non-mixed, keep all edits consistent with the original style.
 - For any non-mixed file, after editing, every line must still use that original line ending style; if that cannot be guaranteed, normalize to the original style and report.
 - For EOL normalization, use `~/.codex/scripts/normalize-eol.ps1` and pass an explicit target EOL (`CRLF` or `LF`) instead of ad-hoc replacement commands.
+- For non-PowerShell workflows, use `~/.codex/scripts/show-eol.pl` (detect) and `~/.codex/scripts/normalize-eol.pl` (normalize) instead of ad-hoc EOL commands.
 - Do independent transformations first; do dependent or lossy transformations last.
 - Preserve semantic meaning before simplifying representation.
 - Encode invariants in code (for example, matching open/close tags with backreferences) rather than relying on assumptions.
@@ -25,7 +26,9 @@
 - Do not use custom script workflows when an approved command set can do the job.
 - Never use custom file-read utilities when `rg` can be used.
 - For simple checks, use only `rg` or already-approved command prefixes; avoid ad-hoc command strings that trigger approval prompts.
+- For any command execution, prefer already-approved command prefixes; if a required action is not covered, request scoped escalation first instead of running an ad-hoc variant.
 - Before running build/test/tool commands, perform an execution-rule preflight: identify applicable project/global `CODEX.md` command prerequisites and include them directly in the command line/environment.
+- For CMake builds/tests in workspace repos, check `.vscode/settings.json` and `CMakePresets.json`/`CMakeUserPresets.json` first and mirror those settings; use manual command lines only when those sources are absent or the user explicitly overrides them.
 - For file edits, use approved editing tools and keep one consistent editing method per session/task unless explicitly asked to change.
 - For EOL detection, use `rg` and keep one consistent `rg` method unless explicitly asked to change.
 - Universal rule: for repeated tasks, use one approved method consistently and do not switch variations unless explicitly requested.

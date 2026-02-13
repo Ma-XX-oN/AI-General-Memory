@@ -33,6 +33,9 @@ store for all projects.  This repo is to fill that gap.
 | [`AGENTS.md`](AGENTS.md) | Project-level bootstrap template for Codex projects |
 | [`regex-patterns.md`](regex-patterns.md) | Reusable regex patterns referenced from CLAUDE.md / CODEX.md |
 | [`scripts/normalize-eol.ps1`](scripts/normalize-eol.ps1) | Utility to normalize file EOL style (`CRLF` or `LF`) |
+| [`scripts/show-eol.ps1`](scripts/show-eol.ps1) | Utility to report file EOL style (`CRLF`, `LF`, `CR`, `Mixed`, `None`) |
+| [`scripts/show-eol.pl`](scripts/show-eol.pl) | Perl utility to report file EOL style (`CRLF`, `LF`, `CR`, `Mixed`, `None`) |
+| [`scripts/normalize-eol.pl`](scripts/normalize-eol.pl) | Perl utility to normalize file EOL style (`CRLF` or `LF`) |
 | [`.gitignore`](.gitignore) | Deny-all with explicit exceptions for knowledge files |
 
 ## Claude Code
