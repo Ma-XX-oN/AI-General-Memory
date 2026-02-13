@@ -29,6 +29,7 @@
 - For any command execution, prefer already-approved command prefixes; if a required action is not covered, request scoped escalation first instead of running an ad-hoc variant.
 - Before running build/test/tool commands, perform an execution-rule preflight: identify applicable project/global `CODEX.md` command prerequisites and include them directly in the command line/environment.
 - For CMake builds/tests in workspace repos, check `.vscode/settings.json` and `CMakePresets.json`/`CMakeUserPresets.json` first and mirror those settings; use manual command lines only when those sources are absent or the user explicitly overrides them.
+- For build/linker mismatch triage, follow `~/.codex/build_issues.md` before ad-hoc fixes.
 - For file edits, use approved editing tools and keep one consistent editing method per session/task unless explicitly asked to change.
 - For EOL detection, use `rg` and keep one consistent `rg` method unless explicitly asked to change.
 - Universal rule: for repeated tasks, use one approved method consistently and do not switch variations unless explicitly requested.
