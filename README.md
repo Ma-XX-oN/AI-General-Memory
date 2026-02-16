@@ -32,6 +32,7 @@ store for all projects.  This repo is to fill that gap.
 | [`CODEX.md`](CODEX.md) | Global instructions and lessons for Codex |
 | [`AGENTS.md`](AGENTS.md) | Project-level bootstrap template for Codex projects |
 | [`regex-patterns.md`](regex-patterns.md) | Reusable regex patterns referenced from CLAUDE.md / CODEX.md |
+| [`testing.md`](testing.md) | Testing guidelines and discipline referenced from CLAUDE.md |
 | [`scripts/normalize-eol.ps1`](scripts/normalize-eol.ps1) | Utility to normalize file EOL style (`CRLF` or `LF`) |
 | [`scripts/show-eol.ps1`](scripts/show-eol.ps1) | Utility to report file EOL style (`CRLF`, `LF`, `CR`, `Mixed`, `None`) |
 | [`scripts/show-eol.pl`](scripts/show-eol.pl) | Perl utility to report file EOL style (`CRLF`, `LF`, `CR`, `Mixed`, `None`) |

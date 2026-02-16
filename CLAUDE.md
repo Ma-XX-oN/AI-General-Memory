@@ -8,9 +8,13 @@ any project) here in `~/.claude/CLAUDE.md` or its referenced files.  Place
 possible, distill project-specific lessons into general principles and store
 them here.
 
-When adding a new file to `~/.claude/`, also add a `!filename` entry to
-`~/.claude/.gitignore` (which uses a deny-all `*` with explicit exceptions)
-so the file is tracked by the `~/.claude/` git repo.
+When adding or modifying files in `~/.claude/`, first read `~/.claude/README.md`
+to understand the repo structure and conventions.  Then:
+
+1. Add a `!filename` entry to `~/.claude/.gitignore` (deny-all with explicit
+   exceptions).
+2. Add an entry to the Contents table in `~/.claude/README.md`.
+3. Reference the file from `CLAUDE.md` (or `CODEX.md` if applicable).
 
 ## Lessons Learned
 
@@ -30,24 +34,10 @@ When encountering issues with library functions, prefer using the correct
 public API that handles necessary preprocessing like caching.  Avoid calling
 internal functions directly or modifying library internals, as this bypasses
 design safeguards and can lead to fragile fixes.  Address the root cause at
-the call site first.
-
-### Read and understand code before writing tests
-
-Before writing tests for any function:
-
-1. **Read the actual function** - look at its signature, parameters, and implementation.
-2. **Verify the function exists** - don't invent APIs that aren't there.
-3. **Understand the behavior** - trace through the code to know what it actually does.
-
-Writing tests without reading the code results in:
-
-- Tests for imaginary function signatures
-- Tests that call functions with wrong argument counts
-- Tests that assert behavior the function doesn't have
-
-This is unacceptable. Own the mistake directly - don't use vague language like
-"someone thought" to deflect blame for code you wrote.
+the call site first.  Note: this applies to code *external* to the library.
+When writing code that is *part of* the library, calling its private functions
+is fine and often preferred — they exist to bypass checks/evaluation that only
+the public API needs to perform for external callers.
 
 ### Ask for help when stuck
 
@@ -65,6 +55,12 @@ like to bounce some ideas off you to possibly get to a solution faster."
 
 Also: when the user says STOP, stop immediately and answer their question
 directly.  Do not continue analyzing or coding.
+
+### Answer questions before taking action
+
+When the user asks a question, answer it fully first.  Do not jump to
+modifying code or files as part of the answer unless explicitly asked to.
+Wait for direction before acting.
 
 ### Question things that don't seem right
 
@@ -99,19 +95,24 @@ enum type dereferences the object:
  */
 ```
 
-### Offensive programming and testing strategy
+### Preserve line endings
 
-When a project uses offensive programming (all input assumed safe and trusted,
-with assertion guards solely to catch developer misuse):
+Before editing a file, check its EOL style with
+`~/.claude/scripts/show-eol.pl`.  After editing, verify the EOL hasn't
+flipped; if it has, fix with `~/.claude/scripts/normalize-eol.pl <LF|CRLF>`.
 
-- **Do not** write tests that intentionally trigger assertion guards.  A test
-  that hits an assert is a buggy test, not a valid error-handling test.
-- Tests should only exercise **valid usage paths**.
-- When auditing assertion guards, check that they exist where they should and
-  that their conditions make sense — not that they can be bypassed or toggled.
+### Redirect expensive command output to a temp file
 
-**OpenSCAD:** Guards are named `verify_*` and exist solely to tell developers
-when they've used a function incorrectly.
+Never pipe long-running commands (builds, large test suites) through
+head/tail/grep directly.  Redirect to a temp file first
+(`cmd 2>&1 | tee /tmp/output.log`), then examine the file.  Re-running an
+expensive command just to see different parts of the output is wasteful.
+
+### Never use MEMORY.md for learned information
+
+Always store learned information in `~/.claude/CLAUDE.md` (general) or the
+project's `CLAUDE.md` (project-specific).  Never use the auto-memory
+`MEMORY.md` file — it hides information from the user.
 
 ### GitHub markdown rendering
 
@@ -124,6 +125,7 @@ when they've used a function incorrectly.
 ## Useful Patterns
 
 - [Generalized bracketed-text regex](regex-patterns.md#generalized-bracketed-text-matching)
+- [Testing guidelines](testing.md)
 
 ## Time tracking (every prompt)
 

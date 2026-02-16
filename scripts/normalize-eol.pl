@@ -1,4 +1,11 @@
-#!/usr/bin/env perl
+#!/bin/sh
+# Shell/Perl bootstrap: shell runs this line, exec-ing Perl with -x to skip
+# the shell preamble.  PERL_BADLANG=0 is set only when $MSYSTEM is defined
+# (MSYS2/Git Bash) to suppress "Setting locale failed" warnings caused by
+# LANG=en_US.UTF-8 not being recognized by Perl's C runtime on Windows.
+# On Linux/macOS, locale warnings are preserved.
+exec env ${MSYSTEM:+PERL_BADLANG=0} perl -x "$0" "$@"
+#!perl
 use strict;
 use warnings;
 
