@@ -2,8 +2,7 @@
 
 ## Working Rules
 
-- Regex debugging: test quantifier behavior (`*`, `+`, `?`) on the first concrete match/counterexample before considering line-ending or engine-specific explanations.
-- If the user says to "remember" something, add it to the project's `CODEX_PROJ.md`; if it is a rule that applies generally, add it to `~/.codex/CODEX.md`.
+- If the user says to "remember" something, store project-specific rules in the project's `CODEX.md`. Store cross-project rules in `~/.codex/CODEX.md`, generalized when possible.
 - For Conventional Commit messages with detail lines, format details as bullet points with no blank lines between bullets.
 - When composing git commit bodies with bullet detail lines, generate contiguous bullet lines with no blank separator lines (for example avoid multiple `-m` paragraphs that insert empty lines).
 - Always use Conventional Commit format for every git commit message.
@@ -38,10 +37,27 @@
 - Before sending any response, run a definitiveness pass to remove unjustified hedging and use direct language for confirmed facts.
 - In Markdown text, when you DO NOT intend the literal sequence `>=`, write it with whitespace as `> =` to prevent auto-conversion to `≥`.
 - For any question about current file contents, perform a fresh read of the target file in the same turn before answering; do not answer from cached context alone.
+- When asked to re-review ("anything else?", "check again"), do a fresh pass instead of assuming prior checks were exhaustive.
+- When fixing one item in a repeated pattern/group, check sibling occurrences and update them together unless the user explicitly limits scope.
+- Prefer public APIs when fixing external library usage; avoid bypassing behavior by calling private/internal APIs directly unless you are working inside that library.
+- If a fix is not working after 2-3 attempts, stop and summarize: goal, attempts tried, blocker, and ask the user to collaborate on next steps.
+- If the user says STOP, stop immediately and answer the question directly without continuing implementation.
+- Question assumptions that appear incorrect or unclear before implementing them.
+- For long-running commands (builds/tests), capture output to a log once, then inspect the log instead of rerunning only to view different sections.
+- When maintaining files under `~/.codex/`, read `~/.codex/README.md` first and keep related index/reference entries consistent.
+- For OpenSCAD JS documentation, require JSDoc on public symbols and use `@slot`/`@deref` plus full `@type` docs for slot-based constants/typedefs.
+- For GitHub markdown docs, avoid raw `<svg>` tags and sanitize punctuation-heavy anchors when generating intra-doc links.
 
 ## Useful Patterns
 
 - [Generalized bracketed-text regex](regex-patterns.md#generalized-bracketed-text-matching)
+- [Regex patterns reference](regex-patterns.md)
+
+## Operational References
+
+- [Build issue triage guide](build_issues.md)
+- [Testing guidelines](testing.md)
+- [Codex home README (memory file maintenance conventions)](README.md)
 
 ## Design Lessons
 
