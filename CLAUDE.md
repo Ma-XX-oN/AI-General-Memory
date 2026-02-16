@@ -114,6 +114,30 @@ Always store learned information in `~/.claude/CLAUDE.md` (general) or the
 project's `CLAUDE.md` (project-specific).  Never use the auto-memory
 `MEMORY.md` file — it hides information from the user.
 
+### Be direct and precise
+
+Use definitive language for confirmed facts.  If uncertain, say so explicitly.
+Before responding, check for unjustified hedging and remove it.  Back claims
+with verifiable evidence (counts, diffs, line references) rather than
+assertions alone.
+
+### Order transforms carefully
+
+Do independent transforms first; do dependent or lossy transforms last.
+Preserve semantic meaning before simplifying representation.
+
+### Design principles
+
+- Generalize before optimizing: extract domain-specific parsing into a
+  reusable spec/API.
+- Put shape in data, not code: declare parameters/defaults once, reuse
+  everywhere.
+- Keep semantics separate from structure: helpers normalize shape; callers
+  validate meaning/types.
+- Make defaults declarative in spec definitions instead of scattering them
+  in function bodies.
+- Verify incrementally with build/tests during refactors to preserve behavior.
+
 ### GitHub markdown rendering
 
 - GitHub strips `<svg>` tags from markdown for security.  Use Unicode

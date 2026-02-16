@@ -1,5 +1,11 @@
 # Regex Patterns
 
+## Debugging
+
+Test quantifier behavior (`*`, `+`, `?`) on the first concrete
+match/counterexample before considering line-ending or engine-specific
+explanations.
+
 ## General techniques
 
 ### Possessive quantifiers and atomic groups
