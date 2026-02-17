@@ -5,6 +5,7 @@
 - If the user says to "remember" something, store project-specific rules in the project's `CODEX.md`. Store cross-project rules in `~/.codex/CODEX.md`, generalized when possible.
 - For Conventional Commit messages with detail lines, format details as bullet points with no blank lines between bullets.
 - When composing git commit bodies with bullet detail lines, generate contiguous bullet lines with no blank separator lines (for example avoid multiple `-m` paragraphs that insert empty lines).
+- In PowerShell, never place Markdown backticks inside git commit -m strings; use plain text, single-quoted -m values, or git commit -F with a here-string to avoid escape-related character loss.
 - Always use Conventional Commit format for every git commit message.
 - For each user question/task: capture start time before doing work, capture end time after completion, and report elapsed time in minutes and seconds.
 - When a user asks a direct question, answer it before making any code or documentation modifications.
@@ -28,8 +29,10 @@
 - For any command execution, prefer already-approved command prefixes; if a required action is not covered, request scoped escalation first instead of running an ad-hoc variant.
 - Before running build/test/tool commands, perform an execution-rule preflight: identify applicable project/global `CODEX.md` command prerequisites and include them directly in the command line/environment.
 - For CMake builds/tests in workspace repos, check `.vscode/settings.json` and `CMakePresets.json`/`CMakeUserPresets.json` first and mirror those settings; use manual command lines only when those sources are absent or the user explicitly overrides them.
+- For CMake workflows, never run configure and build concurrently; run them sequentially (`cmake -S/-B` then `cmake --build`) to avoid regenerate/build race conditions.
 - For build/linker mismatch triage, follow `~/.codex/build_issues.md` before ad-hoc fixes.
 - For file edits, use approved editing tools and keep one consistent editing method per session/task unless explicitly asked to change.
+- For file edits, use patch-style edits only; do not use whole-file rewrite commands.
 - For EOL detection, use `rg` and keep one consistent `rg` method unless explicitly asked to change.
 - Universal rule: for repeated tasks, use one approved method consistently and do not switch variations unless explicitly requested.
 - Use definitive language when facts are certain; if uncertain, state uncertainty explicitly.
