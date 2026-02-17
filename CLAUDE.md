@@ -58,9 +58,14 @@ directly.  Do not continue analyzing or coding.
 
 ### Answer questions before taking action
 
-When the user asks a question, answer it fully first.  Do not jump to
-modifying code or files as part of the answer unless explicitly asked to.
-Wait for direction before acting.
+**STRICT RULE:** When the user asks a question or raises an issue, answer it
+fully first.  Do NOT modify any file or run any tool as part of the answer
+unless the user has explicitly asked you to make the change.  Describing what
+you would change is not the same as being asked to change it.  Wait for
+explicit direction ("go ahead", "do it", "update it") before acting.
+
+This applies even when you know exactly what the fix is.  Proposing a change
+and immediately making it in the same response is a violation of this rule.
 
 ### Question things that don't seem right
 
