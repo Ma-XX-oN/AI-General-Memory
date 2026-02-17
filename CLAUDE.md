@@ -150,6 +150,10 @@ Preserve semantic meaning before simplifying representation.
 - GitHub does not reliably link to anchors containing colons or URL-specific
   punctuation.  Sanitize anchors via `sanitize_anchor_id()`:
   colons become `__`, spaces and other URL punctuation become `_`.
+- GitHub's monospace font renders Unicode box-drawing characters (U+2500–U+257F)
+  at inconsistent widths, causing alignment drift in ASCII art diagrams.  Use
+  plain ASCII (`+`, `-`, `|`) for diagrams intended to render correctly on
+  GitHub; reserve box-drawing characters for local/IDE viewing only.
 
 ## Useful Patterns
 
