@@ -14,5 +14,6 @@
 !scripts/
 !scripts/normalize-eol.ps1
 !scripts/show-eol.ps1
+!scripts/pid-timer.ps1
 !scripts/show-eol.pl
 !scripts/normalize-eol.pl

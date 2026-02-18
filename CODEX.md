@@ -10,6 +10,8 @@
 - For each user question/task: capture start time before doing work, capture end time after completion, and report elapsed time in minutes and seconds.
 - When a user asks a direct question, answer it before making any code or documentation modifications.
 - For timing, use a stable timer file workflow (write start time to a fixed file, then read it later) rather than embedding changing timestamp literals in command strings.
+- For each user question/task, use `~/.codex/scripts/pid-timer.ps1` as standalone one-line calls: run `-StoreTime` at the start and `-TimeElapsed` at the end, and report the script output elapsed time.
+- For each user question/task, run exactly one `pid-timer.ps1 -StoreTime` and exactly one `pid-timer.ps1 -TimeElapsed`; never call `-StoreTime` again before `-TimeElapsed`.
 - Preserve each file's existing line endings (CRLF/LF) when editing; do not change line endings unless explicitly requested.
 - Before editing any file, check its line-ending status; if mixed, notify before editing and abort; if non-mixed, keep all edits consistent with the original style.
 - For any non-mixed file, after editing, every line must still use that original line ending style; if that cannot be guaranteed, normalize to the original style and report.
@@ -48,6 +50,7 @@
 - Question assumptions that appear incorrect or unclear before implementing them.
 - For long-running commands (builds/tests), capture output to a log once, then inspect the log instead of rerunning only to view different sections.
 - When maintaining files under `~/.codex/`, read `~/.codex/README.md` first and keep related index/reference entries consistent.
+- For any edit under `~/.codex/`, run a hard preflight before changing files: read `~/.codex/README.md`, verify target-file tracking with `git -C ~/.codex ls-files -- <path>` and `.gitignore`, check EOL style, and do not edit until all checks pass.
 - For OpenSCAD JS documentation, require JSDoc on public symbols and use `@slot`/`@deref` plus full `@type` docs for slot-based constants/typedefs.
 - For GitHub markdown docs, avoid raw `<svg>` tags and sanitize punctuation-heavy anchors when generating intra-doc links.
 - For non-trivial diagrams where layout precision matters, prefer an ASCII-first draft and then convert to SVG; avoid relying on Mermaid auto-layout for final authoritative diagrams.

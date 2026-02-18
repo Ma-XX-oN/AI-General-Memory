@@ -36,6 +36,7 @@ store for all projects.  This repo is to fill that gap.
 | [`testing.md`](testing.md) | Testing guidelines and discipline referenced from CLAUDE.md |
 | [`scripts/normalize-eol.ps1`](scripts/normalize-eol.ps1) | Utility to normalize file EOL style (`CRLF` or `LF`) |
 | [`scripts/show-eol.ps1`](scripts/show-eol.ps1) | Utility to report file EOL style (`CRLF`, `LF`, `CR`, `Mixed`, `None`) |
+| [`scripts/pid-timer.ps1`](scripts/pid-timer.ps1) | PID-keyed timer utility with `-StoreTime` and `-TimeElapsed` modes using user-scope environment variables |
 | [`scripts/show-eol.pl`](scripts/show-eol.pl) | Perl utility to report file EOL style (`CRLF`, `LF`, `CR`, `Mixed`, `None`) |
 | [`scripts/normalize-eol.pl`](scripts/normalize-eol.pl) | Perl utility to normalize file EOL style (`CRLF` or `LF`) |
 | [`.gitignore`](.gitignore) | Deny-all with explicit exceptions for knowledge files |
