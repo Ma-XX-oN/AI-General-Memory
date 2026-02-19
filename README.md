@@ -1,5 +1,7 @@
 # AI General Memory <!-- omit in toc -->
 
+![Social Preview](social-preview.svg)
+
 Author: _Adrian Hawryluk_ (a.k.a. [Ma-XX-oN](https://github.com/Ma-XX-oN))
 
 Shared knowledge files for Claude Code and Codex.
@@ -40,6 +42,7 @@ directly/indirectly by the users.
 | [`NOTICE`](NOTICE) | Project and contributor attribution notice file |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Contribution workflow and expectations |
 | [`AUTHORS.md`](AUTHORS.md) | Maintainer and contributor attribution list |
+| [`social-preview.svg`](social-preview.svg) | Repository social preview artwork by collaborative effort between Claude Code and Codex |
 | [`build_issues.md`](build_issues.md) | Cross-project build and linker mismatch triage playbook |
 | [`regex-patterns.md`](regex-patterns.md) | Reusable regex patterns referenced from CLAUDE.md / CODEX.md |
 | [`testing.md`](testing.md) | Testing guidelines and discipline referenced from CLAUDE.md |

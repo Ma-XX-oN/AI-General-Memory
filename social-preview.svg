@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <!--
+    Social preview artwork for AI General Memory.
+    Attribution: Artwork by collaborative effort between Claude Code and Codex.
+  -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="100%" stop-color="#161b22"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#58a6ff"/>
+      <stop offset="100%" stop-color="#bc8cff"/>
+    </linearGradient>
+    <linearGradient id="accent2" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#58a6ff"/>
+      <stop offset="50%" stop-color="#bc8cff"/>
+      <stop offset="100%" stop-color="#f778ba"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="640" fill="url(#bg)"/>
+
+  <!-- Subtle grid pattern -->
+  <g opacity="0.03" stroke="#58a6ff" stroke-width="1">
+    <line x1="0" y1="80" x2="1280" y2="80"/>
+    <line x1="0" y1="160" x2="1280" y2="160"/>
+    <line x1="0" y1="240" x2="1280" y2="240"/>
+    <line x1="0" y1="320" x2="1280" y2="320"/>
+    <line x1="0" y1="400" x2="1280" y2="400"/>
+    <line x1="0" y1="480" x2="1280" y2="480"/>
+    <line x1="0" y1="560" x2="1280" y2="560"/>
+    <line x1="160" y1="0" x2="160" y2="640"/>
+    <line x1="320" y1="0" x2="320" y2="640"/>
+    <line x1="480" y1="0" x2="480" y2="640"/>
+    <line x1="640" y1="0" x2="640" y2="640"/>
+    <line x1="800" y1="0" x2="800" y2="640"/>
+    <line x1="960" y1="0" x2="960" y2="640"/>
+    <line x1="1120" y1="0" x2="1120" y2="640"/>
+  </g>
+
+  <!-- Brain/network icon -->
+  <g transform="translate(640, 195)" opacity="0.12">
+    <circle cx="0" cy="0" r="8" fill="#58a6ff"/>
+    <circle cx="-60" cy="-30" r="6" fill="#bc8cff"/>
+    <circle cx="60" cy="-30" r="6" fill="#bc8cff"/>
+    <circle cx="-45" cy="35" r="6" fill="#58a6ff"/>
+    <circle cx="45" cy="35" r="6" fill="#58a6ff"/>
+    <circle cx="-90" cy="10" r="5" fill="#f778ba"/>
+    <circle cx="90" cy="10" r="5" fill="#f778ba"/>
+    <circle cx="0" cy="-55" r="5" fill="#f778ba"/>
+    <line x1="0" y1="0" x2="-60" y2="-30" stroke="#58a6ff" stroke-width="1.5" opacity="0.6"/>
+    <line x1="0" y1="0" x2="60" y2="-30" stroke="#58a6ff" stroke-width="1.5" opacity="0.6"/>
+    <line x1="0" y1="0" x2="-45" y2="35" stroke="#bc8cff" stroke-width="1.5" opacity="0.6"/>
+    <line x1="0" y1="0" x2="45" y2="35" stroke="#bc8cff" stroke-width="1.5" opacity="0.6"/>
+    <line x1="-60" y1="-30" x2="-90" y2="10" stroke="#f778ba" stroke-width="1" opacity="0.4"/>
+    <line x1="60" y1="-30" x2="90" y2="10" stroke="#f778ba" stroke-width="1" opacity="0.4"/>
+    <line x1="-60" y1="-30" x2="0" y2="-55" stroke="#f778ba" stroke-width="1" opacity="0.4"/>
+    <line x1="60" y1="-30" x2="0" y2="-55" stroke="#f778ba" stroke-width="1" opacity="0.4"/>
+    <line x1="-90" y1="10" x2="-45" y2="35" stroke="#58a6ff" stroke-width="1" opacity="0.4"/>
+    <line x1="90" y1="10" x2="45" y2="35" stroke="#58a6ff" stroke-width="1" opacity="0.4"/>
+  </g>
+
+  <!-- Title -->
+  <text x="640" y="270" text-anchor="middle"
+        font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+        font-size="72" font-weight="700" fill="url(#accent2)">
+    AI General Memory
+  </text>
+
+  <!-- Accent line -->
+  <rect x="440" y="295" width="400" height="2" rx="1" fill="url(#accent)" opacity="0.4"/>
+
+  <!-- Subtitle -->
+  <text x="640" y="345" text-anchor="middle"
+        font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+        font-size="28" font-weight="400" fill="#8b949e">
+    Shared knowledge for AI coding assistants
+  </text>
+
+  <!-- Tool paths -->
+  <g font-family="'Cascadia Code', 'Fira Code', 'Consolas', monospace" font-size="22">
+    <text x="505" y="410" text-anchor="middle" fill="#58a6ff" opacity="0.7">~/.claude/</text>
+    <text x="640" y="410" text-anchor="middle" fill="#8b949e" opacity="0.5">+</text>
+    <text x="775" y="410" text-anchor="middle" fill="#bc8cff" opacity="0.7">~/.codex/</text>
+  </g>
+
+  <!-- Bottom tagline -->
+  <text x="640" y="480" text-anchor="middle"
+        font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+        font-size="18" fill="#8b949e">
+    Cross-project lessons &#x2022; Testing guidelines &#x2022; Regex patterns &#x2022; Build triage
+  </text>
+
+  <!-- Corner decoration -->
+  <rect x="0" y="0" width="1280" height="3" fill="url(#accent2)" opacity="0.6"/>
+  <rect x="0" y="637" width="1280" height="3" fill="url(#accent2)" opacity="0.3"/>
+</svg>
