@@ -179,11 +179,11 @@ class PasteMd {
 
       pastePayload := md
       pasteWithSentinel := false
-      ; Text boxes vary on terminal newline handling (CRLF-aware vs LF-aware).
-      ; With LF-only payloads, a final LF can look stripped in CRLF-oriented
-      ; controls even when present. Sentinel + backspace preserves it.
+      ; Text boxes vary on terminal newline handling (CRLF-aware vs LF-aware),
+      ; and some also normalize/filter trailing spaces during paste. Use "."
+      ; as a non-space sentinel, then backspace it after paste.
       if (RegExMatch(md, "\n$")) {
-        pastePayload .= " "
+        pastePayload .= "."
         pasteWithSentinel := true
       }
 
