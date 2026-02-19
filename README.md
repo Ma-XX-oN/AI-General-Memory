@@ -24,9 +24,14 @@ Shared knowledge files for Claude Code and Codex.
 
 ## Purpose
 
-The thing with Claude Code and Codex is that they don't have some basic "common
-knowledge", making them do odd things.  Codex doesn't even have a common memory
-store for all projects.  This repo is to fill that gap.
+I use both Claude Code and Codex collaboratively to get things done.  However,
+the thing with these AIs is that they don't have some basic "common knowledge",
+making them do odd things.  Codex doesn't even have a common memory store for
+all projects.  This repo is to fill that gap.
+
+> NOTE:
+>
+> This will only mitigate most of the odd behaviour, not completely stop it.
 
 ## Contents
 
