@@ -11,7 +11,7 @@
 ; Change this if pandoc isn't on PATH.
 PANDOC_EXE := "C:\Users\adria\AppData\Local\Pandoc\pandoc.exe"
 
-PASTE_DELAY_MS := 50
+PASTE_DELAY_MS := 500
 
 ; Set to true to dump pipeline stages to a log file for debugging.
 DEBUG_PASTE_MD := true
@@ -51,6 +51,11 @@ PasteAsMdQuoted(ItemName, ItemPos, MenuObj) {
 
 class PasteMd {
 
+  static CODE_FENCE := "``````"
+
+  ; Temporary storage for thinking blocks extracted during preprocessing.
+  static _thinkingBlocks := []
+
   /**
    * Writes a labelled debug section to the log file.
    * Replaces CR/LF with visible markers so EOL issues are obvious.
@@ -74,89 +79,90 @@ class PasteMd {
    * @param {boolean} asQuoted - If true, prefixes every line with blockquote syntax (>).
    */
   static PasteMarkdown(asQuoted) {
-  global PANDOC_EXE, PASTE_DELAY_MS, DEBUG_PASTE_MD, DEBUG_PASTE_MD_LOG
+    global PANDOC_EXE, PASTE_DELAY_MS, DEBUG_PASTE_MD, DEBUG_PASTE_MD_LOG
 
-  dbg := DEBUG_PASTE_MD
-  if (dbg) {
-    dbgF := FileOpen(DEBUG_PASTE_MD_LOG, "w", "UTF-8")
-    dbgF.Write("PasteAsMd debug — " . FormatTime(, "yyyy-MM-dd HH:mm:ss") . "`r`n`r`n")
-  }
-
-  clipSaved := ClipboardAll()
-  plain := StrReplace(A_Clipboard, "`r", "")
-  try {
-    htmlFrag := ClipboardWaiter.GetHtmlSection()
-
+    dbg := DEBUG_PASTE_MD
     if (dbg) {
-      PasteMd._DbgSection(dbgF, "1. plain (A_Clipboard minus CR)", plain)
-      PasteMd._DbgSection(dbgF, "2. htmlFrag (CF_HTML fragment)", htmlFrag)
+      dbgF := FileOpen(DEBUG_PASTE_MD_LOG, "w", "UTF-8")
+      dbgF.Write("PasteAsMd debug — " . FormatTime(, "yyyy-MM-dd HH:mm:ss") . "`r`n`r`n")
     }
 
-    if (htmlFrag = "") {
-      md := PasteMd.CleanPlainText(plain)
-      if (dbg)
-        PasteMd._DbgSection(dbgF, "3. md (CleanPlainText – no HTML path)", md)
-    } else {
-      htmlPrep := PasteMd.PreprocessHtmlCodeBlocks(htmlFrag)
-      if (dbg)
-        PasteMd._DbgSection(dbgF, "3. htmlPrep (after PreprocessHtmlCodeBlocks)", htmlPrep)
+    clipSaved := ClipboardAll()
+    plain := StrReplace(A_Clipboard, "`r", "")
+    try {
+      htmlFrag := ClipboardWaiter.GetHtmlSection()
 
-      ; If no meaningful HTML tags remain after preprocessing (just styled
-      ; spans wrapping plain text, or <p> wrappers around plain lines as
-      ; in ProseMirror/Codex), skip pandoc — plain text already has
-      ; correct whitespace and indentation that pandoc would destroy.
-      stripped := RegExReplace(htmlPrep, "i)<br\b[^>]*>", "")
-      stripped := RegExReplace(stripped, "i)</?p\b[^>]*>", "")
-      if !RegExMatch(stripped, "<[^>]++>") {
+      if (dbg) {
+        PasteMd._DbgSection(dbgF, "1. plain (A_Clipboard minus CR)", plain)
+        PasteMd._DbgSection(dbgF, "2. htmlFrag (CF_HTML fragment)", htmlFrag)
+      }
+
+      if (htmlFrag = "") {
         md := PasteMd.CleanPlainText(plain)
         if (dbg)
-          PasteMd._DbgSection(dbgF, "3b. md (no HTML tags → plain text path)", md)
+          PasteMd._DbgSection(dbgF, "3. md (CleanPlainText – no HTML path)", md)
       } else {
-        mdRaw := PasteMd.HtmlToGfmViaPandoc(htmlPrep, PANDOC_EXE)
+        htmlPrep := PasteMd.PreprocessHtmlCodeBlocks(htmlFrag)
         if (dbg)
-          PasteMd._DbgSection(dbgF, "4. mdRaw (pandoc output)", mdRaw)
+          PasteMd._DbgSection(dbgF, "3. htmlPrep (after PreprocessHtmlCodeBlocks)", htmlPrep)
 
-        md := PasteMd.CleanMarkdown(mdRaw)
-        if (dbg)
-          PasteMd._DbgSection(dbgF, "5. md (after CleanMarkdown)", md)
+        ; If no meaningful HTML tags remain after preprocessing (just styled
+        ; spans wrapping plain text, or <p> wrappers around plain lines as
+        ; in ProseMirror/Codex), skip pandoc — plain text already has
+        ; correct whitespace and indentation that pandoc would destroy.
+        stripped := RegExReplace(htmlPrep, "i)<br\b[^>]*>", "")
+        stripped := RegExReplace(stripped, "i)</?p\b[^>]*>", "")
+        if !RegExMatch(stripped, "<[^>]++>") {
+          md := PasteMd.CleanPlainText(plain)
+          if (dbg)
+            PasteMd._DbgSection(dbgF, "3b. md (no HTML tags → plain text path)", md)
+        } else {
+          mdRaw := PasteMd.HtmlToGfmViaPandoc(htmlPrep, PANDOC_EXE)
+          if (dbg)
+            PasteMd._DbgSection(dbgF, "4. mdRaw (pandoc output)", mdRaw)
 
-        md := StrReplace(md, "`r", "")
+          md := PasteMd.CleanMarkdown(mdRaw)
+          md := PasteMd.RestoreThinkingBlocks(md)
+          if (dbg)
+            PasteMd._DbgSection(dbgF, "5. md (after CleanMarkdown)", md)
+
+          md := StrReplace(md, "`r", "")
+        }
+
+        ; Never paste empty.  If conversion failed/empty, use plain text.
+        if (Trim(md, " `t`n") = "" && Trim(plain, " `t`n") != "") {
+          md := PasteMd.CleanPlainText(plain)
+          if (dbg)
+            PasteMd._DbgSection(dbgF, "5b. md (empty→plain fallback)", md)
+        }
       }
 
-      ; Never paste empty.  If conversion failed/empty, use plain text.
-      if (Trim(md, " `t`n") = "" && Trim(plain, " `t`n") != "") {
-        md := PasteMd.CleanPlainText(plain)
-        if (dbg)
-          PasteMd._DbgSection(dbgF, "5b. md (empty→plain fallback)", md)
+      if (asQuoted) {
+        md := PasteMd.QuoteMarkdown(md)
       }
-    }
 
-    if (asQuoted) {
-      md := PasteMd.QuoteMarkdown(md)
-    }
+      ; Remove CR unconditionally (LF-only).
+      md := StrReplace(md, "`r", "")
 
-    ; Remove CR unconditionally (LF-only).
-    md := StrReplace(md, "`r", "")
-
-    if (dbg) {
-      PasteMd._DbgSection(dbgF, "6. FINAL md (pasted)", md)
-      dbgF.Close()
-    }
-
-    A_Clipboard := md
-    Send "^v"
-    Sleep PASTE_DELAY_MS
-  } catch as e {
-    if (dbg) {
-      try {
-        dbgF.Write("!!! EXCEPTION: " . e.File . ":" . e.Line . " — " . e.Message . "`r`n")
+      if (dbg) {
+        PasteMd._DbgSection(dbgF, "6. FINAL md (pasted)", md)
         dbgF.Close()
       }
+
+      A_Clipboard := md
+      Send "^v"
+      Sleep PASTE_DELAY_MS
+    } catch as e {
+      if (dbg) {
+        try {
+          dbgF.Write("!!! EXCEPTION: " . e.File . ":" . e.Line . " — " . e.Message . "`r`n")
+          dbgF.Close()
+        }
+      }
+      MsgBox "Paste-as-markdown " e.File ":" e.Line " failed:`n`n" e.Message
+    } finally {
+      A_Clipboard := clipSaved
     }
-    MsgBox "Paste-as-markdown " e.File ":" e.Line " failed:`n`n" e.Message
-  } finally {
-    A_Clipboard := clipSaved
-  }
   }
 
   /**
@@ -166,40 +172,40 @@ class PasteMd {
    * @returns {string} Markdown text, or empty string on conversion/read failure
    */
   static HtmlToGfmViaPandoc(html, pandocExe) {
-  tmpBase := A_Temp "\chatgpt_md_" A_TickCount
-  tmpHtml := tmpBase ".html"
-  tmpMd := tmpBase ".md"
+    tmpBase := A_Temp "\chatgpt_md_" A_TickCount
+    tmpHtml := tmpBase ".html"
+    tmpMd := tmpBase ".md"
 
-  try FileDelete tmpHtml
-  try FileDelete tmpMd
-
-  ; Write UTF-8 without BOM.
-  f := FileOpen(tmpHtml, "w", "UTF-8-RAW")
-  f.Write(html)
-  f.Close()
-
-  ; No wrapping, LF-only.
-  cmd := '"' . pandocExe . '" -f html -t gfm --wrap=none --eol=lf "' . tmpHtml . '"'
-  cmd .= ' -o "' . tmpMd . '"'
-
-  exitCode := RunWait(cmd, , "Hide")
-  if (exitCode != 0) {
     try FileDelete tmpHtml
     try FileDelete tmpMd
-    return ""
-  }
 
-  md := ""
-  try {
-    md := FileRead(tmpMd, "UTF-8")
-  } catch {
+    ; Write UTF-8 without BOM.
+    f := FileOpen(tmpHtml, "w", "UTF-8-RAW")
+    f.Write(html)
+    f.Close()
+
+    ; No wrapping, LF-only.
+    cmd := '"' . pandocExe . '" -f html -t gfm --wrap=none --eol=lf "' . tmpHtml . '"'
+    cmd .= ' -o "' . tmpMd . '"'
+
+    exitCode := RunWait(cmd, , "Hide")
+    if (exitCode != 0) {
+      try FileDelete tmpHtml
+      try FileDelete tmpMd
+      return ""
+    }
+
     md := ""
-  }
+    try {
+      md := FileRead(tmpMd, "UTF-8")
+    } catch {
+      md := ""
+    }
 
-  try FileDelete tmpHtml
-  try FileDelete tmpMd
+    try FileDelete tmpHtml
+    try FileDelete tmpMd
 
-  return md
+    return md
   }
 
   /**
@@ -209,14 +215,14 @@ class PasteMd {
    * @returns {string} Normalized text
    */
   static CleanPlainText(s) {
-  s := StrReplace(s, "`r", "")
-  lines := StrSplit(s, "`n")
-  out := ""
-  for i, line in lines {
-    line := RTrim(line, " `t")
-    out .= (i = 1 ? "" : "`n") . line
-  }
-  return Trim(out, "`n")
+    s := StrReplace(s, "`r", "")
+    lines := StrSplit(s, "`n")
+    out := ""
+    for i, line in lines {
+      line := RTrim(line, " `t")
+      out .= (i = 1 ? "" : "`n") . line
+    }
+    return Trim(out, "`n")
   }
 
   /**
@@ -226,73 +232,73 @@ class PasteMd {
    * @returns {string} Cleaned markdown
    */
   static CleanMarkdown(md) {
-  md := StrReplace(md, "`r", "")
+    md := StrReplace(md, "`r", "")
 
-  ; Strip <span> tags (presentational wrappers that cause backtick accumulation).
-  md := RegExReplace(md, "i)</?span\b[^>]*>", "")
+    ; Strip <span> tags (presentational wrappers that cause backtick accumulation).
+    md := RegExReplace(md, "i)</?span\b[^>]*>", "")
 
-  ; Convert <br> tags to newlines so line breaks are preserved.
-  md := RegExReplace(md, "i)<br\b[^>]*>", "`n")
+    ; Convert <br> tags to newlines so line breaks are preserved.
+    md := RegExReplace(md, "i)<br\b[^>]*>", "`n")
 
-  ; Convert block-level <code> elements (multi-line) to fenced code blocks.
-  pos := 1
-  while RegExMatch(md, "s)<code\b[^>]*>(.*?)</code>", &m, pos) {
-    if InStr(m[1], "`n") {
-      inner := RegExReplace(m[1], "<[^>]++>", "")
-      inner := PasteMd.DecodeBasicHtmlEntities(inner)
-      inner := Trim(inner, " `t`n")
-      replacement := "``````" . "`n" . inner . "`n" . "``````"
-      md := SubStr(md, 1, m.Pos - 1) . replacement . SubStr(md, m.Pos + m.Len)
-      pos := m.Pos + StrLen(replacement)
-    } else {
-      pos := m.Pos + m.Len
+    ; Convert block-level <code> elements (multi-line) to fenced code blocks.
+    pos := 1
+    while RegExMatch(md, "s)<code\b[^>]*>(.*?)</code>", &m, pos) {
+      if InStr(m[1], "`n") {
+        inner := RegExReplace(m[1], "<[^>]++>", "")
+        inner := PasteMd.DecodeBasicHtmlEntities(inner)
+        inner := Trim(inner, " `t`n")
+        replacement := PasteMd.CODE_FENCE . "`n" . inner . "`n" . PasteMd.CODE_FENCE
+        md := SubStr(md, 1, m.Pos - 1) . replacement . SubStr(md, m.Pos + m.Len)
+        pos := m.Pos + StrLen(replacement)
+      } else {
+        pos := m.Pos + m.Len
+      }
     }
-  }
 
-  lines := StrSplit(md, "`n")
+    lines := StrSplit(md, "`n")
 
-  out := ""
-  inFence := false
+    out := ""
+    inFence := false
 
-  for i, line in lines {
-    t := LTrim(line, " `t")
+    for i, line in lines {
+      t := LTrim(line, " `t")
 
-    ; Fence detection without regex (avoids backtick-escape problems).
-    if (SubStr(t, 1, 3) = "``````") {
-      inFence := !inFence
+      ; Fence detection without regex (avoids backtick-escape problems).
+      if (SubStr(t, 1, 3) = PasteMd.CODE_FENCE) {
+        inFence := !inFence
+        outLine := RTrim(line, " `t")
+        out .= (out = "" ? "" : "`n") . outLine
+        continue
+      }
+
+      if (inFence) {
+        out .= (out = "" ? "" : "`n") . line
+        continue
+      }
+
       outLine := RTrim(line, " `t")
+
+      ; Drop empty headings like "###" or "### ".
+      if RegExMatch(outLine, "^[#]{1,6}\s*$") {
+        continue
+      }
+
+      outLine := PasteMd.SimplifyMarkdownInlineHtml(outLine)
       out .= (out = "" ? "" : "`n") . outLine
-      continue
     }
 
-    if (inFence) {
-      out .= (out = "" ? "" : "`n") . line
-      continue
-    }
+    ; Collapse runs of 3+ newlines to 2 (at most one blank line).
+    out := RegExReplace(out, "\n{3,}", "`n`n")
 
-    outLine := RTrim(line, " `t")
-
-    ; Drop empty headings like "###" or "### ".
-    if RegExMatch(outLine, "^[#]{1,6}\s*$") {
-      continue
-    }
-
-    outLine := PasteMd.SimplifyMarkdownInlineHtml(outLine)
-    out .= (out = "" ? "" : "`n") . outLine
-  }
-
-  ; Collapse runs of 3+ newlines to 2 (at most one blank line).
-  out := RegExReplace(out, "\n{3,}", "`n`n")
-
-  return Trim(out, "`n")
+    return Trim(out, "`n")
   }
 
   /**
-   * PCRE regex pattern for matching HTML tags and quoted strings.
-   * Includes recursive subroutines for robust HTML parsing.
-   * Used as a component in SimplifyMarkdownInlineHtml pattern matching.
+   * PCRE regex subroutine library for HTML parsing and backtick code spans.
+   * Includes recursive subroutines for robust HTML tag matching,
+   * plus a generic backtick code span pattern for any delimiter length.
    */
-  static re_htags := "
+  static RE_HTML_LIB := "
 (
   |(?x)(?!)
   (?<quoted_string> (?<quote>["'])(?:[^"'\\]*+|\\.|(?!\k<quote>).)++\k<quote>)
@@ -308,6 +314,7 @@ class PasteMd {
         `)
     `)*+
   `)
+  (?<codespan>(?<bt_open>``++)(?:[^``]++|(?!\k<bt_open>).)++\k<bt_open>)
   )"
 
   /**
@@ -320,7 +327,7 @@ class PasteMd {
   static SimplifyMarkdownInlineHtml(line) {
     line := PasteMd.DecodeBasicHtmlEntities(line)
 
-    while RegExMatch(line, "<code\b[^>]*+>((?&inside_htag))</code>" PasteMd.re_htags, &m) {
+    while RegExMatch(line, "<code\b[^>]*+>((?&inside_htag))</code>" PasteMd.RE_HTML_LIB, &m) {
       inner := PasteMd.DecodeBasicHtmlEntities(m[1])
       inner := StrReplace(inner, "`r", "")
       inner := StrReplace(inner, "`n", " ")
@@ -329,47 +336,59 @@ class PasteMd {
     }
 
     ; Convert semantic emphasis tags before fallback stripping.
-    while RegExMatch(line, "<(strong|b)\b[^>]*+>((?&inside_htag))</\1>" PasteMd.re_htags, &m) {
+    while RegExMatch(line, "<(strong|b)\b[^>]*+>((?&inside_htag))</\1>" PasteMd.RE_HTML_LIB, &m) {
       replacement := (m[2] = "") ? "" : ("**" . m[2] . "**")
       line := SubStr(line, 1, m.Pos - 1) . replacement . SubStr(line, m.Pos + m.Len)
     }
-    while RegExMatch(line, "<(em|i)\b[^>]*+>((?&inside_htag))</\1>" PasteMd.re_htags, &m) {
+    while RegExMatch(line, "<(em|i)\b[^>]*+>((?&inside_htag))</\1>" PasteMd.RE_HTML_LIB, &m) {
       replacement := (m[2] = "") ? "" : ("*" . m[2] . "*")
       line := SubStr(line, 1, m.Pos - 1) . replacement . SubStr(line, m.Pos + m.Len)
     }
 
     ; Convert HTML links to markdown links for readable output.
-    while RegExMatch(line, "<a\b[^>]*\bhref\s*=\s*(['`"])(.*?)\1[^>]*>((?&inside_htag))</a>" PasteMd.re_htags, &m) {
+    while RegExMatch(line, "<a\b[^>]*\bhref\s*=\s*(['`"])(.*?)\1[^>]*>((?&inside_htag))</a>" PasteMd.RE_HTML_LIB, &m) {
       href := PasteMd.DecodeBasicHtmlEntities(m[2])
       text := PasteMd.DecodeBasicHtmlEntities(m[3])
 
       ; Convert semantic emphasis inside link text before stripping residual tags.
-      while RegExMatch(text, "<(strong|b)\b[^>]*>((?&inside_htag))</\1>" PasteMd.re_htags, &inner) {
-      replacement := (inner[2] = "") ? "" : ("**" . inner[2] . "**")
-      text := SubStr(text, 1, inner.Pos - 1) . replacement . SubStr(text, inner.Pos + inner.Len)
+      while RegExMatch(text, "<(strong|b)\b[^>]*>((?&inside_htag))</\1>" PasteMd.RE_HTML_LIB, &inner) {
+        replacement := (inner[2] = "") ? "" : ("**" . inner[2] . "**")
+        text := SubStr(text, 1, inner.Pos - 1) . replacement . SubStr(text, inner.Pos + inner.Len)
+      }
+      while RegExMatch(text, "<(em|i)\b[^>]*>((?&inside_htag))</\1>" PasteMd.RE_HTML_LIB, &inner) {
+        replacement := (inner[2] = "") ? "" : ("*" . inner[2] . "*")
+        text := SubStr(text, 1, inner.Pos - 1) . replacement . SubStr(text, inner.Pos + inner.Len)
+      }
+
+      ; Remove any unknown tags that are not escaped
+      text := RegExReplace(text, "((?&inside_htag))<[^>]++>" PasteMd.RE_HTML_LIB, "$1")
+      if (text = "") {
+        text := href
+      }
+      replacement := "[" . text . "](" . href . ")"
+      line := SubStr(line, 1, m.Pos - 1) . replacement . SubStr(line, m.Pos + m.Len)
     }
-    while RegExMatch(text, "<(em|i)\b[^>]*>((?&inside_htag))</\1>" PasteMd.re_htags, &inner) {
-      replacement := (inner[2] = "") ? "" : ("*" . inner[2] . "*")
-      text := SubStr(text, 1, inner.Pos - 1) . replacement . SubStr(text, inner.Pos + inner.Len)
+
+    ; Protect backtick code spans from tag stripping.
+    _codeSpans := []
+    pos := 1
+    while RegExMatch(line, "(?&codespan)" PasteMd.RE_HTML_LIB, &m, pos) {
+      _codeSpans.Push(m[0])
+      placeholder := "¤CSPAN_" . _codeSpans.Length . "¤"
+      line := SubStr(line, 1, m.Pos - 1) . placeholder . SubStr(line, m.Pos + m.Len)
+      pos := m.Pos + StrLen(placeholder)
     }
 
     ; Remove any unknown tags that are not escaped
-    text := RegExReplace(text, "((?&inside_htag))<[^>]++>" PasteMd.re_htags, "$1")
-    if (text = "") {
-      text := href
+    line := RegExReplace(line, "\G((?&inside_htag))(?<!\\)<(?:[^>'`"]++|(?&quoted_string))*+>" PasteMd.RE_HTML_LIB, "$1")
+    line := RegExReplace(line, "((?:[^\\]|\\[^<>])++)\\([<>])" PasteMd.RE_HTML_LIB, "$1$2")
+
+    ; Restore backtick code spans.
+    for i, span in _codeSpans {
+      line := StrReplace(line, "¤CSPAN_" . i . "¤", span)
     }
-    replacement := "[" . text . "](" . href . ")"
-    line := SubStr(line, 1, m.Pos - 1) . replacement . SubStr(line, m.Pos + m.Len)
-  }
 
-  ; Remove any unknown tags that are not escaped
-  line := RegExReplace(line, "\G((?&inside_htag))(?<!\\)<(?:[^>'`"]++|(?&quoted_string))*+>" PasteMd.re_htags, "$1")
-  line := RegExReplace(line, "((?:[^\\]|\\[^<>])++)\\([<>])" PasteMd.re_htags, "$1$2")
-  ; Strip common presentational tags that hurt readability in markdown output.
-  ; line := RegExReplace(line, "</?(?:div|p|font|mark|u|small|sup|sub)\b[^>]*>", "")
-  ; line := RegExReplace(line, "<br\s*/?>", " ")
-
-  return line
+    return line
   }
 
   /**
@@ -393,7 +412,7 @@ class PasteMd {
 
   /**
    * Preprocesses HTML before pandoc conversion.
-   * Strips UI artifacts (buttons), converts code-like spans to <code>,
+   * Strips UI artifacts (buttons, thinking blocks), converts code-like spans to <code>,
    * strips presentational spans, normalizes line breaks inside <code>,
    * and wraps multi-line code in <pre>.
    * @param {string} html - HTML fragment from clipboard
@@ -402,6 +421,24 @@ class PasteMd {
   static PreprocessHtmlCodeBlocks(html) {
     ; Strip UI artifacts that don't belong in markdown output.
     html := RegExReplace(html, "is)<button\b[^>]*>.*?</button>", "")
+
+    ; Extract Claude Code thinking blocks as placeholders so pandoc doesn't
+    ; mangle them.  They get restored as raw HTML after markdown cleanup.
+    this._thinkingBlocks := []
+    pos := 1
+    while RegExMatch(html, "is)<details\b[^>]*\bclass=`"[^`"]*\bthinking[^`"]*`"[^>]*>(.*?)</details>", &m, pos) {
+      inner := m[1]
+      ; Remove <summary> element.
+      inner := RegExReplace(inner, "is)<summary\b[^>]*>.*?</summary>", "")
+      ; Strip remaining HTML tags.
+      inner := RegExReplace(inner, "<[^>]++>", "")
+      inner := this.DecodeBasicHtmlEntities(inner)
+      inner := Trim(inner, " `t`n`r")
+      this._thinkingBlocks.Push(inner)
+      placeholder := "¤THINKING_" . this._thinkingBlocks.Length . "¤"
+      html := SubStr(html, 1, m.Pos - 1) . placeholder . SubStr(html, m.Pos + m.Len)
+      pos := m.Pos + StrLen(placeholder)
+    }
 
     ; Convert code-like <span> elements to <code> before stripping generic spans.
     ; Matches spans with inline-markdown/font-mono class (e.g., Codex/Claude Code).
@@ -456,6 +493,24 @@ class PasteMd {
     }
 
     return html
+  }
+
+  /**
+   * Replaces ¤THINKING_N¤ placeholders with clean <details> HTML blocks.
+   * @param {string} md - Markdown text containing placeholders
+   * @returns {string} Markdown with thinking blocks restored as raw HTML
+   */
+  static RestoreThinkingBlocks(md) {
+    for i, content in this._thinkingBlocks {
+      placeholder := "¤THINKING_" . i . "¤"
+      if (content = "") {
+        details := "<details>`n<summary>Thinking</summary>`n</details>"
+      } else {
+        details := "<details>`n<summary>Thinking</summary>`n`n" . content . "`n</details>"
+      }
+      md := StrReplace(md, placeholder, details)
+    }
+    return md
   }
 
   /**
