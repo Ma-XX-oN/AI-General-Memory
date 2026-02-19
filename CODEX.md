@@ -80,3 +80,4 @@
 - Use clear namespace/type names that read naturally at call sites.
 - Treat documentation and examples as part of correctness, not optional polish.
 - Verify incrementally with build/tests during refactors to preserve behavior.
+- Never run build and tests concurrently; always complete build first, then run tests.
