@@ -1,5 +1,7 @@
 # AI General Memory <!-- omit in toc -->
 
+Author: _Adrian Hawryluk_ (a.k.a. [Ma-XX-oN](https://github.com/Ma-XX-oN))
+
 Shared knowledge files for Claude Code and Codex.
 
 - [Purpose](#purpose)
@@ -34,6 +36,10 @@ directly/indirectly by the users.
 | [`CLAUDE.md`](CLAUDE.md) | Global instructions and lessons for Claude Code |
 | [`CODEX.md`](CODEX.md) | Global instructions and lessons for Codex |
 | [`AGENTS.md`](AGENTS.md) | Project-level bootstrap template for Codex projects |
+| [`LICENSE`](LICENSE) | Apache License 2.0 terms for repository content |
+| [`NOTICE`](NOTICE) | Project and contributor attribution notice file |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Contribution workflow and expectations |
+| [`AUTHORS.md`](AUTHORS.md) | Maintainer and contributor attribution list |
 | [`build_issues.md`](build_issues.md) | Cross-project build and linker mismatch triage playbook |
 | [`regex-patterns.md`](regex-patterns.md) | Reusable regex patterns referenced from CLAUDE.md / CODEX.md |
 | [`testing.md`](testing.md) | Testing guidelines and discipline referenced from CLAUDE.md |
