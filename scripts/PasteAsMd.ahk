@@ -16,6 +16,7 @@ PASTE_DELAY_MS := 500
 ; Set to true to dump pipeline stages to a log file for debugging.
 DEBUG_PASTE_MD := true
 DEBUG_PASTE_MD_LOG := A_ScriptDir "\PasteAsMd_debug.log"
+PROMPT_ORDERED_LIST_START_ON_AMBIGUOUS := true
 
 global gPasteMenu := Menu()
 gPasteMenu.Add("Paste as md", PasteAsMd)
@@ -79,7 +80,7 @@ class PasteMd {
    * @param {boolean} asQuoted - If true, prefixes every line with blockquote syntax (>).
    */
   static PasteMarkdown(asQuoted) {
-    global PANDOC_EXE, PASTE_DELAY_MS, DEBUG_PASTE_MD, DEBUG_PASTE_MD_LOG
+    global PANDOC_EXE, PASTE_DELAY_MS, DEBUG_PASTE_MD, DEBUG_PASTE_MD_LOG, PROMPT_ORDERED_LIST_START_ON_AMBIGUOUS
 
     dbg := DEBUG_PASTE_MD
     if (dbg) {
@@ -90,11 +91,20 @@ class PasteMd {
     clipSaved := ClipboardAll()
     plain := StrReplace(A_Clipboard, "`r", "")
     try {
-      htmlFrag := ClipboardWaiter.GetHtmlSection()
+      cfHtml := ClipboardWaiter.GetHtml()
+      htmlFrag := (cfHtml = "")
+        ? ""
+        : ClipboardWaiter.SelectHtmlSection(cfHtml, ClipboardWaiter.HTML_SECTION_FRAGMENT)
 
       if (dbg) {
         PasteMd._DbgSection(dbgF, "1. plain (A_Clipboard minus CR)", plain)
-        PasteMd._DbgSection(dbgF, "2. htmlFrag (CF_HTML fragment)", htmlFrag)
+        PasteMd._DbgSection(dbgF, "2. cfHtml (raw full payload)", cfHtml)
+        PasteMd._DbgSection(dbgF, "3. htmlFrag (CF_HTML fragment)", htmlFrag)
+        dbgF.Write("=== 2b. cfHtml offsets ===`r`n")
+        dbgF.Write("StartHTML: " . PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartHTML:") . "`r`n")
+        dbgF.Write("EndHTML: " . PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndHTML:") . "`r`n")
+        dbgF.Write("StartFragment: " . PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartFragment:") . "`r`n")
+        dbgF.Write("EndFragment: " . PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndFragment:") . "`r`n`r`n")
       }
 
       if (htmlFrag = "") {
@@ -135,11 +145,29 @@ class PasteMd {
           if (dbg)
             PasteMd._DbgSection(dbgF, "5b. md (empty→plain fallback)", md)
         }
+
+        expectedListStart := PasteMd.GetExpectedOrderedListStart(htmlFrag, cfHtml, plain)
+        if (PROMPT_ORDERED_LIST_START_ON_AMBIGUOUS) {
+          promptedStart := PasteMd.MaybePromptOrderedListStart(md, plain, htmlFrag, expectedListStart)
+          if (dbg && promptedStart != expectedListStart) {
+            PasteMd._DbgSection(dbgF, "5c2. prompted list start (ordered-list fix)", "" . promptedStart)
+          }
+          expectedListStart := promptedStart
+        }
+        if (dbg) {
+          PasteMd._DbgSection(dbgF, "5c. expected list start (ordered-list fix)", "" . expectedListStart)
+        }
+
+        md := PasteMd.RestoreOrderedListStart(md, plain, htmlFrag, cfHtml, expectedListStart)
+        if (dbg)
+          PasteMd._DbgSection(dbgF, "5d. md (after RestoreOrderedListStart)", md)
       }
 
       if (asQuoted) {
         md := PasteMd.QuoteMarkdown(md)
       }
+
+      md := PasteMd.EnsureTrailingEolForList(md)
 
       ; Remove CR unconditionally (LF-only).
       md := StrReplace(md, "`r", "")
@@ -149,8 +177,20 @@ class PasteMd {
         dbgF.Close()
       }
 
-      A_Clipboard := md
+      pastePayload := md
+      pasteWithSentinel := false
+      ; Text boxes vary on terminal newline handling (CRLF-aware vs LF-aware).
+      ; With LF-only payloads, a final LF can look stripped in CRLF-oriented
+      ; controls even when present. Sentinel + backspace preserves it.
+      if (RegExMatch(md, "\n$")) {
+        pastePayload .= " "
+        pasteWithSentinel := true
+      }
+
+      A_Clipboard := pastePayload
       Send "^v"
+      if (pasteWithSentinel)
+        Send "{BS}"
       Sleep PASTE_DELAY_MS
     } catch as e {
       if (dbg) {
@@ -233,6 +273,7 @@ class PasteMd {
    */
   static CleanMarkdown(md) {
     md := StrReplace(md, "`r", "")
+    hadTrailingBreak := RegExMatch(md, "\n$")
 
     ; Strip <span> tags (presentational wrappers that cause backtick accumulation).
     md := RegExReplace(md, "i)</?span\b[^>]*>", "")
@@ -287,10 +328,34 @@ class PasteMd {
       out .= (out = "" ? "" : "`n") . outLine
     }
 
+    ; Drop loose-list separator blanks between adjacent ordered-list items.
+    outLines := StrSplit(out, "`n")
+    out2 := ""
+    firstOut2 := true
+    Loop outLines.Length {
+      idx := A_Index
+      line := outLines[idx]
+      if (Trim(line, " `t") = "") {
+        prev := (idx > 1) ? RTrim(outLines[idx - 1], " `t") : ""
+        next := (idx < outLines.Length) ? RTrim(outLines[idx + 1], " `t") : ""
+        if (RegExMatch(prev, "^\s*\d+[.)](?:\s+|$)")
+          && RegExMatch(next, "^\s*\d+[.)](?:\s+|$)")) {
+          continue
+        }
+      }
+
+      out2 .= (firstOut2 ? "" : "`n") . line
+      firstOut2 := false
+    }
+    out := out2
+
     ; Collapse runs of 3+ newlines to 2 (at most one blank line).
     out := RegExReplace(out, "\n{3,}", "`n`n")
 
-    return Trim(out, "`n")
+    out := Trim(out, "`n")
+    if (hadTrailingBreak && out != "")
+      out .= "`n"
+    return out
   }
 
   /**
@@ -447,6 +512,14 @@ class PasteMd {
     ; Strip remaining <span> tags globally (presentational wrappers).
     html := RegExReplace(html, "i)</?span\b[^>]*>", "")
 
+    ; Some sources provide list selections as bare top-level <li> siblings.
+    ; Wrap that shape in <ol> so pandoc keeps ordered-list semantics.
+    htmlNoTrailingBr := RegExReplace(html, "is)(?:<br\b[^>]*>\s*)+$", "")
+    trimmed := Trim(htmlNoTrailingBr, " `t`r`n")
+    if (trimmed != "" && RegExMatch(trimmed, "is)^(?:<li\b[^>]*>.*?</li>\s*)+$")) {
+      html := "<ol>" . trimmed . "</ol>"
+    }
+
     ; Process <code> elements: normalize line breaks and wrap in <pre> if multi-line.
     pos := 1
     while RegExMatch(html, "is)<code\b([^>]*)>(.*?)</code>", &m, pos) {
@@ -514,6 +587,302 @@ class PasteMd {
   }
 
   /**
+   * Restores ordered-list start when converting a single <li> fragment.
+   * Pandoc renumbers isolated list-item fragments to 1.
+   * @param {string} md - Markdown output from conversion pipeline
+   * @param {string} plain - Plain clipboard text
+   * @param {string} htmlFrag - StartFragment HTML
+   * @param {string} cfHtml - Full CF_HTML payload
+   * @returns {string} Markdown with corrected ordered-list numbering
+   */
+  static RestoreOrderedListStart(md, plain, htmlFrag, cfHtml, expected := -1) {
+    md := StrReplace(md, "`r", "")
+    if (md = "")
+      return md
+
+    ; Fragment may be wrapped in container tags (e.g., <div>...<ol>...</ol>).
+    if !RegExMatch(htmlFrag, "is)<(?:li|ol)\b")
+      return md
+
+    ; Only patch markdown that starts as list item 1./1) (with or without body text).
+    if !RegExMatch(md, "^\s*1[.)](?:\s|$)")
+      return md
+
+    if (expected < 0) {
+      expected := this.GetExpectedOrderedListStart(htmlFrag, cfHtml, plain)
+    }
+    if (expected <= 1)
+      return md
+
+    return this.RenumberLeadingOrderedList(md, expected)
+  }
+
+  /**
+   * Prompts user for ordered-list start when clipboard context is ambiguous.
+   * @param {string} md - Markdown output from conversion pipeline
+   * @param {string} plain - Plain clipboard text
+   * @param {string} htmlFrag - StartFragment HTML
+   * @param {number} expected - Inferred start index from available context
+   * @returns {number} Selected start index, or original expected value
+   */
+  static MaybePromptOrderedListStart(md, plain, htmlFrag, expected) {
+    if (expected > 1)
+      return expected
+
+    ; Fragment may be wrapped in container tags (e.g., <div>...<ol>...</ol>).
+    ; Some sources emit bare top-level <li> items without an <ol> wrapper.
+    if !RegExMatch(htmlFrag, "is)<(?:li|ol)\b")
+      return expected
+
+    if !RegExMatch(md, "^\s*1[.)](?:\s|$)")
+      return expected
+
+    defaultStart := 2
+    if RegExMatch(plain, "^\s*(\d+)[.)](?:\s+|$)", &mPlain) {
+      nPlain := Integer(mPlain[1])
+      if (nPlain > 1)
+        defaultStart := nPlain
+    }
+
+    ib := InputBox(
+      "Original ordered-list index is missing from clipboard context.`nEnter starting number for this paste (Cancel keeps 1).",
+      "Paste as md: list start",
+      "w520 h160",
+      "" . defaultStart
+    )
+
+    if (ib.Result != "OK")
+      return expected
+
+    value := Trim(ib.Value, " `t")
+    if !RegExMatch(value, "^\d+$")
+      return expected
+
+    n := Integer(value)
+    if (n < 1)
+      return expected
+
+    return n
+  }
+
+  /**
+   * Renumbers the leading ordered-list block in markdown.
+   * Starts at first non-empty numbered-list line and increments for each item.
+   * @param {string} md - Markdown text
+   * @param {number} startNum - Desired starting list number
+   * @returns {string} Markdown with renumbered leading ordered-list block
+   */
+  static RenumberLeadingOrderedList(md, startNum) {
+    hadTrailingBreak := RegExMatch(md, "\n$")
+    lines := StrSplit(md, "`n")
+    if (lines.Length = 0)
+      return md
+
+    firstIdx := 1
+    while (firstIdx <= lines.Length && Trim(lines[firstIdx], " `t") = "") {
+      firstIdx += 1
+    }
+    if (firstIdx > lines.Length)
+      return md
+
+    if !RegExMatch(lines[firstIdx], "^(\s*)\d+([.)])(?:(\s+)(.*)|\s*)$")
+      return md
+
+    current := startNum
+    started := false
+    drop := Map()
+
+    Loop lines.Length {
+      idx := A_Index
+      if (idx < firstIdx)
+        continue
+
+      line := lines[idx]
+      if RegExMatch(line, "^(\s*)\d+([.)])(?:(\s+)(.*)|\s*)$", &mLine) {
+        if (mLine[4] = "") {
+          drop[idx] := true
+        } else {
+          sep := mLine[3]
+          if (sep = "")
+            sep := " "
+          lines[idx] := mLine[1] . current . mLine[2] . sep . mLine[4]
+        }
+        current += 1
+        started := true
+        continue
+      }
+
+      if (!started)
+        break
+
+      ; Keep blank lines and indented continuation lines within list block.
+      if (Trim(line, " `t") = "" || RegExMatch(line, "^\s{2,}")) {
+        continue
+      }
+
+      break
+    }
+
+    out := ""
+    firstOut := true
+    Loop lines.Length {
+      if (drop.Has(A_Index))
+        continue
+      out .= (firstOut ? "" : "`n") . lines[A_Index]
+      firstOut := false
+    }
+    if (hadTrailingBreak && out != "" && !RegExMatch(out, "\n$"))
+      out .= "`n"
+    return out
+  }
+
+  /**
+   * Determines expected start index for selected ordered-list fragment.
+   * Priority:
+   * 1) <li value="N"> on fragment
+   * 2) parent <ol start="N"> + preceding sibling <li> count from CF_HTML
+   * 3) fragment <ol start="N">
+   * 4) leading plain-text list number
+   * Fragment-shape note:
+   * CF_HTML StartFragment is tag-aligned valid HTML. For partial selection
+   * inside list-item text, many sources still supply a full <li> node, so
+   * partial list-item extent is not supplied in fragment payload.
+   * @param {string} htmlFrag - StartFragment HTML
+   * @param {string} cfHtml - Full CF_HTML payload
+   * @param {string} plain - Plain clipboard text
+   * @returns {number} Expected list index, or 0 when unknown
+   */
+  static GetExpectedOrderedListStart(htmlFrag, cfHtml, plain) {
+    if RegExMatch(htmlFrag, "is)<li\b[^>]*\bvalue\s*=\s*['`"]?(\d+)", &mValue) {
+      return Integer(mValue[1])
+    }
+
+    n := this.GetListStartFromHtmlContext(cfHtml, htmlFrag)
+    if (n > 0)
+      return n
+
+    if RegExMatch(htmlFrag, "is)^\s*<ol\b[^>]*\bstart\s*=\s*['`"]?(\d+)", &mStart) {
+      return Integer(mStart[1])
+    }
+
+    if RegExMatch(plain, "^\s*(\d+)[.)](?:\s+|$)", &mPlain) {
+      return Integer(mPlain[1])
+    }
+
+    return 0
+  }
+
+  /**
+   * Infers ordered-list index at StartFragment from full CF_HTML context.
+   * Tracks nested list containers and counts immediate preceding <li> siblings.
+   * @param {string} cfHtml - Full CF_HTML payload
+   * @param {string} htmlFrag - StartFragment HTML
+   * @returns {number} Inferred index, or 0 when not inside an ordered list
+   */
+  static GetListStartFromHtmlContext(cfHtml, htmlFrag := "") {
+    if (cfHtml = "")
+      return 0
+
+    before := ""
+    startFragOff := this.ParseCfHtmlOffsetRaw(cfHtml, "StartFragment:")
+    startHtmlOff := this.ParseCfHtmlOffsetRaw(cfHtml, "StartHTML:")
+
+    if (startFragOff > 0 && startHtmlOff >= 0 && startFragOff > startHtmlOff) {
+      ; Prefer raw-offset slicing: this preserves exact upstream context even
+      ; when marker text or fragment string matching is unreliable.
+      before := SubStr(cfHtml, startHtmlOff + 1, startFragOff - startHtmlOff)
+    } else {
+      htmlAll := ClipboardWaiter.SelectHtmlSection(cfHtml, ClipboardWaiter.HTML_SECTION_HTML)
+      if (htmlAll = "")
+        return 0
+
+      if RegExMatch(htmlAll, "is)<!--\s*StartFragment\s*-->", &mStartFragment) {
+        before := SubStr(htmlAll, 1, mStartFragment.Pos - 1)
+      } else {
+        fragLookup := Trim(htmlFrag, " `t`r`n")
+        if (fragLookup = "")
+          return 0
+        fragPos := InStr(htmlAll, fragLookup)
+        if (fragPos = 0)
+          return 0
+        before := SubStr(htmlAll, 1, fragPos - 1)
+      }
+    }
+
+    listStack := []
+    pos := 1
+
+    while RegExMatch(before, "is)<(/?)(ol|ul|li)\b([^>]*)>", &mTag, pos) {
+      isClose := (mTag[1] = "/")
+      tagName := StrLower(mTag[2])
+      attrs := mTag[3]
+
+      if (!isClose) {
+        if (tagName = "ol" || tagName = "ul") {
+          ctx := { tag: tagName, start: 1, childLi: 0 }
+          if (tagName = "ol" && RegExMatch(attrs, "i)\bstart\s*=\s*['`"]?(\d+)", &mStart)) {
+            ctx.start := Integer(mStart[1])
+          }
+          listStack.Push(ctx)
+        } else if (tagName = "li") {
+          if (listStack.Length > 0) {
+            listStack[listStack.Length].childLi += 1
+          }
+        }
+      } else {
+        if (tagName = "ol" || tagName = "ul") {
+          idx := listStack.Length
+          while (idx > 0 && listStack[idx].tag != tagName) {
+            idx -= 1
+          }
+          if (idx > 0) {
+            removeCount := listStack.Length - idx + 1
+            Loop removeCount {
+              listStack.Pop()
+            }
+          }
+        }
+      }
+
+      pos := mTag.Pos + mTag.Len
+    }
+
+    idx := listStack.Length
+    while (idx > 0 && listStack[idx].tag != "ol") {
+      idx -= 1
+    }
+    if (idx = 0)
+      return 0
+
+    return listStack[idx].start + listStack[idx].childLi
+  }
+
+  /**
+   * Parses numeric CF_HTML header offsets from raw CF_HTML text.
+   * @param {string} cfHtml - Raw CF_HTML payload string
+   * @param {string} key - Header key, e.g. StartFragment:
+   * @returns {number} Parsed offset, or -1 when missing/invalid
+   */
+  static ParseCfHtmlOffsetRaw(cfHtml, key) {
+    pos := InStr(cfHtml, key)
+    if (!pos)
+      return -1
+
+    pos += StrLen(key)
+    eol := InStr(cfHtml, "`r`n", , pos)
+    if (!eol)
+      eol := InStr(cfHtml, "`n", , pos)
+    if (!eol)
+      return -1
+
+    numStr := Trim(SubStr(cfHtml, pos, eol - pos))
+    if (numStr = "")
+      return -1
+
+    return numStr + 0
+  }
+
+  /**
    * Converts markdown to blockquote form by prefixing each line with ">".
    * Blank lines become ">" with no trailing space.
    * @param {string} md - Markdown text to quote
@@ -522,16 +891,60 @@ class PasteMd {
   static QuoteMarkdown(md) {
     ; Prefix each line.  Blank lines become ">" (no trailing space).
     md := StrReplace(md, "`r", "")
+    hadTrailingBreak := RegExMatch(md, "\n$")
     lines := StrSplit(md, "`n")
+    while (lines.Length > 0 && Trim(lines[lines.Length], " `t") = "") {
+      lines.Pop()
+    }
+    if (lines.Length = 0)
+      return ""
 
     out := ""
-    for i, line in lines {
-      line := RTrim(line, " `t")
+    firstOut := true
+    Loop lines.Length {
+      i := A_Index
+      line := RTrim(lines[i], " `t")
+
+      ; Drop pandoc's separator blank lines between adjacent ordered-list items.
+      if (line = "") {
+        prev := (i > 1) ? RTrim(lines[i - 1], " `t") : ""
+        next := (i < lines.Length) ? RTrim(lines[i + 1], " `t") : ""
+        if (RegExMatch(prev, "^\s*\d+[.)](?:\s+|$)")
+          && RegExMatch(next, "^\s*\d+[.)](?:\s+|$)")) {
+          continue
+        }
+      }
+
       q := (line = "") ? ">" : ("> " . line)
-      out .= (i = 1 ? "" : "`n") . q
+      out .= (firstOut ? "" : "`n") . q
+      firstOut := false
     }
 
-    return Trim(out, "`n")
+    if (hadTrailingBreak && out != "")
+      out .= "`n"
+    return out
+  }
+
+  /**
+   * Ensures list output ends with a single trailing LF.
+   * Applies to ordered/unordered markdown lists, including blockquoted lists.
+   * @param {string} md - Markdown text
+   * @returns {string} Markdown with guaranteed trailing LF for list output
+   */
+  static EnsureTrailingEolForList(md) {
+    md := StrReplace(md, "`r", "")
+    if (md = "")
+      return md
+
+    tail := RTrim(md, "`n")
+    if (tail = "")
+      return md
+
+    lines := StrSplit(tail, "`n")
+    lastLine := RTrim(lines[lines.Length], " `t")
+    if !RegExMatch(lastLine, "^\s*(?:>\s*)?(?:\d+[.)]|[-+*])(?:\s+|$)")
+      return md
+
+    return tail . "`n"
   }
 }
-
