@@ -33,6 +33,11 @@ all projects.  This repo is to fill that gap.
 >
 > This will only mitigate most of the odd behaviour, not completely stop it.
 
+Scripts are mainly for Codex as it tends to do more irritating things. Such as
+making allow popups pop up all the time and foobaring files line endings
+resulting in mixed EOLs.  However, it seems that Claude has found that the line
+ending tools somewhat useful as well, though mostly for confirmation purposes.
+
 ## Contents
 
 Most of these files are used by the AIs.  There are a couple used
