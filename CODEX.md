@@ -7,11 +7,12 @@
 - When composing git commit bodies with bullet detail lines, generate contiguous bullet lines with no blank separator lines (for example avoid multiple `-m` paragraphs that insert empty lines).
 - In PowerShell, never place Markdown backticks inside git commit -m strings; use plain text, single-quoted -m values, or git commit -F with a here-string to avoid escape-related character loss.
 - Always use Conventional Commit format for every git commit message.
-- For each user question/task: capture start time before doing work, capture end time after completion, and report elapsed time in minutes and seconds.
+- For each user question/task: capture `START` before the first action; the first successful `START` capture is immutable for that turn (never overwrite it on retries), capture `END` immediately before sending the final response, and report `ELAPSED` as real wall-clock turn time.
 - When a user asks a direct question, answer it before making any code or documentation modifications.
-- For timing, use a stable timer file workflow (write start time to a fixed file, then read it later) rather than embedding changing timestamp literals in command strings.
-- For each user question/task, use `~/.codex/scripts/pid-timer.ps1` as standalone one-line calls: run `-StoreTime` at the start and `-TimeElapsed` at the end, and report the script output elapsed time.
-- For each user question/task, run exactly one `pid-timer.ps1 -StoreTime` and exactly one `pid-timer.ps1 -TimeElapsed`; never call `-StoreTime` again before `-TimeElapsed`.
+- For timing capture, use one `Get-Date -Format o` at start and one `Get-Date -Format o` at end per turn; if multiple start captures exist, use the earliest successful timestamp as `START`; do not use `pid-timer.ps1`, PID-based timers, or user environment-variable timing state.
+- Compute elapsed from those two timestamps in the response text only; do not run extra timing/calculation commands.
+- Report timing in a fenced code block with exactly these lines: `START=...`, `END=...`, `ELAPSED=...`.
+- Format `ELAPSED` as `m:ss.fff` (minutes, colon, zero-padded seconds with milliseconds), for example `ELAPSED=1:07.532`.
 - Preserve each file's existing line endings (CRLF/LF) when editing; do not change line endings unless explicitly requested.
 - Before editing any file, check its line-ending status; if mixed, notify before editing and abort; if non-mixed, keep all edits consistent with the original style.
 - For any non-mixed file, after editing, every line must still use that original line ending style; if that cannot be guaranteed, normalize to the original style and report.
@@ -46,7 +47,8 @@
 - When fixing one item in a repeated pattern/group, check sibling occurrences and update them together unless the user explicitly limits scope.
 - Prefer public APIs when fixing external library usage; avoid bypassing behavior by calling private/internal APIs directly unless you are working inside that library.
 - If a fix is not working after 2-3 attempts, stop and summarize: goal, attempts tried, blocker, and ask the user to collaborate on next steps.
-- If the user says STOP, stop immediately and answer the question directly without continuing implementation.
+- If the user says STOP, stop immediately, answer the question directly, and do not retry the blocked action in any form (including variants or reworded permission prompts) unless the user explicitly asks to resume.
+- If the user denies an authorization request and gives a reason, do not repeat the same request or a semantic variant; change approach to directly address the stated reason first.
 - Question assumptions that appear incorrect or unclear before implementing them.
 - For long-running commands (builds/tests), capture output to a log once, then inspect the log instead of rerunning only to view different sections.
 - When maintaining files under `~/.codex/`, read `~/.codex/README.md` first and keep related index/reference entries consistent.
