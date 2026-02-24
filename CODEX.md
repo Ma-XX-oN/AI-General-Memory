@@ -19,6 +19,7 @@
 - For PowerShell workflows, use `~/.codex/scripts/show-eol.ps1` (detect) and `~/.codex/scripts/normalize-eol.ps1` (normalize) with an explicit target EOL (`CRLF` or `LF`) instead of ad-hoc EOL commands.
 - For non-PowerShell workflows, use `~/.codex/scripts/show-eol.pl` (detect) and `~/.codex/scripts/normalize-eol.pl` (normalize) instead of ad-hoc EOL commands.
 - Do independent transformations first; do dependent or lossy transformations last.
+- Do not run dependent operations in parallel (for example `git add` -> `git commit` -> `git push`); run them sequentially and verify each step before starting the next to avoid order/race errors.
 - Preserve semantic meaning before simplifying representation.
 - Encode invariants in code (for example, matching open/close tags with backreferences) rather than relying on assumptions.
 - Be exact with language/tool syntax and escaping rules.
@@ -37,6 +38,8 @@
 - For file edits, use approved editing tools and keep one consistent editing method per session/task unless explicitly asked to change.
 - For file edits, use patch-style edits only; do not use whole-file rewrite commands.
 - For EOL detection, use `rg` and keep one consistent `rg` method unless explicitly asked to change.
+- For file-context reads, prefer anchor-based `rg -n "<anchor>" <file> -A/-B/-C` output over manual line-number enumeration filters because it is easier for users to read and for the assistant to write.
+- If no stable anchor exists, use a two-pass `rg` workflow: first pass collects candidate line numbers (`rg -n`), second pass targets the selected line and prints context with `-A/-B/-C` (including piped `rg` forms) before falling back to manual line-number filters.
 - Universal rule: for repeated tasks, use one approved method consistently and do not switch variations unless explicitly requested.
 - Use definitive language when facts are certain; if uncertain, state uncertainty explicitly.
 - For timing output in chat responses, always use a fenced code block (not inline/backtick list items) to prevent webview auto-link artifacts.
