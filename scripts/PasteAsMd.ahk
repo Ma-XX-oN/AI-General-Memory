@@ -20,6 +20,8 @@ class PasteMd {
   static SHOW_POSTER := false
   ; Toggle: convert <img> tags to markdown image syntax; when off, use [img] placeholder.
   static SHOW_IMG := false
+  ; Toggle: wrap pasted output in blockquote syntax.
+  static QUOTE := true
 
   static CODE_FENCE := "``````"
 
@@ -48,17 +50,7 @@ class PasteMd {
    * @param {object} MenuObj - Menu object
    */
   static PasteAsMd(ItemName, ItemPos, MenuObj) {
-    PasteMd.PasteMarkdown(false)
-  }
-
-  /**
-   * Menu callback: pastes clipboard content as quoted markdown (blockquote).
-   * @param {string} ItemName - Menu item label
-   * @param {number} ItemPos - Menu item position
-   * @param {object} MenuObj - Menu object
-   */
-  static PasteAsMdQuoted(ItemName, ItemPos, MenuObj) {
-    PasteMd.PasteMarkdown(true)
+    PasteMd.PasteMarkdown(PasteMd.QUOTE)
   }
 
   /**
@@ -82,6 +74,18 @@ class PasteMd {
   static ToggleShowImg(ItemName, ItemPos, MenuObj) {
     PasteMd.SHOW_IMG := !PasteMd.SHOW_IMG
     PasteMd.gPasteMenu.ToggleCheck("Show img")
+    PasteMd.gPasteMenu.Show(PasteMd._menuX, PasteMd._menuY)
+  }
+
+  /**
+   * Menu callback: toggles QUOTE and re-shows the menu.
+   * @param {string} ItemName - Menu item label
+   * @param {number} ItemPos - Menu item position
+   * @param {object} MenuObj - Menu object
+   */
+  static ToggleQuote(ItemName, ItemPos, MenuObj) {
+    PasteMd.QUOTE := !PasteMd.QUOTE
+    PasteMd.gPasteMenu.ToggleCheck("Quote")
     PasteMd.gPasteMenu.Show(PasteMd._menuX, PasteMd._menuY)
   }
 
@@ -1079,7 +1083,8 @@ class PasteMd {
 ^!+v::PasteMd.ShowPasteMenu()
 
 PasteMd.gPasteMenu.Add("Paste as md", ObjBindMethod(PasteMd, "PasteAsMd"))
-PasteMd.gPasteMenu.Add("Paste as md quoted", ObjBindMethod(PasteMd, "PasteAsMdQuoted"))
 PasteMd.gPasteMenu.Add()
+PasteMd.gPasteMenu.Add("Quote", ObjBindMethod(PasteMd, "ToggleQuote"))
 PasteMd.gPasteMenu.Add("Show poster", ObjBindMethod(PasteMd, "ToggleShowPoster"))
 PasteMd.gPasteMenu.Add("Show img", ObjBindMethod(PasteMd, "ToggleShowImg"))
+PasteMd.gPasteMenu.Check("Quote")
