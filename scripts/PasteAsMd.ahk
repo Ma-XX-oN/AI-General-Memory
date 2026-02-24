@@ -16,18 +16,29 @@ class PasteMd {
   static DEBUG_PASTE_MD_LOG := A_ScriptDir "\PasteAsMd_debug.log"
   static PROMPT_ORDERED_LIST_START_ON_AMBIGUOUS := true
 
+  ; Toggle: prepend detected speaker label ("**User:**" / "**AI:**") to pasted output.
+  static SHOW_POSTER := false
+  ; Toggle: convert <img> tags to markdown image syntax; when off, use [img] placeholder.
+  static SHOW_IMG := false
+
   static CODE_FENCE := "``````"
 
   ; Temporary storage for thinking blocks extracted during preprocessing.
   static _thinkingBlocks := []
 
   static gPasteMenu := Menu()
+  static _menuX := 0
+  static _menuY := 0
 
   /**
    * Shows the markdown paste menu at the current cursor position.
+   * Saves the position so toggle callbacks can re-show at the same location.
    */
   static ShowPasteMenu() {
-    PasteMd.gPasteMenu.Show()
+    MouseGetPos(&x, &y)
+    PasteMd._menuX := x
+    PasteMd._menuY := y
+    PasteMd.gPasteMenu.Show(x, y)
   }
 
   /**
@@ -48,6 +59,63 @@ class PasteMd {
    */
   static PasteAsMdQuoted(ItemName, ItemPos, MenuObj) {
     PasteMd.PasteMarkdown(true)
+  }
+
+  /**
+   * Menu callback: toggles SHOW_POSTER and re-shows the menu.
+   * @param {string} ItemName - Menu item label
+   * @param {number} ItemPos - Menu item position
+   * @param {object} MenuObj - Menu object
+   */
+  static ToggleShowPoster(ItemName, ItemPos, MenuObj) {
+    PasteMd.SHOW_POSTER := !PasteMd.SHOW_POSTER
+    PasteMd.gPasteMenu.ToggleCheck("Show poster")
+    PasteMd.gPasteMenu.Show(PasteMd._menuX, PasteMd._menuY)
+  }
+
+  /**
+   * Menu callback: toggles SHOW_IMG and re-shows the menu.
+   * @param {string} ItemName - Menu item label
+   * @param {number} ItemPos - Menu item position
+   * @param {object} MenuObj - Menu object
+   */
+  static ToggleShowImg(ItemName, ItemPos, MenuObj) {
+    PasteMd.SHOW_IMG := !PasteMd.SHOW_IMG
+    PasteMd.gPasteMenu.ToggleCheck("Show img")
+    PasteMd.gPasteMenu.Show(PasteMd._menuX, PasteMd._menuY)
+  }
+
+  /**
+   * Determines the poster of the message containing the clipboard selection
+   * by scanning the CF_HTML context before StartFragment.
+   * @param {string} cfHtml - Full CF_HTML payload
+   * @returns {string} "AI", "User", or empty string when not detected
+   */
+  static _ExtractPosterFromContext(cfHtml) {
+    startFragOff := PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartFragment:")
+    startHtmlOff := PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartHTML:")
+    if (startFragOff <= 0 || startHtmlOff < 0 || startFragOff <= startHtmlOff)
+      return ""
+
+    before := SubStr(cfHtml, startHtmlOff + 1, startFragOff - startHtmlOff)
+
+    ; Find the LAST (closest) message-type marker before the fragment start.
+    lastAssist := 0
+    lastUser   := 0
+    pos := 1
+    while RegExMatch(before, "i)data-testid=`"assistant-message`"", &m, pos) {
+      lastAssist := m.Pos
+      pos := m.Pos + 1
+    }
+    pos := 1
+    while RegExMatch(before, "i)userMessageContainer_", &m, pos) {
+      lastUser := m.Pos
+      pos := m.Pos + 1
+    }
+
+    if (lastAssist = 0 && lastUser = 0)
+      return ""
+    return (lastAssist > lastUser) ? "AI" : "User"
   }
 
   /**
@@ -152,6 +220,41 @@ class PasteMd {
         md := PasteMd.RestoreOrderedListStart(md, plain, htmlFrag, cfHtml, expectedListStart)
         if (dbg)
           PasteMd._DbgSection(dbgF, "5d. md (after RestoreOrderedListStart)", md)
+      }
+
+      if (PasteMd.SHOW_POSTER) {
+        ; Collect positions of all poster placeholders in document order.
+        mdBefore := md
+        posters := []
+        pos := 1
+        while RegExMatch(md, "m)^¤POSTER_(?:AI|User)¤$", &pm, pos) {
+          posters.Push({type: InStr(pm[0], "AI") ? "AI" : "User", pos: pm.Pos, len: pm.Len})
+          pos := pm.Pos + pm.Len
+        }
+        ; Remove consecutive duplicates, iterating backwards to preserve offsets.
+        i := posters.Length
+        while i > 1 {
+          if (posters[i].type = posters[i - 1].type) {
+            endPos := posters[i].pos + posters[i].len
+            while (SubStr(md, endPos, 1) = "`n")
+              endPos++
+            md := SubStr(md, 1, posters[i].pos - 1) . SubStr(md, endPos)
+            posters.RemoveAt(i)
+          }
+          i--
+        }
+        ; Replace remaining placeholders with bold labels.
+        md := RegExReplace(md, "m)^¤POSTER_AI¤$", "**AI:**")
+        md := RegExReplace(md, "m)^¤POSTER_User¤$", "**User:**")
+        ; If nothing was replaced the fragment had no message container divs
+        ; (partial selection). Fall back to the pre-fragment cfHtml context.
+        if (md = mdBefore && cfHtml != "") {
+          poster := PasteMd._ExtractPosterFromContext(cfHtml)
+          if (poster != "")
+            md := "**" . poster . ":**`n`n" . md
+        }
+        if (dbg)
+          PasteMd._DbgSection(dbgF, "5e. md (after SHOW_POSTER replacement)", md)
       }
 
       if (asQuoted) {
@@ -468,6 +571,8 @@ class PasteMd {
 
   /**
    * Preprocesses HTML before pandoc conversion.
+   * When SHOW_POSTER is enabled, injects ¤POSTER_AI¤ / ¤POSTER_User¤ paragraphs at
+   * the start of each detected message block so per-block labels survive pandoc.
    * Strips UI artifacts (buttons, thinking blocks), converts code-like spans to <code>,
    * strips presentational spans, normalizes line breaks inside <code>,
    * and wraps multi-line code in <pre>.
@@ -475,6 +580,36 @@ class PasteMd {
    * @returns {string} Preprocessed HTML
    */
   static PreprocessHtmlCodeBlocks(html) {
+    ; Handle <img> tags.  When SHOW_IMG is off, replace with [img] / [img: alt].
+    ; When on, leave in place for pandoc to convert to markdown image syntax.
+    pos := 1
+    while RegExMatch(html, "i)<img\b([^>]*?)>", &m, pos) {
+      if (PasteMd.SHOW_IMG) {
+        pos := m.Pos + m.Len
+      } else {
+        attrs := m[1]
+        accessText := ""
+        if (RegExMatch(attrs, "i)\balt\s*=\s*['`"]([^'`"]*)['`"]", &mA) && mA[1] != "")
+          accessText := mA[1]
+        else if (RegExMatch(attrs, "i)\btitle\s*=\s*['`"]([^'`"]*)['`"]", &mT) && mT[1] != "")
+          accessText := mT[1]
+        else if (RegExMatch(attrs, "i)\baria-label\s*=\s*['`"]([^'`"]*)['`"]", &mL) && mL[1] != "")
+          accessText := mL[1]
+        replacement := (accessText = "") ? "[img]" : "[img: " . accessText . "]"
+        html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
+        pos := m.Pos + StrLen(replacement)
+      }
+    }
+
+    ; Inject poster label placeholders at the start of each message block.
+    ; Replaced with bold labels (e.g. "**AI:**") in PasteMarkdown after cleanup.
+    if (PasteMd.SHOW_POSTER) {
+      ; AI messages: identified by data-testid="assistant-message".
+      html := RegExReplace(html, "i)(<div\b[^>]*\bdata-testid=`"assistant-message`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
+      ; User messages: outer container has both message_* and userMessageContainer_* classes.
+      html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bmessage_\w+\s+[^`"]*\buserMessageContainer_[^>]*>)", "$1<p>¤POSTER_User¤</p>")
+    }
+
     ; Strip UI artifacts that don't belong in markdown output.
     html := RegExReplace(html, "is)<button\b[^>]*>.*?</button>", "")
 
@@ -945,3 +1080,6 @@ class PasteMd {
 
 PasteMd.gPasteMenu.Add("Paste as md", ObjBindMethod(PasteMd, "PasteAsMd"))
 PasteMd.gPasteMenu.Add("Paste as md quoted", ObjBindMethod(PasteMd, "PasteAsMdQuoted"))
+PasteMd.gPasteMenu.Add()
+PasteMd.gPasteMenu.Add("Show poster", ObjBindMethod(PasteMd, "ToggleShowPoster"))
+PasteMd.gPasteMenu.Add("Show img", ObjBindMethod(PasteMd, "ToggleShowImg"))
