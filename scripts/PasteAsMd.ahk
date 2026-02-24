@@ -5,57 +5,50 @@
 #SingleInstance Force
 #Include ClipHelper.ahk
 
-; Ctrl+Alt+Shift+V
-^!+v::ShowPasteMenu()
-
-; Change this if pandoc isn't on PATH.
-PANDOC_EXE := "C:\Users\adria\AppData\Local\Pandoc\pandoc.exe"
-
-PASTE_DELAY_MS := 500
-
-; Set to true to dump pipeline stages to a log file for debugging.
-DEBUG_PASTE_MD := true
-DEBUG_PASTE_MD_LOG := A_ScriptDir "\PasteAsMd_debug.log"
-PROMPT_ORDERED_LIST_START_ON_AMBIGUOUS := true
-
-global gPasteMenu := Menu()
-gPasteMenu.Add("Paste as md", PasteAsMd)
-gPasteMenu.Add("Paste as md quoted", PasteAsMdQuoted)
-
-/**
- * Shows the markdown paste menu at the current cursor position.
- */
-ShowPasteMenu() {
-  global gPasteMenu
-  gPasteMenu.Show()
-}
-
-/**
- * Menu callback: pastes clipboard content as markdown.
- * @param {string} ItemName - Menu item label
- * @param {number} ItemPos - Menu item position
- * @param {object} MenuObj - Menu object
- */
-PasteAsMd(ItemName, ItemPos, MenuObj) {
-  PasteMd.PasteMarkdown(false)
-}
-
-/**
- * Menu callback: pastes clipboard content as quoted markdown (blockquote).
- * @param {string} ItemName - Menu item label
- * @param {number} ItemPos - Menu item position
- * @param {object} MenuObj - Menu object
- */
-PasteAsMdQuoted(ItemName, ItemPos, MenuObj) {
-  PasteMd.PasteMarkdown(true)
-}
-
 class PasteMd {
+  ; Change this if pandoc isn't on PATH.
+  static PANDOC_EXE := "C:\Users\adria\AppData\Local\Pandoc\pandoc.exe"
+
+  static PASTE_DELAY_MS := 500
+
+  ; Set to true to dump pipeline stages to a log file for debugging.
+  static DEBUG_PASTE_MD := true
+  static DEBUG_PASTE_MD_LOG := A_ScriptDir "\PasteAsMd_debug.log"
+  static PROMPT_ORDERED_LIST_START_ON_AMBIGUOUS := true
 
   static CODE_FENCE := "``````"
 
   ; Temporary storage for thinking blocks extracted during preprocessing.
   static _thinkingBlocks := []
+
+  static gPasteMenu := Menu()
+
+  /**
+   * Shows the markdown paste menu at the current cursor position.
+   */
+  static ShowPasteMenu() {
+    PasteMd.gPasteMenu.Show()
+  }
+
+  /**
+   * Menu callback: pastes clipboard content as markdown.
+   * @param {string} ItemName - Menu item label
+   * @param {number} ItemPos - Menu item position
+   * @param {object} MenuObj - Menu object
+   */
+  static PasteAsMd(ItemName, ItemPos, MenuObj) {
+    PasteMd.PasteMarkdown(false)
+  }
+
+  /**
+   * Menu callback: pastes clipboard content as quoted markdown (blockquote).
+   * @param {string} ItemName - Menu item label
+   * @param {number} ItemPos - Menu item position
+   * @param {object} MenuObj - Menu object
+   */
+  static PasteAsMdQuoted(ItemName, ItemPos, MenuObj) {
+    PasteMd.PasteMarkdown(true)
+  }
 
   /**
    * Writes a labelled debug section to the log file.
@@ -80,11 +73,9 @@ class PasteMd {
    * @param {boolean} asQuoted - If true, prefixes every line with blockquote syntax (>).
    */
   static PasteMarkdown(asQuoted) {
-    global PANDOC_EXE, PASTE_DELAY_MS, DEBUG_PASTE_MD, DEBUG_PASTE_MD_LOG, PROMPT_ORDERED_LIST_START_ON_AMBIGUOUS
-
-    dbg := DEBUG_PASTE_MD
+    dbg := PasteMd.DEBUG_PASTE_MD
     if (dbg) {
-      dbgF := FileOpen(DEBUG_PASTE_MD_LOG, "w", "UTF-8")
+      dbgF := FileOpen(PasteMd.DEBUG_PASTE_MD_LOG, "w", "UTF-8")
       dbgF.Write("PasteAsMd debug — " . FormatTime(, "yyyy-MM-dd HH:mm:ss") . "`r`n`r`n")
     }
 
@@ -127,7 +118,7 @@ class PasteMd {
           if (dbg)
             PasteMd._DbgSection(dbgF, "3b. md (no HTML tags → plain text path)", md)
         } else {
-          mdRaw := PasteMd.HtmlToGfmViaPandoc(htmlPrep, PANDOC_EXE)
+          mdRaw := PasteMd.HtmlToGfmViaPandoc(htmlPrep, PasteMd.PANDOC_EXE)
           if (dbg)
             PasteMd._DbgSection(dbgF, "4. mdRaw (pandoc output)", mdRaw)
 
@@ -147,7 +138,7 @@ class PasteMd {
         }
 
         expectedListStart := PasteMd.GetExpectedOrderedListStart(htmlFrag, cfHtml, plain)
-        if (PROMPT_ORDERED_LIST_START_ON_AMBIGUOUS) {
+        if (PasteMd.PROMPT_ORDERED_LIST_START_ON_AMBIGUOUS) {
           promptedStart := PasteMd.MaybePromptOrderedListStart(md, plain, htmlFrag, expectedListStart)
           if (dbg && promptedStart != expectedListStart) {
             PasteMd._DbgSection(dbgF, "5c2. prompted list start (ordered-list fix)", "" . promptedStart)
@@ -191,7 +182,7 @@ class PasteMd {
       Send "^v"
       if (pasteWithSentinel)
         Send "{BS}"
-      Sleep PASTE_DELAY_MS
+      Sleep PasteMd.PASTE_DELAY_MS
     } catch as e {
       if (dbg) {
         try {
@@ -948,3 +939,9 @@ class PasteMd {
     return tail . "`n"
   }
 }
+
+; Ctrl+Alt+Shift+V
+^!+v::PasteMd.ShowPasteMenu()
+
+PasteMd.gPasteMenu.Add("Paste as md", ObjBindMethod(PasteMd, "PasteAsMd"))
+PasteMd.gPasteMenu.Add("Paste as md quoted", ObjBindMethod(PasteMd, "PasteAsMdQuoted"))
