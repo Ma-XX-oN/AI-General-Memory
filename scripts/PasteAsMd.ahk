@@ -191,6 +191,8 @@ class PasteMd {
             PasteMd._DbgSection(dbgF, "3b. md (no HTML tags → plain text path)", md)
         } else {
           mdRaw := PasteMd.HtmlToGfmViaPandoc(htmlPrep, PasteMd.PANDOC_EXE)
+          ; Pandoc converts inline <svg> elements to <img> tags; process them now.
+          mdRaw := PasteMd._ProcessImgTags(mdRaw)
           if (dbg)
             PasteMd._DbgSection(dbgF, "4. mdRaw (pandoc output)", mdRaw)
 
@@ -574,20 +576,18 @@ class PasteMd {
   }
 
   /**
-   * Preprocesses HTML before pandoc conversion.
-   * When SHOW_POSTER is enabled, injects ¤POSTER_AI¤ / ¤POSTER_User¤ paragraphs at
-   * the start of each detected message block so per-block labels survive pandoc.
-   * Strips UI artifacts (buttons, thinking blocks), converts code-like spans to <code>,
-   * strips presentational spans, normalizes line breaks inside <code>,
-   * and wraps multi-line code in <pre>.
-   * @param {string} html - HTML fragment from clipboard
-   * @returns {string} Preprocessed HTML
+   * Replaces <img> tags in a string according to the SHOW_IMG toggle.
+   * When SHOW_IMG is off, replaces each tag with [img] or [img: text] using the
+   * first non-empty alt / title / aria-label attribute as the description.
+   * When SHOW_IMG is on, leaves tags in place for pandoc to convert.
+   * Called on both the pre-pandoc HTML and the post-pandoc markdown, because
+   * pandoc converts inline <svg> elements to <img> tags.
+   * @param {string} str - HTML or markdown string to process
+   * @returns {string} String with <img> tags replaced (or left intact when SHOW_IMG is on)
    */
-  static PreprocessHtmlCodeBlocks(html) {
-    ; Handle <img> tags.  When SHOW_IMG is off, replace with [img] / [img: alt].
-    ; When on, leave in place for pandoc to convert to markdown image syntax.
+  static _ProcessImgTags(str) {
     pos := 1
-    while RegExMatch(html, "i)<img\b([^>]*?)>", &m, pos) {
+    while RegExMatch(str, "i)<img\b([^>]*?)>", &m, pos) {
       if (PasteMd.SHOW_IMG) {
         pos := m.Pos + m.Len
       } else {
@@ -600,10 +600,27 @@ class PasteMd {
         else if (RegExMatch(attrs, "i)\baria-label\s*=\s*['`"]([^'`"]*)['`"]", &mL) && mL[1] != "")
           accessText := mL[1]
         replacement := (accessText = "") ? "[img]" : "[img: " . accessText . "]"
-        html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
+        str := SubStr(str, 1, m.Pos - 1) . replacement . SubStr(str, m.Pos + m.Len)
         pos := m.Pos + StrLen(replacement)
       }
     }
+    return str
+  }
+
+  /**
+   * Preprocesses HTML before pandoc conversion.
+   * When SHOW_POSTER is enabled, injects ¤POSTER_AI¤ / ¤POSTER_User¤ paragraphs at
+   * the start of each detected message block so per-block labels survive pandoc.
+   * Strips UI artifacts (buttons, thinking blocks), converts code-like spans to <code>,
+   * strips presentational spans, normalizes line breaks inside <code>,
+   * and wraps multi-line code in <pre>.
+   * @param {string} html - HTML fragment from clipboard
+   * @returns {string} Preprocessed HTML
+   */
+  static PreprocessHtmlCodeBlocks(html) {
+    ; Handle <img> tags.  When SHOW_IMG is off, replace with [img] / [img: alt].
+    ; When on, leave in place for pandoc to convert to markdown image syntax.
+    html := PasteMd._ProcessImgTags(html)
 
     ; Inject poster label placeholders at the start of each message block.
     ; Replaced with bold labels (e.g. "**AI:**") in PasteMarkdown after cleanup.
