@@ -16,7 +16,7 @@ class PasteMd {
   static DEBUG_PASTE_MD_LOG := A_ScriptDir "\PasteAsMd_debug.log"
   static PROMPT_ORDERED_LIST_START_ON_AMBIGUOUS := true
 
-  ; Toggle: prepend detected speaker label ("**User:**" / "**AI:**") to pasted output.
+  ; Toggle: prepend detected speaker label ("**User:**" / "**Codex:**" / "**Claude:**" / "**AI:**") to pasted output.
   static SHOW_POSTER := false
   ; Toggle: convert <img> tags to markdown image syntax; when off, use [img] placeholder.
   static SHOW_IMG := false
@@ -111,8 +111,20 @@ class PasteMd {
       lastAssist := m.Pos
       pos := m.Pos + 1
     }
+    ; Codex assistant messages: group + min-w-0 + flex-col classes.
+    pos := 1
+    while RegExMatch(before, "i)\bclass=`"[^`"]*\bgroup\b[^`"]*\bmin-w-0\b[^`"]*\bflex-col\b[^`"]*`"", &m, pos) {
+      lastAssist := m.Pos
+      pos := m.Pos + 1
+    }
     pos := 1
     while RegExMatch(before, "i)userMessageContainer_", &m, pos) {
+      lastUser := m.Pos
+      pos := m.Pos + 1
+    }
+    ; Codex user messages: right-aligned blocks include flex-col + items-end.
+    pos := 1
+    while RegExMatch(before, "i)\bclass=`"[^`"]*\bflex-col\b[^`"]*\bitems-end\b[^`"]*`"", &m, pos) {
       lastUser := m.Pos
       pos := m.Pos + 1
     }
@@ -120,6 +132,26 @@ class PasteMd {
     if (lastAssist = 0 && lastUser = 0)
       return ""
     return (lastAssist > lastUser) ? "AI" : "User"
+  }
+
+  /**
+   * Resolves assistant label from CF_HTML source context.
+   * @param {string} cfHtml - Full CF_HTML payload
+   * @returns {string} "Codex", "Claude", or "AI"
+   */
+  static _ResolveAssistantLabel(cfHtml) {
+    if (cfHtml = "")
+      return "AI"
+
+    if RegExMatch(cfHtml, "i)extensionId=([^&`r`n]+)", &mExt) {
+      extId := StrLower(mExt[1])
+      if (InStr(extId, "openai.chatgpt"))
+        return "Codex"
+      if (InStr(extId, "anthropic") || InStr(extId, "claude"))
+        return "Claude"
+    }
+
+    return "AI"
   }
 
   /**
@@ -229,6 +261,7 @@ class PasteMd {
       }
 
       if (PasteMd.SHOW_POSTER) {
+        assistantLabel := PasteMd._ResolveAssistantLabel(cfHtml)
         ; Collect positions of all poster placeholders in document order.
         mdBefore := md
         posters := []
@@ -250,12 +283,14 @@ class PasteMd {
           i--
         }
         ; Replace remaining placeholders with bold labels.
-        md := RegExReplace(md, "m)^¤POSTER_AI¤$", "**AI:**")
+        md := RegExReplace(md, "m)^¤POSTER_AI¤$", "**" . assistantLabel . ":**")
         md := RegExReplace(md, "m)^¤POSTER_User¤$", "**User:**")
         ; If nothing was replaced the fragment had no message container divs
         ; (partial selection). Fall back to the pre-fragment cfHtml context.
         if (md = mdBefore && cfHtml != "") {
           poster := PasteMd._ExtractPosterFromContext(cfHtml)
+          if (poster = "AI")
+            poster := assistantLabel
           if (poster != "")
             md := "**" . poster . ":**`n`n" . md
         }
@@ -405,7 +440,7 @@ class PasteMd {
       t := LTrim(line, " `t")
 
       ; Fence detection without regex (avoids backtick-escape problems).
-      if (SubStr(t, 1, 3) = PasteMd.CODE_FENCE) {
+      if (SubStr(t, 1, StrLen(PasteMd.CODE_FENCE)) = PasteMd.CODE_FENCE) {
         inFence := !inFence
         outLine := RTrim(line, " `t")
         out .= (out = "" ? "" : "`n") . outLine
@@ -417,7 +452,11 @@ class PasteMd {
         continue
       }
 
-      outLine := RTrim(line, " `t")
+      ; Keep markdown hard-break intent ("two spaces before newline").
+      rawLine := line
+      outLine := RTrim(rawLine, " `t")
+      if (outLine != "" && RegExMatch(rawLine, " {2,}$"))
+        outLine .= "  "
 
       ; Drop empty headings like "###" or "### ".
       if RegExMatch(outLine, "^[#]{1,6}\s*$") {
@@ -425,6 +464,9 @@ class PasteMd {
       }
 
       outLine := PasteMd.SimplifyMarkdownInlineHtml(outLine)
+      ; Unescape literal details/summary tags and [img: ...] placeholders.
+      outLine := RegExReplace(outLine, "\\(<\/?(?:details|summary)\b[^>]*>)", "$1")
+      outLine := RegExReplace(outLine, "\\\[(img(?::[^\]]*)?)\\\]", "[$1]")
       out .= (out = "" ? "" : "`n") . outLine
     }
 
@@ -623,16 +665,44 @@ class PasteMd {
     html := PasteMd._ProcessImgTags(html)
 
     ; Inject poster label placeholders at the start of each message block.
-    ; Replaced with bold labels (e.g. "**AI:**") in PasteMarkdown after cleanup.
+    ; Replaced with bold labels (e.g. "**Codex:**" / "**Claude:**") in PasteMarkdown.
     if (PasteMd.SHOW_POSTER) {
       ; AI messages: identified by data-testid="assistant-message".
       html := RegExReplace(html, "i)(<div\b[^>]*\bdata-testid=`"assistant-message`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
       ; User messages: outer container has both message_* and userMessageContainer_* classes.
       html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bmessage_\w+\s+[^`"]*\buserMessageContainer_[^>]*>)", "$1<p>¤POSTER_User¤</p>")
+      ; Codex assistant messages: group + min-w-0 + flex-col classes.
+      html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bgroup\b[^`"]*\bmin-w-0\b[^`"]*\bflex-col\b[^`"]*`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
+      ; Codex user messages: right-aligned blocks include flex-col + items-end.
+      html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bflex-col\b[^`"]*\bitems-end\b[^`"]*`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
     }
 
     ; Strip UI artifacts that don't belong in markdown output.
     html := RegExReplace(html, "is)<button\b[^>]*>.*?</button>", "")
+
+    ; Normalize task-list items to markdown checkbox markers before pandoc.
+    pos := 1
+    while RegExMatch(html, "is)<li\b([^>]*)>(.*?)</li>", &mTask, pos) {
+      liAttrs := mTask[1]
+      liInner := mTask[2]
+      if (!RegExMatch(liAttrs, "i)\btask-list-item\b")
+        || !RegExMatch(liInner, "is)^\s*<input\b[^>]*\btype\s*=\s*['`"]checkbox['`"][^>]*>\s*(.*)$", &mTaskText)) {
+        pos := mTask.Pos + mTask.Len
+        continue
+      }
+
+      checked := RegExMatch(liInner, "i)\bchecked\b")
+      text := mTaskText[1]
+      text := RegExReplace(text, "is)<span\b[^>]*>\s*</span>", "")
+      text := RegExReplace(text, "<[^>]++>", "")
+      text := this.DecodeBasicHtmlEntities(text)
+      text := Trim(text, " `t`r`n" . Chr(160))
+
+      marker := checked ? "[x] " : "[ ] "
+      replacement := "<li>" . marker . text . "</li>"
+      html := SubStr(html, 1, mTask.Pos - 1) . replacement . SubStr(html, mTask.Pos + mTask.Len)
+      pos := mTask.Pos + StrLen(replacement)
+    }
 
     ; Extract Claude Code thinking blocks as placeholders so pandoc doesn't
     ; mangle them.  They get restored as raw HTML after markdown cleanup.
@@ -710,6 +780,14 @@ class PasteMd {
 
       html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
       pos := m.Pos + StrLen(replacement)
+    }
+
+    ; Unwrap nested chat code containers so pandoc sees canonical code blocks.
+    prev := ""
+    while (html != prev) {
+      prev := html
+      html := RegExReplace(html, "is)<div\b[^>]*>\s*<div\b[^>]*>\s*(<pre><code\b[^>]*>.*?</code></pre>)\s*</div>\s*</div>", "$1")
+      html := RegExReplace(html, "is)<div\b[^>]*>\s*<div\b[^>]*>\s*(<code\b[^>]*>.*?</code>)\s*</div>\s*</div>", "$1")
     }
 
     return html
@@ -1050,7 +1128,10 @@ class PasteMd {
     firstOut := true
     Loop lines.Length {
       i := A_Index
-      line := RTrim(lines[i], " `t")
+      rawLine := lines[i]
+      line := RTrim(rawLine, " `t")
+      if (line != "" && RegExMatch(rawLine, " {2,}$"))
+        line .= "  "
 
       ; Drop pandoc's separator blank lines between adjacent ordered-list items.
       if (line = "") {
