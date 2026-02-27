@@ -27,6 +27,8 @@ class PasteMd {
 
   ; Temporary storage for thinking blocks extracted during preprocessing.
   static _thinkingBlocks := []
+  ; Temporary storage for user message text blocks extracted during preprocessing.
+  static _userMsgBlocks := []
 
   static gPasteMenu := Menu()
   static _menuX := 0
@@ -230,6 +232,7 @@ class PasteMd {
 
           md := PasteMd.CleanMarkdown(mdRaw)
           md := PasteMd.RestoreThinkingBlocks(md)
+          md := PasteMd.RestoreUserMsgBlocks(md)
           if (dbg)
             PasteMd._DbgSection(dbgF, "5. md (after CleanMarkdown)", md)
 
@@ -263,7 +266,6 @@ class PasteMd {
       if (PasteMd.SHOW_POSTER) {
         assistantLabel := PasteMd._ResolveAssistantLabel(cfHtml)
         ; Collect positions of all poster placeholders in document order.
-        mdBefore := md
         posters := []
         pos := 1
         while RegExMatch(md, "m)^¤POSTER_(?:AI|User)¤$", &pm, pos) {
@@ -282,12 +284,19 @@ class PasteMd {
           }
           i--
         }
+        ; Apply quoting BEFORE replacing poster placeholders. This way the
+        ; placeholder (¤POSTER_AI¤) becomes "> ¤POSTER_AI¤" and can be
+        ; distinguished from previously-pasted "**AI:**" text, which stays
+        ; quoted as "> **AI:**".
+        if (asQuoted)
+          md := PasteMd.QuoteMarkdown(md)
         ; Replace remaining placeholders with bold labels.
-        md := RegExReplace(md, "m)^¤POSTER_AI¤$", "**" . assistantLabel . ":**")
-        md := RegExReplace(md, "m)^¤POSTER_User¤$", "**User:**")
-        ; If nothing was replaced the fragment had no message container divs
-        ; (partial selection). Fall back to the pre-fragment cfHtml context.
-        if (md = mdBefore && cfHtml != "") {
+        ; Placeholders may be prefixed with "> " if quoting is active.
+        md := RegExReplace(md, "m)^(?:> )?¤POSTER_AI¤$", "**" . assistantLabel . ":**")
+        md := RegExReplace(md, "m)^(?:> )?¤POSTER_User¤$", "**User:**")
+        ; If no placeholders were found the fragment had no message container
+        ; divs (partial selection). Fall back to the pre-fragment cfHtml context.
+        if (posters.Length = 0 && cfHtml != "") {
           poster := PasteMd._ExtractPosterFromContext(cfHtml)
           if (poster = "AI")
             poster := assistantLabel
@@ -296,9 +305,7 @@ class PasteMd {
         }
         if (dbg)
           PasteMd._DbgSection(dbgF, "5e. md (after SHOW_POSTER replacement)", md)
-      }
-
-      if (asQuoted) {
+      } else if (asQuoted) {
         md := PasteMd.QuoteMarkdown(md)
       }
 
@@ -726,6 +733,46 @@ class PasteMd {
     ; Matches spans with inline-markdown/font-mono class (e.g., Codex/Claude Code).
     html := RegExReplace(html, "is)<span\b[^>]*\bclass=`"[^`"]*\b(?:inline-markdown|font-mono)\b[^`"]*`"[^>]*>(.*?)</span>", "<code>$1</code>")
 
+    ; Extract user message text before pandoc to preserve \n line structure.
+    ; Both Claude Code and Codex use whitespace-sensitive containers whose text
+    ; nodes would be collapsed by pandoc's HTML whitespace rules.
+    this._userMsgBlocks := []
+
+    ; Codex user messages: text-size-chat whitespace-pre-wrap divs with mixed
+    ; <span> and <code class="font-mono"> elements.
+    pos := 1
+    while RegExMatch(html, "is)(<div\b[^>]*\btext-size-chat\b[^>]*\bwhitespace-pre-wrap\b[^>]*>)(.*?)</div>", &m, pos) {
+      rawContent := m[2]
+      ; Convert font-mono <code> elements to backtick inline code.
+      rawContent := RegExReplace(rawContent, "is)<code\b[^>]*\bfont-mono\b[^>]*>(.*?)</code>", "``$1``")
+      ; Strip <span> wrapper tags (keep text content).
+      rawContent := RegExReplace(rawContent, "i)</?span\b[^>]*>", "")
+      ; Strip any remaining HTML tags.
+      rawContent := RegExReplace(rawContent, "<[^>]++>", "")
+      ; Decode HTML entities.
+      rawContent := this.DecodeBasicHtmlEntities(rawContent)
+      rawContent := StrReplace(rawContent, "`r", "")
+      rawContent := Trim(rawContent, "`n")
+      this._userMsgBlocks.Push(rawContent)
+      placeholder := "<p>¤USERMSG_" . this._userMsgBlocks.Length . "¤</p>"
+      newStr := m[1] . placeholder . "</div>"
+      html := SubStr(html, 1, m.Pos - 1) . newStr . SubStr(html, m.Pos + m.Len)
+      pos := m.Pos + StrLen(newStr)
+    }
+
+    ; Claude Code user messages: unattributed <span> direct children of
+    ; content_xGDvVg divs contain the user's typed text.
+    pos := 1
+    while RegExMatch(html, "is)(<div\b[^>]*\bcontent_xGDvVg\b[^>]*>)\s*<span>(.*?)</span>", &m, pos) {
+      rawText := this.DecodeBasicHtmlEntities(m[2])
+      rawText := StrReplace(rawText, "`r", "")
+      this._userMsgBlocks.Push(rawText)
+      placeholder := "<p>¤USERMSG_" . this._userMsgBlocks.Length . "¤</p>"
+      newStr := m[1] . placeholder
+      html := SubStr(html, 1, m.Pos - 1) . newStr . SubStr(html, m.Pos + m.Len)
+      pos := m.Pos + StrLen(newStr)
+    }
+
     ; Strip remaining <span> tags globally (presentational wrappers).
     html := RegExReplace(html, "i)</?span\b[^>]*>", "")
 
@@ -807,6 +854,22 @@ class PasteMd {
         details := "<details>`n<summary>Thinking</summary>`n`n" . content . "`n</details>"
       }
       md := StrReplace(md, placeholder, details)
+    }
+    return md
+  }
+
+  /**
+   * Replaces ¤USERMSG_N¤ placeholders with the raw user message text extracted
+   * by PreprocessHtmlCodeBlocks.  This content bypasses pandoc to preserve line
+   * structure of markdown-like text (blockquotes, bold labels, etc.) the user
+   * typed or pasted into the chat input.
+   * @param {string} md - Markdown text containing placeholders
+   * @returns {string} Markdown with user message content restored
+   */
+  static RestoreUserMsgBlocks(md) {
+    for i, content in this._userMsgBlocks {
+      placeholder := "¤USERMSG_" . i . "¤"
+      md := StrReplace(md, placeholder, content)
     }
     return md
   }
