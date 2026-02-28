@@ -16,6 +16,9 @@ class PasteMd {
   static DEBUG_PASTE_MD_LOG := A_ScriptDir "\PasteAsMd_debug.log"
   static PROMPT_ORDERED_LIST_START_ON_AMBIGUOUS := true
 
+  ; Number of rotated past-run logs to keep alongside the current one.
+  static LOG_HISTORY_COUNT := 4
+
   ; Toggle: prepend detected speaker label ("**User:**" / "**Codex:**" / "**Claude:**" / "**AI:**") to pasted output.
   static SHOW_POSTER := false
   ; Toggle: convert <img> tags to markdown image syntax; when off, use [img] placeholder.
@@ -42,6 +45,16 @@ class PasteMd {
     MouseGetPos(&x, &y)
     PasteMd._menuX := x
     PasteMd._menuY := y
+    ; Enable "Pin current log" only when there is a log file to pin.
+    if FileExist(PasteMd.DEBUG_PASTE_MD_LOG)
+      PasteMd.gPasteMenu.Enable("Pin current log")
+    else
+      PasteMd.gPasteMenu.Disable("Pin current log")
+    ; Enable "Delete pinned history" only when pinned files exist.
+    if (PasteMd._PinnedLogFiles().Length > 0)
+      PasteMd.gPasteMenu.Enable("Delete pinned history")
+    else
+      PasteMd.gPasteMenu.Disable("Delete pinned history")
     PasteMd.gPasteMenu.Show(x, y)
   }
 
@@ -89,6 +102,38 @@ class PasteMd {
     PasteMd.QUOTE := !PasteMd.QUOTE
     PasteMd.gPasteMenu.ToggleCheck("Quote")
     PasteMd.gPasteMenu.Show(PasteMd._menuX, PasteMd._menuY)
+  }
+
+  /**
+   * Menu callback: immediately copies the current debug log to a timestamped
+   * pinned file so rotation cannot overwrite it.
+   * @param {string} ItemName - Menu item label
+   * @param {number} ItemPos - Menu item position
+   * @param {object} MenuObj - Menu object
+   */
+  static PinCurrentLog(ItemName, ItemPos, MenuObj) {
+    if !FileExist(PasteMd.DEBUG_PASTE_MD_LOG)
+      return
+    FileCopy(PasteMd.DEBUG_PASTE_MD_LOG, PasteMd._PinLogPath())
+  }
+
+  /**
+   * Menu callback: deletes all pinned (timestamped) log files after confirmation.
+   * @param {string} ItemName - Menu item label
+   * @param {number} ItemPos - Menu item position
+   * @param {object} MenuObj - Menu object
+   */
+  static DeletePinnedHistory(ItemName, ItemPos, MenuObj) {
+    files := PasteMd._PinnedLogFiles()
+    if (files.Length = 0)
+      return
+    n := files.Length
+    result := MsgBox("Delete " . n . " pinned log file" . (n = 1 ? "" : "s") . "?`nThis cannot be undone."
+      , "Delete pinned history", "OKCancel Icon!")
+    if (result != "OK")
+      return
+    for f in files
+      FileDelete(f)
   }
 
   /**
@@ -174,6 +219,58 @@ class PasteMd {
   }
 
   /**
+   * Returns the path for rotated log history entry n (1 = most recent).
+   * @param {number} n - History index (1-based)
+   * @returns {string} File path with .N.log suffix
+   */
+  static _LogHistoryPath(n) {
+    return RegExReplace(PasteMd.DEBUG_PASTE_MD_LOG, "\.log$", "." . n . ".log")
+  }
+
+  /**
+   * Returns a timestamped path for a pinned log snapshot.
+   * @returns {string} File path with yyyyMMdd_HHmmss timestamp suffix
+   */
+  static _PinLogPath() {
+    return RegExReplace(PasteMd.DEBUG_PASTE_MD_LOG, "\.log$", "_" . FormatTime(, "yyyyMMdd_HHmmss") . ".log")
+  }
+
+  /**
+   * Returns an array of paths for all pinned (timestamped) log files.
+   * @returns {Array} Absolute paths matching the timestamped filename pattern
+   */
+  static _PinnedLogFiles() {
+    pattern := RegExReplace(PasteMd.DEBUG_PASTE_MD_LOG, "\.log$", "_????????_??????.log")
+    files := []
+    Loop Files, pattern
+      files.Push(A_LoopFileFullPath)
+    return files
+  }
+
+  /**
+   * Rotates numbered log history files, dropping the oldest, then moves the
+   * current log to the .1 slot.  Called before each new debug log is opened.
+   */
+  static _RotateLogFiles() {
+    ; Drop the oldest entry if the rotation is full.
+    oldest := PasteMd._LogHistoryPath(PasteMd.LOG_HISTORY_COUNT)
+    if FileExist(oldest)
+      FileDelete(oldest)
+    ; Shift each slot up: .N-1 → .N, ..., .1 → .2
+    n := PasteMd.LOG_HISTORY_COUNT
+    Loop n - 1 {
+      idx := n - A_Index   ; counts down: N-1, N-2, ..., 1
+      src := PasteMd._LogHistoryPath(idx)
+      dst := PasteMd._LogHistoryPath(idx + 1)
+      if FileExist(src)
+        FileMove(src, dst)
+    }
+    ; Move the current log into the .1 slot.
+    if FileExist(PasteMd.DEBUG_PASTE_MD_LOG)
+      FileMove(PasteMd.DEBUG_PASTE_MD_LOG, PasteMd._LogHistoryPath(1))
+  }
+
+  /**
    * Converts clipboard content to markdown (or quoted markdown) and pastes it.
    * Prefers CF_HTML → pandoc conversion, with plain-text fallback.
    * @param {boolean} asQuoted - If true, prefixes every line with blockquote syntax (>).
@@ -181,6 +278,7 @@ class PasteMd {
   static PasteMarkdown(asQuoted) {
     dbg := PasteMd.DEBUG_PASTE_MD
     if (dbg) {
+      PasteMd._RotateLogFiles()
       dbgF := FileOpen(PasteMd.DEBUG_PASTE_MD_LOG, "w", "UTF-8")
       dbgF.Write("PasteAsMd debug — " . FormatTime(, "yyyy-MM-dd HH:mm:ss") . "`r`n`r`n")
     }
@@ -425,12 +523,14 @@ class PasteMd {
 
     ; Convert block-level <code> elements (multi-line) to fenced code blocks.
     pos := 1
-    while RegExMatch(md, "s)<code\b[^>]*>(.*?)</code>", &m, pos) {
-      if InStr(m[1], "`n") {
-        inner := RegExReplace(m[1], "<[^>]++>", "")
+    while RegExMatch(md, "s)<code\b([^>]*)>(.*?)</code>", &m, pos) {
+      if InStr(m[2], "`n") {
+        ; Extract language identifier from class="language-xxx" if present.
+        lang := RegExMatch(m[1], "i)language-(\w+)", &langM) ? langM[1] : ""
+        inner := RegExReplace(m[2], "<[^>]++>", "")
         inner := PasteMd.DecodeBasicHtmlEntities(inner)
         inner := Trim(inner, " `t`n")
-        replacement := PasteMd.CODE_FENCE . "`n" . inner . "`n" . PasteMd.CODE_FENCE
+        replacement := PasteMd.CODE_FENCE . lang . "`n" . inner . "`n" . PasteMd.CODE_FENCE
         md := SubStr(md, 1, m.Pos - 1) . replacement . SubStr(md, m.Pos + m.Len)
         pos := m.Pos + StrLen(replacement)
       } else {
@@ -500,6 +600,12 @@ class PasteMd {
 
     ; Collapse runs of 3+ newlines to 2 (at most one blank line).
     out := RegExReplace(out, "\n{3,}", "`n`n")
+
+    ; Restore task-list checkbox placeholders to GFM syntax.
+    ; ¤CHK¤/¤UNCHK¤ were inserted by PreprocessHtmlCodeBlocks so pandoc would not
+    ; escape "[x]"/"[ ]" to "\[x\]"/"\[ \]".  Only matches at list-item line starts.
+    out := RegExReplace(out, "m)^(\s*[-*+] )¤CHK¤ ", "$1[x] ")
+    out := RegExReplace(out, "m)^(\s*[-*+] )¤UNCHK¤ ", "$1[ ] ")
 
     out := Trim(out, "`n")
     if (hadTrailingBreak && out != "")
@@ -704,8 +810,14 @@ class PasteMd {
       text := RegExReplace(text, "<[^>]++>", "")
       text := this.DecodeBasicHtmlEntities(text)
       text := Trim(text, " `t`r`n" . Chr(160))
+      ; Re-encode special chars so the text is safe inside HTML that pandoc will parse.
+      text := StrReplace(text, "&", "&amp;")
+      text := StrReplace(text, "<", "&lt;")
+      text := StrReplace(text, ">", "&gt;")
 
-      marker := checked ? "[x] " : "[ ] "
+      ; Use a placeholder marker instead of "[x]" — pandoc escapes bare "[x]" to "\[x\]".
+      ; CleanMarkdown restores ¤CHK¤/¤UNCHK¤ to [x]/[ ] after pandoc runs.
+      marker := checked ? "¤CHK¤ " : "¤UNCHK¤ "
       replacement := "<li>" . marker . text . "</li>"
       html := SubStr(html, 1, mTask.Pos - 1) . replacement . SubStr(html, mTask.Pos + mTask.Len)
       pos := mTask.Pos + StrLen(replacement)
@@ -799,9 +911,8 @@ class PasteMd {
       ; Strip remaining HTML tags inside the code block.
       content := RegExReplace(content, "<[^>]++>", "")
 
-      ; Clean up: remove CR, collapse consecutive blank lines.
+      ; Remove CR; preserve blank lines (they are meaningful in code).
       content := StrReplace(content, "`r", "")
-      content := RegExReplace(content, "\n{2,}", "`n")
 
       if InStr(content, "`n") {
         ; Decode entities for fenced block (markdown output, not HTML).
@@ -833,6 +944,9 @@ class PasteMd {
     prev := ""
     while (html != prev) {
       prev := html
+      ; Flatten outer <pre> with CSS attributes wrapping an inner <pre><code class="language-xxx">.
+      ; Without this, pandoc picks up the outer <pre> as the fence and loses the language tag.
+      html := RegExReplace(html, "is)<pre\b[^>]+>\s*(<pre\b[^>]*><code\b[^>]*>.*?</code></pre>)\s*</pre>", "$1")
       html := RegExReplace(html, "is)<div\b[^>]*>\s*<div\b[^>]*>\s*(<pre><code\b[^>]*>.*?</code></pre>)\s*</div>\s*</div>", "$1")
       html := RegExReplace(html, "is)<div\b[^>]*>\s*<div\b[^>]*>\s*(<code\b[^>]*>.*?</code>)\s*</div>\s*</div>", "$1")
     }
@@ -1248,4 +1362,9 @@ PasteMd.gPasteMenu.Add()
 PasteMd.gPasteMenu.Add("Quote", ObjBindMethod(PasteMd, "ToggleQuote"))
 PasteMd.gPasteMenu.Add("Show poster", ObjBindMethod(PasteMd, "ToggleShowPoster"))
 PasteMd.gPasteMenu.Add("Show img", ObjBindMethod(PasteMd, "ToggleShowImg"))
+PasteMd.gPasteMenu.Add()
+PasteMd.gPasteMenu.Add("Pin current log", ObjBindMethod(PasteMd, "PinCurrentLog"))
+PasteMd.gPasteMenu.Add("Delete pinned history", ObjBindMethod(PasteMd, "DeletePinnedHistory"))
 PasteMd.gPasteMenu.Check("Quote")
+PasteMd.gPasteMenu.Disable("Pin current log")
+PasteMd.gPasteMenu.Disable("Delete pinned history")
