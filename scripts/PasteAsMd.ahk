@@ -6,9 +6,28 @@
 #Include ClipHelper.ahk
 
 class PasteMd {
+  static __New() {
+    PasteMd.gPasteMenu.Add("Paste as &md", ObjBindMethod(PasteMd, "PasteAsMd"))
+    PasteMd.gPasteMenu.Add()
+    PasteMd.gPasteMenu.Add("&Quote", ObjBindMethod(PasteMd, "ToggleQuote"))
+    PasteMd.gPasteMenu.Add("Show &poster", ObjBindMethod(PasteMd, "ToggleShowPoster"))
+    PasteMd.gPasteMenu.Add("Show &img", ObjBindMethod(PasteMd, "ToggleShowImg"))
+    PasteMd.gPasteMenu.Add()
+    PasteMd.gPasteMenu.Add("Pin current &log", ObjBindMethod(PasteMd, "PinCurrentLog"))
+    PasteMd.gPasteMenu.Add("&Delete pinned history", ObjBindMethod(PasteMd, "DeletePinnedHistory"))
+    PasteMd.gPasteMenu.Add("Pinned &filenames", ObjBindMethod(PasteMd, "PastePinnedFilenames"))
+    PasteMd.gPasteMenu.Add("Pinned &fullnames", ObjBindMethod(PasteMd, "PastePinnedFullnames"))
+    PasteMd.gPasteMenu.Check("&Quote")
+    PasteMd.gPasteMenu.Disable("&Delete pinned history")
+    PasteMd.gPasteMenu.Disable("Pinned &filenames")
+    PasteMd.gPasteMenu.Disable("Pinned &fullnames")
+    PasteMd._InitPinState()
+  }
+
   ; Change this if pandoc isn't on PATH.
   static PANDOC_EXE := "C:\Users\adria\AppData\Local\Pandoc\pandoc.exe"
 
+  static PASTE_SENTINEL_DELAY_MS := 10
   static PASTE_DELAY_MS := 500
 
   ; Set to true to dump pipeline stages to a log file for debugging.
@@ -36,26 +55,38 @@ class PasteMd {
   static gPasteMenu := Menu()
   static _menuX := 0
   static _menuY := 0
+  ; Path of the pinned copy of the current log, or "" if not pinned.
+  static _lastPinPath := ""
 
   /**
    * Shows the markdown paste menu at the current cursor position.
    * Saves the position so toggle callbacks can re-show at the same location.
    */
-  static ShowPasteMenu() {
-    MouseGetPos(&x, &y)
-    PasteMd._menuX := x
-    PasteMd._menuY := y
-    ; Enable "Pin current log" only when there is a log file to pin.
-    if FileExist(PasteMd.DEBUG_PASTE_MD_LOG)
-      PasteMd.gPasteMenu.Enable("Pin current log")
+  static ShowPasteMenu(updatePos := true) {
+    if (updatePos) {
+      MouseGetPos(&x, &y)
+      PasteMd._menuX := x
+      PasteMd._menuY := y
+    }
+
+    ; If the pinned file was deleted externally, clear the stale pin state.
+    if (PasteMd._lastPinPath != "" && !FileExist(PasteMd._lastPinPath)) {
+      PasteMd._lastPinPath := ""
+      PasteMd.gPasteMenu.Uncheck("Pin current &log")
+    }
+    ; Enable "Pin current &log" when already pinned (allow unpin) or when log exists (allow pin).
+    if (PasteMd._lastPinPath != "" || FileExist(PasteMd.DEBUG_PASTE_MD_LOG))
+      PasteMd.gPasteMenu.Enable("Pin current &log")
     else
-      PasteMd.gPasteMenu.Disable("Pin current log")
-    ; Enable "Delete pinned history" only when pinned files exist.
-    if (PasteMd._PinnedLogFiles().Length > 0)
-      PasteMd.gPasteMenu.Enable("Delete pinned history")
-    else
-      PasteMd.gPasteMenu.Disable("Delete pinned history")
-    PasteMd.gPasteMenu.Show(x, y)
+      PasteMd.gPasteMenu.Disable("Pin current &log")
+
+    ; Enable pinned-file actions only when pinned files exist.
+    hasPinned := (PasteMd._PinnedLogFiles().Length > 0)
+    pinnedAction := hasPinned ? "Enable" : "Disable"
+    PasteMd.gPasteMenu.%pinnedAction%("&Delete pinned history")
+    PasteMd.gPasteMenu.%pinnedAction%("Pinned &filenames")
+    PasteMd.gPasteMenu.%pinnedAction%("Pinned &fullnames")
+    PasteMd.gPasteMenu.Show(PasteMd._menuX, PasteMd._menuY)
   }
 
   /**
@@ -76,7 +107,7 @@ class PasteMd {
    */
   static ToggleShowPoster(ItemName, ItemPos, MenuObj) {
     PasteMd.SHOW_POSTER := !PasteMd.SHOW_POSTER
-    PasteMd.gPasteMenu.ToggleCheck("Show poster")
+    PasteMd.gPasteMenu.ToggleCheck("Show &poster")
     PasteMd.gPasteMenu.Show(PasteMd._menuX, PasteMd._menuY)
   }
 
@@ -88,7 +119,7 @@ class PasteMd {
    */
   static ToggleShowImg(ItemName, ItemPos, MenuObj) {
     PasteMd.SHOW_IMG := !PasteMd.SHOW_IMG
-    PasteMd.gPasteMenu.ToggleCheck("Show img")
+    PasteMd.gPasteMenu.ToggleCheck("Show &img")
     PasteMd.gPasteMenu.Show(PasteMd._menuX, PasteMd._menuY)
   }
 
@@ -100,7 +131,7 @@ class PasteMd {
    */
   static ToggleQuote(ItemName, ItemPos, MenuObj) {
     PasteMd.QUOTE := !PasteMd.QUOTE
-    PasteMd.gPasteMenu.ToggleCheck("Quote")
+    PasteMd.gPasteMenu.ToggleCheck("&Quote")
     PasteMd.gPasteMenu.Show(PasteMd._menuX, PasteMd._menuY)
   }
 
@@ -112,9 +143,26 @@ class PasteMd {
    * @param {object} MenuObj - Menu object
    */
   static PinCurrentLog(ItemName, ItemPos, MenuObj) {
-    if !FileExist(PasteMd.DEBUG_PASTE_MD_LOG)
-      return
-    FileCopy(PasteMd.DEBUG_PASTE_MD_LOG, PasteMd._PinLogPath())
+    if (PasteMd._lastPinPath != "") {
+      ; Already pinned — unpin.
+      if FileExist(PasteMd._lastPinPath)
+        FileDelete(PasteMd._lastPinPath)
+      PasteMd._lastPinPath := ""
+      PasteMd.gPasteMenu.Uncheck("Pin current &log")
+      ToolTip("Unpinned")
+    } else {
+      ; Not pinned — pin.
+      if !FileExist(PasteMd.DEBUG_PASTE_MD_LOG)
+        return
+      pinPath := PasteMd._PinLogPath()
+      FileCopy(PasteMd.DEBUG_PASTE_MD_LOG, pinPath)
+      PasteMd._lastPinPath := pinPath
+      PasteMd.gPasteMenu.Check("Pin current &log")
+      SplitPath(pinPath, &name)
+      ToolTip("Pinned: " . name)
+    }
+    SetTimer(() => ToolTip(), -2000)
+    PasteMd.ShowPasteMenu(false)
   }
 
   /**
@@ -129,11 +177,62 @@ class PasteMd {
       return
     n := files.Length
     result := MsgBox("Delete " . n . " pinned log file" . (n = 1 ? "" : "s") . "?`nThis cannot be undone."
-      , "Delete pinned history", "OKCancel Icon!")
+      , "&Delete pinned history", "OKCancel Icon!")
     if (result != "OK")
       return
     for f in files
       FileDelete(f)
+  }
+
+  /**
+   * Menu callback: pastes pinned log filenames (no path) as a double-quoted,
+   * space-separated string into the active window.
+   * @param {string} ItemName - Menu item label
+   * @param {number} ItemPos - Menu item position
+   * @param {object} MenuObj - Menu object
+   */
+  static PastePinnedFilenames(ItemName, ItemPos, MenuObj) {
+    files := PasteMd._PinnedLogFiles()
+    if (files.Length = 0)
+      return
+    out := ""
+    for f in files {
+      SplitPath(f, &name)
+      out .= (out = "" ? "" : " ") . '"' . name . '"'
+    }
+    PasteMd._PasteText(out)
+  }
+
+  /**
+   * Menu callback: pastes pinned log full paths as a double-quoted,
+   * space-separated string into the active window.
+   * @param {string} ItemName - Menu item label
+   * @param {number} ItemPos - Menu item position
+   * @param {object} MenuObj - Menu object
+   */
+  static PastePinnedFullnames(ItemName, ItemPos, MenuObj) {
+    files := PasteMd._PinnedLogFiles()
+    if (files.Length = 0)
+      return
+    out := ""
+    for f in files
+      out .= (out = "" ? "" : " ") . '"' . f . '"'
+    PasteMd._PasteText(out)
+  }
+
+  /**
+   * Pastes plain text into the active window, saving and restoring the clipboard.
+   * @param {string} text - Text to paste
+   */
+  static _PasteText(text) {
+    clipSaved := ClipboardAll()
+    try {
+      A_Clipboard := text
+      Send "^v"
+      Sleep PasteMd.PASTE_DELAY_MS
+    } finally {
+      A_Clipboard := clipSaved
+    }
   }
 
   /**
@@ -271,6 +370,24 @@ class PasteMd {
   }
 
   /**
+   * Restores the pin checkmark state after a script restart by comparing the
+   * current log's content against all pinned files.  If a match is found, sets
+   * _lastPinPath and checks the menu item so the UI reflects the pinned state.
+   */
+  static _InitPinState() {
+    if !FileExist(PasteMd.DEBUG_PASTE_MD_LOG)
+      return
+    currentContent := FileRead(PasteMd.DEBUG_PASTE_MD_LOG)
+    for f in PasteMd._PinnedLogFiles() {
+      if (FileRead(f) = currentContent) {
+        PasteMd._lastPinPath := f
+        PasteMd.gPasteMenu.Check("Pin current &log")
+        return
+      }
+    }
+  }
+
+  /**
    * Converts clipboard content to markdown (or quoted markdown) and pastes it.
    * Prefers CF_HTML → pandoc conversion, with plain-text fallback.
    * @param {boolean} asQuoted - If true, prefixes every line with blockquote syntax (>).
@@ -278,6 +395,11 @@ class PasteMd {
   static PasteMarkdown(asQuoted) {
     dbg := PasteMd.DEBUG_PASTE_MD
     if (dbg) {
+      ; New paste — clear any pin state so the checkmark doesn't carry over.
+      if (PasteMd._lastPinPath != "") {
+        PasteMd._lastPinPath := ""
+        PasteMd.gPasteMenu.Uncheck("Pin current &log")
+      }
       PasteMd._RotateLogFiles()
       dbgF := FileOpen(PasteMd.DEBUG_PASTE_MD_LOG, "w", "UTF-8")
       dbgF.Write("PasteAsMd debug — " . FormatTime(, "yyyy-MM-dd HH:mm:ss") . "`r`n`r`n")
@@ -429,8 +551,10 @@ class PasteMd {
 
       A_Clipboard := pastePayload
       Send "^v"
-      if (pasteWithSentinel)
+      if (pasteWithSentinel) {
+        Sleep PasteMd.PASTE_SENTINEL_DELAY_MS
         Send "{BS}"
+      }
       Sleep PasteMd.PASTE_DELAY_MS
     } catch as e {
       if (dbg) {
@@ -1356,15 +1480,3 @@ class PasteMd {
 
 ; Ctrl+Alt+Shift+V
 ^!+v::PasteMd.ShowPasteMenu()
-
-PasteMd.gPasteMenu.Add("Paste as md", ObjBindMethod(PasteMd, "PasteAsMd"))
-PasteMd.gPasteMenu.Add()
-PasteMd.gPasteMenu.Add("Quote", ObjBindMethod(PasteMd, "ToggleQuote"))
-PasteMd.gPasteMenu.Add("Show poster", ObjBindMethod(PasteMd, "ToggleShowPoster"))
-PasteMd.gPasteMenu.Add("Show img", ObjBindMethod(PasteMd, "ToggleShowImg"))
-PasteMd.gPasteMenu.Add()
-PasteMd.gPasteMenu.Add("Pin current log", ObjBindMethod(PasteMd, "PinCurrentLog"))
-PasteMd.gPasteMenu.Add("Delete pinned history", ObjBindMethod(PasteMd, "DeletePinnedHistory"))
-PasteMd.gPasteMenu.Check("Quote")
-PasteMd.gPasteMenu.Disable("Pin current log")
-PasteMd.gPasteMenu.Disable("Delete pinned history")
