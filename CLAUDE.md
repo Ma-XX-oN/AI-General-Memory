@@ -157,12 +157,12 @@ Preserve semantic meaning before simplifying representation.
 
 ## AutoHotkey v2
 
-- Backtick (`` ` ``) is the escape character; `` `` `` = literal backtick in strings
-- Space concatenation (`"abc" var`) does NOT add a space
-- Continuation section `)` closes when at start of a line (leading whitespace ignored)
-- Multi-line string using continuation: `str := "\n(\n  content\n)"` — any `)` at
-  line-start (including indented) closes the section; escape as `` `) `` to include a
-  literal `)` in the string content
+See [ahk.md](ahk.md) for full notes. Critical reminders:
+
+- Backtick (`` ` ``) is the escape character; `` `` `` = literal backtick; backtick before `"` = literal `"` (does NOT close the string — see ahk.md for the trap)
+- Space concatenation (`"abc" var`) works — `.` is optional (useful for line continuation only)
+- Git Bash converts `/Switch` args to paths — use `#ErrorStdOut` directive in script, not command-line flag
+- Use `Chr(96)` to build backtick strings in tests (avoids the backtick-quote trap in string literals)
 
 ## Useful Patterns
 
