@@ -450,6 +450,8 @@ class PasteMd {
           mdRaw := PasteMd.HtmlToGfmViaPandoc(htmlPrep, PasteMd.PANDOC_EXE)
           ; Pandoc converts inline <svg> elements to <img> tags; process them now.
           mdRaw := PasteMd._ProcessImgTags(mdRaw)
+          ; Fix pandoc fence-space bug: "``` python" → "```python"
+          mdRaw := RegExReplace(mdRaw, "m)^(``+) (\S)", "$1$2")
           if (dbg)
             PasteMd._DbgSection(dbgF, "4. mdRaw (pandoc output)", mdRaw)
 
