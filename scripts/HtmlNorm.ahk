@@ -74,7 +74,7 @@ class HtmlNorm {
      *   2.  Poster-label placeholder injection (when showPoster)
      *   3.  Button stripping
      *   4.  ChatGPT code block extraction (pre.overflow-visible! → pre/code)
-     *   5.  Task-list checkbox normalization (→ ¤CHK¤/¤UNCHK¤)
+     *   5.  Task-list checkbox normalization (canonical <input type="checkbox">)
      *   6.  Thinking block extraction (→ ¤THINKING_N¤)
      *   7.  Inline-code span promotion (inline-markdown/font-mono → <code>)
      *   8.  User message extraction (→ ¤USERMSG_N¤)
@@ -284,14 +284,16 @@ class HtmlNorm {
     }
 
     /**
-     * Normalizes task-list `<li>` elements to `<li>¤CHK¤ text</li>` form.
+     * Normalizes task-list `<li>` elements to a canonical checkbox-input form.
      *
      * Processes any `<li class="task-list-item">` that contains
      * `<input type="checkbox">`, regardless of whether the input is a direct
      * child or wrapped in a `<p>` tag (as ChatGPT does).
      *
-     * Uses ¤CHK¤/¤UNCHK¤ placeholders instead of `[x]`/`[ ]` so that pandoc
-     * does not escape the brackets.  `CleanMarkdown()` restores them afterward.
+     * Output form is:
+     *   <li><input type="checkbox" disabled [checked] /> text</li>
+     *
+     * This lets pandoc emit GFM task-list markers natively.
      *
      * @param {string} html
      * @returns {string}
@@ -301,8 +303,11 @@ class HtmlNorm {
         while RegExMatch(html, "is)<li\b([^>]*)>(.*?)</li>", &mTask, pos) {
             liAttrs := mTask[1]
             liInner := mTask[2]
-            ; Require task-list-item class on the <li>.
-            if !RegExMatch(liAttrs, "i)\btask-list-item\b") {
+            ; Supported task-list containers:
+            ; - Standard markdown renderers: class contains task-list-item
+            ; - Claude Code todo tool rows: class contains todoItem_*
+            if (!RegExMatch(liAttrs, "i)\btask-list-item\b")
+                && !RegExMatch(liAttrs, "i)\btodoItem_")) {
                 pos := mTask.Pos + mTask.Len
                 continue
             }
@@ -313,6 +318,12 @@ class HtmlNorm {
                 continue
             }
             checked := RegExMatch(liInner, "i)\bchecked\b")
+            if (!checked) {
+                if RegExMatch(liAttrs, "i)\bcompleted_")
+                    checked := true
+                else if RegExMatch(liInner, "i)\btext-decoration\s*:\s*line-through\b")
+                    checked := true
+            }
             ; Capture text that follows the <input> tag.
             text := SubStr(liInner, mInput.Pos + mInput.Len)
             text := RegExReplace(text, "is)<span\b[^>]*>\s*</span>", "")
@@ -323,8 +334,13 @@ class HtmlNorm {
             text := StrReplace(text, "&", "&amp;")
             text := StrReplace(text, "<", "&lt;")
             text := StrReplace(text, ">", "&gt;")
-            marker := checked ? "¤CHK¤ " : "¤UNCHK¤ "
-            replacement := "<li>" . marker . text . "</li>"
+            inputTag := checked
+                ? '<input type="checkbox" disabled checked />'
+                : '<input type="checkbox" disabled />'
+            replacement := "<li>" . inputTag
+            if (text != "")
+                replacement .= " " . text
+            replacement .= "</li>"
             html := SubStr(html, 1, mTask.Pos - 1) . replacement . SubStr(html, mTask.Pos + mTask.Len)
             pos := mTask.Pos + StrLen(replacement)
         }

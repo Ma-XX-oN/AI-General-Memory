@@ -806,12 +806,6 @@ class PasteMd {
     ; Collapse runs of 3+ newlines to 2 (at most one blank line).
     out := RegExReplace(out, "\n{3,}", "`n`n")
 
-    ; Restore task-list checkbox placeholders to GFM syntax.
-    ; ¤CHK¤/¤UNCHK¤ were inserted by PreprocessHtmlCodeBlocks so pandoc would not
-    ; escape "[x]"/"[ ]" to "\[x\]"/"\[ \]".  Only matches at list-item line starts.
-    out := RegExReplace(out, "m)^(\s*[-*+] )¤CHK¤ ", "$1[x] ")
-    out := RegExReplace(out, "m)^(\s*[-*+] )¤UNCHK¤ ", "$1[ ] ")
-
     out := Trim(out, "`n")
     if (hadTrailingBreak && out != "")
       out .= "`n"
@@ -1044,19 +1038,35 @@ class PasteMd {
     ; Strip UI artifacts that don't belong in markdown output.
     html := RegExReplace(html, "is)<button\b[^>]*>.*?</button>", "")
 
-    ; Normalize task-list items to markdown checkbox markers before pandoc.
+    ; Normalize task-list items to canonical checkbox-input form before pandoc.
     pos := 1
     while RegExMatch(html, "is)<li\b([^>]*)>(.*?)</li>", &mTask, pos) {
       liAttrs := mTask[1]
       liInner := mTask[2]
+      ; Supported task-list containers:
+      ; - Standard markdown renderers: class contains task-list-item
+      ; - Claude Code todo tool rows: class contains todoItem_*
       if (!RegExMatch(liAttrs, "i)\btask-list-item\b")
-        || !RegExMatch(liInner, "is)^\s*<input\b[^>]*\btype\s*=\s*['`"]checkbox['`"][^>]*>\s*(.*)$", &mTaskText)) {
+          && !RegExMatch(liAttrs, "i)\btodoItem_")) {
+        pos := mTask.Pos + mTask.Len
+        continue
+      }
+      ; Find <input type="checkbox"> anywhere inside the item
+      ; (direct child OR inside a <p> wrapper, as ChatGPT does).
+      if !RegExMatch(liInner, "is)<input\b[^>]*\btype\s*=\s*['`"]checkbox['`"][^>]*>", &mInput) {
         pos := mTask.Pos + mTask.Len
         continue
       }
 
       checked := RegExMatch(liInner, "i)\bchecked\b")
-      text := mTaskText[1]
+      if (!checked) {
+        if RegExMatch(liAttrs, "i)\bcompleted_")
+          checked := true
+        else if RegExMatch(liInner, "i)\btext-decoration\s*:\s*line-through\b")
+          checked := true
+      }
+      ; Capture text that follows the <input> tag.
+      text := SubStr(liInner, mInput.Pos + mInput.Len)
       text := RegExReplace(text, "is)<span\b[^>]*>\s*</span>", "")
       text := RegExReplace(text, "<[^>]++>", "")
       text := this.DecodeBasicHtmlEntities(text)
@@ -1066,10 +1076,13 @@ class PasteMd {
       text := StrReplace(text, "<", "&lt;")
       text := StrReplace(text, ">", "&gt;")
 
-      ; Use a placeholder marker instead of "[x]" — pandoc escapes bare "[x]" to "\[x\]".
-      ; CleanMarkdown restores ¤CHK¤/¤UNCHK¤ to [x]/[ ] after pandoc runs.
-      marker := checked ? "¤CHK¤ " : "¤UNCHK¤ "
-      replacement := "<li>" . marker . text . "</li>"
+      inputTag := checked
+        ? '<input type="checkbox" disabled checked />'
+        : '<input type="checkbox" disabled />'
+      replacement := "<li>" . inputTag
+      if (text != "")
+        replacement .= " " . text
+      replacement .= "</li>"
       html := SubStr(html, 1, mTask.Pos - 1) . replacement . SubStr(html, mTask.Pos + mTask.Len)
       pos := mTask.Pos + StrLen(replacement)
     }
