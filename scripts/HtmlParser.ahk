@@ -102,10 +102,11 @@ class HtmlParser {
 
       (?<sq>  '[^']*+' )
       (?<dq>  "[^"]*+" )
+      (?<uq>  [^\s"'=<>]+ )
 
       (?<attr>
         (?<attr_name>  (?&symbol) )
-        (?: \s*+ = \s*+ (?<attr_val> (?:(?&sq)|(?&dq)) ) )?+
+        (?: \s*+ = \s*+ (?<attr_val> (?:(?&sq)|(?&dq)|(?&uq)) ) )?+
         \s*+
         (?C:_HP_Attr)
       `)
@@ -174,9 +175,13 @@ class HtmlParser {
       return
     frame   := HtmlParser._frames[HtmlParser._frames.Length]
     attrVal := m["attr_val"]
-    ; Strip surrounding single/double quotes; empty for boolean attrs.
-    if (attrVal != "")
-      attrVal := SubStr(attrVal, 2, StrLen(attrVal) - 2)
+    ; Strip surrounding quotes only when the value is quoted.
+    if (attrVal != "") {
+      first := SubStr(attrVal, 1, 1)
+      last  := SubStr(attrVal, -1)
+      if (StrLen(attrVal) >= 2 && (first = "'" || first = '"') && last = first)
+        attrVal := SubStr(attrVal, 2, StrLen(attrVal) - 2)
+    }
     frame.attrs[m["attr_name"]] := attrVal
   }
 
