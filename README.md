@@ -53,6 +53,7 @@ directly/indirectly by the users.
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Contribution workflow and expectations |
 | [`AUTHORS.md`](AUTHORS.md) | Maintainer and contributor attribution list |
 | [`social-preview.svg`](social-preview.svg) | Repository social preview artwork by collaborative effort between Claude Code and Codex |
+| [`ahk.md`](ahk.md) | AutoHotkey v2 patterns and pitfalls (Git Bash, strings, concat) — referenced from CLAUDE.md |
 | [`build_issues.md`](build_issues.md) | Cross-project build and linker mismatch triage playbook |
 | [`regex-patterns.md`](regex-patterns.md) | Reusable regex patterns referenced from CLAUDE.md / CODEX.md |
 | [`testing.md`](testing.md) | Testing guidelines and discipline referenced from CLAUDE.md |
