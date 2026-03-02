@@ -327,12 +327,14 @@ class HtmlNorm {
     /**
      * Extracts whitespace-sensitive user message text into ¤USERMSG_N¤ placeholders.
      *
-     * Two container types are handled (both regardless of detected source, since
-     * the class patterns are source-specific enough to avoid false positives):
+     * Three container types are handled:
      *
      * - Codex: `<div class="text-size-chat whitespace-pre-wrap">` with mixed
      *   `<span>` and `<code class="font-mono">` children.
      * - Claude Code: `<div class="content_xGDvVg">` with a single `<span>` child.
+     * - ChatGPT: `<div class="whitespace-pre-wrap">` with plain text (no spans).
+     *   Handled after Codex so that Codex divs (already replaced) are not
+     *   accidentally re-matched by the broader `whitespace-pre-wrap` pattern.
      *
      * `PasteMd.RestoreUserMsgBlocks()` restores the plain text after pandoc.
      * @param {string} html
@@ -363,6 +365,24 @@ class HtmlNorm {
             HtmlNorm._userMsgBlocks.Push(rawText)
             placeholder := "<p>¤USERMSG_" . HtmlNorm._userMsgBlocks.Length . "¤</p>"
             newStr := m[1] . placeholder
+            html := SubStr(html, 1, m.Pos - 1) . newStr . SubStr(html, m.Pos + m.Len)
+            pos := m.Pos + StrLen(newStr)
+        }
+        ; ChatGPT user messages: <div class="whitespace-pre-wrap"> (plain text, no spans).
+        ; The exact-value class match ("whitespace-pre-wrap" as sole class) avoids
+        ; matching Codex's "text-size-chat whitespace-pre-wrap" div that was already
+        ; replaced above but whose outer tag still contains the class name.
+        pos := 1
+        while RegExMatch(html, "is)(<div\b[^>]*\bclass=`"whitespace-pre-wrap`"[^>]*>)(.*?)</div>", &m, pos) {
+            rawContent := m[2]
+            rawContent := RegExReplace(rawContent, "i)<br\b[^>]*>", "`n")
+            rawContent := RegExReplace(rawContent, "<[^>]++>", "")
+            rawContent := HtmlNorm._DecodeBasicHtmlEntities(rawContent)
+            rawContent := StrReplace(rawContent, "`r", "")
+            rawContent := Trim(rawContent, "`n")
+            HtmlNorm._userMsgBlocks.Push(rawContent)
+            placeholder := "<p>¤USERMSG_" . HtmlNorm._userMsgBlocks.Length . "¤</p>"
+            newStr := m[1] . placeholder . "</div>"
             html := SubStr(html, 1, m.Pos - 1) . newStr . SubStr(html, m.Pos + m.Len)
             pos := m.Pos + StrLen(newStr)
         }
