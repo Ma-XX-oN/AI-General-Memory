@@ -70,7 +70,7 @@ class HtmlNorm {
      * Normalizes an HTML fragment for pandoc processing.
      *
      * Transforms are applied in order:
-     *   1.  Image tag handling (replace or keep based on showImg)
+     *   1.  Image/SVG handling: drop if no accessible text, else (img: text); leave when showImg
      *   2.  Poster-label placeholder injection (when showPoster)
      *   3.  Button stripping
      *   4.  ChatGPT code block extraction (pre.overflow-visible! → pre/code)
@@ -157,10 +157,14 @@ class HtmlNorm {
     ; ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Replaces `<img>` tags according to the showImg flag.
-     * When showImg is false, replaces with `[img]` or `[img: text]` using the
-     * first non-empty alt/title/aria-label attribute as the description.
-     * When showImg is true, leaves tags in place for pandoc.
+     * Replaces `<img>` and `<svg>` elements according to the showImg flag.
+     *
+     * When showImg is false:
+     *   - No accessible text (alt / title / aria-label / SVG `<title>`): dropped.
+     *   - Has accessible text: replaced with `(img: <text>)`.
+     *
+     * When showImg is true, leaves elements in place for pandoc.
+     *
      * @param {string} html
      * @param {boolean} showImg
      * @returns {string}
@@ -168,6 +172,7 @@ class HtmlNorm {
     static _ProcessImgTags(html, showImg) {
         if showImg
             return html
+        ; <img> tags (self-closing).
         pos := 1
         while RegExMatch(html, "i)<img\b([^>]*?)>", &m, pos) {
             attrs := m[1]
@@ -178,7 +183,23 @@ class HtmlNorm {
                 accessText := mT[1]
             else if (RegExMatch(attrs, "i)\baria-label\s*=\s*['`"]([^'`"]*)[`"']", &mL) && mL[1] != "")
                 accessText := mL[1]
-            replacement := (accessText = "") ? "[img]" : "[img: " . accessText . "]"
+            replacement := (accessText = "") ? "" : "(img: " . accessText . ")"
+            html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
+            pos := m.Pos + StrLen(replacement)
+        }
+        ; <svg>…</svg> elements — same rule, checking aria-label, title attr, or <title> child.
+        pos := 1
+        while RegExMatch(html, "is)<svg\b([^>]*)>.*?</svg>", &m, pos) {
+            attrs := m[1]
+            full  := m[0]
+            accessText := ""
+            if (RegExMatch(attrs, "i)\baria-label\s*=\s*['`"]([^'`"]*)[`"']", &mL) && mL[1] != "")
+                accessText := mL[1]
+            else if (RegExMatch(attrs, "i)\btitle\s*=\s*['`"]([^'`"]*)[`"']", &mT) && mT[1] != "")
+                accessText := mT[1]
+            else if (RegExMatch(full, "i)<title\b[^>]*>(.*?)</title>", &mTc) && mTc[1] != "")
+                accessText := HtmlNorm._DecodeBasicHtmlEntities(mTc[1])
+            replacement := (accessText = "") ? "" : "(img: " . accessText . ")"
             html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
             pos := m.Pos + StrLen(replacement)
         }
