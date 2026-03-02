@@ -98,7 +98,7 @@ class HtmlNorm {
 
         ; 2. Inject poster-label placeholders.
         if showPoster
-            html := HtmlNorm._InjectPosterPlaceholders(html)
+            html := HtmlNorm._InjectPosterPlaceholders(html, source)
 
         ; 3. Strip UI buttons.
         html := RegExReplace(html, "is)<button\b[^>]*>.*?</button>", "")
@@ -178,29 +178,35 @@ class HtmlNorm {
 
     /**
      * Injects ¤POSTER_AI¤ / ¤POSTER_User¤ paragraph placeholders at the start
-     * of each detected message container, for all four supported sources.
-     * All patterns are applied unconditionally — each is specific enough to its
-     * source that cross-source false positives do not occur in practice.
+     * of each detected message container.  Only the patterns for the detected
+     * source are applied; this prevents cross-source false positives (e.g. the
+     * Codex flex-col patterns matching inner divs inside ChatGPT articles).
      * @param {string} html
+     * @param {string} source - Source identifier from DetectSource()
      * @returns {string}
      */
-    static _InjectPosterPlaceholders(html) {
-        ; Claude Code: AI turn
-        html := RegExReplace(html, "i)(<div\b[^>]*\bdata-testid=`"assistant-message`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
-        ; Claude Code: user turn (class has both message_* and userMessageContainer_*)
-        html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bmessage_\w+\s+[^`"]*\buserMessageContainer_[^>]*>)", "$1<p>¤POSTER_User¤</p>")
-        ; Codex: AI turn (group min-w-0 flex-col)
-        html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bgroup\b[^`"]*\bmin-w-0\b[^`"]*\bflex-col\b[^`"]*`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
-        ; Codex: user turn (flex-col items-end)
-        html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bflex-col\b[^`"]*\bitems-end\b[^`"]*`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
-        ; Claude Web: AI turn (data-is-streaming or font-claude-response)
-        html := RegExReplace(html, "i)(<div\b[^>]*(?:\bdata-is-streaming\b|\bclass=`"[^`"]*\bfont-claude-response\b[^`"]*`")[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
-        ; Claude Web: user turn (data-testid="user-message")
-        html := RegExReplace(html, "i)(<div\b[^>]*\bdata-testid=`"user-message`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
-        ; ChatGPT: AI turn (article with data-turn-id="request-WEB:...")
-        html := RegExReplace(html, "i)(<article\b[^>]*\bdata-turn-id=`"request-WEB:[^`"]*`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
-        ; ChatGPT: user turn (article with plain UUID data-turn-id)
-        html := RegExReplace(html, "i)(<article\b[^>]*\bdata-turn-id=`"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
+    static _InjectPosterPlaceholders(html, source) {
+        if (source = "claudecode") {
+            ; AI turn
+            html := RegExReplace(html, "i)(<div\b[^>]*\bdata-testid=`"assistant-message`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
+            ; user turn (class has both message_* and userMessageContainer_*)
+            html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bmessage_\w+\s+[^`"]*\buserMessageContainer_[^>]*>)", "$1<p>¤POSTER_User¤</p>")
+        } else if (source = "codex") {
+            ; AI turn (group min-w-0 flex-col)
+            html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bgroup\b[^`"]*\bmin-w-0\b[^`"]*\bflex-col\b[^`"]*`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
+            ; user turn (flex-col items-end)
+            html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bflex-col\b[^`"]*\bitems-end\b[^`"]*`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
+        } else if (source = "claudeweb") {
+            ; AI turn (data-is-streaming or font-claude-response)
+            html := RegExReplace(html, "i)(<div\b[^>]*(?:\bdata-is-streaming\b|\bclass=`"[^`"]*\bfont-claude-response\b[^`"]*`")[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
+            ; user turn (data-testid="user-message")
+            html := RegExReplace(html, "i)(<div\b[^>]*\bdata-testid=`"user-message`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
+        } else if (source = "chatgpt") {
+            ; AI turn (article with data-turn-id="request-WEB:...")
+            html := RegExReplace(html, "i)(<article\b[^>]*\bdata-turn-id=`"request-WEB:[^`"]*`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
+            ; user turn (article with plain UUID data-turn-id)
+            html := RegExReplace(html, "i)(<article\b[^>]*\bdata-turn-id=`"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
+        }
         return html
     }
 
