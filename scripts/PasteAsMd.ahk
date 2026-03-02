@@ -286,11 +286,21 @@ class PasteMd {
   /**
    * Resolves assistant label from CF_HTML source context.
    * @param {string} cfHtml - Full CF_HTML payload
-   * @returns {string} "Codex", "Claude", or "AI"
+   * @returns {string} Source-specific label, or "AI" fallback
    */
   static _ResolveAssistantLabel(cfHtml) {
     if (cfHtml = "")
       return "AI"
+
+    source := DetectSource(cfHtml)
+    if (source = "claudecode")
+      return "Claude Code"
+    if (source = "claudeweb")
+      return "Claude Web"
+    if (source = "codex")
+      return "Codex"
+    if (source = "chatgpt")
+      return "ChatGPT"
 
     if RegExMatch(cfHtml, "i)extensionId=([^&`r`n]+)", &mExt) {
       extId := StrLower(mExt[1])
@@ -391,50 +401,49 @@ class PasteMd {
   }
 
   /**
-   * Converts clipboard content to markdown (or quoted markdown) and pastes it.
-   * Prefers CF_HTML → pandoc conversion, with plain-text fallback.
-   * @param {boolean} asQuoted - If true, prefixes every line with blockquote syntax (>).
+   * Converts already-captured plain/cfHtml inputs through the markdown pipeline.
+   * No clipboard writes or paste side effects.
+   * @param {string} plain - Plain clipboard text (typically A_Clipboard with CR stripped)
+   * @param {string} cfHtml - Full CF_HTML payload
+   * @param {boolean} asQuoted - If true, prefixes every line with blockquote syntax (>)
+   * @param {boolean} showPoster - If true, resolves/replaces poster placeholders
+   * @param {boolean} showImg - If true, keep <img> tags for pandoc
+   * @param {boolean} promptOrderedList - If true, may prompt for ordered-list start when ambiguous
+   * @param {string} forcedListStart - Optional explicit ordered-list start override (numeric string)
+   * @returns {Map} Stage outputs for test/debug use
    */
-  static PasteMarkdown(asQuoted) {
-    dbg := PasteMd.DEBUG_PASTE_MD
-    if (dbg) {
-      ; New paste — clear any pin state so the checkmark doesn't carry over.
-      if (PasteMd._lastPinPath != "") {
-        PasteMd._lastPinPath := ""
-        PasteMd.gPasteMenu.Uncheck("Pin current &log")
-      }
-      PasteMd._RotateLogFiles()
-      dbgF := FileOpen(PasteMd.DEBUG_PASTE_MD_LOG, "w", "UTF-8")
-      dbgF.Write("PasteAsMd debug — " . FormatTime(, "yyyy-MM-dd HH:mm:ss") . "`r`n`r`n")
-    }
+  static _ConvertFromCaptured(plain, cfHtml, asQuoted, showPoster, showImg, promptOrderedList := false, forcedListStart := "") {
+    plain := StrReplace(plain, "`r", "")
+    source := DetectSource(cfHtml)
+    htmlFrag := (cfHtml = "")
+      ? ""
+      : ClipboardWaiter.SelectHtmlSection(cfHtml, ClipboardWaiter.HTML_SECTION_FRAGMENT)
 
-    clipSaved := ClipboardAll()
-    plain := StrReplace(A_Clipboard, "`r", "")
+    htmlPrep := ""
+    mdRaw := ""
+    md := ""
+    mdAfterClean := ""
+    mdAfterOrderedList := ""
+    mdAfterPoster := ""
+    expectedListStart := 0
+    usedNoHtmlPath := false
+    usedNoTagPlainPath := false
+
+    prevShowPoster := PasteMd.SHOW_POSTER
+    prevShowImg := PasteMd.SHOW_IMG
+    prevPromptOrderedList := PasteMd.PROMPT_ORDERED_LIST_START_ON_AMBIGUOUS
+    PasteMd.SHOW_POSTER := showPoster
+    PasteMd.SHOW_IMG := showImg
+    PasteMd.PROMPT_ORDERED_LIST_START_ON_AMBIGUOUS := promptOrderedList
+
     try {
-      cfHtml := ClipboardWaiter.GetHtml()
-      htmlFrag := (cfHtml = "")
-        ? ""
-        : ClipboardWaiter.SelectHtmlSection(cfHtml, ClipboardWaiter.HTML_SECTION_FRAGMENT)
-
-      if (dbg) {
-        PasteMd._DbgSection(dbgF, "1. plain (A_Clipboard minus CR)", plain)
-        PasteMd._DbgSection(dbgF, "2. cfHtml (raw full payload)", cfHtml)
-        PasteMd._DbgSection(dbgF, "3. htmlFrag (CF_HTML fragment)", htmlFrag)
-        dbgF.Write("=== 2b. cfHtml offsets ===`r`n")
-        dbgF.Write("StartHTML: " . PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartHTML:") . "`r`n")
-        dbgF.Write("EndHTML: " . PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndHTML:") . "`r`n")
-        dbgF.Write("StartFragment: " . PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartFragment:") . "`r`n")
-        dbgF.Write("EndFragment: " . PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndFragment:") . "`r`n`r`n")
-      }
-
       if (htmlFrag = "") {
         md := PasteMd.CleanPlainText(plain)
-        if (dbg)
-          PasteMd._DbgSection(dbgF, "3. md (CleanPlainText – no HTML path)", md)
+        usedNoHtmlPath := true
+        mdAfterClean := md
+        mdAfterOrderedList := md
       } else {
         htmlPrep := PasteMd._PreprocessHtml(htmlFrag, cfHtml)
-        if (dbg)
-          PasteMd._DbgSection(dbgF, "3. htmlPrep (after _PreprocessHtml)", htmlPrep)
 
         ; If no meaningful HTML tags remain after preprocessing (just styled
         ; spans wrapping plain text, or <p> wrappers around plain lines as
@@ -444,51 +453,41 @@ class PasteMd {
         stripped := RegExReplace(stripped, "i)</?p\b[^>]*>", "")
         if !RegExMatch(stripped, "<[^>]++>") {
           md := PasteMd.CleanPlainText(plain)
-          if (dbg)
-            PasteMd._DbgSection(dbgF, "3b. md (no HTML tags → plain text path)", md)
+          usedNoTagPlainPath := true
+          mdAfterClean := md
         } else {
           mdRaw := PasteMd.HtmlToGfmViaPandoc(htmlPrep, PasteMd.PANDOC_EXE)
           ; Pandoc converts inline <svg> elements to <img> tags; process them now.
           mdRaw := PasteMd._ProcessImgTags(mdRaw)
           ; Fix pandoc fence-space bug: "``` python" → "```python"
           mdRaw := RegExReplace(mdRaw, "m)^(``+) (\S)", "$1$2")
-          if (dbg)
-            PasteMd._DbgSection(dbgF, "4. mdRaw (pandoc output)", mdRaw)
 
           md := PasteMd.CleanMarkdown(mdRaw)
           md := PasteMd.RestoreThinkingBlocks(md)
           md := PasteMd.RestoreUserMsgBlocks(md)
-          if (dbg)
-            PasteMd._DbgSection(dbgF, "5. md (after CleanMarkdown)", md)
-
+          mdAfterClean := md
           md := StrReplace(md, "`r", "")
         }
 
         ; Never paste empty.  If conversion failed/empty, use plain text.
         if (Trim(md, " `t`n") = "" && Trim(plain, " `t`n") != "") {
           md := PasteMd.CleanPlainText(plain)
-          if (dbg)
-            PasteMd._DbgSection(dbgF, "5b. md (empty→plain fallback)", md)
+          mdAfterClean := md
         }
 
         expectedListStart := PasteMd.GetExpectedOrderedListStart(htmlFrag, cfHtml, plain)
-        if (PasteMd.PROMPT_ORDERED_LIST_START_ON_AMBIGUOUS) {
-          promptedStart := PasteMd.MaybePromptOrderedListStart(md, plain, htmlFrag, expectedListStart)
-          if (dbg && promptedStart != expectedListStart) {
-            PasteMd._DbgSection(dbgF, "5c2. prompted list start (ordered-list fix)", "" . promptedStart)
-          }
-          expectedListStart := promptedStart
-        }
-        if (dbg) {
-          PasteMd._DbgSection(dbgF, "5c. expected list start (ordered-list fix)", "" . expectedListStart)
+        if (forcedListStart != "") {
+          if RegExMatch(forcedListStart, "^\d+$")
+            expectedListStart := Integer(forcedListStart)
+        } else if (promptOrderedList) {
+          expectedListStart := PasteMd.MaybePromptOrderedListStart(md, plain, htmlFrag, expectedListStart)
         }
 
         md := PasteMd.RestoreOrderedListStart(md, plain, htmlFrag, cfHtml, expectedListStart)
-        if (dbg)
-          PasteMd._DbgSection(dbgF, "5d. md (after RestoreOrderedListStart)", md)
+        mdAfterOrderedList := md
       }
 
-      if (PasteMd.SHOW_POSTER) {
+      if (showPoster) {
         assistantLabel := PasteMd._ResolveAssistantLabel(cfHtml)
         ; Collect positions of all poster placeholders in document order.
         posters := []
@@ -528,18 +527,95 @@ class PasteMd {
           if (poster != "")
             md := "**" . poster . ":**`n`n" . md
         }
-        if (dbg)
-          PasteMd._DbgSection(dbgF, "5e. md (after SHOW_POSTER replacement)", md)
       } else if (asQuoted) {
         md := PasteMd.QuoteMarkdown(md)
       }
 
+      mdAfterPoster := md
       md := PasteMd.EnsureTrailingEolForList(md)
 
       ; Remove CR unconditionally (LF-only).
       md := StrReplace(md, "`r", "")
 
+      return Map(
+        "source", source,
+        "htmlFrag", htmlFrag,
+        "htmlPrep", htmlPrep,
+        "mdRaw", mdRaw,
+        "mdAfterClean", mdAfterClean,
+        "mdAfterOrderedList", mdAfterOrderedList,
+        "mdAfterPoster", mdAfterPoster,
+        "finalMd", md,
+        "expectedListStart", expectedListStart,
+        "usedNoHtmlPath", usedNoHtmlPath,
+        "usedNoTagPlainPath", usedNoTagPlainPath
+      )
+    } finally {
+      PasteMd.SHOW_POSTER := prevShowPoster
+      PasteMd.SHOW_IMG := prevShowImg
+      PasteMd.PROMPT_ORDERED_LIST_START_ON_AMBIGUOUS := prevPromptOrderedList
+    }
+  }
+
+  /**
+   * Converts clipboard content to markdown (or quoted markdown) and pastes it.
+   * Prefers CF_HTML → pandoc conversion, with plain-text fallback.
+   * @param {boolean} asQuoted - If true, prefixes every line with blockquote syntax (>).
+   */
+  static PasteMarkdown(asQuoted) {
+    dbg := PasteMd.DEBUG_PASTE_MD
+    if (dbg) {
+      ; New paste — clear any pin state so the checkmark doesn't carry over.
+      if (PasteMd._lastPinPath != "") {
+        PasteMd._lastPinPath := ""
+        PasteMd.gPasteMenu.Uncheck("Pin current &log")
+      }
+      PasteMd._RotateLogFiles()
+      dbgF := FileOpen(PasteMd.DEBUG_PASTE_MD_LOG, "w", "UTF-8")
+      dbgF.Write("PasteAsMd debug — " . FormatTime(, "yyyy-MM-dd HH:mm:ss") . "`r`n`r`n")
+    }
+
+    clipSaved := ClipboardAll()
+    plain := StrReplace(A_Clipboard, "`r", "")
+    try {
+      cfHtml := ClipboardWaiter.GetHtml()
+      converted := PasteMd._ConvertFromCaptured(
+        plain,
+        cfHtml,
+        asQuoted,
+        PasteMd.SHOW_POSTER,
+        PasteMd.SHOW_IMG,
+        PasteMd.PROMPT_ORDERED_LIST_START_ON_AMBIGUOUS
+      )
+      md := converted["finalMd"]
+
       if (dbg) {
+        PasteMd._DbgSection(dbgF, "1. plain (A_Clipboard minus CR)", plain)
+        PasteMd._DbgSection(dbgF, "2. cfHtml (raw full payload)", cfHtml)
+        PasteMd._DbgSection(dbgF, "3. htmlFrag (CF_HTML fragment)", converted["htmlFrag"])
+        dbgF.Write("=== 2b. cfHtml offsets ===`r`n")
+        dbgF.Write("StartHTML: " . PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartHTML:") . "`r`n")
+        dbgF.Write("EndHTML: " . PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndHTML:") . "`r`n")
+        dbgF.Write("StartFragment: " . PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartFragment:") . "`r`n")
+        dbgF.Write("EndFragment: " . PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndFragment:") . "`r`n`r`n")
+
+        if (converted["htmlFrag"] = "") {
+          PasteMd._DbgSection(dbgF, "3. md (CleanPlainText – no HTML path)", converted["mdAfterClean"])
+        } else {
+          PasteMd._DbgSection(dbgF, "3. htmlPrep (after _PreprocessHtml)", converted["htmlPrep"])
+          if (converted["usedNoTagPlainPath"]) {
+            PasteMd._DbgSection(dbgF, "3b. md (no HTML tags → plain text path)", converted["mdAfterClean"])
+          } else {
+            PasteMd._DbgSection(dbgF, "4. mdRaw (pandoc output)", converted["mdRaw"])
+            PasteMd._DbgSection(dbgF, "5. md (after CleanMarkdown)", converted["mdAfterClean"])
+          }
+          PasteMd._DbgSection(dbgF, "5c. expected list start (ordered-list fix)", "" . converted["expectedListStart"])
+          PasteMd._DbgSection(dbgF, "5d. md (after RestoreOrderedListStart)", converted["mdAfterOrderedList"])
+        }
+
+        if (PasteMd.SHOW_POSTER)
+          PasteMd._DbgSection(dbgF, "5e. md (after SHOW_POSTER replacement)", converted["mdAfterPoster"])
+
         PasteMd._DbgSection(dbgF, "6. FINAL md (pasted)", md)
         dbgF.Close()
       }
