@@ -33,8 +33,9 @@ DetectSource(cfHtml) {
         if InStr(extId, "anthropic") || InStr(extId, "claude")
             return InStr(cfHtml, "content_xGDvVg") ? "claudecode" : "claudeweb"
     }
-    ; ChatGPT web: no extensionId; its articles carry data-turn-id attributes.
-    if InStr(cfHtml, "data-turn-id=")
+    ; ChatGPT web: no extensionId.  Full-turn copies have data-turn-id on <article>;
+    ; sub-selection copies omit the article but keep CodeMirror overflow-visible! <pre>.
+    if InStr(cfHtml, "data-turn-id=") || InStr(cfHtml, "overflow-visible!")
         return "chatgpt"
     return "unknown"
 }
@@ -223,6 +224,8 @@ class HtmlNorm {
         pos := 1
         while RegExMatch(html, "is)<pre\b[^>]*\boverflow-visible\b[^>]*>(.*?)</pre>", &m, pos) {
             inner := m[1]
+            ; Convert <br> to newlines before stripping all other tags.
+            inner := RegExReplace(inner, "i)<br\b[^>]*>", "`n")
             ; Strip all HTML tags — leaves only the plain code text plus structural whitespace.
             codeText := RegExReplace(inner, "<[^>]++>", "")
             codeText := StrReplace(codeText, "`r", "")
