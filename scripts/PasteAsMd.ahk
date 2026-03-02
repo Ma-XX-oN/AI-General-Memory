@@ -4,6 +4,7 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
 #Include ClipHelper.ahk
+#Include HtmlNorm.ahk
 
 class PasteMd {
   static __New() {
@@ -44,6 +45,8 @@ class PasteMd {
   static SHOW_IMG := false
   ; Toggle: wrap pasted output in blockquote syntax.
   static QUOTE := true
+  ; Toggle: use HtmlNorm.Normalize() instead of the legacy PreprocessHtmlCodeBlocks().
+  static USE_HTML_NORM := true
 
   static CODE_FENCE := "``````"
 
@@ -429,9 +432,9 @@ class PasteMd {
         if (dbg)
           PasteMd._DbgSection(dbgF, "3. md (CleanPlainText – no HTML path)", md)
       } else {
-        htmlPrep := PasteMd.PreprocessHtmlCodeBlocks(htmlFrag)
+        htmlPrep := PasteMd._PreprocessHtml(htmlFrag, cfHtml)
         if (dbg)
-          PasteMd._DbgSection(dbgF, "3. htmlPrep (after PreprocessHtmlCodeBlocks)", htmlPrep)
+          PasteMd._DbgSection(dbgF, "3. htmlPrep (after _PreprocessHtml)", htmlPrep)
 
         ; If no meaningful HTML tags remain after preprocessing (just styled
         ; spans wrapping plain text, or <p> wrappers around plain lines as
@@ -884,6 +887,28 @@ class PasteMd {
       }
     }
     return str
+  }
+
+  /**
+   * Routes HTML preprocessing through either HtmlNorm (new) or the legacy
+   * PreprocessHtmlCodeBlocks, depending on the USE_HTML_NORM flag.
+   *
+   * When USE_HTML_NORM is true, calls HtmlNorm.Normalize() and copies the
+   * resulting _thinkingBlocks / _userMsgBlocks arrays into PasteMd so that
+   * RestoreThinkingBlocks / RestoreUserMsgBlocks work unchanged.
+   *
+   * @param {string} htmlFrag - HTML fragment from the CF_HTML clipboard
+   * @param {string} cfHtml   - Full CF_HTML payload (for source detection)
+   * @returns {string} Preprocessed HTML ready for pandoc
+   */
+  static _PreprocessHtml(htmlFrag, cfHtml) {
+    if PasteMd.USE_HTML_NORM {
+      html := HtmlNorm.Normalize(htmlFrag, DetectSource(cfHtml), PasteMd.SHOW_POSTER, PasteMd.SHOW_IMG)
+      PasteMd._thinkingBlocks := HtmlNorm._thinkingBlocks
+      PasteMd._userMsgBlocks  := HtmlNorm._userMsgBlocks
+      return html
+    }
+    return PasteMd.PreprocessHtmlCodeBlocks(htmlFrag)
   }
 
   /**
