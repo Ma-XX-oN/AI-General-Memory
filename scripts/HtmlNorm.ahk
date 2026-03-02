@@ -31,8 +31,11 @@ DetectSource(cfHtml) {
         if InStr(extId, "openai.chatgpt")
             return "codex"
         if InStr(extId, "anthropic") || InStr(extId, "claude")
-            return InStr(cfHtml, "content_xGDvVg") ? "claudecode" : "claudeweb"
+            return "claudecode"   ; real Claude Web (browser) never has extensionId
     }
+    ; Claude Web (browser): no extensionId in header; detect from HTML content.
+    if InStr(cfHtml, "font-claude-response") || InStr(cfHtml, "data-is-streaming") || InStr(cfHtml, "code-block__code")
+        return "claudeweb"
     ; ChatGPT web: no extensionId.  Full-turn copies have data-turn-id on <article>;
     ; sub-selection copies omit the article but keep CodeMirror overflow-visible! <pre>.
     if InStr(cfHtml, "data-turn-id=") || InStr(cfHtml, "overflow-visible!")
@@ -124,6 +127,12 @@ class HtmlNorm {
 
         ; 10. Strip long footnote hrefs, keeping only the #fragment.
         html := RegExReplace(html, "i)href=`"[^`"]*#(user-content-[^`"]*)`"", "href=`"#$1`"")
+
+        ; 10b. Strip <p> wrapper inside footnote definition <li> elements.
+        ;      <li id="user-content-fn-N"><p>text</p></li> → <li id="...">text</li>
+        ;      Without this, pandoc renders footnote lists in loose format (number on
+        ;      its own line, content indented), instead of tight (number + content inline).
+        html := RegExReplace(html, "is)(<li\b[^>]*\bid=`"user-content-fn-[^`"]*`"[^>]*>)\s*<p\b[^>]*>(.*?)</p>\s*(</li>)", "$1$2$3")
 
         ; 11. Strip residual <span> tags.
         html := RegExReplace(html, "i)</?span\b[^>]*>", "")
@@ -327,19 +336,23 @@ class HtmlNorm {
     /**
      * Extracts whitespace-sensitive user message text into ¤USERMSG_N¤ placeholders.
      *
-     * Two container types are handled (both regardless of detected source, since
-     * the class patterns are source-specific enough to avoid false positives):
+     * Four container types are handled (all source-specific enough to avoid false
+     * positives without explicit source gating):
      *
      * - Codex: `<div class="text-size-chat whitespace-pre-wrap">` with mixed
      *   `<span>` and `<code class="font-mono">` children.
      * - Claude Code: `<div class="content_xGDvVg">` with a single `<span>` child.
+     * - Claude Web: `<p class="whitespace-pre-wrap break-words">` — plain text with
+     *   embedded literal newlines; `<br>` tags possible.
+     * - ChatGPT: `<div class="whitespace-pre-wrap">` (exact sole class value) —
+     *   plain text with embedded literal newlines.
      *
      * `PasteMd.RestoreUserMsgBlocks()` restores the plain text after pandoc.
      * @param {string} html
      * @returns {string}
      */
     static _ExtractUserMessages(html) {
-        ; Codex user messages.
+        ; Codex user messages: <div class="text-size-chat whitespace-pre-wrap">
         pos := 1
         while RegExMatch(html, "is)(<div\b[^>]*\btext-size-chat\b[^>]*\bwhitespace-pre-wrap\b[^>]*>)(.*?)</div>", &m, pos) {
             rawContent := m[2]
@@ -355,7 +368,7 @@ class HtmlNorm {
             html := SubStr(html, 1, m.Pos - 1) . newStr . SubStr(html, m.Pos + m.Len)
             pos := m.Pos + StrLen(newStr)
         }
-        ; Claude Code user messages.
+        ; Claude Code user messages: <div class="content_xGDvVg"><span>text</span>
         pos := 1
         while RegExMatch(html, "is)(<div\b[^>]*\bcontent_xGDvVg\b[^>]*>)\s*<span>(.*?)</span>", &m, pos) {
             rawText := HtmlNorm._DecodeBasicHtmlEntities(m[2])
@@ -365,6 +378,39 @@ class HtmlNorm {
             newStr := m[1] . placeholder
             html := SubStr(html, 1, m.Pos - 1) . newStr . SubStr(html, m.Pos + m.Len)
             pos := m.Pos + StrLen(newStr)
+        }
+        ; Claude Web user messages: <p class="whitespace-pre-wrap break-words">
+        ; Replace the entire <p>...</p> with the placeholder (not nested inside the
+        ; original <p>, which would produce invalid nested <p> elements).
+        pos := 1
+        while RegExMatch(html, "is)(<p\b[^>]*\bclass=`"whitespace-pre-wrap break-words`"[^>]*>)(.*?)</p>", &m, pos) {
+            rawContent := m[2]
+            rawContent := RegExReplace(rawContent, "i)<br\b[^>]*>", "`n")
+            rawContent := RegExReplace(rawContent, "<[^>]++>", "")
+            rawContent := HtmlNorm._DecodeBasicHtmlEntities(rawContent)
+            rawContent := StrReplace(rawContent, "`r", "")
+            rawContent := Trim(rawContent, "`n")
+            HtmlNorm._userMsgBlocks.Push(rawContent)
+            placeholder := "<p>¤USERMSG_" . HtmlNorm._userMsgBlocks.Length . "¤</p>"
+            html := SubStr(html, 1, m.Pos - 1) . placeholder . SubStr(html, m.Pos + m.Len)
+            pos := m.Pos + StrLen(placeholder)
+        }
+        ; ChatGPT user messages: <div class="whitespace-pre-wrap"> (exact sole class).
+        ; Exact-value match avoids re-matching Codex's "text-size-chat whitespace-pre-wrap"
+        ; outer tag, which still carries the class after Codex extraction above.
+        ; Replace the entire <div>...</div> with the placeholder.
+        pos := 1
+        while RegExMatch(html, "is)(<div\b[^>]*\bclass=`"whitespace-pre-wrap`"[^>]*>)(.*?)</div>", &m, pos) {
+            rawContent := m[2]
+            rawContent := RegExReplace(rawContent, "i)<br\b[^>]*>", "`n")
+            rawContent := RegExReplace(rawContent, "<[^>]++>", "")
+            rawContent := HtmlNorm._DecodeBasicHtmlEntities(rawContent)
+            rawContent := StrReplace(rawContent, "`r", "")
+            rawContent := Trim(rawContent, "`n")
+            HtmlNorm._userMsgBlocks.Push(rawContent)
+            placeholder := "<p>¤USERMSG_" . HtmlNorm._userMsgBlocks.Length . "¤</p>"
+            html := SubStr(html, 1, m.Pos - 1) . placeholder . SubStr(html, m.Pos + m.Len)
+            pos := m.Pos + StrLen(placeholder)
         }
         return html
     }
@@ -421,6 +467,10 @@ class HtmlNorm {
             prev := html
             ; Outer <pre class="..."> wrapping an inner <pre><code>.
             html := RegExReplace(html, "is)<pre\b[^>]+>\s*(<pre\b[^>]*><code\b[^>]*>.*?</code></pre>)\s*</pre>", "$1")
+            ; Claude Web: <pre class="code-block__code ..."> directly wrapping <code>.
+            ; Strip the outer pre's class so pandoc uses the <code class="language-xxx">
+            ; for the language identifier, not the pre's CSS utility class.
+            html := RegExReplace(html, "is)<pre\b[^>]*\bcode-block__code\b[^>]*>\s*(<code\b[^>]*>.*?</code>)\s*</pre>", "<pre>$1</pre>")
             ; Claude Web copy-button overlay: <div class="sticky ..."><div ...></div></div>
             ; Strip it so the remaining structure is a simple two-div wrap around <pre><code>.
             html := RegExReplace(html, "is)<div\b[^>]*\bsticky\b[^>]*>.*?</div>\s*</div>", "")
