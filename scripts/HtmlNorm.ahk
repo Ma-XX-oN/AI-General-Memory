@@ -415,6 +415,9 @@ class HtmlNorm {
             prev := html
             ; Outer <pre class="..."> wrapping an inner <pre><code>.
             html := RegExReplace(html, "is)<pre\b[^>]+>\s*(<pre\b[^>]*><code\b[^>]*>.*?</code></pre>)\s*</pre>", "$1")
+            ; Claude Web copy-button overlay: <div class="sticky ..."><div ...></div></div>
+            ; Strip it so the remaining structure is a simple two-div wrap around <pre><code>.
+            html := RegExReplace(html, "is)<div\b[^>]*\bsticky\b[^>]*>.*?</div>\s*</div>", "")
             ; Two nested <div>s wrapping <pre><code>.
             html := RegExReplace(html, "is)<div\b[^>]*>\s*<div\b[^>]*>\s*(<pre><code\b[^>]*>.*?</code></pre>)\s*</div>\s*</div>", "$1")
             ; Two nested <div>s wrapping an inline <code>.
