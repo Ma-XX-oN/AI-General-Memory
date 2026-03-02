@@ -936,16 +936,20 @@ class PasteMd {
   }
 
   /**
-   * Replaces <img> tags in a string according to the SHOW_IMG toggle.
-   * When SHOW_IMG is off, replaces each tag with [img] or [img: text] using the
-   * first non-empty alt / title / aria-label attribute as the description.
-   * When SHOW_IMG is on, leaves tags in place for pandoc to convert.
-   * Called on both the pre-pandoc HTML and the post-pandoc markdown, because
-   * pandoc converts inline <svg> elements to <img> tags.
+   * Replaces `<img>` and `<svg>` elements in a string according to SHOW_IMG.
+   *
+   * When SHOW_IMG is off:
+   *   - No accessible text (alt / title / aria-label / SVG `<title>`): dropped.
+   *   - Has accessible text: replaced with `(img: <text>)`.
+   *
+   * When SHOW_IMG is on, leaves elements in place.
+   * Called on both the pre-pandoc HTML and the post-pandoc markdown.
+   *
    * @param {string} str - HTML or markdown string to process
-   * @returns {string} String with <img> tags replaced (or left intact when SHOW_IMG is on)
+   * @returns {string}
    */
   static _ProcessImgTags(str) {
+    ; <img> tags (self-closing).
     pos := 1
     while RegExMatch(str, "i)<img\b([^>]*?)>", &m, pos) {
       if (PasteMd.SHOW_IMG) {
@@ -959,7 +963,27 @@ class PasteMd {
           accessText := mT[1]
         else if (RegExMatch(attrs, "i)\baria-label\s*=\s*['`"]([^'`"]*)['`"]", &mL) && mL[1] != "")
           accessText := mL[1]
-        replacement := (accessText = "") ? "[img]" : "[img: " . accessText . "]"
+        replacement := (accessText = "") ? "" : "(img: " . accessText . ")"
+        str := SubStr(str, 1, m.Pos - 1) . replacement . SubStr(str, m.Pos + m.Len)
+        pos := m.Pos + StrLen(replacement)
+      }
+    }
+    ; <svg>…</svg> elements — same rule (aria-label, title attr, or <title> child).
+    pos := 1
+    while RegExMatch(str, "is)<svg\b([^>]*)>.*?</svg>", &m, pos) {
+      if (PasteMd.SHOW_IMG) {
+        pos := m.Pos + m.Len
+      } else {
+        attrs := m[1]
+        full  := m[0]
+        accessText := ""
+        if (RegExMatch(attrs, "i)\baria-label\s*=\s*['`"]([^'`"]*)['`"]", &mL) && mL[1] != "")
+          accessText := mL[1]
+        else if (RegExMatch(attrs, "i)\btitle\s*=\s*['`"]([^'`"]*)['`"]", &mT) && mT[1] != "")
+          accessText := mT[1]
+        else if (RegExMatch(full, "i)<title\b[^>]*>(.*?)</title>", &mTc) && mTc[1] != "")
+          accessText := mTc[1]
+        replacement := (accessText = "") ? "" : "(img: " . accessText . ")"
         str := SubStr(str, 1, m.Pos - 1) . replacement . SubStr(str, m.Pos + m.Len)
         pos := m.Pos + StrLen(replacement)
       }
