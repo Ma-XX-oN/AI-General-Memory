@@ -36,6 +36,51 @@ occurrence of an unambiguous, fixed terminator (e.g. `.*?-->` for HTML
 comments).  Do not use them as a substitute for possessive/atomic when
 the goal is to prevent catastrophic backtracking.
 
+### PCRE inline comments `(?#...)`
+
+PCRE inline comments are terminated by the **first** `)` encountered —
+there is no escape mechanism inside `(?#...)`.  Any `)` in the comment
+body (e.g. from an embedded pattern like `(?<tag>...)`) closes the
+comment prematurely, leaving the rest as unmatched pattern text and
+causing a compile error.
+
+**Safe:** keep comment text free of `)`:
+
+```regex
+(?<void_tag> (?# void element fallback — entered when first alt fails )
+```
+
+**Broken:** `)` inside the comment body terminates it early:
+
+```regex
+(?<void_tag> (?# entered when the first alt of (?<tag>...) fails )
+```
+
+With the `x` (extended) flag, `#`-style end-of-line comments are also
+available and have no such restriction.
+
+### PCRE `J` flag and duplicate named groups in recursive subroutines
+
+The `J` flag allows two groups to share a name (e.g. `(?<tag_name>...)` in
+both alternatives of a `(?(DEFINE)...)` subroutine).  **Avoid this in
+recursive patterns.** Two problems arise:
+
+1. **`m["name"]` in callouts always returns the first group** (by source
+   order), even when the second group is the one that just captured.  The
+   first group carries the outer call's value, which leaks into inner
+   callouts.
+
+2. **`\k<name>` picks up the most recently captured value** across both
+   groups, including values from nested subroutine calls, corrupting
+   backreferences in the outer context.
+
+**Fix:** give each subroutine its own uniquely-named capture group.
+For a void-element fallback in a recursive HTML tag parser, extract the
+fallback into a separate `(?<void_tag>...)` subroutine that captures into
+`(?<void_name>...)` instead of reusing `(?<tag_name>...)`.  The callout
+then checks `m["void_name"] != "" ? m["void_name"] : m["tag_name"]`.
+No `J` flag needed.
+
 ### Subroutines and inlining
 
 Subroutines (e.g. PCRE `(?&name)`, Oniguruma `\g<name>`) allow a
@@ -50,6 +95,54 @@ without subroutines:
 - It can be easier to design and reason about the pattern using
   subroutines first, then mechanically inline them for the target
   flavour.
+
+## AHK PCRE callout debugger
+
+Visualises the engine's position in both the haystack and the needle at each
+callout point.  Paste the body into an existing callout function, or define
+it as a standalone top-level function and invoke it with `(?C:debug)`.
+
+### Callout syntax
+
+- `(?C:name)` — named callout (AHK extension; preferred over `(?Cname)` to
+  reduce spellcheck warnings).
+- `C)` flag — **auto-callout**: PCRE inserts callout 255 before every item
+  in the pattern automatically, invoking the `pcre_callout` global.  Very
+  informative for small patterns; generates a lot of output for large ones
+  but has still proven useful for tracing complex match behaviour.
+
+### Debugger function
+
+```ahk
+debug(Match, CalloutNumber, FoundPos, Haystack, NeedleRegEx) {
+  ; See pcre.txt for descriptions of these fields.
+  start_match       := NumGet(A_EventInfo, 12 + A_PtrSize*2, "Int")
+  current_position  := NumGet(A_EventInfo, 16 + A_PtrSize*2, "Int")
+  pad := A_PtrSize=8 ? 4 : 0
+  pattern_position  := NumGet(A_EventInfo, 28 + pad + A_PtrSize*3, "Int")
+  next_item_length  := NumGet(A_EventInfo, 32 + pad + A_PtrSize*3, "Int")
+
+  ; Point out >>current match<<.
+  _HAYSTACK := SubStr(Haystack, 1, start_match)
+    . "🠞" SubStr(Haystack, start_match + 1, current_position - start_match)
+    . "🠜" SubStr(Haystack, current_position + 1)
+
+  ; Point out >>next item to be evaluated<<.
+  _NEEDLE := SubStr(NeedleRegEx, 1, pattern_position)
+    . "🠞" SubStr(NeedleRegEx, pattern_position + 1, next_item_length)
+    . "🠜" SubStr(NeedleRegEx, pattern_position + 1 + next_item_length)
+
+  FileAppend "Haystack:`n" _HAYSTACK "`nNeedle:`n" _NEEDLE "`n", "**"
+}
+```
+
+The arrows `🠞…🠜` bracket the active region.  In the haystack they surround the
+portion already consumed by the current match attempt (`start_match` to
+`current_position`).  In the needle they surround the next item about to be
+evaluated (`pattern_position` + `next_item_length`).
+
+`A_EventInfo` points to a PCRE2 `pcre2_callout_block_8` struct; offsets
+are documented in the PCRE2 source (`pcre2.h`) and in `pcre2_callout(3)`.
 
 ## Generalized bracketed-text matching
 

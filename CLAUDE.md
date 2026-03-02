@@ -155,9 +155,19 @@ Preserve semantic meaning before simplifying representation.
   plain ASCII (`+`, `-`, `|`) for diagrams intended to render correctly on
   GitHub; reserve box-drawing characters for local/IDE viewing only.
 
+## AutoHotkey v2
+
+- Backtick (`` ` ``) is the escape character; `` `` `` = literal backtick in strings
+- Space concatenation (`"abc" var`) does NOT add a space
+- Continuation section `)` closes when at start of a line (leading whitespace ignored)
+- Multi-line string using continuation: `str := "\n(\n  content\n)"` — any `)` at
+  line-start (including indented) closes the section; escape as `` `) `` to include a
+  literal `)` in the string content
+
 ## Useful Patterns
 
 - [Generalized bracketed-text regex](regex-patterns.md#generalized-bracketed-text-matching)
+- [AHK PCRE callout debugger](regex-patterns.md#ahk-pcre-callout-debugger)
 - [Testing guidelines](testing.md)
 
 ## Time tracking (every prompt)
