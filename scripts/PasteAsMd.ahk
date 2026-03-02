@@ -15,12 +15,12 @@ class PasteMd {
     PasteMd.gPasteMenu.Add()
     PasteMd.gPasteMenu.Add("Pin current &log", ObjBindMethod(PasteMd, "PinCurrentLog"))
     PasteMd.gPasteMenu.Add("&Delete pinned history", ObjBindMethod(PasteMd, "DeletePinnedHistory"))
-    PasteMd.gPasteMenu.Add("Pinned &filenames", ObjBindMethod(PasteMd, "PastePinnedFilenames"))
-    PasteMd.gPasteMenu.Add("Pinned &fullnames", ObjBindMethod(PasteMd, "PastePinnedFullnames"))
+    PasteMd.gPasteMenu.Add("Pinned &file names", ObjBindMethod(PasteMd, "PastePinnedFilenames"))
+    PasteMd.gPasteMenu.Add("Pinned &full names", ObjBindMethod(PasteMd, "PastePinnedFullnames"))
     PasteMd.gPasteMenu.Check("&Quote")
     PasteMd.gPasteMenu.Disable("&Delete pinned history")
-    PasteMd.gPasteMenu.Disable("Pinned &filenames")
-    PasteMd.gPasteMenu.Disable("Pinned &fullnames")
+    PasteMd.gPasteMenu.Disable("Pinned &file names")
+    PasteMd.gPasteMenu.Disable("Pinned &full names")
     PasteMd._InitPinState()
   }
 
@@ -84,8 +84,8 @@ class PasteMd {
     hasPinned := (PasteMd._PinnedLogFiles().Length > 0)
     pinnedAction := hasPinned ? "Enable" : "Disable"
     PasteMd.gPasteMenu.%pinnedAction%("&Delete pinned history")
-    PasteMd.gPasteMenu.%pinnedAction%("Pinned &filenames")
-    PasteMd.gPasteMenu.%pinnedAction%("Pinned &fullnames")
+    PasteMd.gPasteMenu.%pinnedAction%("Pinned &file names")
+    PasteMd.gPasteMenu.%pinnedAction%("Pinned &full names")
     PasteMd.gPasteMenu.Show(PasteMd._menuX, PasteMd._menuY)
   }
 

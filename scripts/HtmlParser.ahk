@@ -73,11 +73,15 @@ class HtmlParser {
    * PCRE pattern for recursive HTML tag matching.
    *
    * Subroutines (in DEFINE block):
-   *   symbol — valid XML/HTML name token (letters, digits, `_`, `-`)
-   *   sq / dq — single- or double-quoted string (including surrounding quotes)
-   *   attr   — one attribute: name optionally followed by `=value`
-   *   tag    — one element: opening tag, optional children, closing tag
-   *            (or self-closing with `/>`, or known void element with no close)
+   *   symbol   — valid XML/HTML name token (letters, digits, `_`, `-`)
+   *   sq / dq  — single- or double-quoted string (including surrounding quotes)
+   *   attr     — one attribute: name optionally followed by `=value`
+   *   void_tag — void-element fallback: `dom_reset`, then match bare `<tag>`;
+   *              captures the name into `(?<void_name>)` (distinct from
+   *              `(?<tag_name>)` in `tag`) so that `\k<tag_name>` and
+   *              `m["tag_name"]` in the outer `tag` call are never corrupted
+   *   tag      — one element: opening tag, optional children, closing tag
+   *              (or self-closing with `/>`, or delegates to `(?&void_tag)`)
    *
    * The `(?<tag>...)` subroutine opens with `< (?!/)` so that closing tags
    * (`</foo>`) never enter the pattern and never fire any callouts.
@@ -85,25 +89,31 @@ class HtmlParser {
    * snapshot is always taken before any frame is pushed.  `dom_snapshot_pop`
    * fires at the end of the subroutine on any successful match (first or
    * second alternative); `dom_reset` peeks and restores state for the
-   * second-alternative attempt without consuming the snapshot.
+   * `void_tag` attempt without consuming the snapshot.
    *
    * @type {string}
    */
   static _RE := "
   (
-    Jxs)
+    xs)
     (?(DEFINE)
 
       (?<symbol>  [a-zA-Z_][a-zA-Z_\d\-]*+ )
 
       (?<sq>  '[^']*+' )
-      (?<dq>  `"[^`"]*+`" )
+      (?<dq>  "[^"]*+" )
 
       (?<attr>
         (?<attr_name>  (?&symbol) )
         (?: \s*+ = \s*+ (?<attr_val> (?:(?&sq)|(?&dq)) ) )?+
         \s*+
         (?C:_HP_Attr)
+      `)
+
+      (?<void_tag> (?# void element fallback — entered when the first alt of tag fails )
+        (?C:dom_reset)
+        (?<void_name> (?&symbol) ) (?C:_HP_TagOpen) \s*+ (?&attr)*+ >
+        (?C:_HP_Tag_not_closed)
       `)
 
       (?<tag> (?# assumes that the first character is a `<` )
@@ -117,10 +127,7 @@ class HtmlParser {
           `)
           (?C:_HP_Tag)
         |
-          (?# Fallback: no close tag found — treat as void element )
-          (?C:dom_reset)
-          (?<tag_name> (?&symbol) ) (?C:_HP_TagOpen) \s*+ (?&attr)*+ >
-          (?C:_HP_Tag_not_closed)
+          (?&void_tag)
         `)
         (?C:dom_snapshot_pop)
       `)
@@ -150,7 +157,7 @@ class HtmlParser {
    */
   static _TagOpen(m, *) {
     HtmlParser._frames.Push({
-      name:       m["tag_name"],
+      name:       m["void_name"] != "" ? m["void_name"] : m["tag_name"],
       attrs:      Map(),
       childStart: HtmlParser._dom.Length
     })
