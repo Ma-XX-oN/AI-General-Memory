@@ -79,8 +79,8 @@ for fx in fixtures {
   Chk("no placeholder: ¤UNCHK¤", !InStr(finalMd, "¤UNCHK¤"))
 
   if fx.withUser {
-    Chk("with-user has User label", InStr(finalMd, "**User:**"))
-    Chk("with-user has assistant label", InStr(finalMd, "**" fx.assistantLabel ":**"))
+    Chk("with-user has User label", InStr(finalMd, "## User"))
+    Chk("with-user has assistant label", InStr(finalMd, "## " fx.assistantLabel))
   }
 }
 

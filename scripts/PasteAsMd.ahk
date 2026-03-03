@@ -39,7 +39,7 @@ class PasteMd {
   ; Number of rotated past-run logs to keep alongside the current one.
   static LOG_HISTORY_COUNT := 4
 
-  ; Toggle: prepend detected speaker label ("**User:**" / "**Codex:**" / "**Claude:**" / "**AI:**") to pasted output.
+  ; Toggle: prepend detected speaker label ("## User" / "## Codex" / "## Claude" / "## AI") to pasted output.
   static SHOW_POSTER := false
   ; Toggle: convert <img> tags to markdown image syntax; when off, use [img] placeholder.
   static SHOW_IMG := false
@@ -507,14 +507,18 @@ class PasteMd {
         }
         ; Apply quoting BEFORE replacing poster placeholders. This way the
         ; placeholder (¤POSTER_AI¤) becomes "> ¤POSTER_AI¤" and can be
-        ; distinguished from previously-pasted "**AI:**" text, which stays
-        ; quoted as "> **AI:**".
+        ; distinguished from quoted source text (for example a literal
+        ; heading/content line that starts with "## ...").
         if (asQuoted)
           md := PasteMd.QuoteMarkdown(md)
-        ; Replace remaining placeholders with bold labels.
+        ; Replace remaining placeholders with H2 heading labels.
         ; Placeholders may be prefixed with "> " if quoting is active.
-        md := RegExReplace(md, "m)^(?:> )?¤POSTER_AI¤$", "**" . assistantLabel . ":**")
-        md := RegExReplace(md, "m)^(?:> )?¤POSTER_User¤$", "**User:**")
+        md := RegExReplace(md, "m)^(?:> )?¤POSTER_AI¤$", "## " . assistantLabel)
+        md := RegExReplace(md, "m)^(?:> )?¤POSTER_User¤$", "## User")
+        ; Keep spacing around poster headings truly blank when quote mode is on:
+        ; convert adjacent standalone ">" spacer lines back to empty lines.
+        if (asQuoted)
+          md := PasteMd.UnquoteBlankLinesAroundPosterHeadings(md)
         ; If no placeholders were found the fragment had no message container
         ; divs (partial selection). Fall back to the pre-fragment cfHtml context.
         if (posters.Length = 0 && cfHtml != "") {
@@ -522,7 +526,7 @@ class PasteMd {
           if (poster = "AI")
             poster := assistantLabel
           if (poster != "")
-            md := "**" . poster . ":**`n`n" . md
+            md := "## " . poster . "`n`n" . md
         }
       } else if (asQuoted) {
         md := PasteMd.QuoteMarkdown(md)
@@ -779,7 +783,13 @@ class PasteMd {
       out .= (out = "" ? "" : "`n") . outLine
     }
 
-    ; Drop loose-list separator blanks between adjacent ordered-list items.
+    ; Drop loose-list separator blanks between adjacent items of the same list type.
+    ; Pandoc emits blank lines between <li> items when each contains a <p> wrapper ("loose list").
+    ; Only drops blanks where both neighbors are ordered OR both are unordered — preserves the
+    ; blank line between a closing unordered list and an opening ordered list (and vice-versa).
+    ; TODO: a cleaner alternative is to strip single-<p> wrappers from all <li> elements in
+    ;       HtmlNorm (as already done for footnote <li>s at step 10b), so pandoc never produces
+    ;       loose lists in the first place — removing the need for this post-pandoc cleanup.
     outLines := StrSplit(out, "`n")
     out2 := ""
     firstOut2 := true
@@ -789,8 +799,8 @@ class PasteMd {
       if (Trim(line, " `t") = "") {
         prev := (idx > 1) ? RTrim(outLines[idx - 1], " `t") : ""
         next := (idx < outLines.Length) ? RTrim(outLines[idx + 1], " `t") : ""
-        if (RegExMatch(prev, "^\s*\d+[.)](?:\s+|$)")
-          && RegExMatch(next, "^\s*\d+[.)](?:\s+|$)")) {
+        if ((RegExMatch(prev, "^\s*\d+[.)](?:\s+|$)") && RegExMatch(next, "^\s*\d+[.)](?:\s+|$)"))
+          || (RegExMatch(prev, "^\s*[-+*](?:\s+|$)") && RegExMatch(next, "^\s*[-+*](?:\s+|$)"))) {
           continue
         }
       }
@@ -1354,12 +1364,14 @@ class PasteMd {
       if (line != "" && RegExMatch(rawLine, " {2,}$"))
         line .= "  "
 
-      ; Drop pandoc's separator blank lines between adjacent ordered-list items.
+      ; Drop loose-list separator blanks between adjacent items of the same list type.
       if (line = "") {
         prev := (i > 1) ? RTrim(lines[i - 1], " `t") : ""
         next := (i < lines.Length) ? RTrim(lines[i + 1], " `t") : ""
-        if (RegExMatch(prev, "^\s*\d+[.)](?:\s+|$)")
-          && RegExMatch(next, "^\s*\d+[.)](?:\s+|$)")) {
+        if ((RegExMatch(prev, "^\s*\d+[.)](?:\s+|$)")
+          && RegExMatch(next, "^\s*\d+[.)](?:\s+|$)"))
+          || (RegExMatch(prev, "^\s*[-+*](?:\s+|$)")
+          && RegExMatch(next, "^\s*[-+*](?:\s+|$)"))) {
           continue
         }
       }
@@ -1371,6 +1383,38 @@ class PasteMd {
 
     if (hadTrailingBreak && out != "")
       out .= "`n"
+    return out
+  }
+
+  /**
+   * Converts quoted blank spacer lines (">") adjacent to poster headings
+   * back into truly blank lines.
+   * @param {string} md - Markdown text after poster placeholder replacement
+   * @returns {string} Markdown with unquoted blank lines around poster headings
+   */
+  static UnquoteBlankLinesAroundPosterHeadings(md) {
+    md := StrReplace(md, "`r", "")
+    if (md = "")
+      return md
+
+    lines := StrSplit(md, "`n")
+    Loop lines.Length {
+      i := A_Index
+      if (Trim(lines[i], " `t") != ">")
+        continue
+
+      prevIsPosterHeading := (i > 1) && RegExMatch(RTrim(lines[i - 1], " `t"), "^##\s+\S")
+      nextIsPosterHeading := (i < lines.Length) && RegExMatch(RTrim(lines[i + 1], " `t"), "^##\s+\S")
+      if (prevIsPosterHeading || nextIsPosterHeading)
+        lines[i] := ""
+    }
+
+    out := ""
+    firstOut := true
+    Loop lines.Length {
+      out .= (firstOut ? "" : "`n") . lines[A_Index]
+      firstOut := false
+    }
     return out
   }
 
