@@ -59,6 +59,25 @@ Chk("raw < encoded as &lt;",               InStr(normEntities, "&lt;"))
 Chk("raw & encoded as &amp;",              InStr(normEntities, "&amp;"))
 Chk("raw > encoded as &gt;",               InStr(normEntities, "&gt;"))
 
+; ── 3b: Diff container normalization (tool output) ────────────────────────────
+Log("── 3b: Diff container normalization ─────────────────")
+
+diffHtml := '<div class="header"><button type="button">test-paste-md-fixtures.ahk</button></div>'
+    . '<diffs-container class="composer-diff-simple-line"><pre><code>'
+    . '<div data-line-type="context"><span data-column-content="">  if fx.withUser {</span></div>'
+    . '<div data-line-type="change-deletion"><span data-column-content="">    Chk("with-user has User label", InStr(finalMd, "**User:**"))</span></div>'
+    . '<div data-line-type="change-addition"><span data-column-content="">    Chk("with-user has User label", InStr(finalMd, "## User"))</span></div>'
+    . '<div data-line-type="context"><span data-column-content="">  }</span></div>'
+    . '</code></pre></diffs-container>'
+normDiff := HtmlNorm._NormalizeSimpleDiffBlocks(diffHtml)
+
+Chk("diff container removed", !InStr(normDiff, "<diffs-container"))
+Chk("language-diff code block emitted", InStr(normDiff, '<pre><code class="language-diff">'))
+Chk("edited filename retained", InStr(normDiff, "<code>test-paste-md-fixtures.ahk</code>"))
+Chk("deletion line prefixed with -", InStr(normDiff, '-    Chk("with-user has User label", InStr(finalMd, "**User:**"))'))
+Chk("addition line prefixed with +", InStr(normDiff, '+    Chk("with-user has User label", InStr(finalMd, "## User"))'))
+Chk("context line kept with leading space", InStr(normDiff, "   if fx.withUser {"))
+
 ; ── 4: Task-list — direct <input> (Claude Code / Codex style) ─────────────────
 Log("── 4: Task list — direct input ──────────────────────")
 

@@ -16,6 +16,7 @@ fixtures := [
   { file: "PasteAsMd_ClaudeWeb-with-User.log",  source: "claudeweb",  withUser: true,  assistantLabel: "Claude Web" },
   { file: "PasteAsMd_Codex.log",                source: "codex",      withUser: false, assistantLabel: "Codex" },
   { file: "PasteAsMd_Codex-with-User.log",      source: "codex",      withUser: true,  assistantLabel: "Codex" },
+  { file: "PasteAsMd_Codex-EditedFile.log",     source: "codex",      withUser: false, assistantLabel: "Codex" },
   { file: "PasteAsMd_ChatGPT.log",              source: "chatgpt",    withUser: false, assistantLabel: "ChatGPT" },
   { file: "PasteAsMd_ChatGPT-with-User.log",    source: "chatgpt",    withUser: true,  assistantLabel: "ChatGPT" },
   { file: "PasteAsMd_ChatGPT-with-User2.log",   source: "chatgpt",    withUser: true,  assistantLabel: "ChatGPT" },
