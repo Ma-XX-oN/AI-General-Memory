@@ -1,0 +1,765 @@
+﻿PasteAsMd debug — 2026-03-02 01:53:38
+
+=== 1. plain (A_Clipboard minus CR) (len=750) ===
+Markdown Test Document¶
+Section 1¶
+Headings¶
+Here is a paragraph with bold, italic, bold-italic, strikethrough, inline code, and a link.¶
+Section 2¶
+pythondef hello_world():¶
+    print("Hello, World!")¶
+¶
+hello_world()¶
+javascriptfunction greet(name) {¶
+    console.log(`Hello, ${name}!`);¶
+}¶
+¶
+greet("JavaScript");¶
+bashecho "Hello from Bash!"¶
+Section 3¶
+¶
+ Complete task 1¶
+ Incomplete task 2¶
+ Complete task 3¶
+¶
+Section 4¶
+¶
+This is a blockquote.¶
+¶
+This is a nested blockquote.¶
+¶
+¶
+Section 5¶
+Left-alignedCenter-alignedRight-alignedAppleBananaCherryDurianElderberryFig¶
+Section 6¶
+¶
+Fruits¶
+¶
+Apple¶
+Banana¶
+¶
+¶
+Vegetables¶
+Grains¶
+¶
+Section 7¶
+¶
+First item¶
+Second item¶
+Third item¶
+¶
+Section 8¶
+This is a sentence with a footnote reference.1¶
+Footnotes¶
+¶
+¶
+This is the footnote definition. ↩
+
+=== 2. cfHtml (raw full payload) (len=17536) ===
+Version:0.9⏎¶⏎¶
+¶
+StartHTML:0000000105⏎¶⏎¶
+¶
+EndHTML:0000017536⏎¶⏎¶
+¶
+StartFragment:0000000141⏎¶⏎¶
+¶
+EndFragment:0000017500⏎¶⏎¶
+¶
+<html>⏎¶⏎¶
+¶
+<body>⏎¶⏎¶
+¶
+<!--StartFragment--><h1 class="text-text-100 mt-3 -mb-1 text-[1.375rem] font-bold">Markdown Test Document</h1>¶
+<h2 class="text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold">Section 1</h2>¶
+<h3 class="text-text-100 mt-2 -mb-1 text-base font-bold">Headings</h3>¶
+<p class="font-claude-response-body break-words whitespace-normal leading-[1.7]">Here is a paragraph with <strong>bold</strong>, <em>italic</em>, <em><strong>bold-italic</strong></em>, <del>strikethrough</del>, <code class="bg-text-200/5 border border-0.5 border-border-300 text-danger-000 whitespace-pre-wrap rounded-[0.4rem] px-1 py-px text-[0.9rem]">inline code</code>, and a <a class="underline underline underline-offset-2 decoration-1 decoration-current/40 hover:decoration-current focus:decoration-current" href="https://www.example.com">link</a>.</p>¶
+<h2 class="text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold">Section 2</h2>¶
+<div class="relative group/copy bg-bg-000/50 border-0.5 border-border-400 rounded-lg"><div class="sticky opacity-0 group-hover/copy:opacity-100 top-2 py-2 h-12 w-0 float-right"><div class="absolute right-0 h-8 px-2 items-center inline-flex z-10"><button class="inline-flex¶
+  items-center¶
+  justify-center¶
+  relative¶
+  shrink-0¶
+  can-focus¶
+  select-none¶
+  disabled:pointer-events-none¶
+  disabled:opacity-50¶
+  disabled:shadow-none¶
+  disabled:drop-shadow-none border-transparent¶
+          transition¶
+          font-base¶
+          duration-300¶
+          ease-[cubic-bezier(0.165,0.85,0.45,1)] h-8 w-8 rounded-md active:scale-95 backdrop-blur-md Button_ghost__BUAoh" type="button" aria-label="Copy to clipboard" data-state="closed"><div class="relative"><div class="transition-all opacity-100 scale-100" style="width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg" class="transition-all opacity-100 scale-100" aria-hidden="true" style="flex-shrink: 0;"><path d="M12.5 3C13.3284 3 14 3.67157 14 4.5V6H15.5C16.3284 6 17 6.67157 17 7.5V15.5C17 16.3284 16.3284 17 15.5 17H7.5C6.67157 17 6 16.3284 6 15.5V14H4.5C3.67157 14 3 13.3284 3 12.5V4.5C3 3.67157 3.67157 3 4.5 3H12.5ZM14 12.5C14 13.3284 13.3284 14 12.5 14H7V15.5C7 15.7761 7.22386 16 7.5 16H15.5C15.7761 16 16 15.7761 16 15.5V7.5C16 7.22386 15.7761 7 15.5 7H14V12.5ZM4.5 4C4.22386 4 4 4.22386 4 4.5V12.5C4 12.7761 4.22386 13 4.5 13H12.5C12.7761 13 13 12.7761 13 12.5V4.5C13 4.22386 12.7761 4 12.5 4H4.5Z"></path></svg></div><div class="absolute inset-0 flex items-center justify-center"><div class="transition-all opacity-0 scale-50" style="width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg" class="transition-all opacity-0 scale-50" aria-hidden="true" style="flex-shrink: 0;"><path d="M15.1883 5.10908C15.3699 4.96398 15.6346 4.96153 15.8202 5.11592C16.0056 5.27067 16.0504 5.53125 15.9403 5.73605L15.8836 5.82003L8.38354 14.8202C8.29361 14.9279 8.16242 14.9925 8.02221 14.9989C7.88203 15.0051 7.74545 14.9526 7.64622 14.8534L4.14617 11.3533L4.08172 11.2752C3.95384 11.0811 3.97542 10.817 4.14617 10.6463C4.31693 10.4755 4.58105 10.4539 4.77509 10.5818L4.85321 10.6463L7.96556 13.7586L15.1161 5.1794L15.1883 5.10908Z"></path></svg></div></div></div></button></div></div><div class="text-text-500 font-small p-3.5 pb-0">python</div><div class="overflow-x-auto"><pre class="code-block__code !my-0 !rounded-lg !text-sm !leading-relaxed p-3.5" style="color: rgb(234, 236, 240); background: transparent; font-family: var(--font-mono);"><code class="language-python" style="color: rgb(234, 236, 240); background: transparent; font-family: var(--font-mono); white-space: pre;"><span><span class="token token" style="color: rgb(204, 123, 244);">def</span><span> </span><span class="token token" style="color: rgb(112, 184, 255);">hello_world</span><span class="token token" style="color: rgb(211, 215, 222);">(</span><span class="token token" style="color: rgb(211, 215, 222);">)</span><span class="token token" style="color: rgb(211, 215, 222);">:</span><span>¶
+</span></span><span><span>    </span><span class="token token" style="color: rgb(204, 123, 244);">print</span><span class="token token" style="color: rgb(211, 215, 222);">(</span><span class="token token" style="color: rgb(155, 233, 99);">"Hello, World!"</span><span class="token token" style="color: rgb(211, 215, 222);">)</span><span>¶
+</span></span><span>¶
+</span><span><span>hello_world</span><span class="token token" style="color: rgb(211, 215, 222);">(</span><span class="token token" style="color: rgb(211, 215, 222);">)</span></span></code></pre></div></div>¶
+<div class="relative group/copy bg-bg-000/50 border-0.5 border-border-400 rounded-lg"><div class="sticky opacity-0 group-hover/copy:opacity-100 top-2 py-2 h-12 w-0 float-right"><div class="absolute right-0 h-8 px-2 items-center inline-flex z-10"><button class="inline-flex¶
+  items-center¶
+  justify-center¶
+  relative¶
+  shrink-0¶
+  can-focus¶
+  select-none¶
+  disabled:pointer-events-none¶
+  disabled:opacity-50¶
+  disabled:shadow-none¶
+  disabled:drop-shadow-none border-transparent¶
+          transition¶
+          font-base¶
+          duration-300¶
+          ease-[cubic-bezier(0.165,0.85,0.45,1)] h-8 w-8 rounded-md active:scale-95 backdrop-blur-md Button_ghost__BUAoh" type="button" aria-label="Copy to clipboard" data-state="closed"><div class="relative"><div class="transition-all opacity-100 scale-100" style="width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg" class="transition-all opacity-100 scale-100" aria-hidden="true" style="flex-shrink: 0;"><path d="M12.5 3C13.3284 3 14 3.67157 14 4.5V6H15.5C16.3284 6 17 6.67157 17 7.5V15.5C17 16.3284 16.3284 17 15.5 17H7.5C6.67157 17 6 16.3284 6 15.5V14H4.5C3.67157 14 3 13.3284 3 12.5V4.5C3 3.67157 3.67157 3 4.5 3H12.5ZM14 12.5C14 13.3284 13.3284 14 12.5 14H7V15.5C7 15.7761 7.22386 16 7.5 16H15.5C15.7761 16 16 15.7761 16 15.5V7.5C16 7.22386 15.7761 7 15.5 7H14V12.5ZM4.5 4C4.22386 4 4 4.22386 4 4.5V12.5C4 12.7761 4.22386 13 4.5 13H12.5C12.7761 13 13 12.7761 13 12.5V4.5C13 4.22386 12.7761 4 12.5 4H4.5Z"></path></svg></div><div class="absolute inset-0 flex items-center justify-center"><div class="transition-all opacity-0 scale-50" style="width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg" class="transition-all opacity-0 scale-50" aria-hidden="true" style="flex-shrink: 0;"><path d="M15.1883 5.10908C15.3699 4.96398 15.6346 4.96153 15.8202 5.11592C16.0056 5.27067 16.0504 5.53125 15.9403 5.73605L15.8836 5.82003L8.38354 14.8202C8.29361 14.9279 8.16242 14.9925 8.02221 14.9989C7.88203 15.0051 7.74545 14.9526 7.64622 14.8534L4.14617 11.3533L4.08172 11.2752C3.95384 11.0811 3.97542 10.817 4.14617 10.6463C4.31693 10.4755 4.58105 10.4539 4.77509 10.5818L4.85321 10.6463L7.96556 13.7586L15.1161 5.1794L15.1883 5.10908Z"></path></svg></div></div></div></button></div></div><div class="text-text-500 font-small p-3.5 pb-0">javascript</div><div class="overflow-x-auto"><pre class="code-block__code !my-0 !rounded-lg !text-sm !leading-relaxed p-3.5" style="color: rgb(234, 236, 240); background: transparent; font-family: var(--font-mono);"><code class="language-javascript" style="color: rgb(234, 236, 240); background: transparent; font-family: var(--font-mono); white-space: pre;"><span><span class="token token" style="color: rgb(204, 123, 244);">function</span><span> </span><span class="token token" style="color: rgb(112, 184, 255);">greet</span><span class="token token" style="color: rgb(211, 215, 222);">(</span><span class="token token" style="color: rgb(247, 171, 95);">name</span><span class="token token" style="color: rgb(211, 215, 222);">)</span><span> </span><span class="token token" style="color: rgb(211, 215, 222);">{</span><span>¶
+</span></span><span><span>    </span><span class="token token console" style="color: rgb(251, 173, 96);">console</span><span class="token token" style="color: rgb(211, 215, 222);">.</span><span class="token token property-access" style="color: rgb(112, 184, 255);">log</span><span class="token token" style="color: rgb(211, 215, 222);">(</span><span class="token token template-punctuation" style="color: rgb(155, 233, 99);">`</span><span class="token token" style="color: rgb(155, 233, 99);">Hello, </span><span class="token token interpolation interpolation-punctuation" style="color: rgb(211, 215, 222);">${</span><span class="token token interpolation" style="color: rgb(155, 233, 99);">name</span><span class="token token interpolation interpolation-punctuation" style="color: rgb(211, 215, 222);">}</span><span class="token token" style="color: rgb(155, 233, 99);">!</span><span class="token token template-punctuation" style="color: rgb(155, 233, 99);">`</span><span class="token token" style="color: rgb(211, 215, 222);">)</span><span class="token token" style="color: rgb(211, 215, 222);">;</span><span>¶
+</span></span><span><span></span><span class="token token" style="color: rgb(211, 215, 222);">}</span><span>¶
+</span></span><span>¶
+</span><span><span></span><span class="token token" style="color: rgb(112, 184, 255);">greet</span><span class="token token" style="color: rgb(211, 215, 222);">(</span><span class="token token" style="color: rgb(155, 233, 99);">"JavaScript"</span><span class="token token" style="color: rgb(211, 215, 222);">)</span><span class="token token" style="color: rgb(211, 215, 222);">;</span></span></code></pre></div></div>¶
+<div class="relative group/copy bg-bg-000/50 border-0.5 border-border-400 rounded-lg"><div class="sticky opacity-0 group-hover/copy:opacity-100 top-2 py-2 h-12 w-0 float-right"><div class="absolute right-0 h-8 px-2 items-center inline-flex z-10"><button class="inline-flex¶
+  items-center¶
+  justify-center¶
+  relative¶
+  shrink-0¶
+  can-focus¶
+  select-none¶
+  disabled:pointer-events-none¶
+  disabled:opacity-50¶
+  disabled:shadow-none¶
+  disabled:drop-shadow-none border-transparent¶
+          transition¶
+          font-base¶
+          duration-300¶
+          ease-[cubic-bezier(0.165,0.85,0.45,1)] h-8 w-8 rounded-md active:scale-95 backdrop-blur-md Button_ghost__BUAoh" type="button" aria-label="Copy to clipboard" data-state="closed"><div class="relative"><div class="transition-all opacity-100 scale-100" style="width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg" class="transition-all opacity-100 scale-100" aria-hidden="true" style="flex-shrink: 0;"><path d="M12.5 3C13.3284 3 14 3.67157 14 4.5V6H15.5C16.3284 6 17 6.67157 17 7.5V15.5C17 16.3284 16.3284 17 15.5 17H7.5C6.67157 17 6 16.3284 6 15.5V14H4.5C3.67157 14 3 13.3284 3 12.5V4.5C3 3.67157 3.67157 3 4.5 3H12.5ZM14 12.5C14 13.3284 13.3284 14 12.5 14H7V15.5C7 15.7761 7.22386 16 7.5 16H15.5C15.7761 16 16 15.7761 16 15.5V7.5C16 7.22386 15.7761 7 15.5 7H14V12.5ZM4.5 4C4.22386 4 4 4.22386 4 4.5V12.5C4 12.7761 4.22386 13 4.5 13H12.5C12.7761 13 13 12.7761 13 12.5V4.5C13 4.22386 12.7761 4 12.5 4H4.5Z"></path></svg></div><div class="absolute inset-0 flex items-center justify-center"><div class="transition-all opacity-0 scale-50" style="width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg" class="transition-all opacity-0 scale-50" aria-hidden="true" style="flex-shrink: 0;"><path d="M15.1883 5.10908C15.3699 4.96398 15.6346 4.96153 15.8202 5.11592C16.0056 5.27067 16.0504 5.53125 15.9403 5.73605L15.8836 5.82003L8.38354 14.8202C8.29361 14.9279 8.16242 14.9925 8.02221 14.9989C7.88203 15.0051 7.74545 14.9526 7.64622 14.8534L4.14617 11.3533L4.08172 11.2752C3.95384 11.0811 3.97542 10.817 4.14617 10.6463C4.31693 10.4755 4.58105 10.4539 4.77509 10.5818L4.85321 10.6463L7.96556 13.7586L15.1161 5.1794L15.1883 5.10908Z"></path></svg></div></div></div></button></div></div><div class="text-text-500 font-small p-3.5 pb-0">bash</div><div class="overflow-x-auto"><pre class="code-block__code !my-0 !rounded-lg !text-sm !leading-relaxed p-3.5" style="color: rgb(234, 236, 240); background: transparent; font-family: var(--font-mono);"><code class="language-bash" style="color: rgb(234, 236, 240); background: transparent; font-family: var(--font-mono); white-space: pre;"><span><span class="token token" style="color: rgb(251, 173, 96);">echo</span><span> </span><span class="token token" style="color: rgb(155, 233, 99);">"Hello from Bash!"</span></span></code></pre></div></div>¶
+<h2 class="text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold">Section 3</h2>¶
+<ul class="contains-task-list">¶
+<li class="task-list-item"><input disabled="" type="checkbox" checked=""> Complete task 1</li>¶
+<li class="task-list-item"><input disabled="" type="checkbox"> Incomplete task 2</li>¶
+<li class="task-list-item"><input disabled="" type="checkbox" checked=""> Complete task 3</li>¶
+</ul>¶
+<h2 class="text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold">Section 4</h2>¶
+<blockquote class="ml-2 border-l-4 border-border-300/10 pl-4 text-text-300">¶
+<p class="font-claude-response-body break-words whitespace-normal leading-[1.7]">This is a blockquote.</p>¶
+<blockquote class="ml-2 border-l-4 border-border-300/10 pl-4 text-text-300">¶
+<p class="font-claude-response-body break-words whitespace-normal leading-[1.7]">This is a nested blockquote.</p>¶
+</blockquote>¶
+</blockquote>¶
+<h2 class="text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold">Section 5</h2>¶
+<div class="overflow-x-auto w-full px-2 mb-6"><table class="min-w-full border-collapse text-sm leading-[1.7] whitespace-normal"><thead class="text-left"><tr><th scope="col" class="text-text-100 border-b-0.5 border-border-300/60 py-2 pr-4 align-top font-bold" style="text-align: left;">Left-aligned</th><th scope="col" class="text-text-100 border-b-0.5 border-border-300/60 py-2 pr-4 align-top font-bold" style="text-align: center;">Center-aligned</th><th scope="col" class="text-text-100 border-b-0.5 border-border-300/60 py-2 pr-4 align-top font-bold" style="text-align: right;">Right-aligned</th></tr></thead><tbody><tr><td class="border-b-0.5 border-border-300/30 py-2 pr-4 align-top" style="text-align: left;">Apple</td><td class="border-b-0.5 border-border-300/30 py-2 pr-4 align-top" style="text-align: center;">Banana</td><td class="border-b-0.5 border-border-300/30 py-2 pr-4 align-top" style="text-align: right;">Cherry</td></tr><tr><td class="border-b-0.5 border-border-300/30 py-2 pr-4 align-top" style="text-align: left;">Durian</td><td class="border-b-0.5 border-border-300/30 py-2 pr-4 align-top" style="text-align: center;">Elderberry</td><td class="border-b-0.5 border-border-300/30 py-2 pr-4 align-top" style="text-align: right;">Fig</td></tr></tbody></table></div>¶
+<h2 class="text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold">Section 6</h2>¶
+<ul class="[li_&amp;]:mb-0 [li_&amp;]:mt-1 [li_&amp;]:gap-1 [&amp;:not(:last-child)_ul]:pb-1 [&amp;:not(:last-child)_ol]:pb-1 list-disc flex flex-col gap-1 pl-8 mb-3">¶
+<li class="whitespace-normal break-words pl-2">Fruits¶
+<ul class="[li_&amp;]:mb-0 [li_&amp;]:mt-1 [li_&amp;]:gap-1 [&amp;:not(:last-child)_ul]:pb-1 [&amp;:not(:last-child)_ol]:pb-1 list-disc flex flex-col gap-1 pl-8 mb-3">¶
+<li class="whitespace-normal break-words pl-2">Apple</li>¶
+<li class="whitespace-normal break-words pl-2">Banana</li>¶
+</ul>¶
+</li>¶
+<li class="whitespace-normal break-words pl-2">Vegetables</li>¶
+<li class="whitespace-normal break-words pl-2">Grains</li>¶
+</ul>¶
+<h2 class="text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold">Section 7</h2>¶
+<ol class="[li_&amp;]:mb-0 [li_&amp;]:mt-1 [li_&amp;]:gap-1 [&amp;:not(:last-child)_ul]:pb-1 [&amp;:not(:last-child)_ol]:pb-1 list-decimal flex flex-col gap-1 pl-8 mb-3">¶
+<li class="whitespace-normal break-words pl-2">First item</li>¶
+<li class="whitespace-normal break-words pl-2">Second item</li>¶
+<li class="whitespace-normal break-words pl-2">Third item</li>¶
+</ol>¶
+<h2 class="text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold">Section 8</h2>¶
+<p class="font-claude-response-body break-words whitespace-normal leading-[1.7]">This is a sentence with a footnote reference.<sup><a class="underline underline underline-offset-2 decoration-1 decoration-current/40 hover:decoration-current focus:decoration-current" href="#user-content-fn-1" id="user-content-fnref-1" data-footnote-ref="true" aria-describedby="footnote-label">1</a></sup></p>¶
+<section data-footnotes="true" class="footnotes"><h2 class="sr-only" id="footnote-label">Footnotes</h2>¶
+<ol class="[li_&amp;]:mb-0 [li_&amp;]:mt-1 [li_&amp;]:gap-1 [&amp;:not(:last-child)_ul]:pb-1 [&amp;:not(:last-child)_ol]:pb-1 list-decimal flex flex-col gap-1 pl-8 mb-3">¶
+<li class="whitespace-normal break-words pl-2" id="user-content-fn-1">¶
+<p class="font-claude-response-body break-words whitespace-normal leading-[1.7]">This is the footnote definition. <a class="underline data-footnote-backref" href="#user-content-fnref-1" data-footnote-backref="" aria-label="Back to reference 1">â†©</a></p></li></ol></section><!--EndFragment-->⏎¶⏎¶
+¶
+</body>⏎¶⏎¶
+¶
+</html>
+
+=== 3. htmlFrag (CF_HTML fragment) (len=17357) ===
+<h1 class="text-text-100 mt-3 -mb-1 text-[1.375rem] font-bold">Markdown Test Document</h1>¶
+<h2 class="text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold">Section 1</h2>¶
+<h3 class="text-text-100 mt-2 -mb-1 text-base font-bold">Headings</h3>¶
+<p class="font-claude-response-body break-words whitespace-normal leading-[1.7]">Here is a paragraph with <strong>bold</strong>, <em>italic</em>, <em><strong>bold-italic</strong></em>, <del>strikethrough</del>, <code class="bg-text-200/5 border border-0.5 border-border-300 text-danger-000 whitespace-pre-wrap rounded-[0.4rem] px-1 py-px text-[0.9rem]">inline code</code>, and a <a class="underline underline underline-offset-2 decoration-1 decoration-current/40 hover:decoration-current focus:decoration-current" href="https://www.example.com">link</a>.</p>¶
+<h2 class="text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold">Section 2</h2>¶
+<div class="relative group/copy bg-bg-000/50 border-0.5 border-border-400 rounded-lg"><div class="sticky opacity-0 group-hover/copy:opacity-100 top-2 py-2 h-12 w-0 float-right"><div class="absolute right-0 h-8 px-2 items-center inline-flex z-10"><button class="inline-flex¶
+  items-center¶
+  justify-center¶
+  relative¶
+  shrink-0¶
+  can-focus¶
+  select-none¶
+  disabled:pointer-events-none¶
+  disabled:opacity-50¶
+  disabled:shadow-none¶
+  disabled:drop-shadow-none border-transparent¶
+          transition¶
+          font-base¶
+          duration-300¶
+          ease-[cubic-bezier(0.165,0.85,0.45,1)] h-8 w-8 rounded-md active:scale-95 backdrop-blur-md Button_ghost__BUAoh" type="button" aria-label="Copy to clipboard" data-state="closed"><div class="relative"><div class="transition-all opacity-100 scale-100" style="width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg" class="transition-all opacity-100 scale-100" aria-hidden="true" style="flex-shrink: 0;"><path d="M12.5 3C13.3284 3 14 3.67157 14 4.5V6H15.5C16.3284 6 17 6.67157 17 7.5V15.5C17 16.3284 16.3284 17 15.5 17H7.5C6.67157 17 6 16.3284 6 15.5V14H4.5C3.67157 14 3 13.3284 3 12.5V4.5C3 3.67157 3.67157 3 4.5 3H12.5ZM14 12.5C14 13.3284 13.3284 14 12.5 14H7V15.5C7 15.7761 7.22386 16 7.5 16H15.5C15.7761 16 16 15.7761 16 15.5V7.5C16 7.22386 15.7761 7 15.5 7H14V12.5ZM4.5 4C4.22386 4 4 4.22386 4 4.5V12.5C4 12.7761 4.22386 13 4.5 13H12.5C12.7761 13 13 12.7761 13 12.5V4.5C13 4.22386 12.7761 4 12.5 4H4.5Z"></path></svg></div><div class="absolute inset-0 flex items-center justify-center"><div class="transition-all opacity-0 scale-50" style="width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg" class="transition-all opacity-0 scale-50" aria-hidden="true" style="flex-shrink: 0;"><path d="M15.1883 5.10908C15.3699 4.96398 15.6346 4.96153 15.8202 5.11592C16.0056 5.27067 16.0504 5.53125 15.9403 5.73605L15.8836 5.82003L8.38354 14.8202C8.29361 14.9279 8.16242 14.9925 8.02221 14.9989C7.88203 15.0051 7.74545 14.9526 7.64622 14.8534L4.14617 11.3533L4.08172 11.2752C3.95384 11.0811 3.97542 10.817 4.14617 10.6463C4.31693 10.4755 4.58105 10.4539 4.77509 10.5818L4.85321 10.6463L7.96556 13.7586L15.1161 5.1794L15.1883 5.10908Z"></path></svg></div></div></div></button></div></div><div class="text-text-500 font-small p-3.5 pb-0">python</div><div class="overflow-x-auto"><pre class="code-block__code !my-0 !rounded-lg !text-sm !leading-relaxed p-3.5" style="color: rgb(234, 236, 240); background: transparent; font-family: var(--font-mono);"><code class="language-python" style="color: rgb(234, 236, 240); background: transparent; font-family: var(--font-mono); white-space: pre;"><span><span class="token token" style="color: rgb(204, 123, 244);">def</span><span> </span><span class="token token" style="color: rgb(112, 184, 255);">hello_world</span><span class="token token" style="color: rgb(211, 215, 222);">(</span><span class="token token" style="color: rgb(211, 215, 222);">)</span><span class="token token" style="color: rgb(211, 215, 222);">:</span><span>¶
+</span></span><span><span>    </span><span class="token token" style="color: rgb(204, 123, 244);">print</span><span class="token token" style="color: rgb(211, 215, 222);">(</span><span class="token token" style="color: rgb(155, 233, 99);">"Hello, World!"</span><span class="token token" style="color: rgb(211, 215, 222);">)</span><span>¶
+</span></span><span>¶
+</span><span><span>hello_world</span><span class="token token" style="color: rgb(211, 215, 222);">(</span><span class="token token" style="color: rgb(211, 215, 222);">)</span></span></code></pre></div></div>¶
+<div class="relative group/copy bg-bg-000/50 border-0.5 border-border-400 rounded-lg"><div class="sticky opacity-0 group-hover/copy:opacity-100 top-2 py-2 h-12 w-0 float-right"><div class="absolute right-0 h-8 px-2 items-center inline-flex z-10"><button class="inline-flex¶
+  items-center¶
+  justify-center¶
+  relative¶
+  shrink-0¶
+  can-focus¶
+  select-none¶
+  disabled:pointer-events-none¶
+  disabled:opacity-50¶
+  disabled:shadow-none¶
+  disabled:drop-shadow-none border-transparent¶
+          transition¶
+          font-base¶
+          duration-300¶
+          ease-[cubic-bezier(0.165,0.85,0.45,1)] h-8 w-8 rounded-md active:scale-95 backdrop-blur-md Button_ghost__BUAoh" type="button" aria-label="Copy to clipboard" data-state="closed"><div class="relative"><div class="transition-all opacity-100 scale-100" style="width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg" class="transition-all opacity-100 scale-100" aria-hidden="true" style="flex-shrink: 0;"><path d="M12.5 3C13.3284 3 14 3.67157 14 4.5V6H15.5C16.3284 6 17 6.67157 17 7.5V15.5C17 16.3284 16.3284 17 15.5 17H7.5C6.67157 17 6 16.3284 6 15.5V14H4.5C3.67157 14 3 13.3284 3 12.5V4.5C3 3.67157 3.67157 3 4.5 3H12.5ZM14 12.5C14 13.3284 13.3284 14 12.5 14H7V15.5C7 15.7761 7.22386 16 7.5 16H15.5C15.7761 16 16 15.7761 16 15.5V7.5C16 7.22386 15.7761 7 15.5 7H14V12.5ZM4.5 4C4.22386 4 4 4.22386 4 4.5V12.5C4 12.7761 4.22386 13 4.5 13H12.5C12.7761 13 13 12.7761 13 12.5V4.5C13 4.22386 12.7761 4 12.5 4H4.5Z"></path></svg></div><div class="absolute inset-0 flex items-center justify-center"><div class="transition-all opacity-0 scale-50" style="width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg" class="transition-all opacity-0 scale-50" aria-hidden="true" style="flex-shrink: 0;"><path d="M15.1883 5.10908C15.3699 4.96398 15.6346 4.96153 15.8202 5.11592C16.0056 5.27067 16.0504 5.53125 15.9403 5.73605L15.8836 5.82003L8.38354 14.8202C8.29361 14.9279 8.16242 14.9925 8.02221 14.9989C7.88203 15.0051 7.74545 14.9526 7.64622 14.8534L4.14617 11.3533L4.08172 11.2752C3.95384 11.0811 3.97542 10.817 4.14617 10.6463C4.31693 10.4755 4.58105 10.4539 4.77509 10.5818L4.85321 10.6463L7.96556 13.7586L15.1161 5.1794L15.1883 5.10908Z"></path></svg></div></div></div></button></div></div><div class="text-text-500 font-small p-3.5 pb-0">javascript</div><div class="overflow-x-auto"><pre class="code-block__code !my-0 !rounded-lg !text-sm !leading-relaxed p-3.5" style="color: rgb(234, 236, 240); background: transparent; font-family: var(--font-mono);"><code class="language-javascript" style="color: rgb(234, 236, 240); background: transparent; font-family: var(--font-mono); white-space: pre;"><span><span class="token token" style="color: rgb(204, 123, 244);">function</span><span> </span><span class="token token" style="color: rgb(112, 184, 255);">greet</span><span class="token token" style="color: rgb(211, 215, 222);">(</span><span class="token token" style="color: rgb(247, 171, 95);">name</span><span class="token token" style="color: rgb(211, 215, 222);">)</span><span> </span><span class="token token" style="color: rgb(211, 215, 222);">{</span><span>¶
+</span></span><span><span>    </span><span class="token token console" style="color: rgb(251, 173, 96);">console</span><span class="token token" style="color: rgb(211, 215, 222);">.</span><span class="token token property-access" style="color: rgb(112, 184, 255);">log</span><span class="token token" style="color: rgb(211, 215, 222);">(</span><span class="token token template-punctuation" style="color: rgb(155, 233, 99);">`</span><span class="token token" style="color: rgb(155, 233, 99);">Hello, </span><span class="token token interpolation interpolation-punctuation" style="color: rgb(211, 215, 222);">${</span><span class="token token interpolation" style="color: rgb(155, 233, 99);">name</span><span class="token token interpolation interpolation-punctuation" style="color: rgb(211, 215, 222);">}</span><span class="token token" style="color: rgb(155, 233, 99);">!</span><span class="token token template-punctuation" style="color: rgb(155, 233, 99);">`</span><span class="token token" style="color: rgb(211, 215, 222);">)</span><span class="token token" style="color: rgb(211, 215, 222);">;</span><span>¶
+</span></span><span><span></span><span class="token token" style="color: rgb(211, 215, 222);">}</span><span>¶
+</span></span><span>¶
+</span><span><span></span><span class="token token" style="color: rgb(112, 184, 255);">greet</span><span class="token token" style="color: rgb(211, 215, 222);">(</span><span class="token token" style="color: rgb(155, 233, 99);">"JavaScript"</span><span class="token token" style="color: rgb(211, 215, 222);">)</span><span class="token token" style="color: rgb(211, 215, 222);">;</span></span></code></pre></div></div>¶
+<div class="relative group/copy bg-bg-000/50 border-0.5 border-border-400 rounded-lg"><div class="sticky opacity-0 group-hover/copy:opacity-100 top-2 py-2 h-12 w-0 float-right"><div class="absolute right-0 h-8 px-2 items-center inline-flex z-10"><button class="inline-flex¶
+  items-center¶
+  justify-center¶
+  relative¶
+  shrink-0¶
+  can-focus¶
+  select-none¶
+  disabled:pointer-events-none¶
+  disabled:opacity-50¶
+  disabled:shadow-none¶
+  disabled:drop-shadow-none border-transparent¶
+          transition¶
+          font-base¶
+          duration-300¶
+          ease-[cubic-bezier(0.165,0.85,0.45,1)] h-8 w-8 rounded-md active:scale-95 backdrop-blur-md Button_ghost__BUAoh" type="button" aria-label="Copy to clipboard" data-state="closed"><div class="relative"><div class="transition-all opacity-100 scale-100" style="width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg" class="transition-all opacity-100 scale-100" aria-hidden="true" style="flex-shrink: 0;"><path d="M12.5 3C13.3284 3 14 3.67157 14 4.5V6H15.5C16.3284 6 17 6.67157 17 7.5V15.5C17 16.3284 16.3284 17 15.5 17H7.5C6.67157 17 6 16.3284 6 15.5V14H4.5C3.67157 14 3 13.3284 3 12.5V4.5C3 3.67157 3.67157 3 4.5 3H12.5ZM14 12.5C14 13.3284 13.3284 14 12.5 14H7V15.5C7 15.7761 7.22386 16 7.5 16H15.5C15.7761 16 16 15.7761 16 15.5V7.5C16 7.22386 15.7761 7 15.5 7H14V12.5ZM4.5 4C4.22386 4 4 4.22386 4 4.5V12.5C4 12.7761 4.22386 13 4.5 13H12.5C12.7761 13 13 12.7761 13 12.5V4.5C13 4.22386 12.7761 4 12.5 4H4.5Z"></path></svg></div><div class="absolute inset-0 flex items-center justify-center"><div class="transition-all opacity-0 scale-50" style="width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg" class="transition-all opacity-0 scale-50" aria-hidden="true" style="flex-shrink: 0;"><path d="M15.1883 5.10908C15.3699 4.96398 15.6346 4.96153 15.8202 5.11592C16.0056 5.27067 16.0504 5.53125 15.9403 5.73605L15.8836 5.82003L8.38354 14.8202C8.29361 14.9279 8.16242 14.9925 8.02221 14.9989C7.88203 15.0051 7.74545 14.9526 7.64622 14.8534L4.14617 11.3533L4.08172 11.2752C3.95384 11.0811 3.97542 10.817 4.14617 10.6463C4.31693 10.4755 4.58105 10.4539 4.77509 10.5818L4.85321 10.6463L7.96556 13.7586L15.1161 5.1794L15.1883 5.10908Z"></path></svg></div></div></div></button></div></div><div class="text-text-500 font-small p-3.5 pb-0">bash</div><div class="overflow-x-auto"><pre class="code-block__code !my-0 !rounded-lg !text-sm !leading-relaxed p-3.5" style="color: rgb(234, 236, 240); background: transparent; font-family: var(--font-mono);"><code class="language-bash" style="color: rgb(234, 236, 240); background: transparent; font-family: var(--font-mono); white-space: pre;"><span><span class="token token" style="color: rgb(251, 173, 96);">echo</span><span> </span><span class="token token" style="color: rgb(155, 233, 99);">"Hello from Bash!"</span></span></code></pre></div></div>¶
+<h2 class="text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold">Section 3</h2>¶
+<ul class="contains-task-list">¶
+<li class="task-list-item"><input disabled="" type="checkbox" checked=""> Complete task 1</li>¶
+<li class="task-list-item"><input disabled="" type="checkbox"> Incomplete task 2</li>¶
+<li class="task-list-item"><input disabled="" type="checkbox" checked=""> Complete task 3</li>¶
+</ul>¶
+<h2 class="text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold">Section 4</h2>¶
+<blockquote class="ml-2 border-l-4 border-border-300/10 pl-4 text-text-300">¶
+<p class="font-claude-response-body break-words whitespace-normal leading-[1.7]">This is a blockquote.</p>¶
+<blockquote class="ml-2 border-l-4 border-border-300/10 pl-4 text-text-300">¶
+<p class="font-claude-response-body break-words whitespace-normal leading-[1.7]">This is a nested blockquote.</p>¶
+</blockquote>¶
+</blockquote>¶
+<h2 class="text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold">Section 5</h2>¶
+<div class="overflow-x-auto w-full px-2 mb-6"><table class="min-w-full border-collapse text-sm leading-[1.7] whitespace-normal"><thead class="text-left"><tr><th scope="col" class="text-text-100 border-b-0.5 border-border-300/60 py-2 pr-4 align-top font-bold" style="text-align: left;">Left-aligned</th><th scope="col" class="text-text-100 border-b-0.5 border-border-300/60 py-2 pr-4 align-top font-bold" style="text-align: center;">Center-aligned</th><th scope="col" class="text-text-100 border-b-0.5 border-border-300/60 py-2 pr-4 align-top font-bold" style="text-align: right;">Right-aligned</th></tr></thead><tbody><tr><td class="border-b-0.5 border-border-300/30 py-2 pr-4 align-top" style="text-align: left;">Apple</td><td class="border-b-0.5 border-border-300/30 py-2 pr-4 align-top" style="text-align: center;">Banana</td><td class="border-b-0.5 border-border-300/30 py-2 pr-4 align-top" style="text-align: right;">Cherry</td></tr><tr><td class="border-b-0.5 border-border-300/30 py-2 pr-4 align-top" style="text-align: left;">Durian</td><td class="border-b-0.5 border-border-300/30 py-2 pr-4 align-top" style="text-align: center;">Elderberry</td><td class="border-b-0.5 border-border-300/30 py-2 pr-4 align-top" style="text-align: right;">Fig</td></tr></tbody></table></div>¶
+<h2 class="text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold">Section 6</h2>¶
+<ul class="[li_&amp;]:mb-0 [li_&amp;]:mt-1 [li_&amp;]:gap-1 [&amp;:not(:last-child)_ul]:pb-1 [&amp;:not(:last-child)_ol]:pb-1 list-disc flex flex-col gap-1 pl-8 mb-3">¶
+<li class="whitespace-normal break-words pl-2">Fruits¶
+<ul class="[li_&amp;]:mb-0 [li_&amp;]:mt-1 [li_&amp;]:gap-1 [&amp;:not(:last-child)_ul]:pb-1 [&amp;:not(:last-child)_ol]:pb-1 list-disc flex flex-col gap-1 pl-8 mb-3">¶
+<li class="whitespace-normal break-words pl-2">Apple</li>¶
+<li class="whitespace-normal break-words pl-2">Banana</li>¶
+</ul>¶
+</li>¶
+<li class="whitespace-normal break-words pl-2">Vegetables</li>¶
+<li class="whitespace-normal break-words pl-2">Grains</li>¶
+</ul>¶
+<h2 class="text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold">Section 7</h2>¶
+<ol class="[li_&amp;]:mb-0 [li_&amp;]:mt-1 [li_&amp;]:gap-1 [&amp;:not(:last-child)_ul]:pb-1 [&amp;:not(:last-child)_ol]:pb-1 list-decimal flex flex-col gap-1 pl-8 mb-3">¶
+<li class="whitespace-normal break-words pl-2">First item</li>¶
+<li class="whitespace-normal break-words pl-2">Second item</li>¶
+<li class="whitespace-normal break-words pl-2">Third item</li>¶
+</ol>¶
+<h2 class="text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold">Section 8</h2>¶
+<p class="font-claude-response-body break-words whitespace-normal leading-[1.7]">This is a sentence with a footnote reference.<sup><a class="underline underline underline-offset-2 decoration-1 decoration-current/40 hover:decoration-current focus:decoration-current" href="#user-content-fn-1" id="user-content-fnref-1" data-footnote-ref="true" aria-describedby="footnote-label">1</a></sup></p>¶
+<section data-footnotes="true" class="footnotes"><h2 class="sr-only" id="footnote-label">Footnotes</h2>¶
+<ol class="[li_&amp;]:mb-0 [li_&amp;]:mt-1 [li_&amp;]:gap-1 [&amp;:not(:last-child)_ul]:pb-1 [&amp;:not(:last-child)_ol]:pb-1 list-decimal flex flex-col gap-1 pl-8 mb-3">¶
+<li class="whitespace-normal break-words pl-2" id="user-content-fn-1">¶
+<p class="font-claude-response-body break-words whitespace-normal leading-[1.7]">This is the footnote definition. <a class="underline data-footnote-backref" href="#user-content-fnref-1" data-footnote-backref="" aria-label="Back to reference 1">↩</a></p></li></ol></section>
+
+=== 2b. cfHtml offsets ===
+StartHTML: 105
+EndHTML: 17536
+StartFragment: 141
+EndFragment: 17500
+
+=== 3. htmlPrep (after _PreprocessHtml) (len=6678) ===
+<h1 class="text-text-100 mt-3 -mb-1 text-[1.375rem] font-bold">Markdown Test Document</h1>¶
+<h2 class="text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold">Section 1</h2>¶
+<h3 class="text-text-100 mt-2 -mb-1 text-base font-bold">Headings</h3>¶
+<p class="font-claude-response-body break-words whitespace-normal leading-[1.7]">Here is a paragraph with <strong>bold</strong>, <em>italic</em>, <em><strong>bold-italic</strong></em>, <del>strikethrough</del>, <code class="bg-text-200/5 border border-0.5 border-border-300 text-danger-000 whitespace-pre-wrap rounded-[0.4rem] px-1 py-px text-[0.9rem]">inline code</code>, and a <a class="underline underline underline-offset-2 decoration-1 decoration-current/40 hover:decoration-current focus:decoration-current" href="https://www.example.com">link</a>.</p>¶
+<h2 class="text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold">Section 2</h2>¶
+<div class="relative group/copy bg-bg-000/50 border-0.5 border-border-400 rounded-lg"><div class="sticky opacity-0 group-hover/copy:opacity-100 top-2 py-2 h-12 w-0 float-right"><div class="absolute right-0 h-8 px-2 items-center inline-flex z-10"></div></div><div class="overflow-x-auto"><pre><code class="language-python">def hello_world():¶
+    print("Hello, World!")¶
+¶
+hello_world()</code></pre></div></div>¶
+<div class="relative group/copy bg-bg-000/50 border-0.5 border-border-400 rounded-lg"><div class="sticky opacity-0 group-hover/copy:opacity-100 top-2 py-2 h-12 w-0 float-right"><div class="absolute right-0 h-8 px-2 items-center inline-flex z-10"></div></div><div class="overflow-x-auto"><pre><code class="language-javascript">function greet(name) {¶
+    console.log(`Hello, ${name}!`);¶
+}¶
+¶
+greet("JavaScript");</code></pre></div></div>¶
+<div class="relative group/copy bg-bg-000/50 border-0.5 border-border-400 rounded-lg"><div class="sticky opacity-0 group-hover/copy:opacity-100 top-2 py-2 h-12 w-0 float-right"><div class="absolute right-0 h-8 px-2 items-center inline-flex z-10"></div></div><div class="overflow-x-auto"><pre class="code-block__code !my-0 !rounded-lg !text-sm !leading-relaxed p-3.5" style="color: rgb(234, 236, 240); background: transparent; font-family: var(--font-mono);"><code class="language-bash" style="color: rgb(234, 236, 240); background: transparent; font-family: var(--font-mono); white-space: pre;">echo "Hello from Bash!"</code></pre></div></div>¶
+<h2 class="text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold">Section 3</h2>¶
+<ul class="contains-task-list">¶
+<li>¤CHK¤ Complete task 1</li>¶
+<li>¤UNCHK¤ Incomplete task 2</li>¶
+<li>¤CHK¤ Complete task 3</li>¶
+</ul>¶
+<h2 class="text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold">Section 4</h2>¶
+<blockquote class="ml-2 border-l-4 border-border-300/10 pl-4 text-text-300">¶
+<p class="font-claude-response-body break-words whitespace-normal leading-[1.7]">This is a blockquote.</p>¶
+<blockquote class="ml-2 border-l-4 border-border-300/10 pl-4 text-text-300">¶
+<p class="font-claude-response-body break-words whitespace-normal leading-[1.7]">This is a nested blockquote.</p>¶
+</blockquote>¶
+</blockquote>¶
+<h2 class="text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold">Section 5</h2>¶
+<div class="overflow-x-auto w-full px-2 mb-6"><table class="min-w-full border-collapse text-sm leading-[1.7] whitespace-normal"><thead class="text-left"><tr><th scope="col" class="text-text-100 border-b-0.5 border-border-300/60 py-2 pr-4 align-top font-bold" style="text-align: left;">Left-aligned</th><th scope="col" class="text-text-100 border-b-0.5 border-border-300/60 py-2 pr-4 align-top font-bold" style="text-align: center;">Center-aligned</th><th scope="col" class="text-text-100 border-b-0.5 border-border-300/60 py-2 pr-4 align-top font-bold" style="text-align: right;">Right-aligned</th></tr></thead><tbody><tr><td class="border-b-0.5 border-border-300/30 py-2 pr-4 align-top" style="text-align: left;">Apple</td><td class="border-b-0.5 border-border-300/30 py-2 pr-4 align-top" style="text-align: center;">Banana</td><td class="border-b-0.5 border-border-300/30 py-2 pr-4 align-top" style="text-align: right;">Cherry</td></tr><tr><td class="border-b-0.5 border-border-300/30 py-2 pr-4 align-top" style="text-align: left;">Durian</td><td class="border-b-0.5 border-border-300/30 py-2 pr-4 align-top" style="text-align: center;">Elderberry</td><td class="border-b-0.5 border-border-300/30 py-2 pr-4 align-top" style="text-align: right;">Fig</td></tr></tbody></table></div>¶
+<h2 class="text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold">Section 6</h2>¶
+<ul class="[li_&amp;]:mb-0 [li_&amp;]:mt-1 [li_&amp;]:gap-1 [&amp;:not(:last-child)_ul]:pb-1 [&amp;:not(:last-child)_ol]:pb-1 list-disc flex flex-col gap-1 pl-8 mb-3">¶
+<li class="whitespace-normal break-words pl-2">Fruits¶
+<ul class="[li_&amp;]:mb-0 [li_&amp;]:mt-1 [li_&amp;]:gap-1 [&amp;:not(:last-child)_ul]:pb-1 [&amp;:not(:last-child)_ol]:pb-1 list-disc flex flex-col gap-1 pl-8 mb-3">¶
+<li class="whitespace-normal break-words pl-2">Apple</li>¶
+<li class="whitespace-normal break-words pl-2">Banana</li>¶
+</ul>¶
+</li>¶
+<li class="whitespace-normal break-words pl-2">Vegetables</li>¶
+<li class="whitespace-normal break-words pl-2">Grains</li>¶
+</ul>¶
+<h2 class="text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold">Section 7</h2>¶
+<ol class="[li_&amp;]:mb-0 [li_&amp;]:mt-1 [li_&amp;]:gap-1 [&amp;:not(:last-child)_ul]:pb-1 [&amp;:not(:last-child)_ol]:pb-1 list-decimal flex flex-col gap-1 pl-8 mb-3">¶
+<li class="whitespace-normal break-words pl-2">First item</li>¶
+<li class="whitespace-normal break-words pl-2">Second item</li>¶
+<li class="whitespace-normal break-words pl-2">Third item</li>¶
+</ol>¶
+<h2 class="text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold">Section 8</h2>¶
+<p class="font-claude-response-body break-words whitespace-normal leading-[1.7]">This is a sentence with a footnote reference.<sup><a class="underline underline underline-offset-2 decoration-1 decoration-current/40 hover:decoration-current focus:decoration-current" href="#user-content-fn-1" id="user-content-fnref-1" data-footnote-ref="true" aria-describedby="footnote-label">1</a></sup></p>¶
+<section data-footnotes="true" class="footnotes"><h2 class="sr-only" id="footnote-label">Footnotes</h2>¶
+<ol class="[li_&amp;]:mb-0 [li_&amp;]:mt-1 [li_&amp;]:gap-1 [&amp;:not(:last-child)_ul]:pb-1 [&amp;:not(:last-child)_ol]:pb-1 list-decimal flex flex-col gap-1 pl-8 mb-3">¶
+<li class="whitespace-normal break-words pl-2" id="user-content-fn-1">¶
+<p class="font-claude-response-body break-words whitespace-normal leading-[1.7]">This is the footnote definition. <a class="underline data-footnote-backref" href="#user-content-fnref-1" data-footnote-backref="" aria-label="Back to reference 1">↩</a></p></li></ol></section>
+
+=== 4. mdRaw (pandoc output) (len=2683) ===
+# Markdown Test Document¶
+¶
+## Section 1¶
+¶
+### Headings¶
+¶
+Here is a paragraph with **bold**, *italic*, ***bold-italic***, ~~strikethrough~~, `inline code`, and a <a href="https://www.example.com" class="underline underline-offset-2 decoration-1 decoration-current/40 hover:decoration-current focus:decoration-current">link</a>.¶
+¶
+## Section 2¶
+¶
+<div class="relative group/copy bg-bg-000/50 border-0.5 border-border-400 rounded-lg">¶
+¶
+<div class="sticky opacity-0 group-hover/copy:opacity-100 top-2 py-2 h-12 w-0 float-right">¶
+¶
+<div class="absolute right-0 h-8 px-2 items-center inline-flex z-10">¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+<div class="overflow-x-auto">¶
+¶
+``` python¶
+def hello_world():¶
+    print("Hello, World!")¶
+¶
+hello_world()¶
+```¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+<div class="relative group/copy bg-bg-000/50 border-0.5 border-border-400 rounded-lg">¶
+¶
+<div class="sticky opacity-0 group-hover/copy:opacity-100 top-2 py-2 h-12 w-0 float-right">¶
+¶
+<div class="absolute right-0 h-8 px-2 items-center inline-flex z-10">¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+<div class="overflow-x-auto">¶
+¶
+``` javascript¶
+function greet(name) {¶
+    console.log(`Hello, ${name}!`);¶
+}¶
+¶
+greet("JavaScript");¶
+```¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+<div class="relative group/copy bg-bg-000/50 border-0.5 border-border-400 rounded-lg">¶
+¶
+<div class="sticky opacity-0 group-hover/copy:opacity-100 top-2 py-2 h-12 w-0 float-right">¶
+¶
+<div class="absolute right-0 h-8 px-2 items-center inline-flex z-10">¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+<div class="overflow-x-auto">¶
+¶
+``` code-block__code¶
+echo "Hello from Bash!"¶
+```¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+## Section 3¶
+¶
+- ¤CHK¤ Complete task 1¶
+- ¤UNCHK¤ Incomplete task 2¶
+- ¤CHK¤ Complete task 3¶
+¶
+## Section 4¶
+¶
+> This is a blockquote.¶
+>¶
+> > This is a nested blockquote.¶
+¶
+## Section 5¶
+¶
+<div class="overflow-x-auto w-full px-2 mb-6">¶
+¶
+| Left-aligned | Center-aligned | Right-aligned |¶
+|:-------------|:--------------:|--------------:|¶
+| Apple        |     Banana     |        Cherry |¶
+| Durian       |   Elderberry   |           Fig |¶
+¶
+</div>¶
+¶
+## Section 6¶
+¶
+- Fruits¶
+  - Apple¶
+  - Banana¶
+- Vegetables¶
+- Grains¶
+¶
+## Section 7¶
+¶
+1.  First item¶
+2.  Second item¶
+3.  Third item¶
+¶
+## Section 8¶
+¶
+This is a sentence with a footnote reference.<sup><a href="#user-content-fn-1" id="user-content-fnref-1" class="underline underline-offset-2 decoration-1 decoration-current/40 hover:decoration-current focus:decoration-current" data-footnote-ref="true" aria-describedby="footnote-label">1</a></sup>¶
+¶
+<div class="section footnotes" footnotes="true">¶
+¶
+## Footnotes¶
+¶
+1.  <div id="user-content-fn-1">¶
+¶
+    This is the footnote definition. <a href="#user-content-fnref-1" class="underline data-footnote-backref" data-footnote-backref="" aria-label="Back to reference 1">↩︎</a>¶
+¶
+    </div>¶
+¶
+</div>¶
+
+
+=== 5. md (after CleanMarkdown) (len=1122) ===
+# Markdown Test Document¶
+¶
+## Section 1¶
+¶
+### Headings¶
+¶
+Here is a paragraph with **bold**, *italic*, ***bold-italic***, ~~strikethrough~~, `inline code`, and a [link](https://www.example.com).¶
+¶
+## Section 2¶
+¶
+``` python¶
+def hello_world():¶
+    print("Hello, World!")¶
+¶
+hello_world()¶
+```¶
+¶
+``` javascript¶
+function greet(name) {¶
+    console.log(`Hello, ${name}!`);¶
+}¶
+¶
+greet("JavaScript");¶
+```¶
+¶
+``` code-block__code¶
+echo "Hello from Bash!"¶
+```¶
+¶
+## Section 3¶
+¶
+- [x] Complete task 1¶
+- [ ] Incomplete task 2¶
+- [x] Complete task 3¶
+¶
+## Section 4¶
+¶
+> This is a blockquote.¶
+>¶
+> > This is a nested blockquote.¶
+¶
+## Section 5¶
+¶
+| Left-aligned | Center-aligned | Right-aligned |¶
+|:-------------|:--------------:|--------------:|¶
+| Apple        |     Banana     |        Cherry |¶
+| Durian       |   Elderberry   |           Fig |¶
+¶
+## Section 6¶
+¶
+- Fruits¶
+  - Apple¶
+  - Banana¶
+- Vegetables¶
+- Grains¶
+¶
+## Section 7¶
+¶
+1.  First item¶
+2.  Second item¶
+3.  Third item¶
+¶
+## Section 8¶
+¶
+This is a sentence with a footnote reference.<sup>[1](#user-content-fn-1)</sup>¶
+¶
+## Footnotes¶
+¶
+1.  ¶
+¶
+    This is the footnote definition. [↩︎](#user-content-fnref-1)¶
+¶
+    ¶
+
+
+=== 5c. expected list start (ordered-list fix) (len=1) ===
+0
+
+=== 5d. md (after RestoreOrderedListStart) (len=1122) ===
+# Markdown Test Document¶
+¶
+## Section 1¶
+¶
+### Headings¶
+¶
+Here is a paragraph with **bold**, *italic*, ***bold-italic***, ~~strikethrough~~, `inline code`, and a [link](https://www.example.com).¶
+¶
+## Section 2¶
+¶
+``` python¶
+def hello_world():¶
+    print("Hello, World!")¶
+¶
+hello_world()¶
+```¶
+¶
+``` javascript¶
+function greet(name) {¶
+    console.log(`Hello, ${name}!`);¶
+}¶
+¶
+greet("JavaScript");¶
+```¶
+¶
+``` code-block__code¶
+echo "Hello from Bash!"¶
+```¶
+¶
+## Section 3¶
+¶
+- [x] Complete task 1¶
+- [ ] Incomplete task 2¶
+- [x] Complete task 3¶
+¶
+## Section 4¶
+¶
+> This is a blockquote.¶
+>¶
+> > This is a nested blockquote.¶
+¶
+## Section 5¶
+¶
+| Left-aligned | Center-aligned | Right-aligned |¶
+|:-------------|:--------------:|--------------:|¶
+| Apple        |     Banana     |        Cherry |¶
+| Durian       |   Elderberry   |           Fig |¶
+¶
+## Section 6¶
+¶
+- Fruits¶
+  - Apple¶
+  - Banana¶
+- Vegetables¶
+- Grains¶
+¶
+## Section 7¶
+¶
+1.  First item¶
+2.  Second item¶
+3.  Third item¶
+¶
+## Section 8¶
+¶
+This is a sentence with a footnote reference.<sup>[1](#user-content-fn-1)</sup>¶
+¶
+## Footnotes¶
+¶
+1.  ¶
+¶
+    This is the footnote definition. [↩︎](#user-content-fnref-1)¶
+¶
+    ¶
+
+
+=== 5e. md (after SHOW_POSTER replacement) (len=1234) ===
+> # Markdown Test Document¶
+>¶
+> ## Section 1¶
+>¶
+> ### Headings¶
+>¶
+> Here is a paragraph with **bold**, *italic*, ***bold-italic***, ~~strikethrough~~, `inline code`, and a [link](https://www.example.com).¶
+>¶
+> ## Section 2¶
+>¶
+> ``` python¶
+> def hello_world():¶
+>     print("Hello, World!")¶
+>¶
+> hello_world()¶
+> ```¶
+>¶
+> ``` javascript¶
+> function greet(name) {¶
+>     console.log(`Hello, ${name}!`);¶
+> }¶
+>¶
+> greet("JavaScript");¶
+> ```¶
+>¶
+> ``` code-block__code¶
+> echo "Hello from Bash!"¶
+> ```¶
+>¶
+> ## Section 3¶
+>¶
+> - [x] Complete task 1¶
+> - [ ] Incomplete task 2¶
+> - [x] Complete task 3¶
+>¶
+> ## Section 4¶
+>¶
+> > This is a blockquote.¶
+> >¶
+> > > This is a nested blockquote.¶
+>¶
+> ## Section 5¶
+>¶
+> | Left-aligned | Center-aligned | Right-aligned |¶
+> |:-------------|:--------------:|--------------:|¶
+> | Apple        |     Banana     |        Cherry |¶
+> | Durian       |   Elderberry   |           Fig |¶
+>¶
+> ## Section 6¶
+>¶
+> - Fruits¶
+>   - Apple¶
+>   - Banana¶
+> - Vegetables¶
+> - Grains¶
+>¶
+> ## Section 7¶
+>¶
+> 1.  First item¶
+> 2.  Second item¶
+> 3.  Third item¶
+>¶
+> ## Section 8¶
+>¶
+> This is a sentence with a footnote reference.<sup>[1](#user-content-fn-1)</sup>¶
+>¶
+> ## Footnotes¶
+>¶
+> 1.  ¶
+>¶
+>     This is the footnote definition. [↩︎](#user-content-fnref-1)¶
+
+
+=== 6. FINAL md (pasted) (len=1234) ===
+> # Markdown Test Document¶
+>¶
+> ## Section 1¶
+>¶
+> ### Headings¶
+>¶
+> Here is a paragraph with **bold**, *italic*, ***bold-italic***, ~~strikethrough~~, `inline code`, and a [link](https://www.example.com).¶
+>¶
+> ## Section 2¶
+>¶
+> ``` python¶
+> def hello_world():¶
+>     print("Hello, World!")¶
+>¶
+> hello_world()¶
+> ```¶
+>¶
+> ``` javascript¶
+> function greet(name) {¶
+>     console.log(`Hello, ${name}!`);¶
+> }¶
+>¶
+> greet("JavaScript");¶
+> ```¶
+>¶
+> ``` code-block__code¶
+> echo "Hello from Bash!"¶
+> ```¶
+>¶
+> ## Section 3¶
+>¶
+> - [x] Complete task 1¶
+> - [ ] Incomplete task 2¶
+> - [x] Complete task 3¶
+>¶
+> ## Section 4¶
+>¶
+> > This is a blockquote.¶
+> >¶
+> > > This is a nested blockquote.¶
+>¶
+> ## Section 5¶
+>¶
+> | Left-aligned | Center-aligned | Right-aligned |¶
+> |:-------------|:--------------:|--------------:|¶
+> | Apple        |     Banana     |        Cherry |¶
+> | Durian       |   Elderberry   |           Fig |¶
+>¶
+> ## Section 6¶
+>¶
+> - Fruits¶
+>   - Apple¶
+>   - Banana¶
+> - Vegetables¶
+> - Grains¶
+>¶
+> ## Section 7¶
+>¶
+> 1.  First item¶
+> 2.  Second item¶
+> 3.  Third item¶
+>¶
+> ## Section 8¶
+>¶
+> This is a sentence with a footnote reference.<sup>[1](#user-content-fn-1)</sup>¶
+>¶
+> ## Footnotes¶
+>¶
+> 1.  ¶
+>¶
+>     This is the footnote definition. [↩︎](#user-content-fnref-1)¶
+
+

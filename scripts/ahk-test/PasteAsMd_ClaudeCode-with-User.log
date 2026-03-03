@@ -1,0 +1,608 @@
+﻿PasteAsMd debug — 2026-03-02 01:48:12
+
+=== 1. plain (A_Clipboard minus CR) (len=1417) ===
+Output a markdown test document demonstrating each of the following. No explanations — just the document.¶
+¶
+Required sections, in order:¶
+¶
+1.  Three heading levels (H1, H2, H3)¶
+2.  An inline-formatting paragraph using bold, italic, bold-italic, strikethrough, inline code, and a link¶
+3.  Three fenced code blocks with language tags: one Python (with at least one blank line inside), one JavaScript (with at least one blank line inside), one Bash¶
+4.  A task list with at least one checked and one unchecked item¶
+5.  A blockquote with a nested blockquote inside¶
+6.  A table with left, center, and right column alignment¶
+7.  An unordered list with at least one nested item¶
+8.  An ordered list¶
+9.  A footnote reference and its definition¶
+Show less¶
+The user wants a markdown test document. No explanations, just the document.¶
+¶
+Heading One¶
+Heading Two¶
+Heading Three¶
+This paragraph uses bold, italic, bold-italic, strikethrough, inline code, and a link.¶
+¶
+¶
+def greet(name):¶
+    greeting = f"Hello, {name}!"¶
+¶
+    return greeting¶
+¶
+function greet(name) {¶
+  const greeting = `Hello, ${name}!`;¶
+¶
+  return greeting;¶
+}¶
+¶
+echo "Hello, world!"¶
+ Checked item¶
+ Unchecked item¶
+ Another checked item¶
+Outer blockquote line.¶
+¶
+Nested blockquote line.¶
+¶
+Left	Center	Right¶
+a	b	c¶
+foo	bar	baz¶
+Item one¶
+Nested item¶
+Another nested item¶
+Item two¶
+Item three¶
+First¶
+Second¶
+Third¶
+Here is a footnote reference.1¶
+¶
+Footnotes¶
+This is the footnote definition. ↩
+
+=== 2. cfHtml (raw full payload) (len=16817) ===
+Version:0.9⏎¶⏎¶
+¶
+StartHTML:0000000527⏎¶⏎¶
+¶
+EndHTML:0000016817⏎¶⏎¶
+¶
+StartFragment:0000000563⏎¶⏎¶
+¶
+EndFragment:0000016781⏎¶⏎¶
+¶
+SourceURL:vscode-webview://0pm70dm6f6pdq82ubcl5vmtd4vl8j7343vu35t01f6njt6fk22pm/index.html?id=c806bd70-aac3-42dd-bf5a-0dda09c96e6f&parentId=1&origin=6d0624c4-fd65-4340-a09c-758a7854829c&swVersion=4&extensionId=Anthropic.claude-code&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net&parentOrigin=vscode-file%3A%2F%2Fvscode-app&purpose=webviewView&session=35189a43-e14a-4bfc-a91a-055215585ac9⏎¶⏎¶
+¶
+<html>⏎¶⏎¶
+¶
+<body>⏎¶⏎¶
+¶
+<!--StartFragment--><div class="message_07S1Yg userMessageContainer_07S1Yg  " style="color: rgb(204, 204, 204); display: inline-block; position: relative; flex-direction: column; align-items: flex-start; gap: 0px; padding: 8px 0px; margin: 4px 0px; text-align: left; font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif; font-size: 13px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial;"><div class="userMessageContainer_07S1Yg" style="display: inline-block; position: relative; margin: 0px 0px 4px;"><div class="userMessage_07S1Yg" style="white-space: pre-wrap; word-break: break-word; border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; border-radius: 6px; background-color: rgb(49, 49, 49); display: inline-block; overflow: hidden; user-select: text; max-width: 100%; padding: 4px 6px;"><div class="expandableContainer_xGDvVg" style="display: flex; position: relative; flex-direction: column; gap: 4px; max-width: fit-content;"><div class="contentWrapper_xGDvVg "><div class="content_xGDvVg " style="white-space: pre-wrap; word-break: break-word; overflow: hidden; transition: max-height 0.3s ease-in-out;"><span>Output a markdown test document demonstrating each of the following. No explanations â€” just the document.¶
+¶
+Required sections, in order:¶
+¶
+1.  Three heading levels (H1, H2, H3)¶
+2.  An inline-formatting paragraph using bold, italic, bold-italic, strikethrough, inline code, and a link¶
+3.  Three fenced code blocks with language tags: one Python (with at least one blank line inside), one JavaScript (with at least one blank line inside), one Bash¶
+4.  A task list with at least one checked and one unchecked item¶
+5.  A blockquote with a nested blockquote inside¶
+6.  A table with left, center, and right column alignment¶
+7.  An unordered list with at least one nested item¶
+8.  An ordered list¶
+9.  A footnote reference and its definition</span></div></div><div class="buttonContainer_xGDvVg" style="display: flex; opacity: 0.9; justify-content: flex-end; align-items: flex-end;"><button class="collapseButton_xGDvVg" aria-label="Show less" style="color: rgb(31, 31, 31); font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif; font-size: 0.85em; background-color: rgb(204, 204, 204); display: flex; cursor: pointer; border: none; border-radius: 4px; align-items: center; margin: 4px; padding: 8px; transition: transform 0.2s, box-shadow 0.2s;">Show less</button></div></div></div></div></div><div data-testid="assistant-message" class="message_07S1Yg timelineMessage_07S1Yg  " style="color: rgb(204, 204, 204); display: flex; position: relative; flex-direction: column; align-items: flex-start; gap: 0px; padding: 8px 0px 8px 30px; user-select: text; font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif; font-size: 13px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial;"><details class="thinking_aHyQPQ" open=""><div class="thinkingContent_aHyQPQ" style="color: rgb(157, 157, 157); margin-top: 4px; font-weight: 400;"><span class="root_-a7MRw" style="text-wrap: wrap; overflow-x: hidden; width: 100%;"><p style="white-space: pre-wrap; margin-top: 0px; margin-bottom: 0.2em;">The user wants a markdown test document. No explanations, just the document.</p></span></div></details></div><div data-testid="assistant-message" class="message_07S1Yg timelineMessage_07S1Yg  " style="color: rgb(204, 204, 204); display: flex; position: relative; flex-direction: column; align-items: flex-start; gap: 0px; padding: 8px 0px 8px 30px; user-select: text; font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif; font-size: 13px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial;"><span class="root_-a7MRw" style="text-wrap: wrap; overflow-x: hidden; width: 487.6px;"><h1 style="margin-top: 0px;">Heading One</h1><h2>Heading Two</h2><h3>Heading Three</h3><p style="white-space: pre-wrap; margin-top: 0.1em; margin-bottom: 0.2em;">This paragraph uses <strong>bold</strong>, <em>italic</em>, <em><strong>bold-italic</strong></em>, <del>strikethrough</del>, <code style="font-family: monospace; color: rgb(208, 208, 208); background-color: rgb(60, 60, 60); padding: 2px 4px; border-radius: 3px; font-size: 0.9em; word-break: break-word;">inline code</code>, and a <a href="https://example.com/" target="_blank" rel="noopener noreferrer" style="color: rgb(77, 170, 252); text-decoration: rgb(77, 170, 252);">link</a>.</p><div class="codeBlockWrapper_-a7MRw" style="position: relative; margin: 8px 0px;"><button class="copyButton_CEmTFw copyButton_-a7MRw" title="Copy code" aria-label="Copy code to clipboard" style="color: rgb(204, 204, 204); font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif; font-size: 13px; background: none 0% 0% / auto repeat scroll padding-box border-box rgb(31, 31, 31); border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; cursor: pointer; opacity: 0; display: flex; border-radius: 4px; justify-content: center; align-items: center; padding: 4px; transition: opacity 0.15s, background 0.15s; position: absolute; top: 4px; right: 4px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" data-slot="icon" class="copyIcon_CEmTFw"><path fill-rule="evenodd" d="M15.988 3.012A2.25 2.25 0 0 1 18 5.25v6.5A2.25 2.25 0 0 1 15.75 14H13.5v-3.379a3 3 0 0 0-.879-2.121l-3.12-3.121a3 3 0 0 0-1.402-.791 2.252 2.252 0 0 1 1.913-1.576A2.25 2.25 0 0 1 12.25 1h1.5a2.25 2.25 0 0 1 2.238 2.012ZM11.5 3.25a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 .75.75v.25h-3v-.25Z" clip-rule="evenodd"></path><path d="M3.5 6A1.5 1.5 0 0 0 2 7.5v9A1.5 1.5 0 0 0 3.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L8.44 6.439A1.5 1.5 0 0 0 7.378 6H3.5Z"></path></svg></button><pre style="overflow-x: auto; white-space: pre; box-sizing: border-box; border-radius: 4px; max-width: 100%; margin: 0px; padding: 8px;"><code class="language-python" style="font-family: monospace; color: rgb(208, 208, 208); background-color: rgb(60, 60, 60); padding: 0px; border-radius: 3px; font-size: 0.9em; word-break: break-word;">def greet(name):¶
+    greeting = f"Hello, {name}!"¶
+¶
+    return greeting¶
+</code></pre></div><div class="codeBlockWrapper_-a7MRw" style="position: relative; margin: 8px 0px;"><button class="copyButton_CEmTFw copyButton_-a7MRw" title="Copy code" aria-label="Copy code to clipboard" style="color: rgb(204, 204, 204); font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif; font-size: 13px; background: none 0% 0% / auto repeat scroll padding-box border-box rgb(31, 31, 31); border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; cursor: pointer; opacity: 0; display: flex; border-radius: 4px; justify-content: center; align-items: center; padding: 4px; transition: opacity 0.15s, background 0.15s; position: absolute; top: 4px; right: 4px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" data-slot="icon" class="copyIcon_CEmTFw"><path fill-rule="evenodd" d="M15.988 3.012A2.25 2.25 0 0 1 18 5.25v6.5A2.25 2.25 0 0 1 15.75 14H13.5v-3.379a3 3 0 0 0-.879-2.121l-3.12-3.121a3 3 0 0 0-1.402-.791 2.252 2.252 0 0 1 1.913-1.576A2.25 2.25 0 0 1 12.25 1h1.5a2.25 2.25 0 0 1 2.238 2.012ZM11.5 3.25a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 .75.75v.25h-3v-.25Z" clip-rule="evenodd"></path><path d="M3.5 6A1.5 1.5 0 0 0 2 7.5v9A1.5 1.5 0 0 0 3.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L8.44 6.439A1.5 1.5 0 0 0 7.378 6H3.5Z"></path></svg></button><pre style="overflow-x: auto; white-space: pre; box-sizing: border-box; border-radius: 4px; max-width: 100%; margin: 0px; padding: 8px;"><code class="language-javascript" style="font-family: monospace; color: rgb(208, 208, 208); background-color: rgb(60, 60, 60); padding: 0px; border-radius: 3px; font-size: 0.9em; word-break: break-word;">function greet(name) {¶
+  const greeting = `Hello, ${name}!`;¶
+¶
+  return greeting;¶
+}¶
+</code></pre></div><div class="codeBlockWrapper_-a7MRw" style="position: relative; margin: 8px 0px;"><button class="copyButton_CEmTFw copyButton_-a7MRw" title="Copy code" aria-label="Copy code to clipboard" style="color: rgb(204, 204, 204); font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif; font-size: 13px; background: none 0% 0% / auto repeat scroll padding-box border-box rgb(31, 31, 31); border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; cursor: pointer; opacity: 0; display: flex; border-radius: 4px; justify-content: center; align-items: center; padding: 4px; transition: opacity 0.15s, background 0.15s; position: absolute; top: 4px; right: 4px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" data-slot="icon" class="copyIcon_CEmTFw"><path fill-rule="evenodd" d="M15.988 3.012A2.25 2.25 0 0 1 18 5.25v6.5A2.25 2.25 0 0 1 15.75 14H13.5v-3.379a3 3 0 0 0-.879-2.121l-3.12-3.121a3 3 0 0 0-1.402-.791 2.252 2.252 0 0 1 1.913-1.576A2.25 2.25 0 0 1 12.25 1h1.5a2.25 2.25 0 0 1 2.238 2.012ZM11.5 3.25a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 .75.75v.25h-3v-.25Z" clip-rule="evenodd"></path><path d="M3.5 6A1.5 1.5 0 0 0 2 7.5v9A1.5 1.5 0 0 0 3.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L8.44 6.439A1.5 1.5 0 0 0 7.378 6H3.5Z"></path></svg></button><pre style="overflow-x: auto; white-space: pre; box-sizing: border-box; border-radius: 4px; max-width: 100%; margin: 0px; padding: 8px;"><code class="language-bash" style="font-family: monospace; color: rgb(208, 208, 208); background-color: rgb(60, 60, 60); padding: 0px; border-radius: 3px; font-size: 0.9em; word-break: break-word;">echo "Hello, world!"¶
+</code></pre></div><ul class="contains-task-list" style="padding-inline-start: 2em;"><li class="task-list-item"><input type="checkbox" disabled="" checked="" style="appearance: none; border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; position: relative; pointer-events: none; vertical-align: middle; border-radius: 2px; width: 1em; height: 1em; margin: 2px 4px 2px 2px;"><span>Â </span>Checked item</li><li class="task-list-item"><input type="checkbox" disabled="" style="appearance: none; border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; position: relative; pointer-events: none; vertical-align: middle; border-radius: 2px; width: 1em; height: 1em; margin: 2px 4px 2px 2px;"><span>Â </span>Unchecked item</li><li class="task-list-item"><input type="checkbox" disabled="" checked="" style="appearance: none; border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; position: relative; pointer-events: none; vertical-align: middle; border-radius: 2px; width: 1em; height: 1em; margin: 2px 4px 2px 2px;"><span>Â </span>Another checked item</li></ul><blockquote style="background: none 0% 0% / auto repeat scroll padding-box border-box rgb(43, 43, 43); border-color: rgb(97, 97, 97);"><p style="white-space: pre-wrap; margin-top: 0.1em; margin-bottom: 0.2em;">Outer blockquote line.</p><blockquote style="background: none 0% 0% / auto repeat scroll padding-box border-box rgb(43, 43, 43); border-color: rgb(97, 97, 97);"><p style="white-space: pre-wrap; margin-top: 0.1em; margin-bottom: 0.2em;">Nested blockquote line.</p></blockquote></blockquote><table style="border-collapse: collapse; border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch;"><thead><tr><th style="border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; padding: 2px; text-align: left;">Left</th><th style="border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; padding: 2px; text-align: center;">Center</th><th style="border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; padding: 2px; text-align: right;">Right</th></tr></thead><tbody><tr><td style="border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; padding: 2px; text-align: left;">a</td><td style="border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; padding: 2px; text-align: center;">b</td><td style="border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; padding: 2px; text-align: right;">c</td></tr><tr><td style="border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; padding: 2px; text-align: left;">foo</td><td style="border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; padding: 2px; text-align: center;">bar</td><td style="border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; padding: 2px; text-align: right;">baz</td></tr></tbody></table><ul style="padding-inline-start: 2em;"><li>Item one<ul style="padding-inline-start: 2em;"><li>Nested item</li><li>Another nested item</li></ul></li><li>Item two</li><li>Item three</li></ul><ol style="padding-inline-start: 2em;"><li>First</li><li>Second</li><li>Third</li></ol><p style="white-space: pre-wrap; margin-top: 0.1em; margin-bottom: 0.2em;">Here is a footnote reference.<sup><a href="vscode-webview://0pm70dm6f6pdq82ubcl5vmtd4vl8j7343vu35t01f6njt6fk22pm/index.html?id=c806bd70-aac3-42dd-bf5a-0dda09c96e6f&amp;parentId=1&amp;origin=6d0624c4-fd65-4340-a09c-758a7854829c&amp;swVersion=4&amp;extensionId=Anthropic.claude-code&amp;platform=electron&amp;vscode-resource-base-authority=vscode-resource.vscode-cdn.net&amp;parentOrigin=vscode-file%3A%2F%2Fvscode-app&amp;purpose=webviewView&amp;session=35189a43-e14a-4bfc-a91a-055215585ac9#user-content-fn-1" target="_blank" rel="noopener noreferrer" style="color: rgb(77, 170, 252);">1</a></sup></p><section data-footnotes="true" class="footnotes"><h2 class="sr-only" id="footnote-label" style="margin-top: 0px;">Footnotes</h2><ol style="padding-inline-start: 2em;"><li id="user-content-fn-1"><p style="white-space: pre-wrap; margin-top: 0.1em; margin-bottom: 0.2em;">This is the footnote definition. <a href="vscode-webview://0pm70dm6f6pdq82ubcl5vmtd4vl8j7343vu35t01f6njt6fk22pm/index.html?id=c806bd70-aac3-42dd-bf5a-0dda09c96e6f&amp;parentId=1&amp;origin=6d0624c4-fd65-4340-a09c-758a7854829c&amp;swVersion=4&amp;extensionId=Anthropic.claude-code&amp;platform=electron&amp;vscode-resource-base-authority=vscode-resource.vscode-cdn.net&amp;parentOrigin=vscode-file%3A%2F%2Fvscode-app&amp;purpose=webviewView&amp;session=35189a43-e14a-4bfc-a91a-055215585ac9#user-content-fnref-1" target="_blank" rel="noopener noreferrer" style="color: rgb(77, 170, 252); text-decoration: rgb(77, 170, 252);">â†©</a></p></li></ol></section></span></div><!--EndFragment-->⏎¶⏎¶
+¶
+</body>⏎¶⏎¶
+¶
+</html>
+
+=== 3. htmlFrag (CF_HTML fragment) (len=16211) ===
+<div class="message_07S1Yg userMessageContainer_07S1Yg  " style="color: rgb(204, 204, 204); display: inline-block; position: relative; flex-direction: column; align-items: flex-start; gap: 0px; padding: 8px 0px; margin: 4px 0px; text-align: left; font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif; font-size: 13px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial;"><div class="userMessageContainer_07S1Yg" style="display: inline-block; position: relative; margin: 0px 0px 4px;"><div class="userMessage_07S1Yg" style="white-space: pre-wrap; word-break: break-word; border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; border-radius: 6px; background-color: rgb(49, 49, 49); display: inline-block; overflow: hidden; user-select: text; max-width: 100%; padding: 4px 6px;"><div class="expandableContainer_xGDvVg" style="display: flex; position: relative; flex-direction: column; gap: 4px; max-width: fit-content;"><div class="contentWrapper_xGDvVg "><div class="content_xGDvVg " style="white-space: pre-wrap; word-break: break-word; overflow: hidden; transition: max-height 0.3s ease-in-out;"><span>Output a markdown test document demonstrating each of the following. No explanations — just the document.¶
+¶
+Required sections, in order:¶
+¶
+1.  Three heading levels (H1, H2, H3)¶
+2.  An inline-formatting paragraph using bold, italic, bold-italic, strikethrough, inline code, and a link¶
+3.  Three fenced code blocks with language tags: one Python (with at least one blank line inside), one JavaScript (with at least one blank line inside), one Bash¶
+4.  A task list with at least one checked and one unchecked item¶
+5.  A blockquote with a nested blockquote inside¶
+6.  A table with left, center, and right column alignment¶
+7.  An unordered list with at least one nested item¶
+8.  An ordered list¶
+9.  A footnote reference and its definition</span></div></div><div class="buttonContainer_xGDvVg" style="display: flex; opacity: 0.9; justify-content: flex-end; align-items: flex-end;"><button class="collapseButton_xGDvVg" aria-label="Show less" style="color: rgb(31, 31, 31); font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif; font-size: 0.85em; background-color: rgb(204, 204, 204); display: flex; cursor: pointer; border: none; border-radius: 4px; align-items: center; margin: 4px; padding: 8px; transition: transform 0.2s, box-shadow 0.2s;">Show less</button></div></div></div></div></div><div data-testid="assistant-message" class="message_07S1Yg timelineMessage_07S1Yg  " style="color: rgb(204, 204, 204); display: flex; position: relative; flex-direction: column; align-items: flex-start; gap: 0px; padding: 8px 0px 8px 30px; user-select: text; font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif; font-size: 13px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial;"><details class="thinking_aHyQPQ" open=""><div class="thinkingContent_aHyQPQ" style="color: rgb(157, 157, 157); margin-top: 4px; font-weight: 400;"><span class="root_-a7MRw" style="text-wrap: wrap; overflow-x: hidden; width: 100%;"><p style="white-space: pre-wrap; margin-top: 0px; margin-bottom: 0.2em;">The user wants a markdown test document. No explanations, just the document.</p></span></div></details></div><div data-testid="assistant-message" class="message_07S1Yg timelineMessage_07S1Yg  " style="color: rgb(204, 204, 204); display: flex; position: relative; flex-direction: column; align-items: flex-start; gap: 0px; padding: 8px 0px 8px 30px; user-select: text; font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif; font-size: 13px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial;"><span class="root_-a7MRw" style="text-wrap: wrap; overflow-x: hidden; width: 487.6px;"><h1 style="margin-top: 0px;">Heading One</h1><h2>Heading Two</h2><h3>Heading Three</h3><p style="white-space: pre-wrap; margin-top: 0.1em; margin-bottom: 0.2em;">This paragraph uses <strong>bold</strong>, <em>italic</em>, <em><strong>bold-italic</strong></em>, <del>strikethrough</del>, <code style="font-family: monospace; color: rgb(208, 208, 208); background-color: rgb(60, 60, 60); padding: 2px 4px; border-radius: 3px; font-size: 0.9em; word-break: break-word;">inline code</code>, and a <a href="https://example.com/" target="_blank" rel="noopener noreferrer" style="color: rgb(77, 170, 252); text-decoration: rgb(77, 170, 252);">link</a>.</p><div class="codeBlockWrapper_-a7MRw" style="position: relative; margin: 8px 0px;"><button class="copyButton_CEmTFw copyButton_-a7MRw" title="Copy code" aria-label="Copy code to clipboard" style="color: rgb(204, 204, 204); font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif; font-size: 13px; background: none 0% 0% / auto repeat scroll padding-box border-box rgb(31, 31, 31); border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; cursor: pointer; opacity: 0; display: flex; border-radius: 4px; justify-content: center; align-items: center; padding: 4px; transition: opacity 0.15s, background 0.15s; position: absolute; top: 4px; right: 4px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" data-slot="icon" class="copyIcon_CEmTFw"><path fill-rule="evenodd" d="M15.988 3.012A2.25 2.25 0 0 1 18 5.25v6.5A2.25 2.25 0 0 1 15.75 14H13.5v-3.379a3 3 0 0 0-.879-2.121l-3.12-3.121a3 3 0 0 0-1.402-.791 2.252 2.252 0 0 1 1.913-1.576A2.25 2.25 0 0 1 12.25 1h1.5a2.25 2.25 0 0 1 2.238 2.012ZM11.5 3.25a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 .75.75v.25h-3v-.25Z" clip-rule="evenodd"></path><path d="M3.5 6A1.5 1.5 0 0 0 2 7.5v9A1.5 1.5 0 0 0 3.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L8.44 6.439A1.5 1.5 0 0 0 7.378 6H3.5Z"></path></svg></button><pre style="overflow-x: auto; white-space: pre; box-sizing: border-box; border-radius: 4px; max-width: 100%; margin: 0px; padding: 8px;"><code class="language-python" style="font-family: monospace; color: rgb(208, 208, 208); background-color: rgb(60, 60, 60); padding: 0px; border-radius: 3px; font-size: 0.9em; word-break: break-word;">def greet(name):¶
+    greeting = f"Hello, {name}!"¶
+¶
+    return greeting¶
+</code></pre></div><div class="codeBlockWrapper_-a7MRw" style="position: relative; margin: 8px 0px;"><button class="copyButton_CEmTFw copyButton_-a7MRw" title="Copy code" aria-label="Copy code to clipboard" style="color: rgb(204, 204, 204); font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif; font-size: 13px; background: none 0% 0% / auto repeat scroll padding-box border-box rgb(31, 31, 31); border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; cursor: pointer; opacity: 0; display: flex; border-radius: 4px; justify-content: center; align-items: center; padding: 4px; transition: opacity 0.15s, background 0.15s; position: absolute; top: 4px; right: 4px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" data-slot="icon" class="copyIcon_CEmTFw"><path fill-rule="evenodd" d="M15.988 3.012A2.25 2.25 0 0 1 18 5.25v6.5A2.25 2.25 0 0 1 15.75 14H13.5v-3.379a3 3 0 0 0-.879-2.121l-3.12-3.121a3 3 0 0 0-1.402-.791 2.252 2.252 0 0 1 1.913-1.576A2.25 2.25 0 0 1 12.25 1h1.5a2.25 2.25 0 0 1 2.238 2.012ZM11.5 3.25a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 .75.75v.25h-3v-.25Z" clip-rule="evenodd"></path><path d="M3.5 6A1.5 1.5 0 0 0 2 7.5v9A1.5 1.5 0 0 0 3.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L8.44 6.439A1.5 1.5 0 0 0 7.378 6H3.5Z"></path></svg></button><pre style="overflow-x: auto; white-space: pre; box-sizing: border-box; border-radius: 4px; max-width: 100%; margin: 0px; padding: 8px;"><code class="language-javascript" style="font-family: monospace; color: rgb(208, 208, 208); background-color: rgb(60, 60, 60); padding: 0px; border-radius: 3px; font-size: 0.9em; word-break: break-word;">function greet(name) {¶
+  const greeting = `Hello, ${name}!`;¶
+¶
+  return greeting;¶
+}¶
+</code></pre></div><div class="codeBlockWrapper_-a7MRw" style="position: relative; margin: 8px 0px;"><button class="copyButton_CEmTFw copyButton_-a7MRw" title="Copy code" aria-label="Copy code to clipboard" style="color: rgb(204, 204, 204); font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif; font-size: 13px; background: none 0% 0% / auto repeat scroll padding-box border-box rgb(31, 31, 31); border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; cursor: pointer; opacity: 0; display: flex; border-radius: 4px; justify-content: center; align-items: center; padding: 4px; transition: opacity 0.15s, background 0.15s; position: absolute; top: 4px; right: 4px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" data-slot="icon" class="copyIcon_CEmTFw"><path fill-rule="evenodd" d="M15.988 3.012A2.25 2.25 0 0 1 18 5.25v6.5A2.25 2.25 0 0 1 15.75 14H13.5v-3.379a3 3 0 0 0-.879-2.121l-3.12-3.121a3 3 0 0 0-1.402-.791 2.252 2.252 0 0 1 1.913-1.576A2.25 2.25 0 0 1 12.25 1h1.5a2.25 2.25 0 0 1 2.238 2.012ZM11.5 3.25a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 .75.75v.25h-3v-.25Z" clip-rule="evenodd"></path><path d="M3.5 6A1.5 1.5 0 0 0 2 7.5v9A1.5 1.5 0 0 0 3.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L8.44 6.439A1.5 1.5 0 0 0 7.378 6H3.5Z"></path></svg></button><pre style="overflow-x: auto; white-space: pre; box-sizing: border-box; border-radius: 4px; max-width: 100%; margin: 0px; padding: 8px;"><code class="language-bash" style="font-family: monospace; color: rgb(208, 208, 208); background-color: rgb(60, 60, 60); padding: 0px; border-radius: 3px; font-size: 0.9em; word-break: break-word;">echo "Hello, world!"¶
+</code></pre></div><ul class="contains-task-list" style="padding-inline-start: 2em;"><li class="task-list-item"><input type="checkbox" disabled="" checked="" style="appearance: none; border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; position: relative; pointer-events: none; vertical-align: middle; border-radius: 2px; width: 1em; height: 1em; margin: 2px 4px 2px 2px;"><span> </span>Checked item</li><li class="task-list-item"><input type="checkbox" disabled="" style="appearance: none; border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; position: relative; pointer-events: none; vertical-align: middle; border-radius: 2px; width: 1em; height: 1em; margin: 2px 4px 2px 2px;"><span> </span>Unchecked item</li><li class="task-list-item"><input type="checkbox" disabled="" checked="" style="appearance: none; border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; position: relative; pointer-events: none; vertical-align: middle; border-radius: 2px; width: 1em; height: 1em; margin: 2px 4px 2px 2px;"><span> </span>Another checked item</li></ul><blockquote style="background: none 0% 0% / auto repeat scroll padding-box border-box rgb(43, 43, 43); border-color: rgb(97, 97, 97);"><p style="white-space: pre-wrap; margin-top: 0.1em; margin-bottom: 0.2em;">Outer blockquote line.</p><blockquote style="background: none 0% 0% / auto repeat scroll padding-box border-box rgb(43, 43, 43); border-color: rgb(97, 97, 97);"><p style="white-space: pre-wrap; margin-top: 0.1em; margin-bottom: 0.2em;">Nested blockquote line.</p></blockquote></blockquote><table style="border-collapse: collapse; border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch;"><thead><tr><th style="border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; padding: 2px; text-align: left;">Left</th><th style="border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; padding: 2px; text-align: center;">Center</th><th style="border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; padding: 2px; text-align: right;">Right</th></tr></thead><tbody><tr><td style="border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; padding: 2px; text-align: left;">a</td><td style="border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; padding: 2px; text-align: center;">b</td><td style="border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; padding: 2px; text-align: right;">c</td></tr><tr><td style="border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; padding: 2px; text-align: left;">foo</td><td style="border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; padding: 2px; text-align: center;">bar</td><td style="border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; padding: 2px; text-align: right;">baz</td></tr></tbody></table><ul style="padding-inline-start: 2em;"><li>Item one<ul style="padding-inline-start: 2em;"><li>Nested item</li><li>Another nested item</li></ul></li><li>Item two</li><li>Item three</li></ul><ol style="padding-inline-start: 2em;"><li>First</li><li>Second</li><li>Third</li></ol><p style="white-space: pre-wrap; margin-top: 0.1em; margin-bottom: 0.2em;">Here is a footnote reference.<sup><a href="vscode-webview://0pm70dm6f6pdq82ubcl5vmtd4vl8j7343vu35t01f6njt6fk22pm/index.html?id=c806bd70-aac3-42dd-bf5a-0dda09c96e6f&amp;parentId=1&amp;origin=6d0624c4-fd65-4340-a09c-758a7854829c&amp;swVersion=4&amp;extensionId=Anthropic.claude-code&amp;platform=electron&amp;vscode-resource-base-authority=vscode-resource.vscode-cdn.net&amp;parentOrigin=vscode-file%3A%2F%2Fvscode-app&amp;purpose=webviewView&amp;session=35189a43-e14a-4bfc-a91a-055215585ac9#user-content-fn-1" target="_blank" rel="noopener noreferrer" style="color: rgb(77, 170, 252);">1</a></sup></p><section data-footnotes="true" class="footnotes"><h2 class="sr-only" id="footnote-label" style="margin-top: 0px;">Footnotes</h2><ol style="padding-inline-start: 2em;"><li id="user-content-fn-1"><p style="white-space: pre-wrap; margin-top: 0.1em; margin-bottom: 0.2em;">This is the footnote definition. <a href="vscode-webview://0pm70dm6f6pdq82ubcl5vmtd4vl8j7343vu35t01f6njt6fk22pm/index.html?id=c806bd70-aac3-42dd-bf5a-0dda09c96e6f&amp;parentId=1&amp;origin=6d0624c4-fd65-4340-a09c-758a7854829c&amp;swVersion=4&amp;extensionId=Anthropic.claude-code&amp;platform=electron&amp;vscode-resource-base-authority=vscode-resource.vscode-cdn.net&amp;parentOrigin=vscode-file%3A%2F%2Fvscode-app&amp;purpose=webviewView&amp;session=35189a43-e14a-4bfc-a91a-055215585ac9#user-content-fnref-1" target="_blank" rel="noopener noreferrer" style="color: rgb(77, 170, 252); text-decoration: rgb(77, 170, 252);">↩</a></p></li></ol></section></span></div>
+
+=== 2b. cfHtml offsets ===
+StartHTML: 527
+EndHTML: 16817
+StartFragment: 563
+EndFragment: 16781
+
+=== 3. htmlPrep (after _PreprocessHtml) (len=8147) ===
+<div class="message_07S1Yg userMessageContainer_07S1Yg  " style="color: rgb(204, 204, 204); display: inline-block; position: relative; flex-direction: column; align-items: flex-start; gap: 0px; padding: 8px 0px; margin: 4px 0px; text-align: left; font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif; font-size: 13px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial;"><p>¤POSTER_User¤</p><div class="userMessageContainer_07S1Yg" style="display: inline-block; position: relative; margin: 0px 0px 4px;"><div class="userMessage_07S1Yg" style="white-space: pre-wrap; word-break: break-word; border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; border-radius: 6px; background-color: rgb(49, 49, 49); display: inline-block; overflow: hidden; user-select: text; max-width: 100%; padding: 4px 6px;"><div class="expandableContainer_xGDvVg" style="display: flex; position: relative; flex-direction: column; gap: 4px; max-width: fit-content;"><div class="contentWrapper_xGDvVg "><div class="content_xGDvVg " style="white-space: pre-wrap; word-break: break-word; overflow: hidden; transition: max-height 0.3s ease-in-out;"><p>¤USERMSG_1¤</p></div></div><div class="buttonContainer_xGDvVg" style="display: flex; opacity: 0.9; justify-content: flex-end; align-items: flex-end;"></div></div></div></div></div><div data-testid="assistant-message" class="message_07S1Yg timelineMessage_07S1Yg  " style="color: rgb(204, 204, 204); display: flex; position: relative; flex-direction: column; align-items: flex-start; gap: 0px; padding: 8px 0px 8px 30px; user-select: text; font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif; font-size: 13px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial;"><p>¤POSTER_AI¤</p><details class="thinking_aHyQPQ" open=""><div class="thinkingContent_aHyQPQ" style="color: rgb(157, 157, 157); margin-top: 4px; font-weight: 400;"><p style="white-space: pre-wrap; margin-top: 0px; margin-bottom: 0.2em;">The user wants a markdown test document. No explanations, just the document.</p></div></details></div><div data-testid="assistant-message" class="message_07S1Yg timelineMessage_07S1Yg  " style="color: rgb(204, 204, 204); display: flex; position: relative; flex-direction: column; align-items: flex-start; gap: 0px; padding: 8px 0px 8px 30px; user-select: text; font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif; font-size: 13px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial;"><p>¤POSTER_AI¤</p><h1 style="margin-top: 0px;">Heading One</h1><h2>Heading Two</h2><h3>Heading Three</h3><p style="white-space: pre-wrap; margin-top: 0.1em; margin-bottom: 0.2em;">This paragraph uses <strong>bold</strong>, <em>italic</em>, <em><strong>bold-italic</strong></em>, <del>strikethrough</del>, <code style="font-family: monospace; color: rgb(208, 208, 208); background-color: rgb(60, 60, 60); padding: 2px 4px; border-radius: 3px; font-size: 0.9em; word-break: break-word;">inline code</code>, and a <a href="https://example.com/" target="_blank" rel="noopener noreferrer" style="color: rgb(77, 170, 252); text-decoration: rgb(77, 170, 252);">link</a>.</p><div class="codeBlockWrapper_-a7MRw" style="position: relative; margin: 8px 0px;"><pre><code class="language-python">def greet(name):¶
+    greeting = f"Hello, {name}!"¶
+¶
+    return greeting¶
+</code></pre></div><div class="codeBlockWrapper_-a7MRw" style="position: relative; margin: 8px 0px;"><pre><code class="language-javascript">function greet(name) {¶
+  const greeting = `Hello, ${name}!`;¶
+¶
+  return greeting;¶
+}¶
+</code></pre></div><div class="codeBlockWrapper_-a7MRw" style="position: relative; margin: 8px 0px;"><pre><code class="language-bash">echo "Hello, world!"¶
+</code></pre></div><ul class="contains-task-list" style="padding-inline-start: 2em;"><li>¤CHK¤ Checked item</li><li>¤UNCHK¤ Unchecked item</li><li>¤CHK¤ Another checked item</li></ul><blockquote style="background: none 0% 0% / auto repeat scroll padding-box border-box rgb(43, 43, 43); border-color: rgb(97, 97, 97);"><p style="white-space: pre-wrap; margin-top: 0.1em; margin-bottom: 0.2em;">Outer blockquote line.</p><blockquote style="background: none 0% 0% / auto repeat scroll padding-box border-box rgb(43, 43, 43); border-color: rgb(97, 97, 97);"><p style="white-space: pre-wrap; margin-top: 0.1em; margin-bottom: 0.2em;">Nested blockquote line.</p></blockquote></blockquote><table style="border-collapse: collapse; border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch;"><thead><tr><th style="border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; padding: 2px; text-align: left;">Left</th><th style="border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; padding: 2px; text-align: center;">Center</th><th style="border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; padding: 2px; text-align: right;">Right</th></tr></thead><tbody><tr><td style="border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; padding: 2px; text-align: left;">a</td><td style="border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; padding: 2px; text-align: center;">b</td><td style="border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; padding: 2px; text-align: right;">c</td></tr><tr><td style="border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; padding: 2px; text-align: left;">foo</td><td style="border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; padding: 2px; text-align: center;">bar</td><td style="border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; padding: 2px; text-align: right;">baz</td></tr></tbody></table><ul style="padding-inline-start: 2em;"><li>Item one<ul style="padding-inline-start: 2em;"><li>Nested item</li><li>Another nested item</li></ul></li><li>Item two</li><li>Item three</li></ul><ol style="padding-inline-start: 2em;"><li>First</li><li>Second</li><li>Third</li></ol><p style="white-space: pre-wrap; margin-top: 0.1em; margin-bottom: 0.2em;">Here is a footnote reference.<sup><a href="#user-content-fn-1" target="_blank" rel="noopener noreferrer" style="color: rgb(77, 170, 252);">1</a></sup></p><section data-footnotes="true" class="footnotes"><h2 class="sr-only" id="footnote-label" style="margin-top: 0px;">Footnotes</h2><ol style="padding-inline-start: 2em;"><li id="user-content-fn-1"><p style="white-space: pre-wrap; margin-top: 0.1em; margin-bottom: 0.2em;">This is the footnote definition. <a href="#user-content-fnref-1" target="_blank" rel="noopener noreferrer" style="color: rgb(77, 170, 252); text-decoration: rgb(77, 170, 252);">↩</a></p></li></ol></section></div>
+
+=== 4. mdRaw (pandoc output) (len=5029) ===
+<div class="message_07S1Yg userMessageContainer_07S1Yg" style="color: rgb(204, 204, 204); display: inline-block; position: relative; flex-direction: column; align-items: flex-start; gap: 0px; padding: 8px 0px; margin: 4px 0px; text-align: left; font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif; font-size: 13px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial;">¶
+¶
+¤POSTER_User¤¶
+¶
+<div class="userMessageContainer_07S1Yg" style="display: inline-block; position: relative; margin: 0px 0px 4px;">¶
+¶
+<div class="userMessage_07S1Yg" style="white-space: pre-wrap; word-break: break-word; border-color: rgb(69, 69, 69); border-style: solid; border-width: 0.8px; border-image: none 100% / 1 / 0 stretch; border-radius: 6px; background-color: rgb(49, 49, 49); display: inline-block; overflow: hidden; user-select: text; max-width: 100%; padding: 4px 6px;">¶
+¶
+<div class="expandableContainer_xGDvVg" style="display: flex; position: relative; flex-direction: column; gap: 4px; max-width: fit-content;">¶
+¶
+<div class="contentWrapper_xGDvVg">¶
+¶
+<div class="content_xGDvVg" style="white-space: pre-wrap; word-break: break-word; overflow: hidden; transition: max-height 0.3s ease-in-out;">¶
+¶
+¤USERMSG_1¤¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+<div class="buttonContainer_xGDvVg" style="display: flex; opacity: 0.9; justify-content: flex-end; align-items: flex-end;">¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+<div class="message_07S1Yg timelineMessage_07S1Yg" testid="assistant-message" style="color: rgb(204, 204, 204); display: flex; position: relative; flex-direction: column; align-items: flex-start; gap: 0px; padding: 8px 0px 8px 30px; user-select: text; font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif; font-size: 13px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial;">¶
+¶
+¤POSTER_AI¤¶
+¶
+<div class="thinkingContent_aHyQPQ" style="color: rgb(157, 157, 157); margin-top: 4px; font-weight: 400;">¶
+¶
+The user wants a markdown test document. No explanations, just the document.¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+<div class="message_07S1Yg timelineMessage_07S1Yg" testid="assistant-message" style="color: rgb(204, 204, 204); display: flex; position: relative; flex-direction: column; align-items: flex-start; gap: 0px; padding: 8px 0px 8px 30px; user-select: text; font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif; font-size: 13px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial;">¶
+¶
+¤POSTER_AI¤¶
+¶
+# Heading One¶
+¶
+## Heading Two¶
+¶
+### Heading Three¶
+¶
+This paragraph uses **bold**, *italic*, ***bold-italic***, ~~strikethrough~~, `inline code`, and a <a href="https://example.com/" target="_blank" rel="noopener noreferrer" style="color: rgb(77, 170, 252); text-decoration: rgb(77, 170, 252);">link</a>.¶
+¶
+<div class="codeBlockWrapper_-a7MRw" style="position: relative; margin: 8px 0px;">¶
+¶
+``` python¶
+def greet(name):¶
+    greeting = f"Hello, {name}!"¶
+¶
+    return greeting¶
+```¶
+¶
+</div>¶
+¶
+<div class="codeBlockWrapper_-a7MRw" style="position: relative; margin: 8px 0px;">¶
+¶
+``` javascript¶
+function greet(name) {¶
+  const greeting = `Hello, ${name}!`;¶
+¶
+  return greeting;¶
+}¶
+```¶
+¶
+</div>¶
+¶
+<div class="codeBlockWrapper_-a7MRw" style="position: relative; margin: 8px 0px;">¶
+¶
+``` bash¶
+echo "Hello, world!"¶
+```¶
+¶
+</div>¶
+¶
+- ¤CHK¤ Checked item¶
+- ¤UNCHK¤ Unchecked item¶
+- ¤CHK¤ Another checked item¶
+¶
+> Outer blockquote line.¶
+>¶
+> > Nested blockquote line.¶
+¶
+| Left | Center | Right |¶
+|:-----|:------:|------:|¶
+| a    |   b    |     c |¶
+| foo  |  bar   |   baz |¶
+¶
+- Item one¶
+  - Nested item¶
+  - Another nested item¶
+- Item two¶
+- Item three¶
+¶
+1.  First¶
+2.  Second¶
+3.  Third¶
+¶
+Here is a footnote reference.<sup><a href="#user-content-fn-1" target="_blank" rel="noopener noreferrer" style="color: rgb(77, 170, 252);">1</a></sup>¶
+¶
+<div class="section footnotes" footnotes="true">¶
+¶
+## Footnotes¶
+¶
+1.  <div id="user-content-fn-1">¶
+¶
+    This is the footnote definition. <a href="#user-content-fnref-1" target="_blank" rel="noopener noreferrer" style="color: rgb(77, 170, 252); text-decoration: rgb(77, 170, 252);">↩︎</a>¶
+¶
+    </div>¶
+¶
+</div>¶
+¶
+</div>¶
+
+
+=== 5. md (after CleanMarkdown) (len=1750) ===
+¤POSTER_User¤¶
+¶
+Output a markdown test document demonstrating each of the following. No explanations — just the document.¶
+¶
+Required sections, in order:¶
+¶
+1.  Three heading levels (H1, H2, H3)¶
+2.  An inline-formatting paragraph using bold, italic, bold-italic, strikethrough, inline code, and a link¶
+3.  Three fenced code blocks with language tags: one Python (with at least one blank line inside), one JavaScript (with at least one blank line inside), one Bash¶
+4.  A task list with at least one checked and one unchecked item¶
+5.  A blockquote with a nested blockquote inside¶
+6.  A table with left, center, and right column alignment¶
+7.  An unordered list with at least one nested item¶
+8.  An ordered list¶
+9.  A footnote reference and its definition¶
+¶
+¤POSTER_AI¤¶
+¶
+The user wants a markdown test document. No explanations, just the document.¶
+¶
+¤POSTER_AI¤¶
+¶
+# Heading One¶
+¶
+## Heading Two¶
+¶
+### Heading Three¶
+¶
+This paragraph uses **bold**, *italic*, ***bold-italic***, ~~strikethrough~~, `inline code`, and a [link](https://example.com/).¶
+¶
+``` python¶
+def greet(name):¶
+    greeting = f"Hello, {name}!"¶
+¶
+    return greeting¶
+```¶
+¶
+``` javascript¶
+function greet(name) {¶
+  const greeting = `Hello, ${name}!`;¶
+¶
+  return greeting;¶
+}¶
+```¶
+¶
+``` bash¶
+echo "Hello, world!"¶
+```¶
+¶
+- [x] Checked item¶
+- [ ] Unchecked item¶
+- [x] Another checked item¶
+¶
+> Outer blockquote line.¶
+>¶
+> > Nested blockquote line.¶
+¶
+| Left | Center | Right |¶
+|:-----|:------:|------:|¶
+| a    |   b    |     c |¶
+| foo  |  bar   |   baz |¶
+¶
+- Item one¶
+  - Nested item¶
+  - Another nested item¶
+- Item two¶
+- Item three¶
+¶
+1.  First¶
+2.  Second¶
+3.  Third¶
+¶
+Here is a footnote reference.<sup>[1](#user-content-fn-1)</sup>¶
+¶
+## Footnotes¶
+¶
+1.  ¶
+¶
+    This is the footnote definition. [↩︎](#user-content-fnref-1)¶
+¶
+    ¶
+
+
+=== 5c. expected list start (ordered-list fix) (len=1) ===
+0
+
+=== 5d. md (after RestoreOrderedListStart) (len=1750) ===
+¤POSTER_User¤¶
+¶
+Output a markdown test document demonstrating each of the following. No explanations — just the document.¶
+¶
+Required sections, in order:¶
+¶
+1.  Three heading levels (H1, H2, H3)¶
+2.  An inline-formatting paragraph using bold, italic, bold-italic, strikethrough, inline code, and a link¶
+3.  Three fenced code blocks with language tags: one Python (with at least one blank line inside), one JavaScript (with at least one blank line inside), one Bash¶
+4.  A task list with at least one checked and one unchecked item¶
+5.  A blockquote with a nested blockquote inside¶
+6.  A table with left, center, and right column alignment¶
+7.  An unordered list with at least one nested item¶
+8.  An ordered list¶
+9.  A footnote reference and its definition¶
+¶
+¤POSTER_AI¤¶
+¶
+The user wants a markdown test document. No explanations, just the document.¶
+¶
+¤POSTER_AI¤¶
+¶
+# Heading One¶
+¶
+## Heading Two¶
+¶
+### Heading Three¶
+¶
+This paragraph uses **bold**, *italic*, ***bold-italic***, ~~strikethrough~~, `inline code`, and a [link](https://example.com/).¶
+¶
+``` python¶
+def greet(name):¶
+    greeting = f"Hello, {name}!"¶
+¶
+    return greeting¶
+```¶
+¶
+``` javascript¶
+function greet(name) {¶
+  const greeting = `Hello, ${name}!`;¶
+¶
+  return greeting;¶
+}¶
+```¶
+¶
+``` bash¶
+echo "Hello, world!"¶
+```¶
+¶
+- [x] Checked item¶
+- [ ] Unchecked item¶
+- [x] Another checked item¶
+¶
+> Outer blockquote line.¶
+>¶
+> > Nested blockquote line.¶
+¶
+| Left | Center | Right |¶
+|:-----|:------:|------:|¶
+| a    |   b    |     c |¶
+| foo  |  bar   |   baz |¶
+¶
+- Item one¶
+  - Nested item¶
+  - Another nested item¶
+- Item two¶
+- Item three¶
+¶
+1.  First¶
+2.  Second¶
+3.  Third¶
+¶
+Here is a footnote reference.<sup>[1](#user-content-fn-1)</sup>¶
+¶
+## Footnotes¶
+¶
+1.  ¶
+¶
+    This is the footnote definition. [↩︎](#user-content-fnref-1)¶
+¶
+    ¶
+
+
+=== 5e. md (after SHOW_POSTER replacement) (len=1854) ===
+**User:**¶
+>¶
+> Output a markdown test document demonstrating each of the following. No explanations — just the document.¶
+>¶
+> Required sections, in order:¶
+>¶
+> 1.  Three heading levels (H1, H2, H3)¶
+> 2.  An inline-formatting paragraph using bold, italic, bold-italic, strikethrough, inline code, and a link¶
+> 3.  Three fenced code blocks with language tags: one Python (with at least one blank line inside), one JavaScript (with at least one blank line inside), one Bash¶
+> 4.  A task list with at least one checked and one unchecked item¶
+> 5.  A blockquote with a nested blockquote inside¶
+> 6.  A table with left, center, and right column alignment¶
+> 7.  An unordered list with at least one nested item¶
+> 8.  An ordered list¶
+> 9.  A footnote reference and its definition¶
+>¶
+**Claude:**¶
+>¶
+> The user wants a markdown test document. No explanations, just the document.¶
+>¶
+> # Heading One¶
+>¶
+> ## Heading Two¶
+>¶
+> ### Heading Three¶
+>¶
+> This paragraph uses **bold**, *italic*, ***bold-italic***, ~~strikethrough~~, `inline code`, and a [link](https://example.com/).¶
+>¶
+> ``` python¶
+> def greet(name):¶
+>     greeting = f"Hello, {name}!"¶
+>¶
+>     return greeting¶
+> ```¶
+>¶
+> ``` javascript¶
+> function greet(name) {¶
+>   const greeting = `Hello, ${name}!`;¶
+>¶
+>   return greeting;¶
+> }¶
+> ```¶
+>¶
+> ``` bash¶
+> echo "Hello, world!"¶
+> ```¶
+>¶
+> - [x] Checked item¶
+> - [ ] Unchecked item¶
+> - [x] Another checked item¶
+>¶
+> > Outer blockquote line.¶
+> >¶
+> > > Nested blockquote line.¶
+>¶
+> | Left | Center | Right |¶
+> |:-----|:------:|------:|¶
+> | a    |   b    |     c |¶
+> | foo  |  bar   |   baz |¶
+>¶
+> - Item one¶
+>   - Nested item¶
+>   - Another nested item¶
+> - Item two¶
+> - Item three¶
+>¶
+> 1.  First¶
+> 2.  Second¶
+> 3.  Third¶
+>¶
+> Here is a footnote reference.<sup>[1](#user-content-fn-1)</sup>¶
+>¶
+> ## Footnotes¶
+>¶
+> 1.  ¶
+>¶
+>     This is the footnote definition. [↩︎](#user-content-fnref-1)¶
+
+
+=== 6. FINAL md (pasted) (len=1854) ===
+**User:**¶
+>¶
+> Output a markdown test document demonstrating each of the following. No explanations — just the document.¶
+>¶
+> Required sections, in order:¶
+>¶
+> 1.  Three heading levels (H1, H2, H3)¶
+> 2.  An inline-formatting paragraph using bold, italic, bold-italic, strikethrough, inline code, and a link¶
+> 3.  Three fenced code blocks with language tags: one Python (with at least one blank line inside), one JavaScript (with at least one blank line inside), one Bash¶
+> 4.  A task list with at least one checked and one unchecked item¶
+> 5.  A blockquote with a nested blockquote inside¶
+> 6.  A table with left, center, and right column alignment¶
+> 7.  An unordered list with at least one nested item¶
+> 8.  An ordered list¶
+> 9.  A footnote reference and its definition¶
+>¶
+**Claude:**¶
+>¶
+> The user wants a markdown test document. No explanations, just the document.¶
+>¶
+> # Heading One¶
+>¶
+> ## Heading Two¶
+>¶
+> ### Heading Three¶
+>¶
+> This paragraph uses **bold**, *italic*, ***bold-italic***, ~~strikethrough~~, `inline code`, and a [link](https://example.com/).¶
+>¶
+> ``` python¶
+> def greet(name):¶
+>     greeting = f"Hello, {name}!"¶
+>¶
+>     return greeting¶
+> ```¶
+>¶
+> ``` javascript¶
+> function greet(name) {¶
+>   const greeting = `Hello, ${name}!`;¶
+>¶
+>   return greeting;¶
+> }¶
+> ```¶
+>¶
+> ``` bash¶
+> echo "Hello, world!"¶
+> ```¶
+>¶
+> - [x] Checked item¶
+> - [ ] Unchecked item¶
+> - [x] Another checked item¶
+>¶
+> > Outer blockquote line.¶
+> >¶
+> > > Nested blockquote line.¶
+>¶
+> | Left | Center | Right |¶
+> |:-----|:------:|------:|¶
+> | a    |   b    |     c |¶
+> | foo  |  bar   |   baz |¶
+>¶
+> - Item one¶
+>   - Nested item¶
+>   - Another nested item¶
+> - Item two¶
+> - Item three¶
+>¶
+> 1.  First¶
+> 2.  Second¶
+> 3.  Third¶
+>¶
+> Here is a footnote reference.<sup>[1](#user-content-fn-1)</sup>¶
+>¶
+> ## Footnotes¶
+>¶
+> 1.  ¶
+>¶
+>     This is the footnote definition. [↩︎](#user-content-fnref-1)¶
+
+

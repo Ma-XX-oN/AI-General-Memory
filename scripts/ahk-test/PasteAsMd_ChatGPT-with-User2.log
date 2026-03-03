@@ -1,0 +1,56 @@
+=== 1. plain (A_Clipboard minus CR) (len=343) ===
+Lorem ipsum dolor sit amet.¶
+¶
+Consectetur adipiscing elit, sed do eiusmod tempor.¶
+¶
+Ut enim ad minim veniam?¶
+¶
+Quis nostrud exercitation ullamco laboris nisi.¶
+¶
+Duis aute irure dolor in reprehenderit.¶
+¶
+Excepteur sint occaecat cupidatat non proident.¶
+¶
+Sunt in culpa qui officia deserunt mollit anim.¶
+¶
+Id est laborum et dolorum fuga et harum quidem.
+
+=== 2. cfHtml (raw full payload) (len=1586) ===
+Version:0.9⏎¶⏎¶
+¶
+StartHTML:127⏎¶⏎¶
+¶
+EndHTML:1586⏎¶⏎¶
+¶
+StartFragment:163⏎¶⏎¶
+¶
+EndFragment:1550⏎¶⏎¶
+¶
+SourceURL:https://chatgpt.com/c/test-fixture⏎¶⏎¶
+¶
+⏎¶⏎¶
+¶
+<html>⏎¶⏎¶
+¶
+<body>⏎¶⏎¶
+¶
+<!--StartFragment--><article data-turn-id="aaaaaaaa-0000-0000-0000-000000000001" data-turn="user"><div class="whitespace-pre-wrap">Lorem ipsum dolor sit amet.</div></article>⏎¶⏎¶
+¶
+<article data-turn-id="aaaaaaaa-0000-0000-0000-000000000002" data-turn="assistant"><div class="markdown prose"><p>Consectetur adipiscing elit, sed do eiusmod tempor.</p></div></article>⏎¶⏎¶
+¶
+<article data-turn-id="aaaaaaaa-0000-0000-0000-000000000003" data-turn="user"><div class="whitespace-pre-wrap">Ut enim ad minim veniam?</div></article>⏎¶⏎¶
+¶
+<article data-turn-id="aaaaaaaa-0000-0000-0000-000000000004" data-turn="assistant"><div class="markdown prose"><p>Quis nostrud exercitation ullamco laboris nisi.</p></div></article>⏎¶⏎¶
+¶
+<article data-turn-id="aaaaaaaa-0000-0000-0000-000000000005" data-turn="user"><div class="whitespace-pre-wrap">Duis aute irure dolor in reprehenderit.</div></article>⏎¶⏎¶
+¶
+<article data-turn-id="aaaaaaaa-0000-0000-0000-000000000006" data-turn="assistant"><div class="markdown prose"><p>Excepteur sint occaecat cupidatat non proident.</p></div></article>⏎¶⏎¶
+¶
+<article data-turn-id="aaaaaaaa-0000-0000-0000-000000000007" data-turn="user"><div class="whitespace-pre-wrap">Sunt in culpa qui officia deserunt mollit anim.</div></article>⏎¶⏎¶
+¶
+<article data-turn-id="aaaaaaaa-0000-0000-0000-000000000008" data-turn="assistant"><div class="markdown prose"><p>Id est laborum et dolorum fuga et harum quidem.</p></div></article><!--EndFragment-->⏎¶⏎¶
+¶
+</body>⏎¶⏎¶
+¶
+</html>
+
