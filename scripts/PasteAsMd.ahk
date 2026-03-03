@@ -45,9 +45,6 @@ class PasteMd {
   static SHOW_IMG := false
   ; Toggle: wrap pasted output in blockquote syntax.
   static QUOTE := true
-  ; Toggle: use HtmlNorm.Normalize() instead of the legacy PreprocessHtmlCodeBlocks().
-  static USE_HTML_NORM := true
-
   static CODE_FENCE := "``````"
 
   ; Temporary storage for thinking blocks extracted during preprocessing.
@@ -986,11 +983,8 @@ class PasteMd {
   }
 
   /**
-   * Routes HTML preprocessing through either HtmlNorm (new) or the legacy
-   * PreprocessHtmlCodeBlocks, depending on the USE_HTML_NORM flag.
-   *
-   * When USE_HTML_NORM is true, calls HtmlNorm.Normalize() and copies the
-   * resulting _thinkingBlocks / _userMsgBlocks arrays into PasteMd so that
+   * Preprocesses HTML via HtmlNorm.Normalize(), then copies the resulting
+   * _thinkingBlocks / _userMsgBlocks arrays into PasteMd so that
    * RestoreThinkingBlocks / RestoreUserMsgBlocks work unchanged.
    *
    * @param {string} htmlFrag - HTML fragment from the CF_HTML clipboard
@@ -998,223 +992,9 @@ class PasteMd {
    * @returns {string} Preprocessed HTML ready for pandoc
    */
   static _PreprocessHtml(htmlFrag, cfHtml) {
-    if PasteMd.USE_HTML_NORM {
-      html := HtmlNorm.Normalize(htmlFrag, DetectSource(cfHtml), PasteMd.SHOW_POSTER, PasteMd.SHOW_IMG)
-      PasteMd._thinkingBlocks := HtmlNorm._thinkingBlocks
-      PasteMd._userMsgBlocks  := HtmlNorm._userMsgBlocks
-      return html
-    }
-    return PasteMd.PreprocessHtmlCodeBlocks(htmlFrag)
-  }
-
-  /**
-   * Preprocesses HTML before pandoc conversion.
-   * When SHOW_POSTER is enabled, injects ¤POSTER_AI¤ / ¤POSTER_User¤ paragraphs at
-   * the start of each detected message block so per-block labels survive pandoc.
-   * Strips UI artifacts (buttons, thinking blocks), converts code-like spans to <code>,
-   * strips presentational spans, normalizes line breaks inside <code>,
-   * and wraps multi-line code in <pre>.
-   * @param {string} html - HTML fragment from clipboard
-   * @returns {string} Preprocessed HTML
-   */
-  static PreprocessHtmlCodeBlocks(html) {
-    ; Handle <img> tags.  When SHOW_IMG is off, replace with [img] / [img: alt].
-    ; When on, leave in place for pandoc to convert to markdown image syntax.
-    html := PasteMd._ProcessImgTags(html)
-
-    ; Inject poster label placeholders at the start of each message block.
-    ; Replaced with bold labels (e.g. "**Codex:**" / "**Claude:**") in PasteMarkdown.
-    if (PasteMd.SHOW_POSTER) {
-      ; AI messages: identified by data-testid="assistant-message".
-      html := RegExReplace(html, "i)(<div\b[^>]*\bdata-testid=`"assistant-message`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
-      ; User messages: outer container has both message_* and userMessageContainer_* classes.
-      html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bmessage_\w+\s+[^`"]*\buserMessageContainer_[^>]*>)", "$1<p>¤POSTER_User¤</p>")
-      ; Codex assistant messages: group + min-w-0 + flex-col classes.
-      html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bgroup\b[^`"]*\bmin-w-0\b[^`"]*\bflex-col\b[^`"]*`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
-      ; Codex user messages: right-aligned blocks include flex-col + items-end.
-      html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bflex-col\b[^`"]*\bitems-end\b[^`"]*`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
-    }
-
-    ; Strip UI artifacts that don't belong in markdown output.
-    html := RegExReplace(html, "is)<button\b[^>]*>.*?</button>", "")
-
-    ; Normalize task-list items to canonical checkbox-input form before pandoc.
-    pos := 1
-    while RegExMatch(html, "is)<li\b([^>]*)>(.*?)</li>", &mTask, pos) {
-      liAttrs := mTask[1]
-      liInner := mTask[2]
-      ; Supported task-list containers:
-      ; - Standard markdown renderers: class contains task-list-item
-      ; - Claude Code todo tool rows: class contains todoItem_*
-      if (!RegExMatch(liAttrs, "i)\btask-list-item\b")
-          && !RegExMatch(liAttrs, "i)\btodoItem_")) {
-        pos := mTask.Pos + mTask.Len
-        continue
-      }
-      ; Find <input type="checkbox"> anywhere inside the item
-      ; (direct child OR inside a <p> wrapper, as ChatGPT does).
-      if !RegExMatch(liInner, "is)<input\b[^>]*\btype\s*=\s*['`"]checkbox['`"][^>]*>", &mInput) {
-        pos := mTask.Pos + mTask.Len
-        continue
-      }
-
-      checked := RegExMatch(liInner, "i)\bchecked\b")
-      if (!checked) {
-        if RegExMatch(liAttrs, "i)\bcompleted_")
-          checked := true
-        else if RegExMatch(liInner, "i)\btext-decoration\s*:\s*line-through\b")
-          checked := true
-      }
-      ; Capture text that follows the <input> tag.
-      text := SubStr(liInner, mInput.Pos + mInput.Len)
-      text := RegExReplace(text, "is)<span\b[^>]*>\s*</span>", "")
-      text := RegExReplace(text, "<[^>]++>", "")
-      text := this.DecodeBasicHtmlEntities(text)
-      text := Trim(text, " `t`r`n" . Chr(160))
-      ; Re-encode special chars so the text is safe inside HTML that pandoc will parse.
-      text := StrReplace(text, "&", "&amp;")
-      text := StrReplace(text, "<", "&lt;")
-      text := StrReplace(text, ">", "&gt;")
-
-      inputTag := checked
-        ? '<input type="checkbox" disabled checked />'
-        : '<input type="checkbox" disabled />'
-      replacement := "<li>" . inputTag
-      if (text != "")
-        replacement .= " " . text
-      replacement .= "</li>"
-      html := SubStr(html, 1, mTask.Pos - 1) . replacement . SubStr(html, mTask.Pos + mTask.Len)
-      pos := mTask.Pos + StrLen(replacement)
-    }
-
-    ; Extract Claude Code thinking blocks as placeholders so pandoc doesn't
-    ; mangle them.  They get restored as raw HTML after markdown cleanup.
-    this._thinkingBlocks := []
-    pos := 1
-    while RegExMatch(html, "is)<details\b[^>]*\bclass=`"[^`"]*\bthinking[^`"]*`"[^>]*>(.*?)</details>", &m, pos) {
-      inner := m[1]
-      ; Remove <summary> element.
-      inner := RegExReplace(inner, "is)<summary\b[^>]*>.*?</summary>", "")
-      ; Strip remaining HTML tags.
-      inner := RegExReplace(inner, "<[^>]++>", "")
-      inner := this.DecodeBasicHtmlEntities(inner)
-      inner := Trim(inner, " `t`n`r")
-      this._thinkingBlocks.Push(inner)
-      placeholder := "¤THINKING_" . this._thinkingBlocks.Length . "¤"
-      html := SubStr(html, 1, m.Pos - 1) . placeholder . SubStr(html, m.Pos + m.Len)
-      pos := m.Pos + StrLen(placeholder)
-    }
-
-    ; Convert code-like <span> elements to <code> before stripping generic spans.
-    ; Matches spans with inline-markdown/font-mono class (e.g., Codex/Claude Code).
-    html := RegExReplace(html, "is)<span\b[^>]*\bclass=`"[^`"]*\b(?:inline-markdown|font-mono)\b[^`"]*`"[^>]*>(.*?)</span>", "<code>$1</code>")
-
-    ; Extract user message text before pandoc to preserve \n line structure.
-    ; Both Claude Code and Codex use whitespace-sensitive containers whose text
-    ; nodes would be collapsed by pandoc's HTML whitespace rules.
-    this._userMsgBlocks := []
-
-    ; Codex user messages: text-size-chat whitespace-pre-wrap divs with mixed
-    ; <span> and <code class="font-mono"> elements.
-    pos := 1
-    while RegExMatch(html, "is)(<div\b[^>]*\btext-size-chat\b[^>]*\bwhitespace-pre-wrap\b[^>]*>)(.*?)</div>", &m, pos) {
-      rawContent := m[2]
-      ; Convert font-mono <code> elements to backtick inline code.
-      rawContent := RegExReplace(rawContent, "is)<code\b[^>]*\bfont-mono\b[^>]*>(.*?)</code>", "``$1``")
-      ; Strip <span> wrapper tags (keep text content).
-      rawContent := RegExReplace(rawContent, "i)</?span\b[^>]*>", "")
-      ; Strip any remaining HTML tags.
-      rawContent := RegExReplace(rawContent, "<[^>]++>", "")
-      ; Decode HTML entities.
-      rawContent := this.DecodeBasicHtmlEntities(rawContent)
-      rawContent := StrReplace(rawContent, "`r", "")
-      rawContent := Trim(rawContent, "`n")
-      this._userMsgBlocks.Push(rawContent)
-      placeholder := "<p>¤USERMSG_" . this._userMsgBlocks.Length . "¤</p>"
-      newStr := m[1] . placeholder . "</div>"
-      html := SubStr(html, 1, m.Pos - 1) . newStr . SubStr(html, m.Pos + m.Len)
-      pos := m.Pos + StrLen(newStr)
-    }
-
-    ; Claude Code user messages: unattributed <span> direct children of
-    ; content_xGDvVg divs contain the user's typed text.
-    pos := 1
-    while RegExMatch(html, "is)(<div\b[^>]*\bcontent_xGDvVg\b[^>]*>)\s*<span>(.*?)</span>", &m, pos) {
-      rawText := this.DecodeBasicHtmlEntities(m[2])
-      rawText := StrReplace(rawText, "`r", "")
-      this._userMsgBlocks.Push(rawText)
-      placeholder := "<p>¤USERMSG_" . this._userMsgBlocks.Length . "¤</p>"
-      newStr := m[1] . placeholder
-      html := SubStr(html, 1, m.Pos - 1) . newStr . SubStr(html, m.Pos + m.Len)
-      pos := m.Pos + StrLen(newStr)
-    }
-
-    ; Strip remaining <span> tags globally (presentational wrappers).
-    html := RegExReplace(html, "i)</?span\b[^>]*>", "")
-
-    ; Some sources provide list selections as bare top-level <li> siblings.
-    ; Wrap that shape in <ol> so pandoc keeps ordered-list semantics.
-    htmlNoTrailingBr := RegExReplace(html, "is)(?:<br\b[^>]*>\s*)+$", "")
-    trimmed := Trim(htmlNoTrailingBr, " `t`r`n")
-    if (trimmed != "" && RegExMatch(trimmed, "is)^(?:<li\b[^>]*>.*?</li>\s*)+$")) {
-      html := "<ol>" . trimmed . "</ol>"
-    }
-
-    ; Process <code> elements: normalize line breaks and wrap in <pre> if multi-line.
-    pos := 1
-    while RegExMatch(html, "is)<code\b([^>]*)>(.*?)</code>", &m, pos) {
-      content := m[2]
-      attrs := m[1]
-
-      ; Convert <br> tags to newlines.
-      content := RegExReplace(content, "i)<br\b[^>]*>", "`n")
-
-      ; Convert </div><div> sequences to newlines (VS Code line rendering).
-      content := RegExReplace(content, "i)</div>\s*<div\b[^>]*>", "`n")
-
-      ; Strip remaining HTML tags inside the code block.
-      content := RegExReplace(content, "<[^>]++>", "")
-
-      ; Remove CR; preserve blank lines (they are meaningful in code).
-      content := StrReplace(content, "`r", "")
-
-      if InStr(content, "`n") {
-        ; Decode entities for fenced block (markdown output, not HTML).
-        content := PasteMd.DecodeBasicHtmlEntities(content)
-        ; Multi-line: check if already inside <pre>.
-        beforeSnippet := SubStr(html, Max(1, m.Pos - 100), Min(100, m.Pos - 1))
-
-        ; Only preserve class="language-xxx"; drop CSS classes like "whitespace-pre!".
-        langAttr := ""
-        if RegExMatch(attrs, "i)language-(\w+)", &langM) {
-          langAttr := ' class="language-' . langM[1] . '"'
-        }
-
-        if RegExMatch(beforeSnippet, "i)<pre\b[^>]*>\s*$") {
-          replacement := "<code" . langAttr . ">" . content . "</code>"
-        } else {
-          replacement := "<pre><code" . langAttr . ">" . content . "</code></pre>"
-        }
-      } else {
-        ; Single-line: leave as inline <code> for pandoc.
-        replacement := "<code" . attrs . ">" . content . "</code>"
-      }
-
-      html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
-      pos := m.Pos + StrLen(replacement)
-    }
-
-    ; Unwrap nested chat code containers so pandoc sees canonical code blocks.
-    prev := ""
-    while (html != prev) {
-      prev := html
-      ; Flatten outer <pre> with CSS attributes wrapping an inner <pre><code class="language-xxx">.
-      ; Without this, pandoc picks up the outer <pre> as the fence and loses the language tag.
-      html := RegExReplace(html, "is)<pre\b[^>]+>\s*(<pre\b[^>]*><code\b[^>]*>.*?</code></pre>)\s*</pre>", "$1")
-      html := RegExReplace(html, "is)<div\b[^>]*>\s*<div\b[^>]*>\s*(<pre><code\b[^>]*>.*?</code></pre>)\s*</div>\s*</div>", "$1")
-      html := RegExReplace(html, "is)<div\b[^>]*>\s*<div\b[^>]*>\s*(<code\b[^>]*>.*?</code>)\s*</div>\s*</div>", "$1")
-    }
-
+    html := HtmlNorm.Normalize(htmlFrag, DetectSource(cfHtml), PasteMd.SHOW_POSTER, PasteMd.SHOW_IMG)
+    PasteMd._thinkingBlocks := HtmlNorm._thinkingBlocks
+    PasteMd._userMsgBlocks  := HtmlNorm._userMsgBlocks
     return html
   }
 
@@ -1238,7 +1018,7 @@ class PasteMd {
 
   /**
    * Replaces ¤USERMSG_N¤ placeholders with the raw user message text extracted
-   * by PreprocessHtmlCodeBlocks.  This content bypasses pandoc to preserve line
+   * by HtmlNorm.  This content bypasses pandoc to preserve line
    * structure of markdown-like text (blockquotes, bold labels, etc.) the user
    * typed or pasted into the chat input.
    * @param {string} md - Markdown text containing placeholders
