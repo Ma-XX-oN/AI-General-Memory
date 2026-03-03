@@ -11,7 +11,6 @@ class PasteMd {
     PasteMd.gPasteMenu.Add("Paste as &md", ObjBindMethod(PasteMd, "PasteAsMd"))
     PasteMd.gPasteMenu.Add()
     PasteMd.gPasteMenu.Add("&Quote", ObjBindMethod(PasteMd, "ToggleQuote"))
-    PasteMd.gPasteMenu.Add("Show &poster", ObjBindMethod(PasteMd, "ToggleShowPoster"))
     PasteMd.gPasteMenu.Add("Show &img", ObjBindMethod(PasteMd, "ToggleShowImg"))
     PasteMd.gPasteMenu.Add()
     PasteMd.gPasteMenu.Add("Pin current &log", ObjBindMethod(PasteMd, "PinCurrentLog"))
@@ -46,8 +45,6 @@ class PasteMd {
   ; Number of rotated past-run logs to keep alongside the current one.
   static LOG_HISTORY_COUNT := 4
 
-  ; Toggle: prepend detected speaker label ("## User" / "## Codex" / "## Claude" / "## AI") to pasted output.
-  static SHOW_POSTER := false
   ; Toggle: convert <img> tags to markdown image syntax; when off, use [img] placeholder.
   static SHOW_IMG := false
   ; Toggle: wrap pasted output in blockquote syntax.
@@ -108,18 +105,6 @@ class PasteMd {
    */
   static PasteAsMd(ItemName, ItemPos, MenuObj) {
     PasteMd.PasteMarkdown(PasteMd.QUOTE)
-  }
-
-  /**
-   * Menu callback: toggles SHOW_POSTER and re-shows the menu.
-   * @param {string} ItemName - Menu item label
-   * @param {number} ItemPos - Menu item position
-   * @param {object} MenuObj - Menu object
-   */
-  static ToggleShowPoster(ItemName, ItemPos, MenuObj) {
-    PasteMd.SHOW_POSTER := !PasteMd.SHOW_POSTER
-    PasteMd.gPasteMenu.ToggleCheck("Show &poster")
-    PasteMd.gPasteMenu.Show(PasteMd._menuX, PasteMd._menuY)
   }
 
   /**
@@ -492,10 +477,8 @@ class PasteMd {
     usedNoHtmlPath := false
     usedNoTagPlainPath := false
 
-    prevShowPoster := PasteMd.SHOW_POSTER
     prevShowImg := PasteMd.SHOW_IMG
     prevPromptOrderedList := PasteMd.PROMPT_ORDERED_LIST_START_ON_AMBIGUOUS
-    PasteMd.SHOW_POSTER := showPoster
     PasteMd.SHOW_IMG := showImg
     PasteMd.PROMPT_ORDERED_LIST_START_ON_AMBIGUOUS := promptOrderedList
 
@@ -508,7 +491,7 @@ class PasteMd {
         mdAfterOrderedList := md
       } else {
         PasteMd._BusyUpdate("Preprocessing HTML")
-        htmlPrep := PasteMd._PreprocessHtml(htmlFrag, cfHtml)
+        htmlPrep := PasteMd._PreprocessHtml(htmlFrag, cfHtml, showPoster)
 
         ; If no meaningful HTML tags remain after preprocessing (just styled
         ; spans wrapping plain text, or <p> wrappers around plain lines as
@@ -626,7 +609,6 @@ class PasteMd {
         "usedNoTagPlainPath", usedNoTagPlainPath
       )
     } finally {
-      PasteMd.SHOW_POSTER := prevShowPoster
       PasteMd.SHOW_IMG := prevShowImg
       PasteMd.PROMPT_ORDERED_LIST_START_ON_AMBIGUOUS := prevPromptOrderedList
     }
@@ -661,7 +643,7 @@ class PasteMd {
         plain,
         cfHtml,
         asQuoted,
-        PasteMd.SHOW_POSTER,
+        asQuoted,
         PasteMd.SHOW_IMG,
         PasteMd.PROMPT_ORDERED_LIST_START_ON_AMBIGUOUS
       )
@@ -692,7 +674,7 @@ class PasteMd {
           PasteMd._DbgSection(dbgF, "5d. md (after RestoreOrderedListStart)", converted["mdAfterOrderedList"])
         }
 
-        if (PasteMd.SHOW_POSTER)
+        if (asQuoted)
           PasteMd._DbgSection(dbgF, "5e. md (after SHOW_POSTER replacement)", converted["mdAfterPoster"])
 
         PasteMd._DbgSection(dbgF, "6. FINAL md (pasted)", md)
@@ -1081,10 +1063,11 @@ class PasteMd {
    *
    * @param {string} htmlFrag - HTML fragment from the CF_HTML clipboard
    * @param {string} cfHtml   - Full CF_HTML payload (for source detection)
+   * @param {boolean} showPoster - If true, keep poster placeholders for label replacement
    * @returns {string} Preprocessed HTML ready for pandoc
    */
-  static _PreprocessHtml(htmlFrag, cfHtml) {
-    html := HtmlNorm.Normalize(htmlFrag, DetectSource(cfHtml), PasteMd.SHOW_POSTER, PasteMd.SHOW_IMG)
+  static _PreprocessHtml(htmlFrag, cfHtml, showPoster) {
+    html := HtmlNorm.Normalize(htmlFrag, DetectSource(cfHtml), showPoster, PasteMd.SHOW_IMG)
     PasteMd._thinkingBlocks := HtmlNorm._thinkingBlocks
     PasteMd._userMsgBlocks  := HtmlNorm._userMsgBlocks
     return html
