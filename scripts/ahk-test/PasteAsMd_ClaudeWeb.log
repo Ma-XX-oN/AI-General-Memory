@@ -1,4 +1,4 @@
-﻿PasteAsMd debug — 2026-03-02 01:53:38
+﻿﻿PasteAsMd debug — 2026-03-02 01:53:38
 
 === 1. plain (A_Clipboard minus CR) (len=750) ===
 Markdown Test Document¶
@@ -56,19 +56,26 @@ Footnotes¶
 This is the footnote definition. ↩
 
 === 2. cfHtml (raw full payload) (len=17536) ===
-Version:0.9⏎¶⏎¶
+Version:0.9⏎¶⏎
 ¶
-StartHTML:0000000105⏎¶⏎¶
 ¶
-EndHTML:0000017536⏎¶⏎¶
+StartHTML:0000000105⏎¶⏎
 ¶
-StartFragment:0000000141⏎¶⏎¶
 ¶
-EndFragment:0000017500⏎¶⏎¶
+EndHTML:0000017536⏎¶⏎
 ¶
-<html>⏎¶⏎¶
 ¶
-<body>⏎¶⏎¶
+StartFragment:0000000141⏎¶⏎
+¶
+¶
+EndFragment:0000017500⏎¶⏎
+¶
+¶
+<html>⏎¶⏎
+¶
+¶
+<body>⏎¶⏎
+¶
 ¶
 <!--StartFragment--><h1 class="text-text-100 mt-3 -mb-1 text-[1.375rem] font-bold">Markdown Test Document</h1>¶
 <h2 class="text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold">Section 1</h2>¶
@@ -164,9 +171,11 @@ EndFragment:0000017500⏎¶⏎¶
 <section data-footnotes="true" class="footnotes"><h2 class="sr-only" id="footnote-label">Footnotes</h2>¶
 <ol class="[li_&amp;]:mb-0 [li_&amp;]:mt-1 [li_&amp;]:gap-1 [&amp;:not(:last-child)_ul]:pb-1 [&amp;:not(:last-child)_ol]:pb-1 list-decimal flex flex-col gap-1 pl-8 mb-3">¶
 <li class="whitespace-normal break-words pl-2" id="user-content-fn-1">¶
-<p class="font-claude-response-body break-words whitespace-normal leading-[1.7]">This is the footnote definition. <a class="underline data-footnote-backref" href="#user-content-fnref-1" data-footnote-backref="" aria-label="Back to reference 1">â†©</a></p></li></ol></section><!--EndFragment-->⏎¶⏎¶
+<p class="font-claude-response-body break-words whitespace-normal leading-[1.7]">This is the footnote definition. <a class="underline data-footnote-backref" href="#user-content-fnref-1" data-footnote-backref="" aria-label="Back to reference 1">â†©</a></p></li></ol></section><!--EndFragment-->⏎¶⏎
 ¶
-</body>⏎¶⏎¶
+¶
+</body>⏎¶⏎
+¶
 ¶
 </html>
 

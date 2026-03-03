@@ -1,4 +1,4 @@
-﻿PasteAsMd debug — 2026-03-02 01:55:01
+﻿﻿PasteAsMd debug — 2026-03-02 01:55:01
 
 === 1. plain (A_Clipboard minus CR) (len=461) ===
 H1 Heading¶
@@ -51,19 +51,26 @@ A sentence with a footnote.1¶
 The footnote text. ↩
 
 === 2. cfHtml (raw full payload) (len=8797) ===
-Version:0.9⏎¶⏎¶
+Version:0.9⏎¶⏎
 ¶
-StartHTML:0000000105⏎¶⏎¶
 ¶
-EndHTML:0000008797⏎¶⏎¶
+StartHTML:0000000105⏎¶⏎
 ¶
-StartFragment:0000000141⏎¶⏎¶
 ¶
-EndFragment:0000008761⏎¶⏎¶
+EndHTML:0000008797⏎¶⏎
 ¶
-<html>⏎¶⏎¶
 ¶
-<body>⏎¶⏎¶
+StartFragment:0000000141⏎¶⏎
+¶
+¶
+EndFragment:0000008761⏎¶⏎
+¶
+¶
+<html>⏎¶⏎
+¶
+¶
+<body>⏎¶⏎
+¶
 ¶
 <!--StartFragment--><h1 data-start="0" data-end="12">H1 Heading</h1>¶
 <h2 data-start="14" data-end="27">H2 Heading</h2>¶
@@ -118,9 +125,11 @@ EndFragment:0000008761⏎¶⏎¶
 <section data-footnotes="true" class="footnotes">¶
 <ol>¶
 <li id="user-content-fn-1" data-start="645" data-end="669" data-is-last-node="">¶
-<p data-start="651" data-end="669" data-is-last-node="">The footnote text. <a data-footnote-backref="" aria-label="Back to reference 1" class="decorated-link cursor-pointer" rel="noopener">â†©</a></p></li></ol></section><!--EndFragment-->⏎¶⏎¶
+<p data-start="651" data-end="669" data-is-last-node="">The footnote text. <a data-footnote-backref="" aria-label="Back to reference 1" class="decorated-link cursor-pointer" rel="noopener">â†©</a></p></li></ol></section><!--EndFragment-->⏎¶⏎
 ¶
-</body>⏎¶⏎¶
+¶
+</body>⏎¶⏎
+¶
 ¶
 </html>
 

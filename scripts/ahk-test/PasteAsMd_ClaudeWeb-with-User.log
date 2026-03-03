@@ -1,4 +1,4 @@
-﻿PasteAsMd debug — 2026-03-02 01:52:45
+﻿﻿PasteAsMd debug — 2026-03-02 01:52:45
 
 === 1. plain (A_Clipboard minus CR) (len=1493) ===
 Output a markdown test document demonstrating each of the following. No explanations — just the document.¶
@@ -66,19 +66,26 @@ Footnotes¶
 This is the footnote definition. ↩
 
 === 2. cfHtml (raw full payload) (len=25854) ===
-Version:0.9⏎¶⏎¶
+Version:0.9⏎¶⏎
 ¶
-StartHTML:0000000105⏎¶⏎¶
 ¶
-EndHTML:0000025854⏎¶⏎¶
+StartHTML:0000000105⏎¶⏎
 ¶
-StartFragment:0000000141⏎¶⏎¶
 ¶
-EndFragment:0000025818⏎¶⏎¶
+EndHTML:0000025854⏎¶⏎
 ¶
-<html>⏎¶⏎¶
 ¶
-<body>⏎¶⏎¶
+StartFragment:0000000141⏎¶⏎
+¶
+¶
+EndFragment:0000025818⏎¶⏎
+¶
+¶
+<html>⏎¶⏎
+¶
+¶
+<body>⏎¶⏎
+¶
 ¶
 <!--StartFragment--><div data-test-render-count="2"><div class="mb-1 mt-6 group"><div class="flex flex-col items-end gap-1"><div class="group relative inline-flex gap-2 bg-bg-300 rounded-xl pl-2.5 py-2.5 break-words text-text-100 transition-all max-w-[75ch] flex-col !px-4 max-w-[85%]" style="opacity: 1; transform: none;"><div class="flex flex-row gap-2 relative"><div class="flex-1"><div data-testid="user-message" class="font-large !font-user-message grid grid-cols-1 gap-2 py-0.5 relative" style="max-height: 200px; overflow: hidden; position: relative;"><p class="whitespace-pre-wrap break-words">Output a markdown test document demonstrating each of the following. No explanations â€” just the document.¶
 Required sections, in order:¶
@@ -226,9 +233,11 @@ Required sections, in order:¶
 <section data-footnotes="true" class="footnotes"><h2 class="sr-only" id="footnote-label">Footnotes</h2>¶
 <ol class="[li_&amp;]:mb-0 [li_&amp;]:mt-1 [li_&amp;]:gap-1 [&amp;:not(:last-child)_ul]:pb-1 [&amp;:not(:last-child)_ol]:pb-1 list-decimal flex flex-col gap-1 pl-8 mb-3">¶
 <li class="whitespace-normal break-words pl-2" id="user-content-fn-1">¶
-<p class="font-claude-response-body break-words whitespace-normal leading-[1.7]">This is the footnote definition. <a class="underline data-footnote-backref" href="#user-content-fnref-1" data-footnote-backref="" aria-label="Back to reference 1">â†©</a></p></li></ol></section></div></div></div></div></div></div></div><!--EndFragment-->⏎¶⏎¶
+<p class="font-claude-response-body break-words whitespace-normal leading-[1.7]">This is the footnote definition. <a class="underline data-footnote-backref" href="#user-content-fnref-1" data-footnote-backref="" aria-label="Back to reference 1">â†©</a></p></li></ol></section></div></div></div></div></div></div></div><!--EndFragment-->⏎¶⏎
 ¶
-</body>⏎¶⏎¶
+¶
+</body>⏎¶⏎
+¶
 ¶
 </html>
 
