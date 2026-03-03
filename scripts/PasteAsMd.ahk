@@ -1449,4 +1449,8 @@ class PasteMd {
 }
 
 ; Ctrl+Alt+Shift+V
-^!+v::PasteMd.ShowPasteMenu()
+^!+v::{
+    KeyWait "Alt"   ; wait until Alt is actually released
+    Sleep 10        ; let menu-mode clear
+    PasteMd.ShowPasteMenu()
+}
