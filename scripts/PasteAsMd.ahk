@@ -22,14 +22,21 @@ class PasteMd {
     PasteMd.gPasteMenu.Disable("&Delete pinned history")
     PasteMd.gPasteMenu.Disable("Pinned &file names")
     PasteMd.gPasteMenu.Disable("Pinned &full names")
+    if (PasteMd.BUSY_SPIN_INTERVAL_MS <= 0)
+      throw Error("PasteMd.BUSY_SPIN_INTERVAL_MS must be > 0.")
+    if (PasteMd._busySpinner.Length == 0)
+      throw Error("PasteMd._busySpinner must contain at least one element.")
+    PasteMd._busyTimerFn := ObjBindMethod(PasteMd, "_BusyUpdate")
     PasteMd._InitPinState()
   }
 
   ; Change this if pandoc isn't on PATH.
   static PANDOC_EXE := "C:\Users\adria\AppData\Local\Pandoc\pandoc.exe"
 
-  static PASTE_SENTINEL_DELAY_MS := 10
+  static PASTE_SENTINEL_DELAY_MS := 200
   static PASTE_DELAY_MS := 500
+  static BUSY_TT_SHOW_DELAY_MS := 500
+  static BUSY_SPIN_INTERVAL_MS := 200
 
   ; Set to true to dump pipeline stages to a log file for debugging.
   static DEBUG_PASTE_MD := true
@@ -57,6 +64,10 @@ class PasteMd {
   static _menuY := 0
   ; Path of the pinned copy of the current log, or "" if not pinned.
   static _lastPinPath := ""
+  static _busyStartTick := 0
+  static _busyLabel := ""
+  static _busyTimerFn := 0
+  static _busySpinner := ["", ".", "..", "..."]
 
   /**
    * Shows the markdown paste menu at the current cursor position.
@@ -159,7 +170,7 @@ class PasteMd {
       PasteMd._lastPinPath := pinPath
       PasteMd.gPasteMenu.Check("Pin current &log")
       SplitPath(pinPath, &name)
-      ToolTip("Pinned: " . name)
+      ToolTip("Pinned: " name)
     }
     SetTimer(() => ToolTip(), -2000)
     PasteMd.ShowPasteMenu(false)
@@ -176,7 +187,7 @@ class PasteMd {
     if (files.Length = 0)
       return
     n := files.Length
-    result := MsgBox("Delete " . n . " pinned log file" . (n = 1 ? "" : "s") . "?`nThis cannot be undone."
+    result := MsgBox("Delete " n " pinned log file" (n = 1 ? "" : "s") "?`nThis cannot be undone."
       , "&Delete pinned history", "OKCancel Icon!")
     if (result != "OK")
       return
@@ -198,7 +209,7 @@ class PasteMd {
     out := ""
     for f in files {
       SplitPath(f, &name)
-      out .= (out = "" ? "" : " ") . '"' . name . '"'
+      out .= (out = "" ? "" : " ") '"' name '"'
     }
     PasteMd._PasteText(out)
   }
@@ -216,7 +227,7 @@ class PasteMd {
       return
     out := ""
     for f in files
-      out .= (out = "" ? "" : " ") . '"' . f . '"'
+      out .= (out = "" ? "" : " ") '"' f '"'
     PasteMd._PasteText(out)
   }
 
@@ -233,6 +244,53 @@ class PasteMd {
     } finally {
       A_Clipboard := clipSaved
     }
+  }
+
+  /**
+   * Starts periodic busy tooltip updates for long-running paste operations.
+   * @param {string} stage - Initial status label
+   */
+  static _BusyStart(stage := "Working") {
+    PasteMd._busyStartTick := A_TickCount
+    PasteMd._busyLabel := stage
+    SetTimer(PasteMd._busyTimerFn, PasteMd.BUSY_SPIN_INTERVAL_MS)
+    PasteMd._BusyUpdate(stage)
+  }
+
+  /**
+   * Updates busy tooltip text/spinner while a paste is in progress.
+   * @param {string} stage - Optional updated status label
+   */
+  static _BusyUpdate(stage := "") {
+    if (PasteMd._busyStartTick = 0)
+      return
+
+    if (stage != "")
+      PasteMd._busyLabel := stage
+
+    elapsed := A_TickCount - PasteMd._busyStartTick
+    if (elapsed < PasteMd.BUSY_TT_SHOW_DELAY_MS) {
+      ToolTip()
+      return
+    }
+
+    spinnerCount := PasteMd._busySpinner.Length
+    spinInterval := PasteMd.BUSY_SPIN_INTERVAL_MS
+    spinnerIndex := Mod(Floor(elapsed / spinInterval), spinnerCount) + 1
+    spinner := PasteMd._busySpinner[spinnerIndex]
+    ToolTip(PasteMd._busyLabel spinner)
+  }
+
+  /**
+   * Stops periodic busy updates and clears tooltip state.
+   */
+  static _BusyEnd() {
+    if PasteMd._busyTimerFn
+      SetTimer(PasteMd._busyTimerFn, 0)
+    PasteMd._busyStartTick := 0
+    PasteMd._busyLabel := ""
+    Sleep 10 ; in case _BusyUpdate() was called and interrupted
+    ToolTip()
   }
 
   /**
@@ -318,7 +376,7 @@ class PasteMd {
    * @param {string} s - Raw string to dump
    */
   static _DbgSection(f, label, s) {
-    f.Write("=== " . label . " (len=" . StrLen(s) . ") ===`n")
+    f.Write("=== " label " (len=" StrLen(s) ") ===`n")
     ; Show EOL characters visibly without emitting raw CR in the log payload.
     tokCRLF := "¤CRLF¤"
     tokCR := "¤CR¤"
@@ -339,7 +397,7 @@ class PasteMd {
    * @returns {string} File path with .N.log suffix
    */
   static _LogHistoryPath(n) {
-    return RegExReplace(PasteMd.DEBUG_PASTE_MD_LOG, "\.log$", "." . n . ".log")
+    return RegExReplace(PasteMd.DEBUG_PASTE_MD_LOG, "\.log$", "." n ".log")
   }
 
   /**
@@ -347,7 +405,7 @@ class PasteMd {
    * @returns {string} File path with yyyyMMdd_HHmmss timestamp suffix
    */
   static _PinLogPath() {
-    return RegExReplace(PasteMd.DEBUG_PASTE_MD_LOG, "\.log$", "_" . FormatTime(, "yyyyMMdd_HHmmss") . ".log")
+    return RegExReplace(PasteMd.DEBUG_PASTE_MD_LOG, "\.log$", "_" FormatTime(, "yyyyMMdd_HHmmss") ".log")
   }
 
   /**
@@ -416,8 +474,10 @@ class PasteMd {
    * @returns {Map} Stage outputs for test/debug use
    */
   static _ConvertFromCaptured(plain, cfHtml, asQuoted, showPoster, showImg, promptOrderedList := false, forcedListStart := "") {
+    PasteMd._BusyUpdate("Inspecting clipboard data")
     plain := StrReplace(plain, "`r", "")
     source := DetectSource(cfHtml)
+    PasteMd._BusyUpdate("Reading HTML fragment")
     htmlFrag := (cfHtml = "")
       ? ""
       : ClipboardWaiter.SelectHtmlSection(cfHtml, ClipboardWaiter.HTML_SECTION_FRAGMENT)
@@ -441,11 +501,13 @@ class PasteMd {
 
     try {
       if (htmlFrag = "") {
+        PasteMd._BusyUpdate("Using plain text path")
         md := PasteMd.CleanPlainText(plain)
         usedNoHtmlPath := true
         mdAfterClean := md
         mdAfterOrderedList := md
       } else {
+        PasteMd._BusyUpdate("Preprocessing HTML")
         htmlPrep := PasteMd._PreprocessHtml(htmlFrag, cfHtml)
 
         ; If no meaningful HTML tags remain after preprocessing (just styled
@@ -455,16 +517,19 @@ class PasteMd {
         stripped := RegExReplace(htmlPrep, "i)<br\b[^>]*>", "")
         stripped := RegExReplace(stripped, "i)</?p\b[^>]*>", "")
         if !RegExMatch(stripped, "<[^>]++>") {
+          PasteMd._BusyUpdate("Using plain text path")
           md := PasteMd.CleanPlainText(plain)
           usedNoTagPlainPath := true
           mdAfterClean := md
         } else {
+          PasteMd._BusyUpdate("Converting via pandoc")
           mdRaw := PasteMd.HtmlToGfmViaPandoc(htmlPrep, PasteMd.PANDOC_EXE)
           ; Pandoc converts inline <svg> elements to <img> tags; process them now.
           mdRaw := PasteMd._ProcessImgTags(mdRaw)
           ; Fix pandoc fence-space bug: "``` python" → "```python"
           mdRaw := RegExReplace(mdRaw, "m)^(``+) (\S)", "$1$2")
 
+          PasteMd._BusyUpdate("Cleaning markdown")
           md := PasteMd.CleanMarkdown(mdRaw)
           md := PasteMd.RestoreThinkingBlocks(md)
           md := PasteMd.RestoreUserMsgBlocks(md)
@@ -486,11 +551,13 @@ class PasteMd {
           expectedListStart := PasteMd.MaybePromptOrderedListStart(md, plain, htmlFrag, expectedListStart)
         }
 
+        PasteMd._BusyUpdate("Restoring list numbering")
         md := PasteMd.RestoreOrderedListStart(md, plain, htmlFrag, cfHtml, expectedListStart)
         mdAfterOrderedList := md
       }
 
       if (showPoster) {
+        PasteMd._BusyUpdate("Applying poster labels")
         assistantLabel := PasteMd._ResolveAssistantLabel(cfHtml)
         ; Collect positions of all poster placeholders in document order.
         posters := []
@@ -506,7 +573,7 @@ class PasteMd {
             endPos := posters[i].pos + posters[i].len
             while (SubStr(md, endPos, 1) = "`n")
               endPos++
-            md := SubStr(md, 1, posters[i].pos - 1) . SubStr(md, endPos)
+            md := SubStr(md, 1, posters[i].pos - 1) SubStr(md, endPos)
             posters.RemoveAt(i)
           }
           i--
@@ -519,7 +586,7 @@ class PasteMd {
           md := PasteMd.QuoteMarkdown(md)
         ; Replace remaining placeholders with H2 heading labels.
         ; Placeholders may be prefixed with "> " if quoting is active.
-        md := RegExReplace(md, "m)^(?:> )?¤POSTER_AI¤$", "## " . assistantLabel)
+        md := RegExReplace(md, "m)^(?:> )?¤POSTER_AI¤$", "## " assistantLabel)
         md := RegExReplace(md, "m)^(?:> )?¤POSTER_User¤$", "## User")
         ; Keep spacing around poster headings truly blank when quote mode is on:
         ; convert adjacent standalone ">" spacer lines back to empty lines.
@@ -532,9 +599,10 @@ class PasteMd {
           if (poster = "AI")
             poster := assistantLabel
           if (poster != "")
-            md := "## " . poster . "`n`n" . md
+            md := "## " poster "`n`n" md
         }
       } else if (asQuoted) {
+        PasteMd._BusyUpdate("Applying quote formatting")
         md := PasteMd.QuoteMarkdown(md)
       }
 
@@ -570,6 +638,7 @@ class PasteMd {
    * @param {boolean} asQuoted - If true, prefixes every line with blockquote syntax (>).
    */
   static PasteMarkdown(asQuoted) {
+    PasteMd._BusyStart("Reading clipboard")
     dbg := PasteMd.DEBUG_PASTE_MD
     if (dbg) {
       ; New paste — clear any pin state so the checkmark doesn't carry over.
@@ -579,13 +648,15 @@ class PasteMd {
       }
       PasteMd._RotateLogFiles()
       dbgF := FileOpen(PasteMd.DEBUG_PASTE_MD_LOG, "w", "UTF-8")
-      dbgF.Write("PasteAsMd debug — " . FormatTime(, "yyyy-MM-dd HH:mm:ss") . "`n`n")
+      dbgF.Write("PasteAsMd debug — " FormatTime(, "yyyy-MM-dd HH:mm:ss") "`n`n")
     }
 
     clipSaved := ClipboardAll()
     plain := StrReplace(A_Clipboard, "`r", "")
     try {
+      PasteMd._BusyUpdate()
       cfHtml := ClipboardWaiter.GetHtml()
+      PasteMd._BusyUpdate("Converting content")
       converted := PasteMd._ConvertFromCaptured(
         plain,
         cfHtml,
@@ -595,16 +666,17 @@ class PasteMd {
         PasteMd.PROMPT_ORDERED_LIST_START_ON_AMBIGUOUS
       )
       md := converted["finalMd"]
+      PasteMd._BusyUpdate("Preparing paste")
 
       if (dbg) {
         PasteMd._DbgSection(dbgF, "1. plain (A_Clipboard minus CR)", plain)
         PasteMd._DbgSection(dbgF, "2. cfHtml (raw full payload)", cfHtml)
         PasteMd._DbgSection(dbgF, "3. htmlFrag (CF_HTML fragment)", converted["htmlFrag"])
         dbgF.Write("=== 2b. cfHtml offsets ===`n")
-        dbgF.Write("StartHTML: " . PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartHTML:") . "`n")
-        dbgF.Write("EndHTML: " . PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndHTML:") . "`n")
-        dbgF.Write("StartFragment: " . PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartFragment:") . "`n")
-        dbgF.Write("EndFragment: " . PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndFragment:") . "`n`n")
+        dbgF.Write("StartHTML: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartHTML:") "`n")
+        dbgF.Write("EndHTML: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndHTML:") "`n")
+        dbgF.Write("StartFragment: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartFragment:") "`n")
+        dbgF.Write("EndFragment: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndFragment:") "`n`n")
 
         if (converted["htmlFrag"] = "") {
           PasteMd._DbgSection(dbgF, "3. md (CleanPlainText – no HTML path)", converted["mdAfterClean"])
@@ -616,7 +688,7 @@ class PasteMd {
             PasteMd._DbgSection(dbgF, "4. mdRaw (pandoc output)", converted["mdRaw"])
             PasteMd._DbgSection(dbgF, "5. md (after CleanMarkdown)", converted["mdAfterClean"])
           }
-          PasteMd._DbgSection(dbgF, "5c. expected list start (ordered-list fix)", "" . converted["expectedListStart"])
+          PasteMd._DbgSection(dbgF, "5c. expected list start (ordered-list fix)", "" converted["expectedListStart"])
           PasteMd._DbgSection(dbgF, "5d. md (after RestoreOrderedListStart)", converted["mdAfterOrderedList"])
         }
 
@@ -637,6 +709,7 @@ class PasteMd {
         pasteWithSentinel := true
       }
 
+      PasteMd._BusyUpdate("Pasting")
       A_Clipboard := pastePayload
       Send "^v"
       if (pasteWithSentinel) {
@@ -647,12 +720,13 @@ class PasteMd {
     } catch as e {
       if (dbg) {
         try {
-          dbgF.Write("!!! EXCEPTION: " . e.File . ":" . e.Line . " — " . e.Message . "`n")
+          dbgF.Write("!!! EXCEPTION: " e.File ":" e.Line " — " e.Message "`n")
           dbgF.Close()
         }
       }
       MsgBox "Paste-as-markdown " e.File ":" e.Line " failed:`n`n" e.Message
     } finally {
+      PasteMd._BusyEnd()
       A_Clipboard := clipSaved
     }
   }
@@ -677,9 +751,10 @@ class PasteMd {
     f.Close()
 
     ; No wrapping, LF-only.
-    cmd := '"' . pandocExe . '" -f html -t gfm --wrap=none --eol=lf "' . tmpHtml . '"'
-    cmd .= ' -o "' . tmpMd . '"'
+    cmd := '"' pandocExe '" -f html -t gfm --wrap=none --eol=lf "' tmpHtml '"'
+    cmd .= ' -o "' tmpMd '"'
 
+    PasteMd._BusyUpdate("Converting via pandoc")
     exitCode := RunWait(cmd, , "Hide")
     if (exitCode != 0) {
       try FileDelete tmpHtml
@@ -687,6 +762,7 @@ class PasteMd {
       return ""
     }
 
+    PasteMd._BusyUpdate("Reading conversion output")
     md := ""
     try {
       md := FileRead(tmpMd, "UTF-8")
@@ -712,7 +788,7 @@ class PasteMd {
     out := ""
     for i, line in lines {
       line := RTrim(line, " `t")
-      out .= (i = 1 ? "" : "`n") . line
+      out .= (i = 1 ? "" : "`n") line
     }
     return Trim(out, "`n")
   }
@@ -742,8 +818,8 @@ class PasteMd {
         inner := RegExReplace(m[2], "<[^>]++>", "")
         inner := PasteMd.DecodeBasicHtmlEntities(inner)
         inner := Trim(inner, " `t`n")
-        replacement := PasteMd.CODE_FENCE . lang . "`n" . inner . "`n" . PasteMd.CODE_FENCE
-        md := SubStr(md, 1, m.Pos - 1) . replacement . SubStr(md, m.Pos + m.Len)
+        replacement := PasteMd.CODE_FENCE lang "`n" inner "`n" PasteMd.CODE_FENCE
+        md := SubStr(md, 1, m.Pos - 1) replacement SubStr(md, m.Pos + m.Len)
         pos := m.Pos + StrLen(replacement)
       } else {
         pos := m.Pos + m.Len
@@ -762,12 +838,12 @@ class PasteMd {
       if (SubStr(t, 1, StrLen(PasteMd.CODE_FENCE)) = PasteMd.CODE_FENCE) {
         inFence := !inFence
         outLine := RTrim(line, " `t")
-        out .= (out = "" ? "" : "`n") . outLine
+        out .= (out = "" ? "" : "`n") outLine
         continue
       }
 
       if (inFence) {
-        out .= (out = "" ? "" : "`n") . line
+        out .= (out = "" ? "" : "`n") line
         continue
       }
 
@@ -786,7 +862,7 @@ class PasteMd {
       ; Unescape literal details/summary tags and [img: ...] placeholders.
       outLine := RegExReplace(outLine, "\\(<\/?(?:details|summary)\b[^>]*>)", "$1")
       outLine := RegExReplace(outLine, "\\\[(img(?::[^\]]*)?)\\\]", "[$1]")
-      out .= (out = "" ? "" : "`n") . outLine
+      out .= (out = "" ? "" : "`n") outLine
     }
 
     ; Drop loose-list separator blanks between adjacent items of the same list type.
@@ -811,7 +887,7 @@ class PasteMd {
         }
       }
 
-      out2 .= (firstOut2 ? "" : "`n") . line
+      out2 .= (firstOut2 ? "" : "`n") line
       firstOut2 := false
     }
     out := out2
@@ -863,18 +939,18 @@ class PasteMd {
       inner := PasteMd.DecodeBasicHtmlEntities(m[1])
       inner := StrReplace(inner, "`r", "")
       inner := StrReplace(inner, "`n", " ")
-      replacement := (inner = "") ? "" : ("``" . inner . "``")
-      line := SubStr(line, 1, m.Pos - 1) . replacement . SubStr(line, m.Pos + m.Len)
+      replacement := (inner = "") ? "" : ("``" inner "``")
+      line := SubStr(line, 1, m.Pos - 1) replacement SubStr(line, m.Pos + m.Len)
     }
 
     ; Convert semantic emphasis tags before fallback stripping.
     while RegExMatch(line, "<(strong|b)\b[^>]*+>((?&inside_htag))</\1>" PasteMd.RE_HTML_LIB, &m) {
-      replacement := (m[2] = "") ? "" : ("**" . m[2] . "**")
-      line := SubStr(line, 1, m.Pos - 1) . replacement . SubStr(line, m.Pos + m.Len)
+      replacement := (m[2] = "") ? "" : ("**" m[2] "**")
+      line := SubStr(line, 1, m.Pos - 1) replacement SubStr(line, m.Pos + m.Len)
     }
     while RegExMatch(line, "<(em|i)\b[^>]*+>((?&inside_htag))</\1>" PasteMd.RE_HTML_LIB, &m) {
-      replacement := (m[2] = "") ? "" : ("*" . m[2] . "*")
-      line := SubStr(line, 1, m.Pos - 1) . replacement . SubStr(line, m.Pos + m.Len)
+      replacement := (m[2] = "") ? "" : ("*" m[2] "*")
+      line := SubStr(line, 1, m.Pos - 1) replacement SubStr(line, m.Pos + m.Len)
     }
 
     ; Convert HTML links to markdown links for readable output.
@@ -884,12 +960,12 @@ class PasteMd {
 
       ; Convert semantic emphasis inside link text before stripping residual tags.
       while RegExMatch(text, "<(strong|b)\b[^>]*>((?&inside_htag))</\1>" PasteMd.RE_HTML_LIB, &inner) {
-        replacement := (inner[2] = "") ? "" : ("**" . inner[2] . "**")
-        text := SubStr(text, 1, inner.Pos - 1) . replacement . SubStr(text, inner.Pos + inner.Len)
+        replacement := (inner[2] = "") ? "" : ("**" inner[2] "**")
+        text := SubStr(text, 1, inner.Pos - 1) replacement SubStr(text, inner.Pos + inner.Len)
       }
       while RegExMatch(text, "<(em|i)\b[^>]*>((?&inside_htag))</\1>" PasteMd.RE_HTML_LIB, &inner) {
-        replacement := (inner[2] = "") ? "" : ("*" . inner[2] . "*")
-        text := SubStr(text, 1, inner.Pos - 1) . replacement . SubStr(text, inner.Pos + inner.Len)
+        replacement := (inner[2] = "") ? "" : ("*" inner[2] "*")
+        text := SubStr(text, 1, inner.Pos - 1) replacement SubStr(text, inner.Pos + inner.Len)
       }
 
       ; Remove any unknown tags that are not escaped
@@ -897,8 +973,8 @@ class PasteMd {
       if (text = "") {
         text := href
       }
-      replacement := "[" . text . "](" . href . ")"
-      line := SubStr(line, 1, m.Pos - 1) . replacement . SubStr(line, m.Pos + m.Len)
+      replacement := "[" text "](" href ")"
+      line := SubStr(line, 1, m.Pos - 1) replacement SubStr(line, m.Pos + m.Len)
     }
 
     ; Protect backtick code spans from tag stripping.
@@ -906,8 +982,8 @@ class PasteMd {
     pos := 1
     while RegExMatch(line, "(?&codespan)" PasteMd.RE_HTML_LIB, &m, pos) {
       _codeSpans.Push(m[0])
-      placeholder := "¤CSPAN_" . _codeSpans.Length . "¤"
-      line := SubStr(line, 1, m.Pos - 1) . placeholder . SubStr(line, m.Pos + m.Len)
+      placeholder := "¤CSPAN_" _codeSpans.Length "¤"
+      line := SubStr(line, 1, m.Pos - 1) placeholder SubStr(line, m.Pos + m.Len)
       pos := m.Pos + StrLen(placeholder)
     }
 
@@ -917,7 +993,7 @@ class PasteMd {
 
     ; Restore backtick code spans.
     for i, span in _codeSpans {
-      line := StrReplace(line, "¤CSPAN_" . i . "¤", span)
+      line := StrReplace(line, "¤CSPAN_" i "¤", span)
     }
 
     return line
@@ -970,8 +1046,8 @@ class PasteMd {
           accessText := mT[1]
         else if (RegExMatch(attrs, "i)\baria-label\s*=\s*['`"]([^'`"]*)['`"]", &mL) && mL[1] != "")
           accessText := mL[1]
-        replacement := (accessText = "") ? "" : "(img: " . accessText . ")"
-        str := SubStr(str, 1, m.Pos - 1) . replacement . SubStr(str, m.Pos + m.Len)
+        replacement := (accessText = "") ? "" : "(img: " accessText ")"
+        str := SubStr(str, 1, m.Pos - 1) replacement SubStr(str, m.Pos + m.Len)
         pos := m.Pos + StrLen(replacement)
       }
     }
@@ -990,8 +1066,8 @@ class PasteMd {
           accessText := mT[1]
         else if (RegExMatch(full, "i)<title\b[^>]*>(.*?)</title>", &mTc) && mTc[1] != "")
           accessText := mTc[1]
-        replacement := (accessText = "") ? "" : "(img: " . accessText . ")"
-        str := SubStr(str, 1, m.Pos - 1) . replacement . SubStr(str, m.Pos + m.Len)
+        replacement := (accessText = "") ? "" : "(img: " accessText ")"
+        str := SubStr(str, 1, m.Pos - 1) replacement SubStr(str, m.Pos + m.Len)
         pos := m.Pos + StrLen(replacement)
       }
     }
@@ -1021,11 +1097,11 @@ class PasteMd {
    */
   static RestoreThinkingBlocks(md) {
     for i, content in this._thinkingBlocks {
-      placeholder := "¤THINKING_" . i . "¤"
+      placeholder := "¤THINKING_" i "¤"
       if (content = "") {
         details := "<details>`n<summary>Thinking</summary>`n</details>"
       } else {
-        details := "<details>`n<summary>Thinking</summary>`n`n" . content . "`n</details>"
+        details := "<details>`n<summary>Thinking</summary>`n`n" content "`n</details>"
       }
       md := StrReplace(md, placeholder, details)
     }
@@ -1042,7 +1118,7 @@ class PasteMd {
    */
   static RestoreUserMsgBlocks(md) {
     for i, content in this._userMsgBlocks {
-      placeholder := "¤USERMSG_" . i . "¤"
+      placeholder := "¤USERMSG_" i "¤"
       md := StrReplace(md, placeholder, content)
     }
     return md
@@ -1110,7 +1186,7 @@ class PasteMd {
       "Original ordered-list index is missing from clipboard context.`nEnter starting number for this paste (Cancel keeps 1).",
       "Paste as md: list start",
       "w520 h160",
-      "" . defaultStart
+      "" defaultStart
     )
 
     if (ib.Result != "OK")
@@ -1167,7 +1243,7 @@ class PasteMd {
           sep := mLine[3]
           if (sep = "")
             sep := " "
-          lines[idx] := mLine[1] . current . mLine[2] . sep . mLine[4]
+          lines[idx] := mLine[1] current mLine[2] sep mLine[4]
         }
         current += 1
         started := true
@@ -1190,7 +1266,7 @@ class PasteMd {
     Loop lines.Length {
       if (drop.Has(A_Index))
         continue
-      out .= (firstOut ? "" : "`n") . lines[A_Index]
+      out .= (firstOut ? "" : "`n") lines[A_Index]
       firstOut := false
     }
     if (hadTrailingBreak && out != "" && !RegExMatch(out, "\n$"))
@@ -1382,8 +1458,8 @@ class PasteMd {
         }
       }
 
-      q := (line = "") ? ">" : ("> " . line)
-      out .= (firstOut ? "" : "`n") . q
+      q := (line = "") ? ">" : ("> " line)
+      out .= (firstOut ? "" : "`n") q
       firstOut := false
     }
 
@@ -1418,7 +1494,7 @@ class PasteMd {
     out := ""
     firstOut := true
     Loop lines.Length {
-      out .= (firstOut ? "" : "`n") . lines[A_Index]
+      out .= (firstOut ? "" : "`n") lines[A_Index]
       firstOut := false
     }
     return out
@@ -1444,7 +1520,7 @@ class PasteMd {
     if !RegExMatch(lastLine, "^\s*(?:>\s*)?(?:\d+[.)]|[-+*])(?:\s+|$)")
       return md
 
-    return tail . "`n"
+    return tail "`n"
   }
 }
 
