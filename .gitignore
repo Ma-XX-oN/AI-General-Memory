@@ -29,5 +29,5 @@
 !scripts/HtmlDom.ahk
 !scripts/ahk-test
 !scripts/ahk-test/**
-ahk-test/*.actual.md
-ahk-test/test-*.log
+scripts/ahk-test/*.actual.md
+scripts/ahk-test/test-*.log

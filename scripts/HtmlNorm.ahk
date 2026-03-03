@@ -72,18 +72,19 @@ class HtmlNorm {
      * Transforms are applied in order:
      *   1.  Image/SVG handling: drop if no accessible text, else (img: text); leave when showImg
      *   2.  Poster-label placeholder injection (when showPoster)
-     *   3.  Button stripping
-     *   4.  ChatGPT code block extraction (pre.overflow-visible! → pre/code)
-     *   5.  Task-list checkbox normalization (canonical <input type="checkbox">)
-     *   6.  Thinking block extraction (→ ¤THINKING_N¤)
-     *   7.  Inline-code span promotion (inline-markdown/font-mono → <code>)
-     *   8.  User message extraction (→ ¤USERMSG_N¤)
-     *   9.  Claude Web language-label div removal
-     *   10. Footnote URL stripping (long URLs → #fragment)
-     *   11. Residual span tag removal
-     *   12. Bare <li> list wrapping in <ol>
-     *   13. <code> element normalization (line-break conversion, pre-wrapping)
-     *   14. Nested container unwrapping
+     *   3.  Diff-block normalization (diffs-container → pre/code language-diff)
+     *   4.  Button stripping
+     *   5.  ChatGPT code block extraction (pre.overflow-visible! → pre/code)
+     *   6.  Task-list checkbox normalization (canonical <input type="checkbox">)
+     *   7.  Thinking block extraction (→ ¤THINKING_N¤)
+     *   8.  Inline-code span promotion (inline-markdown/font-mono → <code>)
+     *   9.  User message extraction (→ ¤USERMSG_N¤)
+     *   10. Claude Web language-label div removal
+     *   11. Footnote URL stripping (long URLs → #fragment)
+     *   12. Residual span tag removal
+     *   13. Bare <li> list wrapping in <ol>
+     *   14. <code> element normalization (line-break conversion, pre-wrapping)
+     *   15. Nested container unwrapping
      *
      * @param {string} htmlFrag  - HTML fragment from the CF_HTML clipboard
      * @param {string} source    - Source identifier from DetectSource()
@@ -103,50 +104,53 @@ class HtmlNorm {
         if showPoster
             html := HtmlNorm._InjectPosterPlaceholders(html, source)
 
-        ; 3. Strip UI buttons.
+        ; 3. Convert tool diff containers into canonical language-diff code blocks.
+        html := HtmlNorm._NormalizeSimpleDiffBlocks(html)
+
+        ; 4. Strip UI buttons.
         html := RegExReplace(html, "is)<button\b[^>]*>.*?</button>", "")
 
-        ; 4. ChatGPT: normalize CodeMirror code blocks before any span stripping.
+        ; 5. ChatGPT: normalize CodeMirror code blocks before any span stripping.
         if (source = "chatgpt")
             html := HtmlNorm._NormalizeChatGptCodeBlocks(html)
 
-        ; 5. Normalize task-list checkboxes.
+        ; 6. Normalize task-list checkboxes.
         html := HtmlNorm._NormalizeTaskListItems(html)
 
-        ; 6. Extract thinking blocks.
+        ; 7. Extract thinking blocks.
         html := HtmlNorm._ExtractThinkingBlocks(html)
 
-        ; 7. Promote inline-code spans.
+        ; 8. Promote inline-code spans.
         html := RegExReplace(html, "is)<span\b[^>]*\bclass=`"[^`"]*\b(?:inline-markdown|font-mono)\b[^`"]*`"[^>]*>(.*?)</span>", "<code>$1</code>")
 
-        ; 8. Extract whitespace-sensitive user message text.
+        ; 9. Extract whitespace-sensitive user message text.
         html := HtmlNorm._ExtractUserMessages(html)
 
-        ; 9. Strip Claude Web language-label divs (font-small p-3.5 pb-0).
+        ; 10. Strip Claude Web language-label divs (font-small p-3.5 pb-0).
         html := RegExReplace(html, "is)<div\b[^>]*\bclass=`"[^`"]*\bfont-small\b[^`"]*\bp-3[^`"]*`"[^>]*>.*?</div>", "")
 
-        ; 10. Strip long footnote hrefs, keeping only the #fragment.
+        ; 11. Strip long footnote hrefs, keeping only the #fragment.
         html := RegExReplace(html, "i)href=`"[^`"]*#(user-content-[^`"]*)`"", "href=`"#$1`"")
 
-        ; 10b. Strip <p> wrapper inside footnote definition <li> elements.
+        ; 11b. Strip <p> wrapper inside footnote definition <li> elements.
         ;      <li id="user-content-fn-N"><p>text</p></li> → <li id="...">text</li>
         ;      Without this, pandoc renders footnote lists in loose format (number on
         ;      its own line, content indented), instead of tight (number + content inline).
         html := RegExReplace(html, "is)(<li\b[^>]*\bid=`"user-content-fn-[^`"]*`"[^>]*>)\s*<p\b[^>]*>(.*?)</p>\s*(</li>)", "$1$2$3")
 
-        ; 11. Strip residual <span> tags.
+        ; 12. Strip residual <span> tags.
         html := RegExReplace(html, "i)</?span\b[^>]*>", "")
 
-        ; 12. Wrap bare top-level <li> siblings in <ol>.
+        ; 13. Wrap bare top-level <li> siblings in <ol>.
         htmlNoTrailingBr := RegExReplace(html, "is)(?:<br\b[^>]*>\s*)+$", "")
         trimmed := Trim(htmlNoTrailingBr, " `t`r`n")
         if (trimmed != "" && RegExMatch(trimmed, "is)^(?:<li\b[^>]*>.*?</li>\s*)+$"))
             html := "<ol>" . trimmed . "</ol>"
 
-        ; 13. Normalize <code> elements.
+        ; 14. Normalize <code> elements.
         html := HtmlNorm._NormalizeCodeElements(html)
 
-        ; 14. Unwrap nested containers that obscure code blocks.
+        ; 15. Unwrap nested containers that obscure code blocks.
         html := HtmlNorm._UnwrapNestedContainers(html)
 
         return html
@@ -239,6 +243,94 @@ class HtmlNorm {
             html := RegExReplace(html, "i)(<article\b[^>]*\bdata-turn-id=`"request-WEB:[^`"]*`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
             ; User turn: prefer data-turn="user"; fall back to legacy plain-UUID data-turn-id.
             html := RegExReplace(html, "i)(<article\b[^>]*\bdata-turn=`"user`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
+        }
+        return html
+    }
+
+    /**
+     * Converts VS Code chat/tool diff widgets to canonical HTML diff code blocks.
+     *
+     * Input shape (Codex/Claude tool output):
+     * - <diffs-container ...>
+     *   - many <div data-line-type="...">...</div> rows with line text
+     *
+     * Output shape:
+     * - <pre><code class="language-diff">...</code></pre>
+     *
+     * Also preserves the edited filename when present in a nearby header button
+     * (for example "test-paste-md-fixtures.ahk") by inserting a short
+     * `<p><code>filename</code></p>` line before the diff block.
+     *
+     * Line-type mapping:
+     * - deletion rows => '-' prefix
+     * - addition rows => '+' prefix
+     * - context/other rows => ' ' prefix
+     *
+     * @param {string} html
+     * @returns {string}
+     */
+    static _NormalizeSimpleDiffBlocks(html) {
+        pos := 1
+        while RegExMatch(html, "is)<diffs-container\b[^>]*>(.*?)</diffs-container>", &mDiff, pos) {
+            inner := mDiff[1]
+            fileName := ""
+            ; The editable filename appears in a button before the diff block.
+            ; Some captures include very large inline style payloads between header
+            ; and diff body, so scan the full prefix and keep the last non-empty
+            ; button label.
+            before := SubStr(html, 1, mDiff.Pos - 1)
+            btnPos := 1
+            while RegExMatch(before, "is)<button\b[^>]*>(.*?)</button>", &mBtn, btnPos) {
+                btnText := RegExReplace(mBtn[1], "<[^>]++>", "")
+                btnText := HtmlNorm._DecodeBasicHtmlEntities(btnText)
+                btnText := Trim(btnText, " `t`r`n")
+                if (btnText != "")
+                    fileName := btnText
+                btnPos := mBtn.Pos + mBtn.Len
+            }
+            linePos := 1
+            diffLines := []
+            while RegExMatch(inner, "is)<div\b[^>]*\bdata-line-type\s*=\s*['`"]([^'`"]+)['`"][^>]*>(.*?)</div>", &mLine, linePos) {
+                lineType := StrLower(mLine[1])
+                lineHtml := mLine[2]
+                lineText := RegExReplace(lineHtml, "<[^>]++>", "")
+                lineText := HtmlNorm._DecodeBasicHtmlEntities(lineText)
+                lineText := StrReplace(lineText, "`r", "")
+                lineText := Trim(lineText, "`n")
+                prefix := " "
+                if InStr(lineType, "deletion")
+                    prefix := "-"
+                else if InStr(lineType, "addition")
+                    prefix := "+"
+                diffLines.Push(prefix . lineText)
+                linePos := mLine.Pos + mLine.Len
+            }
+
+            if (diffLines.Length = 0) {
+                pos := mDiff.Pos + mDiff.Len
+                continue
+            }
+
+            diffText := ""
+            for _, line in diffLines
+                diffText .= (diffText = "" ? "" : "`n") . line
+
+            ; Escape for safe embedding inside <code>.
+            diffText := StrReplace(diffText, "&", "&amp;")
+            diffText := StrReplace(diffText, "<", "&lt;")
+            diffText := StrReplace(diffText, ">", "&gt;")
+
+            header := ""
+            if (fileName != "") {
+                fileNameEsc := StrReplace(fileName, "&", "&amp;")
+                fileNameEsc := StrReplace(fileNameEsc, "<", "&lt;")
+                fileNameEsc := StrReplace(fileNameEsc, ">", "&gt;")
+                header := "<p><code>" . fileNameEsc . "</code></p>"
+            }
+
+            replacement := header . '<pre><code class="language-diff">' . diffText . '</code></pre>'
+            html := SubStr(html, 1, mDiff.Pos - 1) . replacement . SubStr(html, mDiff.Pos + mDiff.Len)
+            pos := mDiff.Pos + StrLen(replacement)
         }
         return html
     }
