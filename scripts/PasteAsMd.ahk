@@ -318,13 +318,19 @@ class PasteMd {
    * @param {string} s - Raw string to dump
    */
   static _DbgSection(f, label, s) {
-    f.Write("=== " . label . " (len=" . StrLen(s) . ") ===`r`n")
-    ; Show EOL characters visibly.
-    vis := StrReplace(s, "`r`n", "⏎¶`r`n")   ; CRLF → visible + real CRLF
-    vis := StrReplace(vis, "`r", "⏎`r`n")      ; lone CR
-    vis := StrReplace(vis, "`n", "¶`r`n")       ; lone LF
+    f.Write("=== " . label . " (len=" . StrLen(s) . ") ===`n")
+    ; Show EOL characters visibly without emitting raw CR in the log payload.
+    tokCRLF := "¤CRLF¤"
+    tokCR := "¤CR¤"
+    tokLF := "¤LF¤"
+    vis := StrReplace(s, "`r`n", tokCRLF)
+    vis := StrReplace(vis, "`r", tokCR)
+    vis := StrReplace(vis, "`n", tokLF)
+    vis := StrReplace(vis, tokCRLF, "⏎¶`n") ; CRLF
+    vis := StrReplace(vis, tokCR, "⏎`n")    ; lone CR
+    vis := StrReplace(vis, tokLF, "¶`n")    ; lone LF
     f.Write(vis)
-    f.Write("`r`n`r`n")
+    f.Write("`n`n")
   }
 
   /**
@@ -573,7 +579,7 @@ class PasteMd {
       }
       PasteMd._RotateLogFiles()
       dbgF := FileOpen(PasteMd.DEBUG_PASTE_MD_LOG, "w", "UTF-8")
-      dbgF.Write("PasteAsMd debug — " . FormatTime(, "yyyy-MM-dd HH:mm:ss") . "`r`n`r`n")
+      dbgF.Write("PasteAsMd debug — " . FormatTime(, "yyyy-MM-dd HH:mm:ss") . "`n`n")
     }
 
     clipSaved := ClipboardAll()
@@ -594,11 +600,11 @@ class PasteMd {
         PasteMd._DbgSection(dbgF, "1. plain (A_Clipboard minus CR)", plain)
         PasteMd._DbgSection(dbgF, "2. cfHtml (raw full payload)", cfHtml)
         PasteMd._DbgSection(dbgF, "3. htmlFrag (CF_HTML fragment)", converted["htmlFrag"])
-        dbgF.Write("=== 2b. cfHtml offsets ===`r`n")
-        dbgF.Write("StartHTML: " . PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartHTML:") . "`r`n")
-        dbgF.Write("EndHTML: " . PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndHTML:") . "`r`n")
-        dbgF.Write("StartFragment: " . PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartFragment:") . "`r`n")
-        dbgF.Write("EndFragment: " . PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndFragment:") . "`r`n`r`n")
+        dbgF.Write("=== 2b. cfHtml offsets ===`n")
+        dbgF.Write("StartHTML: " . PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartHTML:") . "`n")
+        dbgF.Write("EndHTML: " . PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndHTML:") . "`n")
+        dbgF.Write("StartFragment: " . PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartFragment:") . "`n")
+        dbgF.Write("EndFragment: " . PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndFragment:") . "`n`n")
 
         if (converted["htmlFrag"] = "") {
           PasteMd._DbgSection(dbgF, "3. md (CleanPlainText – no HTML path)", converted["mdAfterClean"])
@@ -641,7 +647,7 @@ class PasteMd {
     } catch as e {
       if (dbg) {
         try {
-          dbgF.Write("!!! EXCEPTION: " . e.File . ":" . e.Line . " — " . e.Message . "`r`n")
+          dbgF.Write("!!! EXCEPTION: " . e.File . ":" . e.Line . " — " . e.Message . "`n")
           dbgF.Close()
         }
       }

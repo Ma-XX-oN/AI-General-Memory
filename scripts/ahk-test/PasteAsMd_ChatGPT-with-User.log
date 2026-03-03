@@ -1,4 +1,4 @@
-﻿PasteAsMd debug — 2026-03-02 01:54:23
+﻿﻿PasteAsMd debug — 2026-03-02 01:54:23
 
 === 1. plain (A_Clipboard minus CR) (len=1193) ===
 Output a markdown test document demonstrating each of the following. No explanations — just the document.¶
@@ -64,19 +64,26 @@ A sentence with a footnote.1¶
 The footnote text. ↩
 
 === 2. cfHtml (raw full payload) (len=12656) ===
-Version:0.9⏎¶⏎¶
+Version:0.9⏎¶⏎
 ¶
-StartHTML:0000000105⏎¶⏎¶
 ¶
-EndHTML:0000012656⏎¶⏎¶
+StartHTML:0000000105⏎¶⏎
 ¶
-StartFragment:0000000141⏎¶⏎¶
 ¶
-EndFragment:0000012620⏎¶⏎¶
+EndHTML:0000012656⏎¶⏎
 ¶
-<html>⏎¶⏎¶
 ¶
-<body>⏎¶⏎¶
+StartFragment:0000000141⏎¶⏎
+¶
+¶
+EndFragment:0000012620⏎¶⏎
+¶
+¶
+<html>⏎¶⏎
+¶
+¶
+<body>⏎¶⏎
+¶
 ¶
 <!--StartFragment--><article class="text-token-text-primary w-full focus:outline-none [--shadow-height:45px] has-data-writing-block:pointer-events-none has-data-writing-block:-mt-(--shadow-height) has-data-writing-block:pt-(--shadow-height) [&amp;:has([data-writing-block])&gt;*]:pointer-events-auto scroll-mt-(--header-height)" tabindex="-1" dir="auto" data-turn-id="e7e18cd8-cda9-498a-8e2f-be36bc9a685c" data-testid="conversation-turn-7" data-scroll-anchor="false" data-turn="user"><div class="text-base my-auto mx-auto pt-12 [--thread-content-margin:--spacing(4)] @w-sm/main:[--thread-content-margin:--spacing(6)] @w-lg/main:[--thread-content-margin:--spacing(16)] px-(--thread-content-margin)"><div tabindex="-1" class="[--thread-content-max-width:40rem] @w-lg/main:[--thread-content-max-width:48rem] mx-auto max-w-(--thread-content-max-width) flex-1 group/turn-messages focus-visible:outline-hidden relative flex w-full min-w-0 flex-col"><div class="flex max-w-full flex-col grow"><div data-message-author-role="user" data-message-id="e7e18cd8-cda9-498a-8e2f-be36bc9a685c" dir="auto" class="min-h-8 text-message relative flex w-full flex-col items-end gap-2 text-start break-words whitespace-normal [.text-message+&amp;]:mt-1"><div class="flex w-full flex-col gap-1 empty:hidden items-end rtl:items-start"><div class="user-message-bubble-color corner-superellipse/1.1 relative rounded-[18px] px-4 py-1.5 data-[multiline]:py-3 max-w-[var(--user-chat-width,70%)]" data-multiline=""><div class="whitespace-pre-wrap">Output a markdown test document demonstrating each of the following. No explanations â€” just the document.¶
 ¶
@@ -143,9 +150,11 @@ Required sections, in order:¶
 <section data-footnotes="true" class="footnotes">¶
 <ol>¶
 <li id="user-content-fn-1" data-start="645" data-end="669" data-is-last-node="">¶
-<p data-start="651" data-end="669" data-is-last-node="">The footnote text. <a data-footnote-backref="" aria-label="Back to reference 1" class="decorated-link cursor-pointer" rel="noopener">â†©</a></p></li></ol></section></div></div></div></div></div></div></article><!--EndFragment-->⏎¶⏎¶
+<p data-start="651" data-end="669" data-is-last-node="">The footnote text. <a data-footnote-backref="" aria-label="Back to reference 1" class="decorated-link cursor-pointer" rel="noopener">â†©</a></p></li></ol></section></div></div></div></div></div></div></article><!--EndFragment-->⏎¶⏎
 ¶
-</body>⏎¶⏎¶
+¶
+</body>⏎¶⏎
+¶
 ¶
 </html>
 

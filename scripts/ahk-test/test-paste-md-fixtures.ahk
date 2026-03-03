@@ -125,16 +125,27 @@ SectionToText(section) {
 }
 
 DecodeDbgExact(s) {
-  ; Reverse _DbgSection's marker stream exactly (CRLF-aware).
-  tokCRLF := "⏎¶⏎`r¶`r`n¶`r`n"
-  tokCR := "⏎`r¶`r`n"
-  tokLF := "¶`r`n"
-  tokCRLF_LF := "⏎¶⏎`r¶`n¶`n"
-  tokCR_LF := "⏎`r¶`n"
-  tokLF_LF := "¶`n"
+  ; Reverse _DbgSection marker stream for:
+  ; - current LF-only logger output
+  ; - legacy output normalized to LF
+  tokLegacyCRLF := "⏎¶⏎`n¶`n¶`n"
+  tokLegacyCR := "⏎`n¶`n"
+  tokCRLF := "⏎¶`n"
+  tokCR := "⏎`n"
+  tokLF := "¶`n"
   out := ""
   pos := 1
   while (pos <= StrLen(s)) {
+    if (SubStr(s, pos, StrLen(tokLegacyCRLF)) = tokLegacyCRLF) {
+      out .= "`r`n"
+      pos += StrLen(tokLegacyCRLF)
+      continue
+    }
+    if (SubStr(s, pos, StrLen(tokLegacyCR)) = tokLegacyCR) {
+      out .= "`r"
+      pos += StrLen(tokLegacyCR)
+      continue
+    }
     if (SubStr(s, pos, StrLen(tokCRLF)) = tokCRLF) {
       out .= "`r`n"
       pos += StrLen(tokCRLF)
@@ -148,21 +159,6 @@ DecodeDbgExact(s) {
     if (SubStr(s, pos, StrLen(tokLF)) = tokLF) {
       out .= "`n"
       pos += StrLen(tokLF)
-      continue
-    }
-    if (SubStr(s, pos, StrLen(tokCRLF_LF)) = tokCRLF_LF) {
-      out .= "`r`n"
-      pos += StrLen(tokCRLF_LF)
-      continue
-    }
-    if (SubStr(s, pos, StrLen(tokCR_LF)) = tokCR_LF) {
-      out .= "`r"
-      pos += StrLen(tokCR_LF)
-      continue
-    }
-    if (SubStr(s, pos, StrLen(tokLF_LF)) = tokLF_LF) {
-      out .= "`n"
-      pos += StrLen(tokLF_LF)
       continue
     }
     out .= SubStr(s, pos, 1)
