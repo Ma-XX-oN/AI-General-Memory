@@ -1,0 +1,670 @@
+﻿PasteAsMd debug — 2026-03-02 01:54:23
+
+=== 1. plain (A_Clipboard minus CR) (len=1193) ===
+Output a markdown test document demonstrating each of the following. No explanations — just the document.¶
+¶
+Required sections, in order:¶
+¶
+1.  Three heading levels (H1, H2, H3)¶
+2.  An inline-formatting paragraph using bold, italic, bold-italic, strikethrough, inline code, and a link¶
+3.  Three fenced code blocks with language tags: one Python (with at least one blank line inside), one JavaScript (with at least one blank line inside), one Bash¶
+4.  A task list with at least one checked and one unchecked item¶
+5.  A blockquote with a nested blockquote inside¶
+6.  A table with left, center, and right column alignment¶
+7.  An unordered list with at least one nested item¶
+8.  An ordered list¶
+9.  A footnote reference and its definition¶
+H1 Heading¶
+H2 Heading¶
+H3 Heading¶
+¶
+This paragraph shows bold, italic, bold-italic, strikethrough, inline code, and a link¶
+.¶
+¶
+def greet(name):¶
+  return f"Hello, {name}!"¶
+¶
+¶
+print(greet("world"))¶
+function add(a, b) {¶
+  return a + b;¶
+}¶
+¶
+console.log(add(1, 2));¶
+echo "hello"¶
+¶
+ Done¶
+¶
+ Not done¶
+¶
+Level one¶
+¶
+Level two (nested)¶
+¶
+Left	Center	Right¶
+a	b	c¶
+1	2	3¶
+¶
+Alpha¶
+¶
+Beta¶
+¶
+Nested under Beta¶
+¶
+Gamma¶
+¶
+First¶
+¶
+Second¶
+¶
+Third¶
+¶
+A sentence with a footnote.1¶
+¶
+The footnote text. ↩
+
+=== 2. cfHtml (raw full payload) (len=12656) ===
+Version:0.9⏎¶⏎¶
+¶
+StartHTML:0000000105⏎¶⏎¶
+¶
+EndHTML:0000012656⏎¶⏎¶
+¶
+StartFragment:0000000141⏎¶⏎¶
+¶
+EndFragment:0000012620⏎¶⏎¶
+¶
+<html>⏎¶⏎¶
+¶
+<body>⏎¶⏎¶
+¶
+<!--StartFragment--><article class="text-token-text-primary w-full focus:outline-none [--shadow-height:45px] has-data-writing-block:pointer-events-none has-data-writing-block:-mt-(--shadow-height) has-data-writing-block:pt-(--shadow-height) [&amp;:has([data-writing-block])&gt;*]:pointer-events-auto scroll-mt-(--header-height)" tabindex="-1" dir="auto" data-turn-id="e7e18cd8-cda9-498a-8e2f-be36bc9a685c" data-testid="conversation-turn-7" data-scroll-anchor="false" data-turn="user"><div class="text-base my-auto mx-auto pt-12 [--thread-content-margin:--spacing(4)] @w-sm/main:[--thread-content-margin:--spacing(6)] @w-lg/main:[--thread-content-margin:--spacing(16)] px-(--thread-content-margin)"><div tabindex="-1" class="[--thread-content-max-width:40rem] @w-lg/main:[--thread-content-max-width:48rem] mx-auto max-w-(--thread-content-max-width) flex-1 group/turn-messages focus-visible:outline-hidden relative flex w-full min-w-0 flex-col"><div class="flex max-w-full flex-col grow"><div data-message-author-role="user" data-message-id="e7e18cd8-cda9-498a-8e2f-be36bc9a685c" dir="auto" class="min-h-8 text-message relative flex w-full flex-col items-end gap-2 text-start break-words whitespace-normal [.text-message+&amp;]:mt-1"><div class="flex w-full flex-col gap-1 empty:hidden items-end rtl:items-start"><div class="user-message-bubble-color corner-superellipse/1.1 relative rounded-[18px] px-4 py-1.5 data-[multiline]:py-3 max-w-[var(--user-chat-width,70%)]" data-multiline=""><div class="whitespace-pre-wrap">Output a markdown test document demonstrating each of the following. No explanations â€” just the document.¶
+¶
+Required sections, in order:¶
+¶
+1.  Three heading levels (H1, H2, H3)¶
+2.  An inline-formatting paragraph using bold, italic, bold-italic, strikethrough, inline code, and a link¶
+3.  Three fenced code blocks with language tags: one Python (with at least one blank line inside), one JavaScript (with at least one blank line inside), one Bash¶
+4.  A task list with at least one checked and one unchecked item¶
+5.  A blockquote with a nested blockquote inside¶
+6.  A table with left, center, and right column alignment¶
+7.  An unordered list with at least one nested item¶
+8.  An ordered list¶
+9.  A footnote reference and its definition</div></div></div></div></div><div class="z-0 flex justify-end"></div></div></div></article><article class="text-token-text-primary w-full focus:outline-none [--shadow-height:45px] has-data-writing-block:pointer-events-none has-data-writing-block:-mt-(--shadow-height) has-data-writing-block:pt-(--shadow-height) [&amp;:has([data-writing-block])&gt;*]:pointer-events-auto scroll-mt-[calc(var(--header-height)+min(200px,max(70px,20svh)))]" tabindex="-1" dir="auto" data-turn-id="request-WEB:6ce35c78-e49e-4761-86ed-b0601f3f87be-3" data-testid="conversation-turn-8" data-scroll-anchor="true" data-turn="assistant"><div class="text-base my-auto mx-auto pb-10 [--thread-content-margin:--spacing(4)] @w-sm/main:[--thread-content-margin:--spacing(6)] @w-lg/main:[--thread-content-margin:--spacing(16)] px-(--thread-content-margin)"><div tabindex="-1" class="[--thread-content-max-width:40rem] @w-lg/main:[--thread-content-max-width:48rem] mx-auto max-w-(--thread-content-max-width) flex-1 group/turn-messages focus-visible:outline-hidden relative flex w-full min-w-0 flex-col agent-turn"><div class="flex max-w-full flex-col grow"><div data-message-author-role="assistant" data-message-id="b87ca3e2-1278-4e11-8eb3-49211f024b8d" dir="auto" data-message-model-slug="gpt-5-2-thinking" class="min-h-8 text-message relative flex w-full flex-col items-end gap-2 text-start break-words whitespace-normal [.text-message+&amp;]:mt-1"><div class="flex w-full flex-col gap-1 empty:hidden first:pt-[1px]"><div class="markdown prose dark:prose-invert w-full wrap-break-word dark markdown-new-styling"><h1 data-start="0" data-end="12">H1 Heading</h1>¶
+<h2 data-start="14" data-end="27">H2 Heading</h2>¶
+<h3 data-start="29" data-end="43">H3 Heading</h3>¶
+<p data-start="45" data-end="173">This paragraph shows <strong data-start="66" data-end="74">bold</strong>, <em data-start="76" data-end="84">italic</em>, <em data-start="86" data-end="103"><strong data-start="87" data-end="102">bold-italic</strong></em>, <del data-start="105" data-end="122">strikethrough</del>, <code data-start="124" data-end="137">inline code</code>, and a <a data-start="145" data-end="172" rel="noopener" target="_new" class="decorated-link" href="https://example.com">link<span aria-hidden="true" class="ms-0.5 inline-block align-middle leading-none"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" aria-hidden="true" data-rtl-flip="" class="block h-[0.75em] w-[0.75em] stroke-current stroke-[0.75]"><use href="/cdn/assets/sprites-core-eri7ssmm.svg#304883" fill="currentColor"></use></svg></span></a>.</p>¶
+<pre class="overflow-visible! px-0!" data-start="175" data-end="256"><div class="relative w-full my-4"><div class=""><div class="relative"><div class="h-full min-h-0 min-w-0"><div class="h-full min-h-0 min-w-0"><div class="border border-token-border-light border-radius-3xl corner-superellipse/1.1 rounded-3xl"><div class="h-full w-full border-radius-3xl bg-token-bg-elevated-secondary corner-superellipse/1.1 overflow-clip rounded-3xl lxnfua_clipPathFallback"><div class="pointer-events-none absolute inset-x-4 top-12 bottom-4"><div class="pointer-events-none sticky z-40 shrink-0 z-1!"><div class="sticky bg-token-border-light"></div></div></div><div class=""><div class="relative z-0 flex max-w-full"><div id="code-block-viewer" dir="ltr" class="q9tKkq_viewer cm-editor z-10 light:cm-light dark:cm-light flex h-full w-full flex-col items-stretch Í¼s Í¼16"><div class="cm-scroller"><div class="cm-content q9tKkq_readonly"><span class="Í¼v">def</span><span> </span><span class="Í¼11">greet</span><span>(</span><span class="Í¼11">name</span><span>):</span><br><span>  </span><span class="Í¼v">return</span><span> </span><span class="Í¼z">f"Hello, </span><span>{</span><span class="Í¼11">name</span><span>}</span><span class="Í¼z">!"</span><br><br><br><span class="Í¼11">print</span><span>(</span><span class="Í¼11">greet</span><span>(</span><span class="Í¼z">"world"</span><span>))</span></div></div></div></div></div></div></div></div></div><div class=""><div class=""></div></div></div></div></div></pre>¶
+<pre class="overflow-visible! px-0!" data-start="258" data-end="339"><div class="relative w-full my-4"><div class=""><div class="relative"><div class="h-full min-h-0 min-w-0"><div class="h-full min-h-0 min-w-0"><div class="border border-token-border-light border-radius-3xl corner-superellipse/1.1 rounded-3xl"><div class="h-full w-full border-radius-3xl bg-token-bg-elevated-secondary corner-superellipse/1.1 overflow-clip rounded-3xl lxnfua_clipPathFallback"><div class="pointer-events-none absolute inset-x-4 top-12 bottom-4"><div class="pointer-events-none sticky z-40 shrink-0 z-1!"><div class="sticky bg-token-border-light"></div></div></div><div class=""><div class="relative z-0 flex max-w-full"><div id="code-block-viewer" dir="ltr" class="q9tKkq_viewer cm-editor z-10 light:cm-light dark:cm-light flex h-full w-full flex-col items-stretch Í¼s Í¼16"><div class="cm-scroller"><div class="cm-content q9tKkq_readonly"><span class="Í¼v">function</span><span> </span><span class="Í¼11">add</span><span>(</span><span class="Í¼11">a</span><span>, </span><span class="Í¼11">b</span><span>) {</span><br><span>  </span><span class="Í¼v">return</span><span> </span><span class="Í¼11">a</span><span> </span><span class="Í¼v">+</span><span> </span><span class="Í¼11">b</span><span>;</span><br><span>}</span><br><br><span class="Í¼11">console</span><span class="Í¼v">.</span><span>log(</span><span class="Í¼11">add</span><span>(</span><span class="Í¼y">1</span><span>, </span><span class="Í¼y">2</span><span>));</span></div></div></div></div></div></div></div></div></div><div class=""><div class=""></div></div></div></div></div></pre>¶
+<pre class="overflow-visible! px-0!" data-start="341" data-end="365"><div class="relative w-full my-4"><div class=""><div class="relative"><div class="h-full min-h-0 min-w-0"><div class="h-full min-h-0 min-w-0"><div class="border border-token-border-light border-radius-3xl corner-superellipse/1.1 rounded-3xl"><div class="h-full w-full border-radius-3xl bg-token-bg-elevated-secondary corner-superellipse/1.1 overflow-clip rounded-3xl lxnfua_clipPathFallback"><div class="pointer-events-none absolute inset-x-4 top-12 bottom-4"><div class="pointer-events-none sticky z-40 shrink-0 z-1!"><div class="sticky bg-token-border-light"></div></div></div><div class=""><div class="relative z-0 flex max-w-full"><div id="code-block-viewer" dir="ltr" class="q9tKkq_viewer cm-editor z-10 light:cm-light dark:cm-light flex h-full w-full flex-col items-stretch Í¼s Í¼16"><div class="cm-scroller"><div class="cm-content q9tKkq_readonly"><span class="Í¼10">echo</span><span> </span><span class="Í¼z">"hello"</span></div></div></div></div></div></div></div></div></div><div class=""><div class=""></div></div></div></div></div></pre>¶
+<ul class="contains-task-list" data-start="367" data-end="392">¶
+<li class="task-list-item" data-start="367" data-end="377">¶
+<p data-start="373" data-end="377"><input disabled="" type="checkbox" checked=""> Done</p>¶
+</li>¶
+<li class="task-list-item" data-start="378" data-end="392">¶
+<p data-start="384" data-end="392"><input disabled="" type="checkbox"> Not done</p>¶
+</li>¶
+</ul>¶
+<blockquote data-start="394" data-end="430">¶
+<p data-start="396" data-end="405">Level one</p>¶
+<blockquote data-start="410" data-end="430">¶
+<p data-start="412" data-end="430">Level two (nested)</p>¶
+</blockquote>¶
+</blockquote>¶
+<div class="TyagGW_tableContainer"><div tabindex="-1" class="group TyagGW_tableWrapper flex flex-col-reverse w-fit"><table data-start="432" data-end="535" class="w-fit min-w-(--thread-content-width)"><thead data-start="432" data-end="457"><tr data-start="432" data-end="457"><th data-start="432" data-end="439" data-col-size="sm" class="">Left</th><th data-start="439" data-end="448" data-col-size="sm" class="">Center</th><th data-start="448" data-end="457" data-col-size="sm" class="">Right</th></tr></thead><tbody data-start="484" data-end="535"><tr data-start="484" data-end="509"><td data-start="484" data-end="491" data-col-size="sm">a</td><td data-start="491" data-end="500" data-col-size="sm">b</td><td data-start="500" data-end="509" data-col-size="sm">c</td></tr><tr data-start="510" data-end="535"><td data-start="510" data-end="517" data-col-size="sm">1</td><td data-start="517" data-end="526" data-col-size="sm">2</td><td data-start="526" data-end="535" data-col-size="sm">3</td></tr></tbody></table></div></div>¶
+<ul data-start="537" data-end="581">¶
+<li data-start="537" data-end="544">¶
+<p data-start="539" data-end="544">Alpha</p>¶
+</li>¶
+<li data-start="545" data-end="573">¶
+<p data-start="547" data-end="551">Beta</p>¶
+<ul data-start="554" data-end="573">¶
+<li data-start="554" data-end="573">¶
+<p data-start="556" data-end="573">Nested under Beta</p>¶
+</li>¶
+</ul>¶
+</li>¶
+<li data-start="574" data-end="581">¶
+<p data-start="576" data-end="581">Gamma</p>¶
+</li>¶
+</ul>¶
+<ol data-start="583" data-end="610">¶
+<li data-start="583" data-end="591">¶
+<p data-start="586" data-end="591">First</p>¶
+</li>¶
+<li data-start="592" data-end="601">¶
+<p data-start="595" data-end="601">Second</p>¶
+</li>¶
+<li data-start="602" data-end="610">¶
+<p data-start="605" data-end="610">Third</p>¶
+</li>¶
+</ol>¶
+<p data-start="612" data-end="643">A sentence with a footnote.<sup data-start="639" data-end="643"><a id="user-content-fnref-1" data-footnote-ref="true" aria-describedby="footnote-label" data-start="639" data-end="643" class="decorated-link cursor-pointer" rel="noopener">1<span aria-hidden="true" class="ms-0.5 inline-block align-middle leading-none"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" aria-hidden="true" data-rtl-flip="" class="block h-[0.75em] w-[0.75em] stroke-current stroke-[0.75]"><use href="/cdn/assets/sprites-core-eri7ssmm.svg#304883" fill="currentColor"></use></svg></span></a></sup></p>¶
+<section data-footnotes="true" class="footnotes">¶
+<ol>¶
+<li id="user-content-fn-1" data-start="645" data-end="669" data-is-last-node="">¶
+<p data-start="651" data-end="669" data-is-last-node="">The footnote text. <a data-footnote-backref="" aria-label="Back to reference 1" class="decorated-link cursor-pointer" rel="noopener">â†©</a></p></li></ol></section></div></div></div></div></div></div></article><!--EndFragment-->⏎¶⏎¶
+¶
+</body>⏎¶⏎¶
+¶
+</html>
+
+=== 3. htmlFrag (CF_HTML fragment) (len=12444) ===
+<article class="text-token-text-primary w-full focus:outline-none [--shadow-height:45px] has-data-writing-block:pointer-events-none has-data-writing-block:-mt-(--shadow-height) has-data-writing-block:pt-(--shadow-height) [&amp;:has([data-writing-block])&gt;*]:pointer-events-auto scroll-mt-(--header-height)" tabindex="-1" dir="auto" data-turn-id="e7e18cd8-cda9-498a-8e2f-be36bc9a685c" data-testid="conversation-turn-7" data-scroll-anchor="false" data-turn="user"><div class="text-base my-auto mx-auto pt-12 [--thread-content-margin:--spacing(4)] @w-sm/main:[--thread-content-margin:--spacing(6)] @w-lg/main:[--thread-content-margin:--spacing(16)] px-(--thread-content-margin)"><div tabindex="-1" class="[--thread-content-max-width:40rem] @w-lg/main:[--thread-content-max-width:48rem] mx-auto max-w-(--thread-content-max-width) flex-1 group/turn-messages focus-visible:outline-hidden relative flex w-full min-w-0 flex-col"><div class="flex max-w-full flex-col grow"><div data-message-author-role="user" data-message-id="e7e18cd8-cda9-498a-8e2f-be36bc9a685c" dir="auto" class="min-h-8 text-message relative flex w-full flex-col items-end gap-2 text-start break-words whitespace-normal [.text-message+&amp;]:mt-1"><div class="flex w-full flex-col gap-1 empty:hidden items-end rtl:items-start"><div class="user-message-bubble-color corner-superellipse/1.1 relative rounded-[18px] px-4 py-1.5 data-[multiline]:py-3 max-w-[var(--user-chat-width,70%)]" data-multiline=""><div class="whitespace-pre-wrap">Output a markdown test document demonstrating each of the following. No explanations — just the document.¶
+¶
+Required sections, in order:¶
+¶
+1.  Three heading levels (H1, H2, H3)¶
+2.  An inline-formatting paragraph using bold, italic, bold-italic, strikethrough, inline code, and a link¶
+3.  Three fenced code blocks with language tags: one Python (with at least one blank line inside), one JavaScript (with at least one blank line inside), one Bash¶
+4.  A task list with at least one checked and one unchecked item¶
+5.  A blockquote with a nested blockquote inside¶
+6.  A table with left, center, and right column alignment¶
+7.  An unordered list with at least one nested item¶
+8.  An ordered list¶
+9.  A footnote reference and its definition</div></div></div></div></div><div class="z-0 flex justify-end"></div></div></div></article><article class="text-token-text-primary w-full focus:outline-none [--shadow-height:45px] has-data-writing-block:pointer-events-none has-data-writing-block:-mt-(--shadow-height) has-data-writing-block:pt-(--shadow-height) [&amp;:has([data-writing-block])&gt;*]:pointer-events-auto scroll-mt-[calc(var(--header-height)+min(200px,max(70px,20svh)))]" tabindex="-1" dir="auto" data-turn-id="request-WEB:6ce35c78-e49e-4761-86ed-b0601f3f87be-3" data-testid="conversation-turn-8" data-scroll-anchor="true" data-turn="assistant"><div class="text-base my-auto mx-auto pb-10 [--thread-content-margin:--spacing(4)] @w-sm/main:[--thread-content-margin:--spacing(6)] @w-lg/main:[--thread-content-margin:--spacing(16)] px-(--thread-content-margin)"><div tabindex="-1" class="[--thread-content-max-width:40rem] @w-lg/main:[--thread-content-max-width:48rem] mx-auto max-w-(--thread-content-max-width) flex-1 group/turn-messages focus-visible:outline-hidden relative flex w-full min-w-0 flex-col agent-turn"><div class="flex max-w-full flex-col grow"><div data-message-author-role="assistant" data-message-id="b87ca3e2-1278-4e11-8eb3-49211f024b8d" dir="auto" data-message-model-slug="gpt-5-2-thinking" class="min-h-8 text-message relative flex w-full flex-col items-end gap-2 text-start break-words whitespace-normal [.text-message+&amp;]:mt-1"><div class="flex w-full flex-col gap-1 empty:hidden first:pt-[1px]"><div class="markdown prose dark:prose-invert w-full wrap-break-word dark markdown-new-styling"><h1 data-start="0" data-end="12">H1 Heading</h1>¶
+<h2 data-start="14" data-end="27">H2 Heading</h2>¶
+<h3 data-start="29" data-end="43">H3 Heading</h3>¶
+<p data-start="45" data-end="173">This paragraph shows <strong data-start="66" data-end="74">bold</strong>, <em data-start="76" data-end="84">italic</em>, <em data-start="86" data-end="103"><strong data-start="87" data-end="102">bold-italic</strong></em>, <del data-start="105" data-end="122">strikethrough</del>, <code data-start="124" data-end="137">inline code</code>, and a <a data-start="145" data-end="172" rel="noopener" target="_new" class="decorated-link" href="https://example.com">link<span aria-hidden="true" class="ms-0.5 inline-block align-middle leading-none"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" aria-hidden="true" data-rtl-flip="" class="block h-[0.75em] w-[0.75em] stroke-current stroke-[0.75]"><use href="/cdn/assets/sprites-core-eri7ssmm.svg#304883" fill="currentColor"></use></svg></span></a>.</p>¶
+<pre class="overflow-visible! px-0!" data-start="175" data-end="256"><div class="relative w-full my-4"><div class=""><div class="relative"><div class="h-full min-h-0 min-w-0"><div class="h-full min-h-0 min-w-0"><div class="border border-token-border-light border-radius-3xl corner-superellipse/1.1 rounded-3xl"><div class="h-full w-full border-radius-3xl bg-token-bg-elevated-secondary corner-superellipse/1.1 overflow-clip rounded-3xl lxnfua_clipPathFallback"><div class="pointer-events-none absolute inset-x-4 top-12 bottom-4"><div class="pointer-events-none sticky z-40 shrink-0 z-1!"><div class="sticky bg-token-border-light"></div></div></div><div class=""><div class="relative z-0 flex max-w-full"><div id="code-block-viewer" dir="ltr" class="q9tKkq_viewer cm-editor z-10 light:cm-light dark:cm-light flex h-full w-full flex-col items-stretch ͼs ͼ16"><div class="cm-scroller"><div class="cm-content q9tKkq_readonly"><span class="ͼv">def</span><span> </span><span class="ͼ11">greet</span><span>(</span><span class="ͼ11">name</span><span>):</span><br><span>  </span><span class="ͼv">return</span><span> </span><span class="ͼz">f"Hello, </span><span>{</span><span class="ͼ11">name</span><span>}</span><span class="ͼz">!"</span><br><br><br><span class="ͼ11">print</span><span>(</span><span class="ͼ11">greet</span><span>(</span><span class="ͼz">"world"</span><span>))</span></div></div></div></div></div></div></div></div></div><div class=""><div class=""></div></div></div></div></div></pre>¶
+<pre class="overflow-visible! px-0!" data-start="258" data-end="339"><div class="relative w-full my-4"><div class=""><div class="relative"><div class="h-full min-h-0 min-w-0"><div class="h-full min-h-0 min-w-0"><div class="border border-token-border-light border-radius-3xl corner-superellipse/1.1 rounded-3xl"><div class="h-full w-full border-radius-3xl bg-token-bg-elevated-secondary corner-superellipse/1.1 overflow-clip rounded-3xl lxnfua_clipPathFallback"><div class="pointer-events-none absolute inset-x-4 top-12 bottom-4"><div class="pointer-events-none sticky z-40 shrink-0 z-1!"><div class="sticky bg-token-border-light"></div></div></div><div class=""><div class="relative z-0 flex max-w-full"><div id="code-block-viewer" dir="ltr" class="q9tKkq_viewer cm-editor z-10 light:cm-light dark:cm-light flex h-full w-full flex-col items-stretch ͼs ͼ16"><div class="cm-scroller"><div class="cm-content q9tKkq_readonly"><span class="ͼv">function</span><span> </span><span class="ͼ11">add</span><span>(</span><span class="ͼ11">a</span><span>, </span><span class="ͼ11">b</span><span>) {</span><br><span>  </span><span class="ͼv">return</span><span> </span><span class="ͼ11">a</span><span> </span><span class="ͼv">+</span><span> </span><span class="ͼ11">b</span><span>;</span><br><span>}</span><br><br><span class="ͼ11">console</span><span class="ͼv">.</span><span>log(</span><span class="ͼ11">add</span><span>(</span><span class="ͼy">1</span><span>, </span><span class="ͼy">2</span><span>));</span></div></div></div></div></div></div></div></div></div><div class=""><div class=""></div></div></div></div></div></pre>¶
+<pre class="overflow-visible! px-0!" data-start="341" data-end="365"><div class="relative w-full my-4"><div class=""><div class="relative"><div class="h-full min-h-0 min-w-0"><div class="h-full min-h-0 min-w-0"><div class="border border-token-border-light border-radius-3xl corner-superellipse/1.1 rounded-3xl"><div class="h-full w-full border-radius-3xl bg-token-bg-elevated-secondary corner-superellipse/1.1 overflow-clip rounded-3xl lxnfua_clipPathFallback"><div class="pointer-events-none absolute inset-x-4 top-12 bottom-4"><div class="pointer-events-none sticky z-40 shrink-0 z-1!"><div class="sticky bg-token-border-light"></div></div></div><div class=""><div class="relative z-0 flex max-w-full"><div id="code-block-viewer" dir="ltr" class="q9tKkq_viewer cm-editor z-10 light:cm-light dark:cm-light flex h-full w-full flex-col items-stretch ͼs ͼ16"><div class="cm-scroller"><div class="cm-content q9tKkq_readonly"><span class="ͼ10">echo</span><span> </span><span class="ͼz">"hello"</span></div></div></div></div></div></div></div></div></div><div class=""><div class=""></div></div></div></div></div></pre>¶
+<ul class="contains-task-list" data-start="367" data-end="392">¶
+<li class="task-list-item" data-start="367" data-end="377">¶
+<p data-start="373" data-end="377"><input disabled="" type="checkbox" checked=""> Done</p>¶
+</li>¶
+<li class="task-list-item" data-start="378" data-end="392">¶
+<p data-start="384" data-end="392"><input disabled="" type="checkbox"> Not done</p>¶
+</li>¶
+</ul>¶
+<blockquote data-start="394" data-end="430">¶
+<p data-start="396" data-end="405">Level one</p>¶
+<blockquote data-start="410" data-end="430">¶
+<p data-start="412" data-end="430">Level two (nested)</p>¶
+</blockquote>¶
+</blockquote>¶
+<div class="TyagGW_tableContainer"><div tabindex="-1" class="group TyagGW_tableWrapper flex flex-col-reverse w-fit"><table data-start="432" data-end="535" class="w-fit min-w-(--thread-content-width)"><thead data-start="432" data-end="457"><tr data-start="432" data-end="457"><th data-start="432" data-end="439" data-col-size="sm" class="">Left</th><th data-start="439" data-end="448" data-col-size="sm" class="">Center</th><th data-start="448" data-end="457" data-col-size="sm" class="">Right</th></tr></thead><tbody data-start="484" data-end="535"><tr data-start="484" data-end="509"><td data-start="484" data-end="491" data-col-size="sm">a</td><td data-start="491" data-end="500" data-col-size="sm">b</td><td data-start="500" data-end="509" data-col-size="sm">c</td></tr><tr data-start="510" data-end="535"><td data-start="510" data-end="517" data-col-size="sm">1</td><td data-start="517" data-end="526" data-col-size="sm">2</td><td data-start="526" data-end="535" data-col-size="sm">3</td></tr></tbody></table></div></div>¶
+<ul data-start="537" data-end="581">¶
+<li data-start="537" data-end="544">¶
+<p data-start="539" data-end="544">Alpha</p>¶
+</li>¶
+<li data-start="545" data-end="573">¶
+<p data-start="547" data-end="551">Beta</p>¶
+<ul data-start="554" data-end="573">¶
+<li data-start="554" data-end="573">¶
+<p data-start="556" data-end="573">Nested under Beta</p>¶
+</li>¶
+</ul>¶
+</li>¶
+<li data-start="574" data-end="581">¶
+<p data-start="576" data-end="581">Gamma</p>¶
+</li>¶
+</ul>¶
+<ol data-start="583" data-end="610">¶
+<li data-start="583" data-end="591">¶
+<p data-start="586" data-end="591">First</p>¶
+</li>¶
+<li data-start="592" data-end="601">¶
+<p data-start="595" data-end="601">Second</p>¶
+</li>¶
+<li data-start="602" data-end="610">¶
+<p data-start="605" data-end="610">Third</p>¶
+</li>¶
+</ol>¶
+<p data-start="612" data-end="643">A sentence with a footnote.<sup data-start="639" data-end="643"><a id="user-content-fnref-1" data-footnote-ref="true" aria-describedby="footnote-label" data-start="639" data-end="643" class="decorated-link cursor-pointer" rel="noopener">1<span aria-hidden="true" class="ms-0.5 inline-block align-middle leading-none"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" aria-hidden="true" data-rtl-flip="" class="block h-[0.75em] w-[0.75em] stroke-current stroke-[0.75]"><use href="/cdn/assets/sprites-core-eri7ssmm.svg#304883" fill="currentColor"></use></svg></span></a></sup></p>¶
+<section data-footnotes="true" class="footnotes">¶
+<ol>¶
+<li id="user-content-fn-1" data-start="645" data-end="669" data-is-last-node="">¶
+<p data-start="651" data-end="669" data-is-last-node="">The footnote text. <a data-footnote-backref="" aria-label="Back to reference 1" class="decorated-link cursor-pointer" rel="noopener">↩</a></p></li></ol></section></div></div></div></div></div></div></article>
+
+=== 2b. cfHtml offsets ===
+StartHTML: 105
+EndHTML: 12656
+StartFragment: 141
+EndFragment: 12620
+
+=== 3. htmlPrep (after _PreprocessHtml) (len=8127) ===
+<article class="text-token-text-primary w-full focus:outline-none [--shadow-height:45px] has-data-writing-block:pointer-events-none has-data-writing-block:-mt-(--shadow-height) has-data-writing-block:pt-(--shadow-height) [&amp;:has([data-writing-block])&gt;*]:pointer-events-auto scroll-mt-(--header-height)" tabindex="-1" dir="auto" data-turn-id="e7e18cd8-cda9-498a-8e2f-be36bc9a685c" data-testid="conversation-turn-7" data-scroll-anchor="false" data-turn="user"><p>¤POSTER_User¤</p><div class="text-base my-auto mx-auto pt-12 [--thread-content-margin:--spacing(4)] @w-sm/main:[--thread-content-margin:--spacing(6)] @w-lg/main:[--thread-content-margin:--spacing(16)] px-(--thread-content-margin)"><div tabindex="-1" class="[--thread-content-max-width:40rem] @w-lg/main:[--thread-content-max-width:48rem] mx-auto max-w-(--thread-content-max-width) flex-1 group/turn-messages focus-visible:outline-hidden relative flex w-full min-w-0 flex-col"><p>¤POSTER_AI¤</p><div class="flex max-w-full flex-col grow"><div data-message-author-role="user" data-message-id="e7e18cd8-cda9-498a-8e2f-be36bc9a685c" dir="auto" class="min-h-8 text-message relative flex w-full flex-col items-end gap-2 text-start break-words whitespace-normal [.text-message+&amp;]:mt-1"><p>¤POSTER_User¤</p><div class="flex w-full flex-col gap-1 empty:hidden items-end rtl:items-start"><p>¤POSTER_User¤</p><div class="user-message-bubble-color corner-superellipse/1.1 relative rounded-[18px] px-4 py-1.5 data-[multiline]:py-3 max-w-[var(--user-chat-width,70%)]" data-multiline=""><div class="whitespace-pre-wrap">Output a markdown test document demonstrating each of the following. No explanations — just the document.¶
+¶
+Required sections, in order:¶
+¶
+1.  Three heading levels (H1, H2, H3)¶
+2.  An inline-formatting paragraph using bold, italic, bold-italic, strikethrough, inline code, and a link¶
+3.  Three fenced code blocks with language tags: one Python (with at least one blank line inside), one JavaScript (with at least one blank line inside), one Bash¶
+4.  A task list with at least one checked and one unchecked item¶
+5.  A blockquote with a nested blockquote inside¶
+6.  A table with left, center, and right column alignment¶
+7.  An unordered list with at least one nested item¶
+8.  An ordered list¶
+9.  A footnote reference and its definition</div></div></div></div></div><div class="z-0 flex justify-end"></div></div></div></article><article class="text-token-text-primary w-full focus:outline-none [--shadow-height:45px] has-data-writing-block:pointer-events-none has-data-writing-block:-mt-(--shadow-height) has-data-writing-block:pt-(--shadow-height) [&amp;:has([data-writing-block])&gt;*]:pointer-events-auto scroll-mt-[calc(var(--header-height)+min(200px,max(70px,20svh)))]" tabindex="-1" dir="auto" data-turn-id="request-WEB:6ce35c78-e49e-4761-86ed-b0601f3f87be-3" data-testid="conversation-turn-8" data-scroll-anchor="true" data-turn="assistant"><p>¤POSTER_AI¤</p><div class="text-base my-auto mx-auto pb-10 [--thread-content-margin:--spacing(4)] @w-sm/main:[--thread-content-margin:--spacing(6)] @w-lg/main:[--thread-content-margin:--spacing(16)] px-(--thread-content-margin)"><div tabindex="-1" class="[--thread-content-max-width:40rem] @w-lg/main:[--thread-content-max-width:48rem] mx-auto max-w-(--thread-content-max-width) flex-1 group/turn-messages focus-visible:outline-hidden relative flex w-full min-w-0 flex-col agent-turn"><p>¤POSTER_AI¤</p><div class="flex max-w-full flex-col grow"><div data-message-author-role="assistant" data-message-id="b87ca3e2-1278-4e11-8eb3-49211f024b8d" dir="auto" data-message-model-slug="gpt-5-2-thinking" class="min-h-8 text-message relative flex w-full flex-col items-end gap-2 text-start break-words whitespace-normal [.text-message+&amp;]:mt-1"><p>¤POSTER_User¤</p><div class="flex w-full flex-col gap-1 empty:hidden first:pt-[1px]"><div class="markdown prose dark:prose-invert w-full wrap-break-word dark markdown-new-styling"><h1 data-start="0" data-end="12">H1 Heading</h1>¶
+<h2 data-start="14" data-end="27">H2 Heading</h2>¶
+<h3 data-start="29" data-end="43">H3 Heading</h3>¶
+<p data-start="45" data-end="173">This paragraph shows <strong data-start="66" data-end="74">bold</strong>, <em data-start="76" data-end="84">italic</em>, <em data-start="86" data-end="103"><strong data-start="87" data-end="102">bold-italic</strong></em>, <del data-start="105" data-end="122">strikethrough</del>, <code data-start="124" data-end="137">inline code</code>, and a <a data-start="145" data-end="172" rel="noopener" target="_new" class="decorated-link" href="https://example.com">link<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" aria-hidden="true" data-rtl-flip="" class="block h-[0.75em] w-[0.75em] stroke-current stroke-[0.75]"><use href="/cdn/assets/sprites-core-eri7ssmm.svg#304883" fill="currentColor"></use></svg></a>.</p>¶
+<pre><code>def greet(name):  return f"Hello, {name}!"print(greet("world"))</code></pre>¶
+<pre><code>function add(a, b) {  return a + b;}console.log(add(1, 2));</code></pre>¶
+<pre><code>echo "hello"</code></pre>¶
+<ul class="contains-task-list" data-start="367" data-end="392">¶
+<li>¤CHK¤ Done</li>¶
+<li>¤UNCHK¤ Not done</li>¶
+</ul>¶
+<blockquote data-start="394" data-end="430">¶
+<p data-start="396" data-end="405">Level one</p>¶
+<blockquote data-start="410" data-end="430">¶
+<p data-start="412" data-end="430">Level two (nested)</p>¶
+</blockquote>¶
+</blockquote>¶
+<div class="TyagGW_tableContainer"><div tabindex="-1" class="group TyagGW_tableWrapper flex flex-col-reverse w-fit"><table data-start="432" data-end="535" class="w-fit min-w-(--thread-content-width)"><thead data-start="432" data-end="457"><tr data-start="432" data-end="457"><th data-start="432" data-end="439" data-col-size="sm" class="">Left</th><th data-start="439" data-end="448" data-col-size="sm" class="">Center</th><th data-start="448" data-end="457" data-col-size="sm" class="">Right</th></tr></thead><tbody data-start="484" data-end="535"><tr data-start="484" data-end="509"><td data-start="484" data-end="491" data-col-size="sm">a</td><td data-start="491" data-end="500" data-col-size="sm">b</td><td data-start="500" data-end="509" data-col-size="sm">c</td></tr><tr data-start="510" data-end="535"><td data-start="510" data-end="517" data-col-size="sm">1</td><td data-start="517" data-end="526" data-col-size="sm">2</td><td data-start="526" data-end="535" data-col-size="sm">3</td></tr></tbody></table></div></div>¶
+<ul data-start="537" data-end="581">¶
+<li data-start="537" data-end="544">¶
+<p data-start="539" data-end="544">Alpha</p>¶
+</li>¶
+<li data-start="545" data-end="573">¶
+<p data-start="547" data-end="551">Beta</p>¶
+<ul data-start="554" data-end="573">¶
+<li data-start="554" data-end="573">¶
+<p data-start="556" data-end="573">Nested under Beta</p>¶
+</li>¶
+</ul>¶
+</li>¶
+<li data-start="574" data-end="581">¶
+<p data-start="576" data-end="581">Gamma</p>¶
+</li>¶
+</ul>¶
+<ol data-start="583" data-end="610">¶
+<li data-start="583" data-end="591">¶
+<p data-start="586" data-end="591">First</p>¶
+</li>¶
+<li data-start="592" data-end="601">¶
+<p data-start="595" data-end="601">Second</p>¶
+</li>¶
+<li data-start="602" data-end="610">¶
+<p data-start="605" data-end="610">Third</p>¶
+</li>¶
+</ol>¶
+<p data-start="612" data-end="643">A sentence with a footnote.<sup data-start="639" data-end="643"><a id="user-content-fnref-1" data-footnote-ref="true" aria-describedby="footnote-label" data-start="639" data-end="643" class="decorated-link cursor-pointer" rel="noopener">1<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" aria-hidden="true" data-rtl-flip="" class="block h-[0.75em] w-[0.75em] stroke-current stroke-[0.75]"><use href="/cdn/assets/sprites-core-eri7ssmm.svg#304883" fill="currentColor"></use></svg></a></sup></p>¶
+<section data-footnotes="true" class="footnotes">¶
+<ol>¶
+<li id="user-content-fn-1" data-start="645" data-end="669" data-is-last-node="">¶
+<p data-start="651" data-end="669" data-is-last-node="">The footnote text. <a data-footnote-backref="" aria-label="Back to reference 1" class="decorated-link cursor-pointer" rel="noopener">↩</a></p></li></ol></section></div></div></div></div></div></div></article>
+
+=== 4. mdRaw (pandoc output) (len=4250) ===
+¤POSTER_User¤¶
+¶
+<div class="text-base my-auto mx-auto pt-12 [--thread-content-margin:--spacing(4)] @w-sm/main:[--thread-content-margin:--spacing(6)] @w-lg/main:[--thread-content-margin:--spacing(16)] px-(--thread-content-margin)">¶
+¶
+<div class="[--thread-content-max-width:40rem] @w-lg/main:[--thread-content-max-width:48rem] mx-auto max-w-(--thread-content-max-width) flex-1 group/turn-messages focus-visible:outline-hidden relative flex w-full min-w-0 flex-col" tabindex="-1">¶
+¶
+¤POSTER_AI¤¶
+¶
+<div class="flex max-w-full flex-col grow">¶
+¶
+<div class="min-h-8 text-message relative flex w-full flex-col items-end gap-2 text-start break-words whitespace-normal [.text-message+&]:mt-1" message-author-role="user" message-id="e7e18cd8-cda9-498a-8e2f-be36bc9a685c" dir="auto">¶
+¶
+¤POSTER_User¤¶
+¶
+<div class="flex w-full flex-col gap-1 empty:hidden items-end rtl:items-start">¶
+¶
+¤POSTER_User¤¶
+¶
+<div class="user-message-bubble-color corner-superellipse/1.1 relative rounded-[18px] px-4 py-1.5 data-[multiline]:py-3 max-w-[var(--user-chat-width,70%)]" multiline="">¶
+¶
+<div class="whitespace-pre-wrap">¶
+¶
+Output a markdown test document demonstrating each of the following. No explanations — just the document. Required sections, in order: 1. Three heading levels (H1, H2, H3) 2. An inline-formatting paragraph using bold, italic, bold-italic, strikethrough, inline code, and a link 3. Three fenced code blocks with language tags: one Python (with at least one blank line inside), one JavaScript (with at least one blank line inside), one Bash 4. A task list with at least one checked and one unchecked item 5. A blockquote with a nested blockquote inside 6. A table with left, center, and right column alignment 7. An unordered list with at least one nested item 8. An ordered list 9. A footnote reference and its definition¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+<div class="z-0 flex justify-end">¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+¤POSTER_AI¤¶
+¶
+<div class="text-base my-auto mx-auto pb-10 [--thread-content-margin:--spacing(4)] @w-sm/main:[--thread-content-margin:--spacing(6)] @w-lg/main:[--thread-content-margin:--spacing(16)] px-(--thread-content-margin)">¶
+¶
+<div class="[--thread-content-max-width:40rem] @w-lg/main:[--thread-content-max-width:48rem] mx-auto max-w-(--thread-content-max-width) flex-1 group/turn-messages focus-visible:outline-hidden relative flex w-full min-w-0 flex-col agent-turn" tabindex="-1">¶
+¶
+¤POSTER_AI¤¶
+¶
+<div class="flex max-w-full flex-col grow">¶
+¶
+<div class="min-h-8 text-message relative flex w-full flex-col items-end gap-2 text-start break-words whitespace-normal [.text-message+&]:mt-1" message-author-role="assistant" message-id="b87ca3e2-1278-4e11-8eb3-49211f024b8d" dir="auto" message-model-slug="gpt-5-2-thinking">¶
+¶
+¤POSTER_User¤¶
+¶
+<div class="flex w-full flex-col gap-1 empty:hidden first:pt-[1px]">¶
+¶
+<div class="markdown prose dark:prose-invert w-full wrap-break-word dark markdown-new-styling">¶
+¶
+# H1 Heading¶
+¶
+## H2 Heading¶
+¶
+### H3 Heading¶
+¶
+This paragraph shows **bold**, *italic*, ***bold-italic***, ~~strikethrough~~, `inline code`, and a <a href="https://example.com" class="decorated-link" data-start="145" data-end="172" rel="noopener" target="_new">link[img]</a>.¶
+¶
+    def greet(name):  return f"Hello, {name}!"print(greet("world"))¶
+¶
+    function add(a, b) {  return a + b;}console.log(add(1, 2));¶
+¶
+    echo "hello"¶
+¶
+- ¤CHK¤ Done¶
+- ¤UNCHK¤ Not done¶
+¶
+> Level one¶
+>¶
+> > Level two (nested)¶
+¶
+<div class="TyagGW_tableContainer">¶
+¶
+<div class="group TyagGW_tableWrapper flex flex-col-reverse w-fit" tabindex="-1">¶
+¶
+| Left | Center | Right |¶
+|------|--------|-------|¶
+| a    | b      | c     |¶
+| 1    | 2      | 3     |¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+- Alpha¶
+¶
+- Beta¶
+¶
+  - Nested under Beta¶
+¶
+- Gamma¶
+¶
+1.  First¶
+¶
+2.  Second¶
+¶
+3.  Third¶
+¶
+A sentence with a footnote.<sup><span id="user-content-fnref-1" class="decorated-link cursor-pointer" footnote-ref="true" aria-describedby="footnote-label" data-start="639" end="643" rel="noopener">1[img]</span></sup>¶
+¶
+<div class="section footnotes" footnotes="true">¶
+¶
+1.  <div id="user-content-fn-1">¶
+¶
+    The footnote text. <span class="decorated-link cursor-pointer" footnote-backref="" aria-label="Back to reference 1" rel="noopener">↩</span>¶
+¶
+    </div>¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+</div>¶
+
+
+=== 5. md (after CleanMarkdown) (len=1487) ===
+¤POSTER_User¤¶
+¶
+¤POSTER_AI¤¶
+¶
+¤POSTER_User¤¶
+¶
+¤POSTER_User¤¶
+¶
+Output a markdown test document demonstrating each of the following. No explanations — just the document. Required sections, in order: 1. Three heading levels (H1, H2, H3) 2. An inline-formatting paragraph using bold, italic, bold-italic, strikethrough, inline code, and a link 3. Three fenced code blocks with language tags: one Python (with at least one blank line inside), one JavaScript (with at least one blank line inside), one Bash 4. A task list with at least one checked and one unchecked item 5. A blockquote with a nested blockquote inside 6. A table with left, center, and right column alignment 7. An unordered list with at least one nested item 8. An ordered list 9. A footnote reference and its definition¶
+¶
+¤POSTER_AI¤¶
+¶
+¤POSTER_AI¤¶
+¶
+¤POSTER_User¤¶
+¶
+# H1 Heading¶
+¶
+## H2 Heading¶
+¶
+### H3 Heading¶
+¶
+This paragraph shows **bold**, *italic*, ***bold-italic***, ~~strikethrough~~, `inline code`, and a [link[img]](https://example.com).¶
+¶
+    def greet(name):  return f"Hello, {name}!"print(greet("world"))¶
+¶
+    function add(a, b) {  return a + b;}console.log(add(1, 2));¶
+¶
+    echo "hello"¶
+¶
+- [x] Done¶
+- [ ] Not done¶
+¶
+> Level one¶
+>¶
+> > Level two (nested)¶
+¶
+| Left | Center | Right |¶
+|------|--------|-------|¶
+| a    | b      | c     |¶
+| 1    | 2      | 3     |¶
+¶
+- Alpha¶
+¶
+- Beta¶
+¶
+  - Nested under Beta¶
+¶
+- Gamma¶
+¶
+1.  First¶
+2.  Second¶
+3.  Third¶
+¶
+A sentence with a footnote.<sup>1[img]</sup>¶
+¶
+1.  ¶
+¶
+    The footnote text. ↩¶
+¶
+    ¶
+
+
+=== 5c. expected list start (ordered-list fix) (len=1) ===
+0
+
+=== 5d. md (after RestoreOrderedListStart) (len=1487) ===
+¤POSTER_User¤¶
+¶
+¤POSTER_AI¤¶
+¶
+¤POSTER_User¤¶
+¶
+¤POSTER_User¤¶
+¶
+Output a markdown test document demonstrating each of the following. No explanations — just the document. Required sections, in order: 1. Three heading levels (H1, H2, H3) 2. An inline-formatting paragraph using bold, italic, bold-italic, strikethrough, inline code, and a link 3. Three fenced code blocks with language tags: one Python (with at least one blank line inside), one JavaScript (with at least one blank line inside), one Bash 4. A task list with at least one checked and one unchecked item 5. A blockquote with a nested blockquote inside 6. A table with left, center, and right column alignment 7. An unordered list with at least one nested item 8. An ordered list 9. A footnote reference and its definition¶
+¶
+¤POSTER_AI¤¶
+¶
+¤POSTER_AI¤¶
+¶
+¤POSTER_User¤¶
+¶
+# H1 Heading¶
+¶
+## H2 Heading¶
+¶
+### H3 Heading¶
+¶
+This paragraph shows **bold**, *italic*, ***bold-italic***, ~~strikethrough~~, `inline code`, and a [link[img]](https://example.com).¶
+¶
+    def greet(name):  return f"Hello, {name}!"print(greet("world"))¶
+¶
+    function add(a, b) {  return a + b;}console.log(add(1, 2));¶
+¶
+    echo "hello"¶
+¶
+- [x] Done¶
+- [ ] Not done¶
+¶
+> Level one¶
+>¶
+> > Level two (nested)¶
+¶
+| Left | Center | Right |¶
+|------|--------|-------|¶
+| a    | b      | c     |¶
+| 1    | 2      | 3     |¶
+¶
+- Alpha¶
+¶
+- Beta¶
+¶
+  - Nested under Beta¶
+¶
+- Gamma¶
+¶
+1.  First¶
+2.  Second¶
+3.  Third¶
+¶
+A sentence with a footnote.<sup>1[img]</sup>¶
+¶
+1.  ¶
+¶
+    The footnote text. ↩¶
+¶
+    ¶
+
+
+=== 5e. md (after SHOW_POSTER replacement) (len=1510) ===
+**User:**¶
+>¶
+**AI:**¶
+>¶
+**User:**¶
+>¶
+> Output a markdown test document demonstrating each of the following. No explanations — just the document. Required sections, in order: 1. Three heading levels (H1, H2, H3) 2. An inline-formatting paragraph using bold, italic, bold-italic, strikethrough, inline code, and a link 3. Three fenced code blocks with language tags: one Python (with at least one blank line inside), one JavaScript (with at least one blank line inside), one Bash 4. A task list with at least one checked and one unchecked item 5. A blockquote with a nested blockquote inside 6. A table with left, center, and right column alignment 7. An unordered list with at least one nested item 8. An ordered list 9. A footnote reference and its definition¶
+>¶
+**AI:**¶
+>¶
+**User:**¶
+>¶
+> # H1 Heading¶
+>¶
+> ## H2 Heading¶
+>¶
+> ### H3 Heading¶
+>¶
+> This paragraph shows **bold**, *italic*, ***bold-italic***, ~~strikethrough~~, `inline code`, and a [link[img]](https://example.com).¶
+>¶
+>     def greet(name):  return f"Hello, {name}!"print(greet("world"))¶
+>¶
+>     function add(a, b) {  return a + b;}console.log(add(1, 2));¶
+>¶
+>     echo "hello"¶
+>¶
+> - [x] Done¶
+> - [ ] Not done¶
+>¶
+> > Level one¶
+> >¶
+> > > Level two (nested)¶
+>¶
+> | Left | Center | Right |¶
+> |------|--------|-------|¶
+> | a    | b      | c     |¶
+> | 1    | 2      | 3     |¶
+>¶
+> - Alpha¶
+>¶
+> - Beta¶
+>¶
+>   - Nested under Beta¶
+>¶
+> - Gamma¶
+>¶
+> 1.  First¶
+> 2.  Second¶
+> 3.  Third¶
+>¶
+> A sentence with a footnote.<sup>1[img]</sup>¶
+>¶
+> 1.  ¶
+>¶
+>     The footnote text. ↩¶
+
+
+=== 6. FINAL md (pasted) (len=1510) ===
+**User:**¶
+>¶
+**AI:**¶
+>¶
+**User:**¶
+>¶
+> Output a markdown test document demonstrating each of the following. No explanations — just the document. Required sections, in order: 1. Three heading levels (H1, H2, H3) 2. An inline-formatting paragraph using bold, italic, bold-italic, strikethrough, inline code, and a link 3. Three fenced code blocks with language tags: one Python (with at least one blank line inside), one JavaScript (with at least one blank line inside), one Bash 4. A task list with at least one checked and one unchecked item 5. A blockquote with a nested blockquote inside 6. A table with left, center, and right column alignment 7. An unordered list with at least one nested item 8. An ordered list 9. A footnote reference and its definition¶
+>¶
+**AI:**¶
+>¶
+**User:**¶
+>¶
+> # H1 Heading¶
+>¶
+> ## H2 Heading¶
+>¶
+> ### H3 Heading¶
+>¶
+> This paragraph shows **bold**, *italic*, ***bold-italic***, ~~strikethrough~~, `inline code`, and a [link[img]](https://example.com).¶
+>¶
+>     def greet(name):  return f"Hello, {name}!"print(greet("world"))¶
+>¶
+>     function add(a, b) {  return a + b;}console.log(add(1, 2));¶
+>¶
+>     echo "hello"¶
+>¶
+> - [x] Done¶
+> - [ ] Not done¶
+>¶
+> > Level one¶
+> >¶
+> > > Level two (nested)¶
+>¶
+> | Left | Center | Right |¶
+> |------|--------|-------|¶
+> | a    | b      | c     |¶
+> | 1    | 2      | 3     |¶
+>¶
+> - Alpha¶
+>¶
+> - Beta¶
+>¶
+>   - Nested under Beta¶
+>¶
+> - Gamma¶
+>¶
+> 1.  First¶
+> 2.  Second¶
+> 3.  Third¶
+>¶
+> A sentence with a footnote.<sup>1[img]</sup>¶
+>¶
+> 1.  ¶
+>¶
+>     The footnote text. ↩¶
+
+

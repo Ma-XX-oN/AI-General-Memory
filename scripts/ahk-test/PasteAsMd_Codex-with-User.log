@@ -1,0 +1,595 @@
+﻿PasteAsMd debug — 2026-03-02 01:51:17
+
+=== 1. plain (A_Clipboard minus CR) (len=1505) ===
+Output a markdown test document demonstrating each of the following. No explanations — just the document.¶
+¶
+Required sections, in order:¶
+¶
+1.  Three heading levels (H1, H2, H3)¶
+2.  An inline-formatting paragraph using bold, italic, bold-italic, strikethrough, inline code, and a link¶
+3.  Three fenced code blocks with language tags: one Python (with at least one blank line inside), one JavaScript (with at least one blank line inside), one Bash¶
+4.  A task list with at least one checked and one unchecked item¶
+5.  A blockquote with a nested blockquote inside¶
+6.  A table with left, center, and right column alignment¶
+7.  An unordered list with at least one nested item¶
+8.  An ordered list¶
+9.  A footnote reference and its definition¶
+¶
+Heading Level 1¶
+Heading Level 2¶
+Heading Level 3¶
+This paragraph uses bold, italic, bold-italic, strikethrough, inline code, and a link.¶
+¶
+def greet(name):¶
+    message = f"Hello, {name}!"¶
+¶
+    return message¶
+¶
+print(greet("world"))¶
+function greet(name) {¶
+  const message = `Hello, ${name}!`;¶
+¶
+  return message;¶
+}¶
+¶
+console.log(greet("world"));¶
+echo "Starting job"¶
+mkdir -p ./tmp¶
+echo "Done"¶
+ Checked item¶
+ Unchecked item¶
+This is the outer blockquote.¶
+¶
+This is the nested blockquote.¶
+It has a second line.¶
+¶
+Back to the outer blockquote.¶
+¶
+Left	Center	Right¶
+L1	C1	R1¶
+L2	C2	R22¶
+Unordered item one¶
+Unordered item two¶
+Nested unordered item¶
+Unordered item three¶
+Ordered item one¶
+Ordered item two¶
+Ordered item three with footnote reference1¶
+Footnotes¶
+This is the footnote definition. ↩
+
+=== 2. cfHtml (raw full payload) (len=35290) ===
+Version:0.9⏎¶⏎¶
+¶
+StartHTML:0000000475⏎¶⏎¶
+¶
+EndHTML:0000035290⏎¶⏎¶
+¶
+StartFragment:0000000511⏎¶⏎¶
+¶
+EndFragment:0000035254⏎¶⏎¶
+¶
+SourceURL:vscode-webview://0sm6951fc3s1fe2g40vq8ni09j6l1jsdaenck51vtpgfh427ffk5/index.html?id=7fccb0da-7c3f-4b89-ad90-3ec4b953ab13&parentId=1&origin=8490f5f0-3f6e-45fa-b55e-e7ea32531261&swVersion=4&extensionId=openai.chatgpt&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net&parentOrigin=vscode-file%3A%2F%2Fvscode-app&purpose=webviewView⏎¶⏎¶
+¶
+<html>⏎¶⏎¶
+¶
+<body>⏎¶⏎¶
+¶
+<!--StartFragment--><div class="flex flex-col" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; display: flex; flex-direction: column; color: rgb(204, 204, 204); font-family: &quot;Segoe WPC&quot;, &quot;Segoe UI&quot;, sans-serif; font-size: 13px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial;"><div data-content-search-unit-key="019cad3c-c506-7922-861e-8bae0bec948b:0:user" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><div class="flex flex-col items-end gap-2" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;"><div class="group flex w-full flex-col items-end justify-end gap-1" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; display: flex; width: 270.4px; flex-direction: column; align-items: flex-end; justify-content: flex-end; gap: 4px;"><div class="bg-token-foreground/5 max-w-[77%] break-words rounded-2xl px-3 py-2 [&amp;_.contain-inline-size]:[contain:initial]" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; max-width: 77%; border-radius: 20px; background-color: oklab(0.845175 0.0000383258 0.0000169277 / 0.05); padding-inline: 12px; padding-block: 8px; overflow-wrap: break-word; corner-shape: superellipse(1.5);"><div class="text-size-chat whitespace-pre-wrap" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; white-space: pre-wrap; font-size: 13px;"><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">Output a markdown test document demonstrating each of the following. No explanations â€” just the document.¶
+¶
+Required sections, in order:¶
+¶
+1.  Three heading levels (H1, H2, H3)¶
+2.  An inline-formatting paragraph using bold, italic, bold-italic, strikethrough, inline code, and a link¶
+3.  Three fenced code blocks with language tags: one Python (with at least one blank line inside), one JavaScript (with at least one blank line inside), one Bash¶
+4.  A task list with at least one checked and one unchecked item¶
+5.  A blockquote with a nested blockquote inside¶
+6.  A table with left, center, and right column alignment¶
+7.  An unordered list with at least one nested item¶
+8.  An ordered list¶
+9.  A footnote reference and its definition</span></div></div><div class="flex flex-row-reverse items-center gap-1" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; display: flex; flex-direction: row-reverse; align-items: center; gap: 4px;"><div class="mr-1 ms-1 flex items-start gap-0.5 transition-opacity opacity-0 group-hover:opacity-100" style="box-sizing: border-box; border: 0px solid; margin: 0px 4px 0px 0px; padding: 0px; margin-inline-start: 4px; display: flex; align-items: flex-start; gap: 2px; opacity: 0; transition-property: opacity; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 0.15s;"><button type="button" class="border-token-border user-select-none no-drag enabled:hover:bg-token-foreground/10 cursor-interaction flex items-center gap-1 border focus:outline-none disabled:cursor-not-allowed disabled:opacity-40 rounded-full electron:rounded-md text-token-description-foreground enabled:hover:bg-token-foreground/5 data-[state=open]:bg-token-foreground/5 border-transparent electron:p-1 electron:[&amp;&gt;svg]:icon-sm flex items-center justify-center p-0.5" aria-label="Copy message" data-state="closed" style="box-sizing: border-box; border: 1px solid rgba(0, 0, 0, 0); margin: 0px; padding: 2px; font: inherit; letter-spacing: inherit; color: rgb(157, 157, 157); opacity: 1; background-color: rgba(0, 0, 0, 0); border-radius: 9999px; appearance: button; display: flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer; app-region: no-drag;"><svg width="21" height="21" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-2xs"><path d="M13.468 11.1216C13.468 10.4107 13.468 9.91717 13.4367 9.53369C13.4137 9.25191 13.3758 9.0622 13.3244 8.91846L13.2687 8.78858C13.1148 8.48652 12.8803 8.23344 12.593 8.05713L12.466 7.98584C12.308 7.90546 12.0963 7.84854 11.7209 7.81787C11.3374 7.78656 10.8439 7.78662 10.133 7.78662H7.29999C6.58895 7.78662 6.09562 7.78654 5.7121 7.81787C5.43015 7.84091 5.24064 7.87872 5.09686 7.93018L4.96698 7.98584C4.66487 8.13977 4.41184 8.37419 4.23554 8.66162L4.16522 8.78858C4.08477 8.94657 4.02794 9.15811 3.99725 9.53369C3.96594 9.91718 3.96503 10.4107 3.96503 11.1216V13.9546C3.96503 14.6656 3.96592 15.159 3.99725 15.5425C4.02796 15.9182 4.08471 16.1296 4.16522 16.2876L4.23554 16.4136C4.41185 16.7012 4.66472 16.9353 4.96698 17.0894L5.09686 17.146C5.24061 17.1974 5.43024 17.2343 5.7121 17.2573C6.09562 17.2887 6.58895 17.2896 7.29999 17.2896H10.133C10.8439 17.2896 11.3374 17.2886 11.7209 17.2573C12.0965 17.2266 12.308 17.1698 12.466 17.0894L12.593 17.019C12.8804 16.8427 13.1148 16.5897 13.2687 16.2876L13.3244 16.1577C13.3759 16.0139 13.4137 15.8244 13.4367 15.5425C13.468 15.159 13.468 14.6656 13.468 13.9546V11.1216ZM14.798 13.1196C15.2528 13.118 15.6011 13.1147 15.8879 13.0913C16.2634 13.0606 16.475 13.0038 16.633 12.9233L16.759 12.8521C17.0466 12.6757 17.2808 12.4228 17.4348 12.1206L17.4914 11.9907C17.5428 11.847 17.5797 11.6572 17.6027 11.3755C17.634 10.992 17.6349 10.4985 17.6349 9.7876V6.95459C17.6349 6.24355 17.6341 5.75022 17.6027 5.3667C17.5797 5.08484 17.5428 4.89522 17.4914 4.75147L17.4348 4.62158C17.2807 4.31933 17.0466 4.06645 16.759 3.89014L16.633 3.81982C16.475 3.73932 16.2636 3.68256 15.8879 3.65186C15.5044 3.62052 15.011 3.61963 14.3 3.61963H11.467C10.7561 3.61963 10.2626 3.62054 9.87909 3.65186C9.59738 3.67487 9.40759 3.71179 9.26386 3.76318L9.13397 3.81982C8.83175 3.97382 8.57885 4.20802 8.40253 4.49561L8.33124 4.62158C8.25079 4.77957 8.19396 4.99114 8.16327 5.3667C8.13984 5.65352 8.13561 6.00178 8.13397 6.45654H10.133C10.822 6.45654 11.3791 6.4559 11.8293 6.49268C12.2873 6.5301 12.6937 6.6093 13.0705 6.80127L13.2883 6.92334C13.7839 7.22739 14.1878 7.66313 14.4533 8.18408L14.5197 8.32666C14.6642 8.66318 14.7291 9.02433 14.7619 9.42529C14.7987 9.8755 14.798 10.4326 14.798 11.1216V13.1196ZM18.965 9.7876C18.965 10.4766 18.9657 11.0337 18.9289 11.4839C18.8961 11.8848 18.8311 12.246 18.6867 12.5825L18.6203 12.7251C18.3548 13.246 17.9509 13.6818 17.4553 13.9858L17.2365 14.1079C16.8599 14.2998 16.4541 14.3791 15.9963 14.4165C15.6592 14.444 15.2624 14.4481 14.7951 14.4497C14.7935 14.917 14.7894 15.3138 14.7619 15.6509C14.7292 16.0516 14.664 16.4122 14.5197 16.7485L14.4533 16.8911C14.1878 17.4122 13.7841 17.8487 13.2883 18.1528L13.0705 18.2749C12.6937 18.4669 12.2873 18.5461 11.8293 18.5835C11.3791 18.6203 10.822 18.6196 10.133 18.6196H7.29999C6.6109 18.6196 6.05394 18.6203 5.6037 18.5835C5.20305 18.5508 4.84233 18.4855 4.50604 18.3413L4.36347 18.2749C3.84243 18.0094 3.40584 17.6056 3.10175 17.1099L2.97968 16.8911C2.78787 16.5145 2.70849 16.1087 2.67108 15.6509C2.6343 15.2006 2.63495 14.6437 2.63495 13.9546V11.1216C2.63495 10.4326 2.63431 9.8755 2.67108 9.42529C2.7085 8.96729 2.78771 8.56084 2.97968 8.18408L3.10175 7.96631C3.40585 7.47049 3.84235 7.06679 4.36347 6.80127L4.50604 6.73486C4.84236 6.59059 5.20302 6.52542 5.6037 6.49268C5.9405 6.46516 6.33707 6.4601 6.80389 6.4585C6.8055 5.99167 6.81056 5.5951 6.83807 5.2583C6.87549 4.80047 6.95482 4.39471 7.14667 4.01807L7.26874 3.79932C7.5728 3.30371 8.00855 2.89973 8.52948 2.63428L8.67206 2.56787C9.00854 2.42345 9.36978 2.35844 9.77069 2.32568C10.2209 2.28891 10.778 2.28955 11.467 2.28955H14.3C14.9891 2.28955 15.546 2.2889 15.9963 2.32568C16.4541 2.3631 16.8599 2.44247 17.2365 2.63428L17.4553 2.75635C17.951 3.06044 18.3548 3.49703 18.6203 4.01807L18.6867 4.16065C18.8309 4.49694 18.8962 4.85765 18.9289 5.2583C18.9657 5.70854 18.965 6.2655 18.965 6.95459V9.7876Z" fill="currentColor"></path></svg></button></div></div></div></div></div></div><div aria-hidden="true" class="w-full" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; width: 270.4px; color: rgb(204, 204, 204); font-family: &quot;Segoe WPC&quot;, &quot;Segoe UI&quot;, sans-serif; font-size: 13px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial; height: 16px;"></div><div class="flex flex-col" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; display: flex; flex-direction: column; color: rgb(204, 204, 204); font-family: &quot;Segoe WPC&quot;, &quot;Segoe UI&quot;, sans-serif; font-size: 13px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial;"><div data-content-search-unit-key="019cad3c-c506-7922-861e-8bae0bec948b:2:assistant" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><div class="group flex min-w-0 flex-col" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; display: flex; min-width: 0px; flex-direction: column;"><div class="[&amp;&gt;*:first-child]:mt-0 overflow-x-auto [&amp;&gt;ol:first-child]:mt-0 [&amp;&gt;ul:first-child]:mt-0 [&amp;&gt;*:last-child]:mb-0" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; overflow-x: auto; scrollbar-color: rgba(100, 100, 100, 0.7) rgba(0, 0, 0, 0);"><h1 class="font-semibold heading-lg mt-5 mb-2" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 8px; padding: 0px; font-size: 24px; font-weight: 600; line-height: 1.2; --tw-font-weight: 600;">Heading Level 1</h1><h2 class="font-semibold heading-base mt-4 mb-2" style="box-sizing: border-box; border: 0px solid; margin: 16px 0px 8px; padding: 0px; font-size: 16px; font-weight: 600; line-height: 1.33; --tw-font-weight: 600;">Heading Level 2</h2><h3 class="font-semibold text-size-chat mt-3 mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 12px 0px 6px; padding: 0px; font-size: 13px; font-weight: 600; --tw-font-weight: 600;">Heading Level 3</h3><p class="text-size-chat leading-relaxed extension:leading-normal my-2" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; margin-block: 8px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">This paragraph uses<span>Â </span><strong style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; font-weight: bolder;">bold</strong>,<span>Â </span><em style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">italic</em>,<span>Â </span><em style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><strong style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; font-weight: bolder;">bold-italic</strong></em>,<span>Â </span><del style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">strikethrough</del>,<span>Â </span><span class="inline-markdown text-size-chat-sm font-mono blend bg-token-text-code-block-background rounded-sm px-1.5 py-0.5 leading-none extension:bg-token-foreground/10 electron:bg-token-list-hover-background/60" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; border-radius: 7.5px; background-color: oklab(0.845175 0.0000383258 0.0000169277 / 0.1); padding-inline: 6px; padding-block: 2px; font-family: &quot;Cascadia Code&quot;, Consolas, &quot;Courier New&quot;, monospace; --tw-leading: 1 !important; line-height: 1 !important; font-size: 12px;">inline code</span>, and<span>Â </span><a href="https://example.com/" class="text-token-text-link-foreground underline decoration-current decoration-opacity-50 decoration-[0.5px]" target="_blank" rel="noopener noreferrer" style="color: rgb(77, 170, 252); text-decoration-line: underline; text-decoration-thickness: 0.5px; text-decoration-style: inherit; text-decoration-color: currentcolor; box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">a link</a>.</p><div class="bg-token-text-code-block-background border-token-input-background relative overflow-clip rounded-lg border contain-inline-size dark my-2" data-theme="dark" style="box-sizing: border-box; border: 1px solid rgb(49, 49, 49); margin: 0px; padding: 0px; position: relative; margin-block: 8px; overflow: clip; border-radius: 12.5px; background-color: rgb(43, 43, 43); --tw-contain-size: inline-size; contain: inline-size; corner-shape: superellipse(1.5);"><div class="text-size-chat overflow-y-auto p-2" dir="ltr" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 8px; overflow-y: auto; font-size: 13px; scrollbar-color: rgba(121, 121, 121, 0.4) rgba(0, 0, 0, 0);"><code class="whitespace-pre!" style="font-family: &quot;Cascadia Code&quot;, Consolas, &quot;Courier New&quot;, monospace; color: unset !important; background-color: unset !important; padding: 0px !important; border-radius: 0px !important; box-sizing: border-box; border: 0px solid; margin: 0px; font-feature-settings: normal; font-variation-settings: normal; font-size: 1em; white-space: pre !important;"><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-keyword" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(46, 149, 211);">def</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"> </span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-title function_" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(242, 44, 61);">greet</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">(</span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-params" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">name</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">):¶
+    message = </span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-string" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(0, 166, 125);">f"Hello, <span class="hljs-subst" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">{name}</span></span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">!"¶
+¶
+    </span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-keyword" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(46, 149, 211);">return</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"> message¶
+¶
+</span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-built_in" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(233, 149, 12);">print</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">(greet(</span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-string" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(0, 166, 125);">"world"</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">))¶
+</span></span></code></div></div><div class="bg-token-text-code-block-background border-token-input-background relative overflow-clip rounded-lg border contain-inline-size dark my-2" data-theme="dark" style="box-sizing: border-box; border: 1px solid rgb(49, 49, 49); margin: 0px; padding: 0px; position: relative; margin-block: 8px; overflow: clip; border-radius: 12.5px; background-color: rgb(43, 43, 43); --tw-contain-size: inline-size; contain: inline-size; corner-shape: superellipse(1.5);"><div class="text-size-chat overflow-y-auto p-2" dir="ltr" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 8px; overflow-y: auto; font-size: 13px; scrollbar-color: rgba(121, 121, 121, 0.4) rgba(0, 0, 0, 0);"><code class="whitespace-pre!" style="font-family: &quot;Cascadia Code&quot;, Consolas, &quot;Courier New&quot;, monospace; color: unset !important; background-color: unset !important; padding: 0px !important; border-radius: 0px !important; box-sizing: border-box; border: 0px solid; margin: 0px; font-feature-settings: normal; font-variation-settings: normal; font-size: 1em; white-space: pre !important;"><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-keyword" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(46, 149, 211);">function</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"> </span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-title function_" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(242, 44, 61);">greet</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">(</span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-params" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">name</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">) {¶
+  </span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-keyword" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(46, 149, 211);">const</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"> message = </span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-string" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(0, 166, 125);">`Hello, <span class="hljs-subst" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">${name}</span></span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">!`;¶
+¶
+  </span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-keyword" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(46, 149, 211);">return</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"> message;¶
+}¶
+¶
+</span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-variable language_" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(223, 48, 121);">console</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">.</span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-title function_" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(242, 44, 61);">log</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">(</span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-title function_" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(242, 44, 61);">greet</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">(</span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-string" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(0, 166, 125);">"world"</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">));¶
+</span></span></code></div></div><div class="bg-token-text-code-block-background border-token-input-background relative overflow-clip rounded-lg border contain-inline-size dark my-2" data-theme="dark" style="box-sizing: border-box; border: 1px solid rgb(49, 49, 49); margin: 0px; padding: 0px; position: relative; margin-block: 8px; overflow: clip; border-radius: 12.5px; background-color: rgb(43, 43, 43); --tw-contain-size: inline-size; contain: inline-size; corner-shape: superellipse(1.5);"><div class="text-size-chat overflow-y-auto p-2" dir="ltr" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 8px; overflow-y: auto; font-size: 13px; scrollbar-color: rgba(121, 121, 121, 0.4) rgba(0, 0, 0, 0);"><code class="whitespace-pre!" style="font-family: &quot;Cascadia Code&quot;, Consolas, &quot;Courier New&quot;, monospace; color: unset !important; background-color: unset !important; padding: 0px !important; border-radius: 0px !important; box-sizing: border-box; border: 0px solid; margin: 0px; font-feature-settings: normal; font-variation-settings: normal; font-size: 1em; white-space: pre !important;"><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-built_in" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(233, 149, 12);">echo</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"> </span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-string" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(0, 166, 125);">"Starting job"</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">¶
+</span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-built_in" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(233, 149, 12);">mkdir</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"> -p ./tmp¶
+</span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-built_in" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(233, 149, 12);">echo</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"> </span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-string" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(0, 166, 125);">"Done"</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">¶
+</span></span></code></div></div><ul class="text-size-chat leading-relaxed extension:leading-normal mt-0 mb-4  list-none pl-0 contains-task-list" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 16px; padding: 0px; list-style: none; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;"><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5 list-none task-list-item" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; list-style-type: none; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;"><input disabled="" type="checkbox" checked="" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; font: inherit; letter-spacing: inherit; color: inherit; opacity: 1; background-color: rgba(0, 0, 0, 0); border-radius: 0px;"><span>Â </span>Checked item</li><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5 list-none task-list-item" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; list-style-type: none; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;"><input disabled="" type="checkbox" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; font: inherit; letter-spacing: inherit; color: inherit; opacity: 1; background-color: rgba(0, 0, 0, 0); border-radius: 0px;"><span>Â </span>Unchecked item</li></ul><blockquote class="text-size-chat leading-relaxed extension:leading-normal my-3 border-l-2 border-gray-300 pl-4 italic" style="background: none 0% 0% / auto repeat scroll padding-box border-box rgb(43, 43, 43); border-color: oklch(0.872 0.01 258.338); box-sizing: border-box; border-width: 0px 0px 0px 2px; border-style: solid; border-image: initial; margin: 0px; padding: 0px 0px 0px 16px; margin-block: 12px; --tw-leading: 1.5; line-height: 1.5; font-style: italic; font-size: 13px;"><p class="text-size-chat leading-relaxed extension:leading-normal my-2" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; margin-block: 8px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">This is the outer blockquote.</p><blockquote class="text-size-chat leading-relaxed extension:leading-normal my-3 border-l-2 border-gray-300 pl-4 italic" style="background: none 0% 0% / auto repeat scroll padding-box border-box rgb(43, 43, 43); border-color: oklch(0.872 0.01 258.338); box-sizing: border-box; border-width: 0px 0px 0px 2px; border-style: solid; border-image: initial; margin: 0px; padding: 0px 0px 0px 16px; margin-block: 12px; --tw-leading: 1.5; line-height: 1.5; font-style: italic; font-size: 13px;"><p class="text-size-chat leading-relaxed extension:leading-normal my-2" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; margin-block: 8px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">This is the nested blockquote.<br style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">It has a second line.</p></blockquote><p class="text-size-chat leading-relaxed extension:leading-normal my-2" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; margin-block: 8px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">Back to the outer blockquote.</p></blockquote><table class="text-size-chat leading-relaxed extension:leading-normal my-3 w-full border-collapse" style="box-sizing: border-box; border-width: 0px; border-style: solid; border-color: inherit; border-image: initial; margin: 0px; padding: 0px; text-indent: 0px; border-collapse: collapse; margin-block: 12px; width: 270.4px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;"><thead class="bg-token-foreground/5" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; background-color: oklab(0.845175 0.0000383258 0.0000169277 / 0.05);"><tr class="border-token-border border-b" style="box-sizing: border-box; border-width: 0px 0px 1px; border-style: solid; border-color: oklab(0.845175 0.0000383258 0.0000169277 / 0.08); border-image: initial; margin: 0px; padding: 0px;"><th class="p-1 text-left font-semibold text-token-foreground" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 4px; text-align: left; --tw-font-weight: 600; font-weight: 600; color: rgb(204, 204, 204);">Left</th><th class="p-1 text-left font-semibold text-token-foreground" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 4px; text-align: left; --tw-font-weight: 600; font-weight: 600; color: rgb(204, 204, 204);">Center</th><th class="p-1 text-left font-semibold text-token-foreground" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 4px; text-align: left; --tw-font-weight: 600; font-weight: 600; color: rgb(204, 204, 204);">Right</th></tr></thead><tbody style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><tr class="border-token-border border-b" style="box-sizing: border-box; border-width: 0px 0px 1px; border-style: solid; border-color: oklab(0.845175 0.0000383258 0.0000169277 / 0.08); border-image: initial; margin: 0px; padding: 0px;"><td class="p-1" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 4px;">L1</td><td class="p-1" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 4px;">C1</td><td class="p-1" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 4px;">R1</td></tr><tr class="border-token-border border-b" style="box-sizing: border-box; border-width: 0px 0px 1px; border-style: solid; border-color: oklab(0.845175 0.0000383258 0.0000169277 / 0.08); border-image: initial; margin: 0px; padding: 0px;"><td class="p-1" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 4px;">L2</td><td class="p-1" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 4px;">C2</td><td class="p-1" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 4px;">R22</td></tr></tbody></table><ul class="text-size-chat leading-relaxed extension:leading-normal mt-0 mb-4  list-disc pl-4" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 16px; padding: 0px 0px 0px 16px; list-style: disc; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;"><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">Unordered item one</li><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">Unordered item two<ul class="text-size-chat leading-relaxed extension:leading-normal mt-0 mb-4  list-disc pl-4" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 16px; padding: 0px 0px 0px 16px; list-style: disc; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;"><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">Nested unordered item</li></ul></li><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">Unordered item three</li></ul><ol class="text-size-chat leading-relaxed extension:leading-normal list-decimal mt-1.5 mb-3 pl-8" start="1" style="box-sizing: border-box; border: 0px solid; margin: 6px 0px 12px; padding: 0px 0px 0px 32px; list-style: decimal; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;"><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">Ordered item one</li><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">Ordered item two</li><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">Ordered item three with footnote reference<sup style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; vertical-align: baseline; font-size: 9.75px; line-height: 0; position: relative; top: -0.5em;"><a href="https://file+.vscode-resource.vscode-cdn.net/c%3A/Users/adria/.vscode/extensions/openai.chatgpt-0.4.79-win32-x64/webview/#user-content-fn-note" class="text-token-text-link-foreground underline decoration-current decoration-opacity-50 decoration-[0.5px]" target="_blank" rel="noopener noreferrer" style="color: rgb(77, 170, 252); box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; text-decoration-line: underline; text-decoration-thickness: 0.5px; text-decoration-style: inherit; text-decoration-color: currentcolor;">1</a></sup></li></ol><section data-footnotes="true" class="footnotes" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><h2 class="font-semibold heading-base mt-4 mb-2" style="box-sizing: border-box; border: 0px solid; margin: 16px 0px 8px; padding: 0px; font-size: 16px; font-weight: 600; line-height: 1.33; --tw-font-weight: 600;">Footnotes</h2><ol class="text-size-chat leading-relaxed extension:leading-normal list-decimal mt-1.5 mb-3 pl-8" start="1" style="box-sizing: border-box; border: 0px solid; margin: 6px 0px 12px; padding: 0px 0px 0px 32px; list-style: decimal; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;"><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;"><p class="text-size-chat leading-relaxed extension:leading-normal my-2" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; margin-block: 8px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">This is the footnote definition.<span>Â </span><a href="https://file+.vscode-resource.vscode-cdn.net/c%3A/Users/adria/.vscode/extensions/openai.chatgpt-0.4.79-win32-x64/webview/#user-content-fnref-note" class="text-token-text-link-foreground underline decoration-current decoration-opacity-50 decoration-[0.5px]" target="_blank" rel="noopener noreferrer" style="color: rgb(77, 170, 252); text-decoration-line: underline; text-decoration-thickness: 0.5px; text-decoration-style: inherit; text-decoration-color: currentcolor; box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">â†©</a></p></li></ol></section></div></div></div></div><!--EndFragment-->⏎¶⏎¶
+¶
+</body>⏎¶⏎¶
+¶
+</html>
+
+=== 3. htmlFrag (CF_HTML fragment) (len=34730) ===
+<div class="flex flex-col" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; display: flex; flex-direction: column; color: rgb(204, 204, 204); font-family: &quot;Segoe WPC&quot;, &quot;Segoe UI&quot;, sans-serif; font-size: 13px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial;"><div data-content-search-unit-key="019cad3c-c506-7922-861e-8bae0bec948b:0:user" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><div class="flex flex-col items-end gap-2" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;"><div class="group flex w-full flex-col items-end justify-end gap-1" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; display: flex; width: 270.4px; flex-direction: column; align-items: flex-end; justify-content: flex-end; gap: 4px;"><div class="bg-token-foreground/5 max-w-[77%] break-words rounded-2xl px-3 py-2 [&amp;_.contain-inline-size]:[contain:initial]" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; max-width: 77%; border-radius: 20px; background-color: oklab(0.845175 0.0000383258 0.0000169277 / 0.05); padding-inline: 12px; padding-block: 8px; overflow-wrap: break-word; corner-shape: superellipse(1.5);"><div class="text-size-chat whitespace-pre-wrap" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; white-space: pre-wrap; font-size: 13px;"><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">Output a markdown test document demonstrating each of the following. No explanations — just the document.¶
+¶
+Required sections, in order:¶
+¶
+1.  Three heading levels (H1, H2, H3)¶
+2.  An inline-formatting paragraph using bold, italic, bold-italic, strikethrough, inline code, and a link¶
+3.  Three fenced code blocks with language tags: one Python (with at least one blank line inside), one JavaScript (with at least one blank line inside), one Bash¶
+4.  A task list with at least one checked and one unchecked item¶
+5.  A blockquote with a nested blockquote inside¶
+6.  A table with left, center, and right column alignment¶
+7.  An unordered list with at least one nested item¶
+8.  An ordered list¶
+9.  A footnote reference and its definition</span></div></div><div class="flex flex-row-reverse items-center gap-1" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; display: flex; flex-direction: row-reverse; align-items: center; gap: 4px;"><div class="mr-1 ms-1 flex items-start gap-0.5 transition-opacity opacity-0 group-hover:opacity-100" style="box-sizing: border-box; border: 0px solid; margin: 0px 4px 0px 0px; padding: 0px; margin-inline-start: 4px; display: flex; align-items: flex-start; gap: 2px; opacity: 0; transition-property: opacity; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 0.15s;"><button type="button" class="border-token-border user-select-none no-drag enabled:hover:bg-token-foreground/10 cursor-interaction flex items-center gap-1 border focus:outline-none disabled:cursor-not-allowed disabled:opacity-40 rounded-full electron:rounded-md text-token-description-foreground enabled:hover:bg-token-foreground/5 data-[state=open]:bg-token-foreground/5 border-transparent electron:p-1 electron:[&amp;&gt;svg]:icon-sm flex items-center justify-center p-0.5" aria-label="Copy message" data-state="closed" style="box-sizing: border-box; border: 1px solid rgba(0, 0, 0, 0); margin: 0px; padding: 2px; font: inherit; letter-spacing: inherit; color: rgb(157, 157, 157); opacity: 1; background-color: rgba(0, 0, 0, 0); border-radius: 9999px; appearance: button; display: flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer; app-region: no-drag;"><svg width="21" height="21" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-2xs"><path d="M13.468 11.1216C13.468 10.4107 13.468 9.91717 13.4367 9.53369C13.4137 9.25191 13.3758 9.0622 13.3244 8.91846L13.2687 8.78858C13.1148 8.48652 12.8803 8.23344 12.593 8.05713L12.466 7.98584C12.308 7.90546 12.0963 7.84854 11.7209 7.81787C11.3374 7.78656 10.8439 7.78662 10.133 7.78662H7.29999C6.58895 7.78662 6.09562 7.78654 5.7121 7.81787C5.43015 7.84091 5.24064 7.87872 5.09686 7.93018L4.96698 7.98584C4.66487 8.13977 4.41184 8.37419 4.23554 8.66162L4.16522 8.78858C4.08477 8.94657 4.02794 9.15811 3.99725 9.53369C3.96594 9.91718 3.96503 10.4107 3.96503 11.1216V13.9546C3.96503 14.6656 3.96592 15.159 3.99725 15.5425C4.02796 15.9182 4.08471 16.1296 4.16522 16.2876L4.23554 16.4136C4.41185 16.7012 4.66472 16.9353 4.96698 17.0894L5.09686 17.146C5.24061 17.1974 5.43024 17.2343 5.7121 17.2573C6.09562 17.2887 6.58895 17.2896 7.29999 17.2896H10.133C10.8439 17.2896 11.3374 17.2886 11.7209 17.2573C12.0965 17.2266 12.308 17.1698 12.466 17.0894L12.593 17.019C12.8804 16.8427 13.1148 16.5897 13.2687 16.2876L13.3244 16.1577C13.3759 16.0139 13.4137 15.8244 13.4367 15.5425C13.468 15.159 13.468 14.6656 13.468 13.9546V11.1216ZM14.798 13.1196C15.2528 13.118 15.6011 13.1147 15.8879 13.0913C16.2634 13.0606 16.475 13.0038 16.633 12.9233L16.759 12.8521C17.0466 12.6757 17.2808 12.4228 17.4348 12.1206L17.4914 11.9907C17.5428 11.847 17.5797 11.6572 17.6027 11.3755C17.634 10.992 17.6349 10.4985 17.6349 9.7876V6.95459C17.6349 6.24355 17.6341 5.75022 17.6027 5.3667C17.5797 5.08484 17.5428 4.89522 17.4914 4.75147L17.4348 4.62158C17.2807 4.31933 17.0466 4.06645 16.759 3.89014L16.633 3.81982C16.475 3.73932 16.2636 3.68256 15.8879 3.65186C15.5044 3.62052 15.011 3.61963 14.3 3.61963H11.467C10.7561 3.61963 10.2626 3.62054 9.87909 3.65186C9.59738 3.67487 9.40759 3.71179 9.26386 3.76318L9.13397 3.81982C8.83175 3.97382 8.57885 4.20802 8.40253 4.49561L8.33124 4.62158C8.25079 4.77957 8.19396 4.99114 8.16327 5.3667C8.13984 5.65352 8.13561 6.00178 8.13397 6.45654H10.133C10.822 6.45654 11.3791 6.4559 11.8293 6.49268C12.2873 6.5301 12.6937 6.6093 13.0705 6.80127L13.2883 6.92334C13.7839 7.22739 14.1878 7.66313 14.4533 8.18408L14.5197 8.32666C14.6642 8.66318 14.7291 9.02433 14.7619 9.42529C14.7987 9.8755 14.798 10.4326 14.798 11.1216V13.1196ZM18.965 9.7876C18.965 10.4766 18.9657 11.0337 18.9289 11.4839C18.8961 11.8848 18.8311 12.246 18.6867 12.5825L18.6203 12.7251C18.3548 13.246 17.9509 13.6818 17.4553 13.9858L17.2365 14.1079C16.8599 14.2998 16.4541 14.3791 15.9963 14.4165C15.6592 14.444 15.2624 14.4481 14.7951 14.4497C14.7935 14.917 14.7894 15.3138 14.7619 15.6509C14.7292 16.0516 14.664 16.4122 14.5197 16.7485L14.4533 16.8911C14.1878 17.4122 13.7841 17.8487 13.2883 18.1528L13.0705 18.2749C12.6937 18.4669 12.2873 18.5461 11.8293 18.5835C11.3791 18.6203 10.822 18.6196 10.133 18.6196H7.29999C6.6109 18.6196 6.05394 18.6203 5.6037 18.5835C5.20305 18.5508 4.84233 18.4855 4.50604 18.3413L4.36347 18.2749C3.84243 18.0094 3.40584 17.6056 3.10175 17.1099L2.97968 16.8911C2.78787 16.5145 2.70849 16.1087 2.67108 15.6509C2.6343 15.2006 2.63495 14.6437 2.63495 13.9546V11.1216C2.63495 10.4326 2.63431 9.8755 2.67108 9.42529C2.7085 8.96729 2.78771 8.56084 2.97968 8.18408L3.10175 7.96631C3.40585 7.47049 3.84235 7.06679 4.36347 6.80127L4.50604 6.73486C4.84236 6.59059 5.20302 6.52542 5.6037 6.49268C5.9405 6.46516 6.33707 6.4601 6.80389 6.4585C6.8055 5.99167 6.81056 5.5951 6.83807 5.2583C6.87549 4.80047 6.95482 4.39471 7.14667 4.01807L7.26874 3.79932C7.5728 3.30371 8.00855 2.89973 8.52948 2.63428L8.67206 2.56787C9.00854 2.42345 9.36978 2.35844 9.77069 2.32568C10.2209 2.28891 10.778 2.28955 11.467 2.28955H14.3C14.9891 2.28955 15.546 2.2889 15.9963 2.32568C16.4541 2.3631 16.8599 2.44247 17.2365 2.63428L17.4553 2.75635C17.951 3.06044 18.3548 3.49703 18.6203 4.01807L18.6867 4.16065C18.8309 4.49694 18.8962 4.85765 18.9289 5.2583C18.9657 5.70854 18.965 6.2655 18.965 6.95459V9.7876Z" fill="currentColor"></path></svg></button></div></div></div></div></div></div><div aria-hidden="true" class="w-full" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; width: 270.4px; color: rgb(204, 204, 204); font-family: &quot;Segoe WPC&quot;, &quot;Segoe UI&quot;, sans-serif; font-size: 13px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial; height: 16px;"></div><div class="flex flex-col" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; display: flex; flex-direction: column; color: rgb(204, 204, 204); font-family: &quot;Segoe WPC&quot;, &quot;Segoe UI&quot;, sans-serif; font-size: 13px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial;"><div data-content-search-unit-key="019cad3c-c506-7922-861e-8bae0bec948b:2:assistant" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><div class="group flex min-w-0 flex-col" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; display: flex; min-width: 0px; flex-direction: column;"><div class="[&amp;&gt;*:first-child]:mt-0 overflow-x-auto [&amp;&gt;ol:first-child]:mt-0 [&amp;&gt;ul:first-child]:mt-0 [&amp;&gt;*:last-child]:mb-0" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; overflow-x: auto; scrollbar-color: rgba(100, 100, 100, 0.7) rgba(0, 0, 0, 0);"><h1 class="font-semibold heading-lg mt-5 mb-2" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 8px; padding: 0px; font-size: 24px; font-weight: 600; line-height: 1.2; --tw-font-weight: 600;">Heading Level 1</h1><h2 class="font-semibold heading-base mt-4 mb-2" style="box-sizing: border-box; border: 0px solid; margin: 16px 0px 8px; padding: 0px; font-size: 16px; font-weight: 600; line-height: 1.33; --tw-font-weight: 600;">Heading Level 2</h2><h3 class="font-semibold text-size-chat mt-3 mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 12px 0px 6px; padding: 0px; font-size: 13px; font-weight: 600; --tw-font-weight: 600;">Heading Level 3</h3><p class="text-size-chat leading-relaxed extension:leading-normal my-2" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; margin-block: 8px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">This paragraph uses<span> </span><strong style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; font-weight: bolder;">bold</strong>,<span> </span><em style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">italic</em>,<span> </span><em style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><strong style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; font-weight: bolder;">bold-italic</strong></em>,<span> </span><del style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">strikethrough</del>,<span> </span><span class="inline-markdown text-size-chat-sm font-mono blend bg-token-text-code-block-background rounded-sm px-1.5 py-0.5 leading-none extension:bg-token-foreground/10 electron:bg-token-list-hover-background/60" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; border-radius: 7.5px; background-color: oklab(0.845175 0.0000383258 0.0000169277 / 0.1); padding-inline: 6px; padding-block: 2px; font-family: &quot;Cascadia Code&quot;, Consolas, &quot;Courier New&quot;, monospace; --tw-leading: 1 !important; line-height: 1 !important; font-size: 12px;">inline code</span>, and<span> </span><a href="https://example.com/" class="text-token-text-link-foreground underline decoration-current decoration-opacity-50 decoration-[0.5px]" target="_blank" rel="noopener noreferrer" style="color: rgb(77, 170, 252); text-decoration-line: underline; text-decoration-thickness: 0.5px; text-decoration-style: inherit; text-decoration-color: currentcolor; box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">a link</a>.</p><div class="bg-token-text-code-block-background border-token-input-background relative overflow-clip rounded-lg border contain-inline-size dark my-2" data-theme="dark" style="box-sizing: border-box; border: 1px solid rgb(49, 49, 49); margin: 0px; padding: 0px; position: relative; margin-block: 8px; overflow: clip; border-radius: 12.5px; background-color: rgb(43, 43, 43); --tw-contain-size: inline-size; contain: inline-size; corner-shape: superellipse(1.5);"><div class="text-size-chat overflow-y-auto p-2" dir="ltr" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 8px; overflow-y: auto; font-size: 13px; scrollbar-color: rgba(121, 121, 121, 0.4) rgba(0, 0, 0, 0);"><code class="whitespace-pre!" style="font-family: &quot;Cascadia Code&quot;, Consolas, &quot;Courier New&quot;, monospace; color: unset !important; background-color: unset !important; padding: 0px !important; border-radius: 0px !important; box-sizing: border-box; border: 0px solid; margin: 0px; font-feature-settings: normal; font-variation-settings: normal; font-size: 1em; white-space: pre !important;"><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-keyword" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(46, 149, 211);">def</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"> </span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-title function_" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(242, 44, 61);">greet</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">(</span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-params" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">name</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">):¶
+    message = </span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-string" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(0, 166, 125);">f"Hello, <span class="hljs-subst" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">{name}</span></span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">!"¶
+¶
+    </span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-keyword" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(46, 149, 211);">return</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"> message¶
+¶
+</span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-built_in" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(233, 149, 12);">print</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">(greet(</span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-string" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(0, 166, 125);">"world"</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">))¶
+</span></span></code></div></div><div class="bg-token-text-code-block-background border-token-input-background relative overflow-clip rounded-lg border contain-inline-size dark my-2" data-theme="dark" style="box-sizing: border-box; border: 1px solid rgb(49, 49, 49); margin: 0px; padding: 0px; position: relative; margin-block: 8px; overflow: clip; border-radius: 12.5px; background-color: rgb(43, 43, 43); --tw-contain-size: inline-size; contain: inline-size; corner-shape: superellipse(1.5);"><div class="text-size-chat overflow-y-auto p-2" dir="ltr" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 8px; overflow-y: auto; font-size: 13px; scrollbar-color: rgba(121, 121, 121, 0.4) rgba(0, 0, 0, 0);"><code class="whitespace-pre!" style="font-family: &quot;Cascadia Code&quot;, Consolas, &quot;Courier New&quot;, monospace; color: unset !important; background-color: unset !important; padding: 0px !important; border-radius: 0px !important; box-sizing: border-box; border: 0px solid; margin: 0px; font-feature-settings: normal; font-variation-settings: normal; font-size: 1em; white-space: pre !important;"><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-keyword" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(46, 149, 211);">function</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"> </span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-title function_" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(242, 44, 61);">greet</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">(</span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-params" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">name</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">) {¶
+  </span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-keyword" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(46, 149, 211);">const</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"> message = </span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-string" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(0, 166, 125);">`Hello, <span class="hljs-subst" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">${name}</span></span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">!`;¶
+¶
+  </span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-keyword" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(46, 149, 211);">return</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"> message;¶
+}¶
+¶
+</span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-variable language_" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(223, 48, 121);">console</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">.</span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-title function_" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(242, 44, 61);">log</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">(</span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-title function_" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(242, 44, 61);">greet</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">(</span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-string" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(0, 166, 125);">"world"</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">));¶
+</span></span></code></div></div><div class="bg-token-text-code-block-background border-token-input-background relative overflow-clip rounded-lg border contain-inline-size dark my-2" data-theme="dark" style="box-sizing: border-box; border: 1px solid rgb(49, 49, 49); margin: 0px; padding: 0px; position: relative; margin-block: 8px; overflow: clip; border-radius: 12.5px; background-color: rgb(43, 43, 43); --tw-contain-size: inline-size; contain: inline-size; corner-shape: superellipse(1.5);"><div class="text-size-chat overflow-y-auto p-2" dir="ltr" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 8px; overflow-y: auto; font-size: 13px; scrollbar-color: rgba(121, 121, 121, 0.4) rgba(0, 0, 0, 0);"><code class="whitespace-pre!" style="font-family: &quot;Cascadia Code&quot;, Consolas, &quot;Courier New&quot;, monospace; color: unset !important; background-color: unset !important; padding: 0px !important; border-radius: 0px !important; box-sizing: border-box; border: 0px solid; margin: 0px; font-feature-settings: normal; font-variation-settings: normal; font-size: 1em; white-space: pre !important;"><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-built_in" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(233, 149, 12);">echo</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"> </span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-string" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(0, 166, 125);">"Starting job"</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">¶
+</span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-built_in" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(233, 149, 12);">mkdir</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"> -p ./tmp¶
+</span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-built_in" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(233, 149, 12);">echo</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"> </span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><span class="hljs-string" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; color: rgb(0, 166, 125);">"Done"</span></span><span style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">¶
+</span></span></code></div></div><ul class="text-size-chat leading-relaxed extension:leading-normal mt-0 mb-4  list-none pl-0 contains-task-list" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 16px; padding: 0px; list-style: none; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;"><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5 list-none task-list-item" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; list-style-type: none; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;"><input disabled="" type="checkbox" checked="" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; font: inherit; letter-spacing: inherit; color: inherit; opacity: 1; background-color: rgba(0, 0, 0, 0); border-radius: 0px;"><span> </span>Checked item</li><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5 list-none task-list-item" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; list-style-type: none; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;"><input disabled="" type="checkbox" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; font: inherit; letter-spacing: inherit; color: inherit; opacity: 1; background-color: rgba(0, 0, 0, 0); border-radius: 0px;"><span> </span>Unchecked item</li></ul><blockquote class="text-size-chat leading-relaxed extension:leading-normal my-3 border-l-2 border-gray-300 pl-4 italic" style="background: none 0% 0% / auto repeat scroll padding-box border-box rgb(43, 43, 43); border-color: oklch(0.872 0.01 258.338); box-sizing: border-box; border-width: 0px 0px 0px 2px; border-style: solid; border-image: initial; margin: 0px; padding: 0px 0px 0px 16px; margin-block: 12px; --tw-leading: 1.5; line-height: 1.5; font-style: italic; font-size: 13px;"><p class="text-size-chat leading-relaxed extension:leading-normal my-2" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; margin-block: 8px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">This is the outer blockquote.</p><blockquote class="text-size-chat leading-relaxed extension:leading-normal my-3 border-l-2 border-gray-300 pl-4 italic" style="background: none 0% 0% / auto repeat scroll padding-box border-box rgb(43, 43, 43); border-color: oklch(0.872 0.01 258.338); box-sizing: border-box; border-width: 0px 0px 0px 2px; border-style: solid; border-image: initial; margin: 0px; padding: 0px 0px 0px 16px; margin-block: 12px; --tw-leading: 1.5; line-height: 1.5; font-style: italic; font-size: 13px;"><p class="text-size-chat leading-relaxed extension:leading-normal my-2" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; margin-block: 8px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">This is the nested blockquote.<br style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">It has a second line.</p></blockquote><p class="text-size-chat leading-relaxed extension:leading-normal my-2" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; margin-block: 8px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">Back to the outer blockquote.</p></blockquote><table class="text-size-chat leading-relaxed extension:leading-normal my-3 w-full border-collapse" style="box-sizing: border-box; border-width: 0px; border-style: solid; border-color: inherit; border-image: initial; margin: 0px; padding: 0px; text-indent: 0px; border-collapse: collapse; margin-block: 12px; width: 270.4px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;"><thead class="bg-token-foreground/5" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; background-color: oklab(0.845175 0.0000383258 0.0000169277 / 0.05);"><tr class="border-token-border border-b" style="box-sizing: border-box; border-width: 0px 0px 1px; border-style: solid; border-color: oklab(0.845175 0.0000383258 0.0000169277 / 0.08); border-image: initial; margin: 0px; padding: 0px;"><th class="p-1 text-left font-semibold text-token-foreground" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 4px; text-align: left; --tw-font-weight: 600; font-weight: 600; color: rgb(204, 204, 204);">Left</th><th class="p-1 text-left font-semibold text-token-foreground" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 4px; text-align: left; --tw-font-weight: 600; font-weight: 600; color: rgb(204, 204, 204);">Center</th><th class="p-1 text-left font-semibold text-token-foreground" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 4px; text-align: left; --tw-font-weight: 600; font-weight: 600; color: rgb(204, 204, 204);">Right</th></tr></thead><tbody style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><tr class="border-token-border border-b" style="box-sizing: border-box; border-width: 0px 0px 1px; border-style: solid; border-color: oklab(0.845175 0.0000383258 0.0000169277 / 0.08); border-image: initial; margin: 0px; padding: 0px;"><td class="p-1" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 4px;">L1</td><td class="p-1" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 4px;">C1</td><td class="p-1" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 4px;">R1</td></tr><tr class="border-token-border border-b" style="box-sizing: border-box; border-width: 0px 0px 1px; border-style: solid; border-color: oklab(0.845175 0.0000383258 0.0000169277 / 0.08); border-image: initial; margin: 0px; padding: 0px;"><td class="p-1" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 4px;">L2</td><td class="p-1" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 4px;">C2</td><td class="p-1" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 4px;">R22</td></tr></tbody></table><ul class="text-size-chat leading-relaxed extension:leading-normal mt-0 mb-4  list-disc pl-4" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 16px; padding: 0px 0px 0px 16px; list-style: disc; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;"><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">Unordered item one</li><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">Unordered item two<ul class="text-size-chat leading-relaxed extension:leading-normal mt-0 mb-4  list-disc pl-4" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 16px; padding: 0px 0px 0px 16px; list-style: disc; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;"><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">Nested unordered item</li></ul></li><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">Unordered item three</li></ul><ol class="text-size-chat leading-relaxed extension:leading-normal list-decimal mt-1.5 mb-3 pl-8" start="1" style="box-sizing: border-box; border: 0px solid; margin: 6px 0px 12px; padding: 0px 0px 0px 32px; list-style: decimal; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;"><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">Ordered item one</li><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">Ordered item two</li><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">Ordered item three with footnote reference<sup style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; vertical-align: baseline; font-size: 9.75px; line-height: 0; position: relative; top: -0.5em;"><a href="https://file+.vscode-resource.vscode-cdn.net/c%3A/Users/adria/.vscode/extensions/openai.chatgpt-0.4.79-win32-x64/webview/#user-content-fn-note" class="text-token-text-link-foreground underline decoration-current decoration-opacity-50 decoration-[0.5px]" target="_blank" rel="noopener noreferrer" style="color: rgb(77, 170, 252); box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; text-decoration-line: underline; text-decoration-thickness: 0.5px; text-decoration-style: inherit; text-decoration-color: currentcolor;">1</a></sup></li></ol><section data-footnotes="true" class="footnotes" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><h2 class="font-semibold heading-base mt-4 mb-2" style="box-sizing: border-box; border: 0px solid; margin: 16px 0px 8px; padding: 0px; font-size: 16px; font-weight: 600; line-height: 1.33; --tw-font-weight: 600;">Footnotes</h2><ol class="text-size-chat leading-relaxed extension:leading-normal list-decimal mt-1.5 mb-3 pl-8" start="1" style="box-sizing: border-box; border: 0px solid; margin: 6px 0px 12px; padding: 0px 0px 0px 32px; list-style: decimal; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;"><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;"><p class="text-size-chat leading-relaxed extension:leading-normal my-2" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; margin-block: 8px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">This is the footnote definition.<span> </span><a href="https://file+.vscode-resource.vscode-cdn.net/c%3A/Users/adria/.vscode/extensions/openai.chatgpt-0.4.79-win32-x64/webview/#user-content-fnref-note" class="text-token-text-link-foreground underline decoration-current decoration-opacity-50 decoration-[0.5px]" target="_blank" rel="noopener noreferrer" style="color: rgb(77, 170, 252); text-decoration-line: underline; text-decoration-thickness: 0.5px; text-decoration-style: inherit; text-decoration-color: currentcolor; box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">↩</a></p></li></ol></section></div></div></div></div>
+
+=== 2b. cfHtml offsets ===
+StartHTML: 475
+EndHTML: 35290
+StartFragment: 511
+EndFragment: 35254
+
+=== 3. htmlPrep (after _PreprocessHtml) (len=16350) ===
+<div class="flex flex-col" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; display: flex; flex-direction: column; color: rgb(204, 204, 204); font-family: &quot;Segoe WPC&quot;, &quot;Segoe UI&quot;, sans-serif; font-size: 13px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial;"><div data-content-search-unit-key="019cad3c-c506-7922-861e-8bae0bec948b:0:user" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><div class="flex flex-col items-end gap-2" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;"><p>¤POSTER_User¤</p><div class="group flex w-full flex-col items-end justify-end gap-1" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; display: flex; width: 270.4px; flex-direction: column; align-items: flex-end; justify-content: flex-end; gap: 4px;"><p>¤POSTER_User¤</p><div class="bg-token-foreground/5 max-w-[77%] break-words rounded-2xl px-3 py-2 [&amp;_.contain-inline-size]:[contain:initial]" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; max-width: 77%; border-radius: 20px; background-color: oklab(0.845175 0.0000383258 0.0000169277 / 0.05); padding-inline: 12px; padding-block: 8px; overflow-wrap: break-word; corner-shape: superellipse(1.5);"><div class="text-size-chat whitespace-pre-wrap" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; white-space: pre-wrap; font-size: 13px;"><p>¤USERMSG_1¤</p></div></div><div class="flex flex-row-reverse items-center gap-1" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; display: flex; flex-direction: row-reverse; align-items: center; gap: 4px;"><div class="mr-1 ms-1 flex items-start gap-0.5 transition-opacity opacity-0 group-hover:opacity-100" style="box-sizing: border-box; border: 0px solid; margin: 0px 4px 0px 0px; padding: 0px; margin-inline-start: 4px; display: flex; align-items: flex-start; gap: 2px; opacity: 0; transition-property: opacity; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 0.15s;"></div></div></div></div></div></div><div aria-hidden="true" class="w-full" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; width: 270.4px; color: rgb(204, 204, 204); font-family: &quot;Segoe WPC&quot;, &quot;Segoe UI&quot;, sans-serif; font-size: 13px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial; height: 16px;"></div><div class="flex flex-col" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; display: flex; flex-direction: column; color: rgb(204, 204, 204); font-family: &quot;Segoe WPC&quot;, &quot;Segoe UI&quot;, sans-serif; font-size: 13px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial;"><div data-content-search-unit-key="019cad3c-c506-7922-861e-8bae0bec948b:2:assistant" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><div class="group flex min-w-0 flex-col" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; display: flex; min-width: 0px; flex-direction: column;"><p>¤POSTER_AI¤</p><div class="[&amp;&gt;*:first-child]:mt-0 overflow-x-auto [&amp;&gt;ol:first-child]:mt-0 [&amp;&gt;ul:first-child]:mt-0 [&amp;&gt;*:last-child]:mb-0" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; overflow-x: auto; scrollbar-color: rgba(100, 100, 100, 0.7) rgba(0, 0, 0, 0);"><h1 class="font-semibold heading-lg mt-5 mb-2" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 8px; padding: 0px; font-size: 24px; font-weight: 600; line-height: 1.2; --tw-font-weight: 600;">Heading Level 1</h1><h2 class="font-semibold heading-base mt-4 mb-2" style="box-sizing: border-box; border: 0px solid; margin: 16px 0px 8px; padding: 0px; font-size: 16px; font-weight: 600; line-height: 1.33; --tw-font-weight: 600;">Heading Level 2</h2><h3 class="font-semibold text-size-chat mt-3 mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 12px 0px 6px; padding: 0px; font-size: 13px; font-weight: 600; --tw-font-weight: 600;">Heading Level 3</h3><p class="text-size-chat leading-relaxed extension:leading-normal my-2" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; margin-block: 8px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">This paragraph uses <strong style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; font-weight: bolder;">bold</strong>, <em style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">italic</em>, <em style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><strong style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; font-weight: bolder;">bold-italic</strong></em>, <del style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">strikethrough</del>, <code>inline code</code>, and <a href="https://example.com/" class="text-token-text-link-foreground underline decoration-current decoration-opacity-50 decoration-[0.5px]" target="_blank" rel="noopener noreferrer" style="color: rgb(77, 170, 252); text-decoration-line: underline; text-decoration-thickness: 0.5px; text-decoration-style: inherit; text-decoration-color: currentcolor; box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">a link</a>.</p><pre><code>def greet(name):¶
+    message = f"Hello, {name}!"¶
+¶
+    return message¶
+¶
+print(greet("world"))¶
+</code></pre><pre><code>function greet(name) {¶
+  const message = `Hello, ${name}!`;¶
+¶
+  return message;¶
+}¶
+¶
+console.log(greet("world"));¶
+</code></pre><pre><code>echo "Starting job"¶
+mkdir -p ./tmp¶
+echo "Done"¶
+</code></pre><ul class="text-size-chat leading-relaxed extension:leading-normal mt-0 mb-4  list-none pl-0 contains-task-list" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 16px; padding: 0px; list-style: none; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;"><li>¤CHK¤ Checked item</li><li>¤UNCHK¤ Unchecked item</li></ul><blockquote class="text-size-chat leading-relaxed extension:leading-normal my-3 border-l-2 border-gray-300 pl-4 italic" style="background: none 0% 0% / auto repeat scroll padding-box border-box rgb(43, 43, 43); border-color: oklch(0.872 0.01 258.338); box-sizing: border-box; border-width: 0px 0px 0px 2px; border-style: solid; border-image: initial; margin: 0px; padding: 0px 0px 0px 16px; margin-block: 12px; --tw-leading: 1.5; line-height: 1.5; font-style: italic; font-size: 13px;"><p class="text-size-chat leading-relaxed extension:leading-normal my-2" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; margin-block: 8px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">This is the outer blockquote.</p><blockquote class="text-size-chat leading-relaxed extension:leading-normal my-3 border-l-2 border-gray-300 pl-4 italic" style="background: none 0% 0% / auto repeat scroll padding-box border-box rgb(43, 43, 43); border-color: oklch(0.872 0.01 258.338); box-sizing: border-box; border-width: 0px 0px 0px 2px; border-style: solid; border-image: initial; margin: 0px; padding: 0px 0px 0px 16px; margin-block: 12px; --tw-leading: 1.5; line-height: 1.5; font-style: italic; font-size: 13px;"><p class="text-size-chat leading-relaxed extension:leading-normal my-2" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; margin-block: 8px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">This is the nested blockquote.<br style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">It has a second line.</p></blockquote><p class="text-size-chat leading-relaxed extension:leading-normal my-2" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; margin-block: 8px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">Back to the outer blockquote.</p></blockquote><table class="text-size-chat leading-relaxed extension:leading-normal my-3 w-full border-collapse" style="box-sizing: border-box; border-width: 0px; border-style: solid; border-color: inherit; border-image: initial; margin: 0px; padding: 0px; text-indent: 0px; border-collapse: collapse; margin-block: 12px; width: 270.4px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;"><thead class="bg-token-foreground/5" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; background-color: oklab(0.845175 0.0000383258 0.0000169277 / 0.05);"><tr class="border-token-border border-b" style="box-sizing: border-box; border-width: 0px 0px 1px; border-style: solid; border-color: oklab(0.845175 0.0000383258 0.0000169277 / 0.08); border-image: initial; margin: 0px; padding: 0px;"><th class="p-1 text-left font-semibold text-token-foreground" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 4px; text-align: left; --tw-font-weight: 600; font-weight: 600; color: rgb(204, 204, 204);">Left</th><th class="p-1 text-left font-semibold text-token-foreground" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 4px; text-align: left; --tw-font-weight: 600; font-weight: 600; color: rgb(204, 204, 204);">Center</th><th class="p-1 text-left font-semibold text-token-foreground" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 4px; text-align: left; --tw-font-weight: 600; font-weight: 600; color: rgb(204, 204, 204);">Right</th></tr></thead><tbody style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><tr class="border-token-border border-b" style="box-sizing: border-box; border-width: 0px 0px 1px; border-style: solid; border-color: oklab(0.845175 0.0000383258 0.0000169277 / 0.08); border-image: initial; margin: 0px; padding: 0px;"><td class="p-1" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 4px;">L1</td><td class="p-1" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 4px;">C1</td><td class="p-1" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 4px;">R1</td></tr><tr class="border-token-border border-b" style="box-sizing: border-box; border-width: 0px 0px 1px; border-style: solid; border-color: oklab(0.845175 0.0000383258 0.0000169277 / 0.08); border-image: initial; margin: 0px; padding: 0px;"><td class="p-1" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 4px;">L2</td><td class="p-1" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 4px;">C2</td><td class="p-1" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 4px;">R22</td></tr></tbody></table><ul class="text-size-chat leading-relaxed extension:leading-normal mt-0 mb-4  list-disc pl-4" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 16px; padding: 0px 0px 0px 16px; list-style: disc; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;"><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">Unordered item one</li><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">Unordered item two<ul class="text-size-chat leading-relaxed extension:leading-normal mt-0 mb-4  list-disc pl-4" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 16px; padding: 0px 0px 0px 16px; list-style: disc; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;"><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">Nested unordered item</li></ul></li><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">Unordered item three</li></ul><ol class="text-size-chat leading-relaxed extension:leading-normal list-decimal mt-1.5 mb-3 pl-8" start="1" style="box-sizing: border-box; border: 0px solid; margin: 6px 0px 12px; padding: 0px 0px 0px 32px; list-style: decimal; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;"><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">Ordered item one</li><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">Ordered item two</li><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">Ordered item three with footnote reference<sup style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; vertical-align: baseline; font-size: 9.75px; line-height: 0; position: relative; top: -0.5em;"><a href="#user-content-fn-note" class="text-token-text-link-foreground underline decoration-current decoration-opacity-50 decoration-[0.5px]" target="_blank" rel="noopener noreferrer" style="color: rgb(77, 170, 252); box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; text-decoration-line: underline; text-decoration-thickness: 0.5px; text-decoration-style: inherit; text-decoration-color: currentcolor;">1</a></sup></li></ol><section data-footnotes="true" class="footnotes" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;"><h2 class="font-semibold heading-base mt-4 mb-2" style="box-sizing: border-box; border: 0px solid; margin: 16px 0px 8px; padding: 0px; font-size: 16px; font-weight: 600; line-height: 1.33; --tw-font-weight: 600;">Footnotes</h2><ol class="text-size-chat leading-relaxed extension:leading-normal list-decimal mt-1.5 mb-3 pl-8" start="1" style="box-sizing: border-box; border: 0px solid; margin: 6px 0px 12px; padding: 0px 0px 0px 32px; list-style: decimal; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;"><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;"><p class="text-size-chat leading-relaxed extension:leading-normal my-2" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; margin-block: 8px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">This is the footnote definition. <a href="#user-content-fnref-note" class="text-token-text-link-foreground underline decoration-current decoration-opacity-50 decoration-[0.5px]" target="_blank" rel="noopener noreferrer" style="color: rgb(77, 170, 252); text-decoration-line: underline; text-decoration-thickness: 0.5px; text-decoration-style: inherit; text-decoration-color: currentcolor; box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">↩</a></p></li></ol></section></div></div></div></div>
+
+=== 4. mdRaw (pandoc output) (len=6903) ===
+<div class="flex flex-col" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; display: flex; flex-direction: column; color: rgb(204, 204, 204); font-family: &quot;Segoe WPC&quot;, &quot;Segoe UI&quot;, sans-serif; font-size: 13px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial;">¶
+¶
+<div content-search-unit-key="019cad3c-c506-7922-861e-8bae0bec948b:0:user" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">¶
+¶
+<div class="flex flex-col items-end gap-2" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">¶
+¶
+¤POSTER_User¤¶
+¶
+<div class="group flex w-full flex-col items-end justify-end gap-1" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; display: flex; width: 270.4px; flex-direction: column; align-items: flex-end; justify-content: flex-end; gap: 4px;">¶
+¶
+¤POSTER_User¤¶
+¶
+<div class="bg-token-foreground/5 max-w-[77%] break-words rounded-2xl px-3 py-2 [&_.contain-inline-size]:[contain:initial]" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; max-width: 77%; border-radius: 20px; background-color: oklab(0.845175 0.0000383258 0.0000169277 / 0.05); padding-inline: 12px; padding-block: 8px; overflow-wrap: break-word; corner-shape: superellipse(1.5);">¶
+¶
+<div class="text-size-chat whitespace-pre-wrap" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; white-space: pre-wrap; font-size: 13px;">¶
+¶
+¤USERMSG_1¤¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+<div class="flex flex-row-reverse items-center gap-1" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; display: flex; flex-direction: row-reverse; align-items: center; gap: 4px;">¶
+¶
+<div class="mr-1 ms-1 flex items-start gap-0.5 transition-opacity opacity-0 group-hover:opacity-100" style="box-sizing: border-box; border: 0px solid; margin: 0px 4px 0px 0px; padding: 0px; margin-inline-start: 4px; display: flex; align-items: flex-start; gap: 2px; opacity: 0; transition-property: opacity; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 0.15s;">¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+<div class="w-full" aria-hidden="true" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; width: 270.4px; color: rgb(204, 204, 204); font-family: &quot;Segoe WPC&quot;, &quot;Segoe UI&quot;, sans-serif; font-size: 13px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial; height: 16px;">¶
+¶
+</div>¶
+¶
+<div class="flex flex-col" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; display: flex; flex-direction: column; color: rgb(204, 204, 204); font-family: &quot;Segoe WPC&quot;, &quot;Segoe UI&quot;, sans-serif; font-size: 13px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial;">¶
+¶
+<div content-search-unit-key="019cad3c-c506-7922-861e-8bae0bec948b:2:assistant" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">¶
+¶
+<div class="group flex min-w-0 flex-col" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; display: flex; min-width: 0px; flex-direction: column;">¶
+¶
+¤POSTER_AI¤¶
+¶
+<div class="[&>*:first-child]:mt-0 overflow-x-auto [&>ol:first-child]:mt-0 [&>ul:first-child]:mt-0 [&>*:last-child]:mb-0" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; overflow-x: auto; scrollbar-color: rgba(100, 100, 100, 0.7) rgba(0, 0, 0, 0);">¶
+¶
+# Heading Level 1¶
+¶
+## Heading Level 2¶
+¶
+### Heading Level 3¶
+¶
+This paragraph uses **bold**, *italic*, ***bold-italic***, ~~strikethrough~~, `inline code`, and <a href="https://example.com/" class="text-token-text-link-foreground underline decoration-current decoration-opacity-50 decoration-[0.5px]" target="_blank" rel="noopener noreferrer" style="color: rgb(77, 170, 252); text-decoration-line: underline; text-decoration-thickness: 0.5px; text-decoration-style: inherit; text-decoration-color: currentcolor; box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">a link</a>.¶
+¶
+    def greet(name):¶
+        message = f"Hello, {name}!"¶
+¶
+        return message¶
+¶
+    print(greet("world"))¶
+¶
+    function greet(name) {¶
+      const message = `Hello, ${name}!`;¶
+¶
+      return message;¶
+    }¶
+¶
+    console.log(greet("world"));¶
+¶
+    echo "Starting job"¶
+    mkdir -p ./tmp¶
+    echo "Done"¶
+¶
+- ¤CHK¤ Checked item¶
+- ¤UNCHK¤ Unchecked item¶
+¶
+> This is the outer blockquote.¶
+>¶
+> > This is the nested blockquote.  ¶
+> > It has a second line.¶
+>¶
+> Back to the outer blockquote.¶
+¶
+| Left | Center | Right |¶
+|------|--------|-------|¶
+| L1   | C1     | R1    |¶
+| L2   | C2     | R22   |¶
+¶
+- Unordered item one¶
+- Unordered item two¶
+  - Nested unordered item¶
+- Unordered item three¶
+¶
+1.  Ordered item one¶
+2.  Ordered item two¶
+3.  Ordered item three with footnote reference<sup><a href="#user-content-fn-note" class="text-token-text-link-foreground underline decoration-current decoration-opacity-50 decoration-[0.5px]" target="_blank" rel="noopener noreferrer" style="color: rgb(77, 170, 252); box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px; text-decoration-line: underline; text-decoration-thickness: 0.5px; text-decoration-style: inherit; text-decoration-color: currentcolor;">1</a></sup>¶
+¶
+<div class="section footnotes" footnotes="true" style="box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">¶
+¶
+## Footnotes¶
+¶
+1.  This is the footnote definition. <a href="#user-content-fnref-note" class="text-token-text-link-foreground underline decoration-current decoration-opacity-50 decoration-[0.5px]" target="_blank" rel="noopener noreferrer" style="color: rgb(77, 170, 252); text-decoration-line: underline; text-decoration-thickness: 0.5px; text-decoration-style: inherit; text-decoration-color: currentcolor; box-sizing: border-box; border: 0px solid; margin: 0px; padding: 0px;">↩︎</a>¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+</div>¶
+¶
+</div>¶
+
+
+=== 5. md (after CleanMarkdown) (len=1846) ===
+¤POSTER_User¤¶
+¶
+¤POSTER_User¤¶
+¶
+Output a markdown test document demonstrating each of the following. No explanations — just the document.¶
+¶
+Required sections, in order:¶
+¶
+1.  Three heading levels (H1, H2, H3)¶
+2.  An inline-formatting paragraph using bold, italic, bold-italic, strikethrough, inline code, and a link¶
+3.  Three fenced code blocks with language tags: one Python (with at least one blank line inside), one JavaScript (with at least one blank line inside), one Bash¶
+4.  A task list with at least one checked and one unchecked item¶
+5.  A blockquote with a nested blockquote inside¶
+6.  A table with left, center, and right column alignment¶
+7.  An unordered list with at least one nested item¶
+8.  An ordered list¶
+9.  A footnote reference and its definition¶
+¶
+¤POSTER_AI¤¶
+¶
+# Heading Level 1¶
+¶
+## Heading Level 2¶
+¶
+### Heading Level 3¶
+¶
+This paragraph uses **bold**, *italic*, ***bold-italic***, ~~strikethrough~~, `inline code`, and [a link](https://example.com/).¶
+¶
+    def greet(name):¶
+        message = f"Hello, {name}!"¶
+¶
+        return message¶
+¶
+    print(greet("world"))¶
+¶
+    function greet(name) {¶
+      const message = `Hello, ${name}!`;¶
+¶
+      return message;¶
+    }¶
+¶
+    console.log(greet("world"));¶
+¶
+    echo "Starting job"¶
+    mkdir -p ./tmp¶
+    echo "Done"¶
+¶
+- [x] Checked item¶
+- [ ] Unchecked item¶
+¶
+> This is the outer blockquote.¶
+>¶
+> > This is the nested blockquote.  ¶
+> > It has a second line.¶
+>¶
+> Back to the outer blockquote.¶
+¶
+| Left | Center | Right |¶
+|------|--------|-------|¶
+| L1   | C1     | R1    |¶
+| L2   | C2     | R22   |¶
+¶
+- Unordered item one¶
+- Unordered item two¶
+  - Nested unordered item¶
+- Unordered item three¶
+¶
+1.  Ordered item one¶
+2.  Ordered item two¶
+3.  Ordered item three with footnote reference<sup>[1](#user-content-fn-note)</sup>¶
+¶
+## Footnotes¶
+¶
+1.  This is the footnote definition. [↩︎](#user-content-fnref-note)¶
+
+
+=== 5c. expected list start (ordered-list fix) (len=1) ===
+0
+
+=== 5d. md (after RestoreOrderedListStart) (len=1846) ===
+¤POSTER_User¤¶
+¶
+¤POSTER_User¤¶
+¶
+Output a markdown test document demonstrating each of the following. No explanations — just the document.¶
+¶
+Required sections, in order:¶
+¶
+1.  Three heading levels (H1, H2, H3)¶
+2.  An inline-formatting paragraph using bold, italic, bold-italic, strikethrough, inline code, and a link¶
+3.  Three fenced code blocks with language tags: one Python (with at least one blank line inside), one JavaScript (with at least one blank line inside), one Bash¶
+4.  A task list with at least one checked and one unchecked item¶
+5.  A blockquote with a nested blockquote inside¶
+6.  A table with left, center, and right column alignment¶
+7.  An unordered list with at least one nested item¶
+8.  An ordered list¶
+9.  A footnote reference and its definition¶
+¶
+¤POSTER_AI¤¶
+¶
+# Heading Level 1¶
+¶
+## Heading Level 2¶
+¶
+### Heading Level 3¶
+¶
+This paragraph uses **bold**, *italic*, ***bold-italic***, ~~strikethrough~~, `inline code`, and [a link](https://example.com/).¶
+¶
+    def greet(name):¶
+        message = f"Hello, {name}!"¶
+¶
+        return message¶
+¶
+    print(greet("world"))¶
+¶
+    function greet(name) {¶
+      const message = `Hello, ${name}!`;¶
+¶
+      return message;¶
+    }¶
+¶
+    console.log(greet("world"));¶
+¶
+    echo "Starting job"¶
+    mkdir -p ./tmp¶
+    echo "Done"¶
+¶
+- [x] Checked item¶
+- [ ] Unchecked item¶
+¶
+> This is the outer blockquote.¶
+>¶
+> > This is the nested blockquote.  ¶
+> > It has a second line.¶
+>¶
+> Back to the outer blockquote.¶
+¶
+| Left | Center | Right |¶
+|------|--------|-------|¶
+| L1   | C1     | R1    |¶
+| L2   | C2     | R22   |¶
+¶
+- Unordered item one¶
+- Unordered item two¶
+  - Nested unordered item¶
+- Unordered item three¶
+¶
+1.  Ordered item one¶
+2.  Ordered item two¶
+3.  Ordered item three with footnote reference<sup>[1](#user-content-fn-note)</sup>¶
+¶
+## Footnotes¶
+¶
+1.  This is the footnote definition. [↩︎](#user-content-fnref-note)¶
+
+
+=== 5e. md (after SHOW_POSTER replacement) (len=1944) ===
+**User:**¶
+>¶
+> Output a markdown test document demonstrating each of the following. No explanations — just the document.¶
+>¶
+> Required sections, in order:¶
+>¶
+> 1.  Three heading levels (H1, H2, H3)¶
+> 2.  An inline-formatting paragraph using bold, italic, bold-italic, strikethrough, inline code, and a link¶
+> 3.  Three fenced code blocks with language tags: one Python (with at least one blank line inside), one JavaScript (with at least one blank line inside), one Bash¶
+> 4.  A task list with at least one checked and one unchecked item¶
+> 5.  A blockquote with a nested blockquote inside¶
+> 6.  A table with left, center, and right column alignment¶
+> 7.  An unordered list with at least one nested item¶
+> 8.  An ordered list¶
+> 9.  A footnote reference and its definition¶
+>¶
+**Codex:**¶
+>¶
+> # Heading Level 1¶
+>¶
+> ## Heading Level 2¶
+>¶
+> ### Heading Level 3¶
+>¶
+> This paragraph uses **bold**, *italic*, ***bold-italic***, ~~strikethrough~~, `inline code`, and [a link](https://example.com/).¶
+>¶
+>     def greet(name):¶
+>         message = f"Hello, {name}!"¶
+>¶
+>         return message¶
+>¶
+>     print(greet("world"))¶
+>¶
+>     function greet(name) {¶
+>       const message = `Hello, ${name}!`;¶
+>¶
+>       return message;¶
+>     }¶
+>¶
+>     console.log(greet("world"));¶
+>¶
+>     echo "Starting job"¶
+>     mkdir -p ./tmp¶
+>     echo "Done"¶
+>¶
+> - [x] Checked item¶
+> - [ ] Unchecked item¶
+>¶
+> > This is the outer blockquote.¶
+> >¶
+> > > This is the nested blockquote.  ¶
+> > > It has a second line.¶
+> >¶
+> > Back to the outer blockquote.¶
+>¶
+> | Left | Center | Right |¶
+> |------|--------|-------|¶
+> | L1   | C1     | R1    |¶
+> | L2   | C2     | R22   |¶
+>¶
+> - Unordered item one¶
+> - Unordered item two¶
+>   - Nested unordered item¶
+> - Unordered item three¶
+>¶
+> 1.  Ordered item one¶
+> 2.  Ordered item two¶
+> 3.  Ordered item three with footnote reference<sup>[1](#user-content-fn-note)</sup>¶
+>¶
+> ## Footnotes¶
+>¶
+> 1.  This is the footnote definition. [↩︎](#user-content-fnref-note)¶
+
+
+=== 6. FINAL md (pasted) (len=1944) ===
+**User:**¶
+>¶
+> Output a markdown test document demonstrating each of the following. No explanations — just the document.¶
+>¶
+> Required sections, in order:¶
+>¶
+> 1.  Three heading levels (H1, H2, H3)¶
+> 2.  An inline-formatting paragraph using bold, italic, bold-italic, strikethrough, inline code, and a link¶
+> 3.  Three fenced code blocks with language tags: one Python (with at least one blank line inside), one JavaScript (with at least one blank line inside), one Bash¶
+> 4.  A task list with at least one checked and one unchecked item¶
+> 5.  A blockquote with a nested blockquote inside¶
+> 6.  A table with left, center, and right column alignment¶
+> 7.  An unordered list with at least one nested item¶
+> 8.  An ordered list¶
+> 9.  A footnote reference and its definition¶
+>¶
+**Codex:**¶
+>¶
+> # Heading Level 1¶
+>¶
+> ## Heading Level 2¶
+>¶
+> ### Heading Level 3¶
+>¶
+> This paragraph uses **bold**, *italic*, ***bold-italic***, ~~strikethrough~~, `inline code`, and [a link](https://example.com/).¶
+>¶
+>     def greet(name):¶
+>         message = f"Hello, {name}!"¶
+>¶
+>         return message¶
+>¶
+>     print(greet("world"))¶
+>¶
+>     function greet(name) {¶
+>       const message = `Hello, ${name}!`;¶
+>¶
+>       return message;¶
+>     }¶
+>¶
+>     console.log(greet("world"));¶
+>¶
+>     echo "Starting job"¶
+>     mkdir -p ./tmp¶
+>     echo "Done"¶
+>¶
+> - [x] Checked item¶
+> - [ ] Unchecked item¶
+>¶
+> > This is the outer blockquote.¶
+> >¶
+> > > This is the nested blockquote.  ¶
+> > > It has a second line.¶
+> >¶
+> > Back to the outer blockquote.¶
+>¶
+> | Left | Center | Right |¶
+> |------|--------|-------|¶
+> | L1   | C1     | R1    |¶
+> | L2   | C2     | R22   |¶
+>¶
+> - Unordered item one¶
+> - Unordered item two¶
+>   - Nested unordered item¶
+> - Unordered item three¶
+>¶
+> 1.  Ordered item one¶
+> 2.  Ordered item two¶
+> 3.  Ordered item three with footnote reference<sup>[1](#user-content-fn-note)</sup>¶
+>¶
+> ## Footnotes¶
+>¶
+> 1.  This is the footnote definition. [↩︎](#user-content-fnref-note)¶
+
+

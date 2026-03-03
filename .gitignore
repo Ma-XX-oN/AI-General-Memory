@@ -27,3 +27,7 @@
 !scripts/HtmlNorm.ahk
 !scripts/HtmlParser.ahk
 !scripts/HtmlDom.ahk
+!scripts/ahk-test
+!scripts/ahk-test/**
+ahk-test/*.actual.md
+ahk-test/test-*.log
