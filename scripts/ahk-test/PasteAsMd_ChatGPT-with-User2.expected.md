@@ -1,31 +1,31 @@
-﻿**User:**
->
+﻿## User
+
 > Lorem ipsum dolor sit amet.
->
-**ChatGPT:**
->
+
+## ChatGPT
+
 > Consectetur adipiscing elit, sed do eiusmod tempor.
->
-**User:**
->
+
+## User
+
 > Ut enim ad minim veniam?
->
-**ChatGPT:**
->
+
+## ChatGPT
+
 > Quis nostrud exercitation ullamco laboris nisi.
->
-**User:**
->
+
+## User
+
 > Duis aute irure dolor in reprehenderit.
->
-**ChatGPT:**
->
+
+## ChatGPT
+
 > Excepteur sint occaecat cupidatat non proident.
->
-**User:**
->
+
+## User
+
 > Sunt in culpa qui officia deserunt mollit anim.
->
-**ChatGPT:**
->
+
+## ChatGPT
+
 > Id est laborum et dolorum fuga et harum quidem.

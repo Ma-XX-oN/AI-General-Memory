@@ -1,5 +1,5 @@
-﻿**User:**
->
+﻿## User
+
 > Output a markdown test document demonstrating each of the following. No explanations — just the document.
 >
 > Required sections, in order:
@@ -13,9 +13,9 @@
 > 7.  An unordered list with at least one nested item
 > 8.  An ordered list
 > 9.  A footnote reference and its definition
->
-**Claude Code:**
->
+
+## Claude Code
+
 > The user wants a markdown test document. No explanations, just the document.
 >
 > # Heading One
