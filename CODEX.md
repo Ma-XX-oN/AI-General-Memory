@@ -44,6 +44,9 @@
 - Use definitive language when facts are certain; if uncertain, state uncertainty explicitly.
 - For timing output in chat responses, always use a fenced code block (not inline/backtick list items) to prevent webview auto-link artifacts.
 - Before sending any response, run a definitiveness pass to remove unjustified hedging and use direct language for confirmed facts.
+- Ground recommendations in function/data semantics first; treat naming/style concerns as secondary unless the semantics are already settled.
+- In technical answers, explicitly separate confirmed facts from preferences/inference, and include the strongest counterargument before the final recommendation.
+- If a recommendation changes, state the concrete new fact that caused the change.
 - In Markdown text, when you DO NOT intend the literal sequence `>=`, write it with whitespace as `> =` to prevent auto-conversion to `≥`.
 - For any question about current file contents, perform a fresh read of the target file in the same turn before answering; do not answer from cached context alone.
 - When asked to re-review ("anything else?", "check again"), do a fresh pass instead of assuming prior checks were exhaustive.
