@@ -1,5 +1,5 @@
-﻿**User:**
->
+﻿## User
+
 > Output a markdown test document demonstrating each of the following. No explanations — just the document.
 >
 > Required sections, in order:
@@ -13,9 +13,9 @@
 > 7.  An unordered list with at least one nested item
 > 8.  An ordered list
 > 9.  A footnote reference and its definition
->
-**ChatGPT:**
->
+
+## ChatGPT
+
 > # H1 Heading
 >
 > ## H2 Heading
@@ -50,11 +50,8 @@
 > | 1    | 2      | 3     |
 >
 > - Alpha
->
 > - Beta
->
 >   - Nested under Beta
->
 > - Gamma
 >
 > 1.  First

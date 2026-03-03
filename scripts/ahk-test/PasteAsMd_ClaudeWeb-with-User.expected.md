@@ -1,5 +1,5 @@
-﻿**User:**
->
+﻿## User
+
 > Output a markdown test document demonstrating each of the following. No explanations — just the document.
 > Required sections, in order:
 > 1.  Three heading levels (H1, H2, H3)
@@ -13,9 +13,9 @@
 > 9.  A footnote reference and its definition
 >
 > 11:25
->
-**Claude Web:**
->
+
+## Claude Web
+
 > # Markdown Test Document
 >
 > ## Section 1

@@ -32,11 +32,8 @@
 > | 1    | 2      | 3     |
 >
 > - Alpha
->
 > - Beta
->
 >   - Nested under Beta
->
 > - Gamma
 >
 > 1.  First
