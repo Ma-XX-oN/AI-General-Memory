@@ -24,3 +24,7 @@
 !scripts/normalize-eol.pl
 !scripts/PasteAsMd.ahk
 !scripts/ClipHelper.ahk
+!scripts/HtmlNorm.ahk
+!scripts/HtmlParser.ahk
+!scripts/HtmlDom.ahk
+!scripts/logger.ahk
