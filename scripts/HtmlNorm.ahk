@@ -232,10 +232,13 @@ class HtmlNorm {
             ; user turn (data-testid="user-message")
             html := RegExReplace(html, "i)(<div\b[^>]*\bdata-testid=`"user-message`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
         } else if (source = "chatgpt") {
-            ; AI turn (article with data-turn-id="request-WEB:...")
+            ; AI turn: prefer data-turn="assistant"; fall back to legacy data-turn-id="request-WEB:..." prefix.
+            ; Both patterns may match the same article in older captures — the duplicate dedup in
+            ; PasteMarkdown collapses consecutive same-type markers, so double injection is harmless.
+            html := RegExReplace(html, "i)(<article\b[^>]*\bdata-turn=`"assistant`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
             html := RegExReplace(html, "i)(<article\b[^>]*\bdata-turn-id=`"request-WEB:[^`"]*`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
-            ; user turn (article with plain UUID data-turn-id)
-            html := RegExReplace(html, "i)(<article\b[^>]*\bdata-turn-id=`"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
+            ; User turn: prefer data-turn="user"; fall back to legacy plain-UUID data-turn-id.
+            html := RegExReplace(html, "i)(<article\b[^>]*\bdata-turn=`"user`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
         }
         return html
     }
