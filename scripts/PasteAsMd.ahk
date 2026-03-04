@@ -1153,6 +1153,7 @@ class PasteMd {
     md := StrReplace(md, "`r", "")
     if (md = "")
       return md
+    fragTrim := LTrim(htmlFrag, " `t`r`n")
 
     ; Respect explicit/inferred non-1 starts.
     if (expected > 1)
@@ -1166,8 +1167,8 @@ class PasteMd {
     if !RegExMatch(htmlFrag, "is)<li\b")
       return md
 
-    ; If fragment already carries explicit list container tags, keep list intent.
-    if RegExMatch(htmlFrag, "is)<(?:ol|ul)\b")
+    ; Keep explicit list intent only when fragment itself starts with list container.
+    if RegExMatch(fragTrim, "is)^<(?:ol|ul)\b")
       return md
 
     ; Demote only multi-item fragments (single-item stays on numbered path).
@@ -1177,6 +1178,10 @@ class PasteMd {
     ; If plain text already looks like a list, keep numbering.
     if RegExMatch(plain, "m)^\s*(?:\d+[.)]|[-+*])(?:\s+|$)")
       return md
+
+    ; Bare <li> fragments with nested <ul> are unordered selections.
+    if (RegExMatch(fragTrim, "is)^<li\b") && RegExMatch(htmlFrag, "is)<ul\b"))
+      return this.UnorderLeadingOrderedBlock(md)
 
     return this.UnlistLeadingOrderedBlock(md)
   }
@@ -1226,6 +1231,79 @@ class PasteMd {
 
       ; Keep blank and indented continuation lines within the block.
       if (Trim(line, " `t") = "" || RegExMatch(line, "^\s{2,}")) {
+        continue
+      }
+
+      break
+    }
+
+    out := ""
+    firstOut := true
+    Loop lines.Length {
+      if (drop.Has(A_Index))
+        continue
+      out .= (firstOut ? "" : "`n") lines[A_Index]
+      firstOut := false
+    }
+    if (hadTrailingBreak && out != "" && !RegExMatch(out, "\n$"))
+      out .= "`n"
+    return out
+  }
+
+  /**
+   * Converts leading ordered-list markers in the first block to unordered markers.
+   * Empty numbered items are dropped.
+   * @param {string} md - Markdown text
+   * @returns {string} Markdown with unordered leading block
+   */
+  static UnorderLeadingOrderedBlock(md) {
+    hadTrailingBreak := RegExMatch(md, "\n$")
+    lines := StrSplit(md, "`n")
+    if (lines.Length = 0)
+      return md
+
+    firstIdx := 1
+    while (firstIdx <= lines.Length && Trim(lines[firstIdx], " `t") = "") {
+      firstIdx += 1
+    }
+    if (firstIdx > lines.Length)
+      return md
+
+    if !RegExMatch(lines[firstIdx], "^(\s*)\d+([.)])(?:(\s+)(.*)|\s*)$")
+      return md
+
+    started := false
+    drop := Map()
+    Loop lines.Length {
+      idx := A_Index
+      if (idx < firstIdx)
+        continue
+
+      line := lines[idx]
+      if RegExMatch(line, "^(\s*)\d+([.)])(?:(\s+)(.*)|\s*)$", &mLine) {
+        if (mLine[4] = "") {
+          drop[idx] := true
+        } else {
+          lines[idx] := mLine[1] "- " mLine[4]
+        }
+        started := true
+        continue
+      }
+
+      if (!started)
+        break
+
+      ; Keep blank and indented continuation lines within the block.
+      if (Trim(line, " `t") = "") {
+        continue
+      }
+      if RegExMatch(line, "^ {4,}") {
+        ; Ordered-list continuations are typically 4-space indented.
+        ; Shift by 2 when converting to unordered so nested bullets stay compact.
+        lines[idx] := SubStr(line, 3)
+        continue
+      }
+      if RegExMatch(line, "^\s{2,}") {
         continue
       }
 
