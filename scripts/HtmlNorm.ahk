@@ -5,6 +5,8 @@
 ; normalizer that handles Codex, Claude Code, Claude Web, and ChatGPT web.
 ;
 ; No dependencies — does not require HtmlParser.ahk.
+;
+; FUCKING CLAUDE!!!!  YOU THINK WE DID THAT WORK FOR SHITS AND GIGGLES?!?!?
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 /**
