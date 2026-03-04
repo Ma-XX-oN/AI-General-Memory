@@ -182,3 +182,49 @@ From 5. md (after CleanMarkdown)
 ¶
 2.  ¶
 ```
+
+### 096551c fix(paste-md): preserve unordered intent for parent-list fragments
+
+PasteAsMd_Codex-OrderedList-Parent.expected.md  
+PasteAsMd_Codex-OrderedList-Nested.expected.md
+
+Moves incidental list correction from markdown patching to structural HTML
+normalization before pandoc.
+
+From stage 2. cfHtml (raw full payload) (Simplified)
+
+```html
+<html>
+<body>
+<!--StartFragment-->
+<li>...</li>
+<li>...</li>
+<!--EndFragment-->
+</body>
+</html>
+```
+
+From stage 3. htmlPrep (after _PreprocessHtml) (Simplified)
+
+```html
+<ol>
+  <li>...</li>
+  <li>...</li>
+</ol>
+```
+
+**Fix applied here.**
+
+From stage 4. mdRaw (pandoc output)
+
+```md
+- item A
+- item B
+```
+
+From 5. md (after CleanMarkdown)
+
+```md
+- item A
+- item B
+```
