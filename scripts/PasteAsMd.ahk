@@ -26,8 +26,6 @@ class PasteMd {
     if (PasteMd._busySpinner.Length == 0)
       throw Error("PasteMd._busySpinner must contain at least one element.")
     PasteMd._busyTimerFn := ObjBindMethod(PasteMd, "_BusyUpdate")
-    PasteMd._defaultOrderedListPromptFn := ObjBindMethod(PasteMd, "_PromptOrderedListStartDialog")
-    PasteMd._orderedListPromptFn := PasteMd._defaultOrderedListPromptFn
     PasteMd._InitPinState()
   }
 
@@ -67,29 +65,6 @@ class PasteMd {
   static _busyLabel := ""
   static _busyTimerFn := 0
   static _busySpinner := ["", ".", "..", "..."]
-  static _defaultOrderedListPromptFn := 0
-  static _orderedListPromptFn := 0
-  static _shellListItemPlaceholder := "¤LI_SHELL¤"
-
-  /**
-   * Overrides ordered-list prompt provider for deterministic testing.
-   * @param {Func} promptFn - Callable receiving (defaultStart, expected, plain, htmlFrag)
-   * @returns {Func} Previous prompt provider
-   */
-  static SetOrderedListPromptProvider(promptFn) {
-    prev := PasteMd._orderedListPromptFn
-    if !IsObject(promptFn)
-      throw Error("Ordered-list prompt provider must be callable.")
-    PasteMd._orderedListPromptFn := promptFn
-    return prev
-  }
-
-  /**
-   * Restores ordered-list prompt provider to runtime default dialog.
-   */
-  static ResetOrderedListPromptProvider() {
-    PasteMd._orderedListPromptFn := PasteMd._defaultOrderedListPromptFn
-  }
 
   /**
    * Shows the markdown paste menu at the current cursor position.
@@ -327,7 +302,7 @@ class PasteMd {
     }
     ; Codex assistant messages: group + min-w-0 + flex-col classes.
     pos := 1
-    while RegExMatch(before, "i)\bclass=`"[^`"]*+\bgroup\b[^`"]*+\bmin-w-0\b[^`"]*+\bflex-col\b[^`"]*+`"", &m, pos) {
+    while RegExMatch(before, "i)\bclass=`"[^`"]*\bgroup\b[^`"]*\bmin-w-0\b[^`"]*\bflex-col\b[^`"]*`"", &m, pos) {
       lastAssist := m.Pos
       pos := m.Pos + 1
     }
@@ -338,7 +313,7 @@ class PasteMd {
     }
     ; Codex user messages: right-aligned blocks include flex-col + items-end.
     pos := 1
-    while RegExMatch(before, "i)\bclass=`"[^`"]*+\bflex-col\b[^`"]*+\bitems-end\b[^`"]*+`"", &m, pos) {
+    while RegExMatch(before, "i)\bclass=`"[^`"]*\bflex-col\b[^`"]*\bitems-end\b[^`"]*`"", &m, pos) {
       lastUser := m.Pos
       pos := m.Pos + 1
     }
@@ -367,7 +342,7 @@ class PasteMd {
     if (source = "chatgpt")
       return "ChatGPT"
 
-    if RegExMatch(cfHtml, "i)extensionId=([^&`r`n]++)", &mExt) {
+    if RegExMatch(cfHtml, "i)extensionId=([^&`r`n]+)", &mExt) {
       extId := StrLower(mExt[1])
       if (InStr(extId, "openai.chatgpt"))
         return "Codex"
@@ -480,9 +455,10 @@ class PasteMd {
    * @param {boolean} showPoster - If true, resolves/replaces poster placeholders
    * @param {boolean} showImg - If true, keep <img> tags for pandoc
    * @param {boolean} promptOrderedList - If true, may prompt for ordered-list start when ambiguous
+   * @param {string} forcedListStart - Optional explicit ordered-list start override (numeric string)
    * @returns {Map} Stage outputs for test/debug use
    */
-  static _ConvertFromCaptured(plain, cfHtml, asQuoted, showPoster, showImg, promptOrderedList := false) {
+  static _ConvertFromCaptured(plain, cfHtml, asQuoted, showPoster, showImg, promptOrderedList := false, forcedListStart := "") {
     PasteMd._BusyUpdate("Inspecting clipboard data")
     plain := StrReplace(plain, "`r", "")
     source := DetectSource(cfHtml)
@@ -498,7 +474,6 @@ class PasteMd {
     mdAfterOrderedList := ""
     mdAfterPoster := ""
     expectedListStart := 0
-    aborted := false
     usedNoHtmlPath := false
     usedNoTagPlainPath := false
 
@@ -520,37 +495,12 @@ class PasteMd {
         htmlPrep := PasteMd._PreprocessHtml(htmlFrag, cfHtml, showPoster)
         htmlPrep := PasteMd.NormalizeIncidentalListIntentHtml(htmlPrep, htmlFrag, plain, expectedListStart)
 
-        if (promptOrderedList) {
-          promptResult := PasteMd.MaybePromptOrderedListStart(htmlPrep, plain, htmlFrag, expectedListStart)
-          if (promptResult["aborted"]) {
-            aborted := true
-            return Map(
-              "source", source,
-              "htmlFrag", htmlFrag,
-              "htmlPrep", htmlPrep,
-              "mdRaw", mdRaw,
-              "mdAfterClean", mdAfterClean,
-              "mdAfterOrderedList", mdAfterOrderedList,
-              "mdAfterPoster", mdAfterPoster,
-              "finalMd", "",
-              "expectedListStart", expectedListStart,
-              "usedNoHtmlPath", usedNoHtmlPath,
-              "usedNoTagPlainPath", usedNoTagPlainPath,
-              "aborted", true
-            )
-          }
-          expectedListStart := promptResult["value"]
-        }
-
-        htmlPrep := PasteMd.ApplyOrderedListStartToHtml(htmlPrep, expectedListStart)
-        htmlPrep := PasteMd.StabilizeShellOnlyListItemsHtml(htmlPrep)
-
         ; If no meaningful HTML tags remain after preprocessing (just styled
         ; spans wrapping plain text, or <p> wrappers around plain lines as
         ; in ProseMirror/Codex), skip pandoc — plain text already has
         ; correct whitespace and indentation that pandoc would destroy.
-        stripped := RegExReplace(htmlPrep, "i)<br\b[^>]*+>", "")
-        stripped := RegExReplace(stripped, "i)</?p\b[^>]*+>", "")
+        stripped := RegExReplace(htmlPrep, "i)<br\b[^>]*>", "")
+        stripped := RegExReplace(stripped, "i)</?p\b[^>]*>", "")
         if !RegExMatch(stripped, "<[^>]++>") {
           PasteMd._BusyUpdate("Using plain text path")
           md := PasteMd.CleanPlainText(plain)
@@ -562,13 +512,12 @@ class PasteMd {
           ; Pandoc converts inline <svg> elements to <img> tags; process them now.
           mdRaw := PasteMd._ProcessImgTags(mdRaw)
           ; Fix pandoc fence-space bug: "``` python" → "```python"
-          mdRaw := RegExReplace(mdRaw, "m)^(``++) (\S++)", "$1$2")
+          mdRaw := RegExReplace(mdRaw, "m)^(``+) (\S)", "$1$2")
 
           PasteMd._BusyUpdate("Cleaning markdown")
           md := PasteMd.CleanMarkdown(mdRaw)
           md := PasteMd.RestoreThinkingBlocks(md)
           md := PasteMd.RestoreUserMsgBlocks(md)
-          md := PasteMd.RemoveListShellPlaceholders(md)
           mdAfterClean := md
           md := StrReplace(md, "`r", "")
         }
@@ -579,7 +528,15 @@ class PasteMd {
           mdAfterClean := md
         }
 
-        PasteMd._BusyUpdate("Finalizing list output")
+        if (forcedListStart != "") {
+          if RegExMatch(forcedListStart, "^\d+$")
+            expectedListStart := Integer(forcedListStart)
+        } else if (promptOrderedList) {
+          expectedListStart := PasteMd.MaybePromptOrderedListStart(md, plain, htmlFrag, expectedListStart)
+        }
+
+        PasteMd._BusyUpdate("Restoring list numbering")
+        md := PasteMd.RestoreOrderedListStart(md, plain, htmlFrag, cfHtml, expectedListStart)
         mdAfterOrderedList := md
       }
 
@@ -650,8 +607,7 @@ class PasteMd {
         "finalMd", md,
         "expectedListStart", expectedListStart,
         "usedNoHtmlPath", usedNoHtmlPath,
-        "usedNoTagPlainPath", usedNoTagPlainPath,
-        "aborted", aborted
+        "usedNoTagPlainPath", usedNoTagPlainPath
       )
     } finally {
       PasteMd.SHOW_IMG := prevShowImg
@@ -725,9 +681,6 @@ class PasteMd {
         PasteMd._DbgSection(dbgF, "6. FINAL md (pasted)", md)
         dbgF.Close()
       }
-
-      if (converted["aborted"])
-        return
 
       pastePayload := md
       pasteWithSentinel := false
@@ -834,17 +787,17 @@ class PasteMd {
     hadTrailingBreak := RegExMatch(md, "\n$")
 
     ; Strip <span> tags (presentational wrappers that cause backtick accumulation).
-    md := RegExReplace(md, "i)</?span\b[^>]*+>", "")
+    md := RegExReplace(md, "i)</?span\b[^>]*>", "")
 
     ; Convert <br> tags to newlines so line breaks are preserved.
-    md := RegExReplace(md, "i)<br\b[^>]*+>", "`n")
+    md := RegExReplace(md, "i)<br\b[^>]*>", "`n")
 
     ; Convert block-level <code> elements (multi-line) to fenced code blocks.
     pos := 1
-    while RegExMatch(md, "s)<code\b([^>]*+)>(.*?)</code>", &m, pos) {
+    while RegExMatch(md, "s)<code\b([^>]*)>(.*?)</code>", &m, pos) {
       if InStr(m[2], "`n") {
         ; Extract language identifier from class="language-xxx" if present.
-        lang := RegExMatch(m[1], "i)language-(\w++)", &langM) ? langM[1] : ""
+        lang := RegExMatch(m[1], "i)language-(\w+)", &langM) ? langM[1] : ""
         inner := RegExReplace(m[2], "<[^>]++>", "")
         inner := PasteMd.DecodeBasicHtmlEntities(inner)
         inner := Trim(inner, " `t`n")
@@ -880,18 +833,18 @@ class PasteMd {
       ; Keep markdown hard-break intent ("two spaces before newline").
       rawLine := line
       outLine := RTrim(rawLine, " `t")
-      if (outLine != "" && RegExMatch(rawLine, " {2,}+$"))
+      if (outLine != "" && RegExMatch(rawLine, " {2,}$"))
         outLine .= "  "
 
       ; Drop empty headings like "###" or "### ".
-      if RegExMatch(outLine, "^[#]{1,6}+[ \t]*+$") {
+      if RegExMatch(outLine, "^[#]{1,6}\s*$") {
         continue
       }
 
       outLine := PasteMd.SimplifyMarkdownInlineHtml(outLine)
       ; Unescape literal details/summary tags and [img: ...] placeholders.
-      outLine := RegExReplace(outLine, "\\(<\/?(?:details|summary)\b[^>]*+>)", "$1")
-      outLine := RegExReplace(outLine, "\\\[(img(?::[^\]]*+)?)\\\]", "[$1]")
+      outLine := RegExReplace(outLine, "\\(<\/?(?:details|summary)\b[^>]*>)", "$1")
+      outLine := RegExReplace(outLine, "\\\[(img(?::[^\]]*)?)\\\]", "[$1]")
       out .= (out = "" ? "" : "`n") outLine
     }
 
@@ -911,8 +864,8 @@ class PasteMd {
       if (Trim(line, " `t") = "") {
         prev := (idx > 1) ? RTrim(outLines[idx - 1], " `t") : ""
         next := (idx < outLines.Length) ? RTrim(outLines[idx + 1], " `t") : ""
-        if ((RegExMatch(prev, "^[ \t]*+\d++[.)](?:[ \t]++|$)") && RegExMatch(next, "^[ \t]*+\d++[.)](?:[ \t]++|$)"))
-          || (RegExMatch(prev, "^[ \t]*+[-+*](?:[ \t]++|$)") && RegExMatch(next, "^[ \t]*+[-+*](?:[ \t]++|$)"))) {
+        if ((RegExMatch(prev, "^\s*\d+[.)](?:\s+|$)") && RegExMatch(next, "^\s*\d+[.)](?:\s+|$)"))
+          || (RegExMatch(prev, "^\s*[-+*](?:\s+|$)") && RegExMatch(next, "^\s*[-+*](?:\s+|$)"))) {
           continue
         }
       }
@@ -923,7 +876,7 @@ class PasteMd {
     out := out2
 
     ; Collapse runs of 3+ newlines to 2 (at most one blank line).
-    out := RegExReplace(out, "\n{3,}+", "`n`n")
+    out := RegExReplace(out, "\n{3,}", "`n`n")
 
     out := Trim(out, "`n")
     if (hadTrailingBreak && out != "")
@@ -984,16 +937,16 @@ class PasteMd {
     }
 
     ; Convert HTML links to markdown links for readable output.
-    while RegExMatch(line, "<a\b[^>]*\bhref\s*+=\s*+(['`"])(.*?)\1[^>]*+>((?&inside_htag))</a>" PasteMd.RE_HTML_LIB, &m) {
+    while RegExMatch(line, "<a\b[^>]*\bhref\s*=\s*(['`"])(.*?)\1[^>]*>((?&inside_htag))</a>" PasteMd.RE_HTML_LIB, &m) {
       href := PasteMd.DecodeBasicHtmlEntities(m[2])
       text := PasteMd.DecodeBasicHtmlEntities(m[3])
 
       ; Convert semantic emphasis inside link text before stripping residual tags.
-      while RegExMatch(text, "<(strong|b)\b[^>]*+>((?&inside_htag))</\1>" PasteMd.RE_HTML_LIB, &inner) {
+      while RegExMatch(text, "<(strong|b)\b[^>]*>((?&inside_htag))</\1>" PasteMd.RE_HTML_LIB, &inner) {
         replacement := (inner[2] = "") ? "" : ("**" inner[2] "**")
         text := SubStr(text, 1, inner.Pos - 1) replacement SubStr(text, inner.Pos + inner.Len)
       }
-      while RegExMatch(text, "<(em|i)\b[^>]*+>((?&inside_htag))</\1>" PasteMd.RE_HTML_LIB, &inner) {
+      while RegExMatch(text, "<(em|i)\b[^>]*>((?&inside_htag))</\1>" PasteMd.RE_HTML_LIB, &inner) {
         replacement := (inner[2] = "") ? "" : ("*" inner[2] "*")
         text := SubStr(text, 1, inner.Pos - 1) replacement SubStr(text, inner.Pos + inner.Len)
       }
@@ -1064,17 +1017,17 @@ class PasteMd {
   static _ProcessImgTags(str) {
     ; <img> tags (self-closing).
     pos := 1
-    while RegExMatch(str, "i)<img\b([^>]*+)>", &m, pos) {
+    while RegExMatch(str, "i)<img\b([^>]*?)>", &m, pos) {
       if (PasteMd.SHOW_IMG) {
         pos := m.Pos + m.Len
       } else {
         attrs := m[1]
         accessText := ""
-        if (RegExMatch(attrs, "i)\balt\s*+=\s*+['`"]([^'`"]*+)['`"]", &mA) && mA[1] != "")
+        if (RegExMatch(attrs, "i)\balt\s*=\s*['`"]([^'`"]*)['`"]", &mA) && mA[1] != "")
           accessText := mA[1]
-        else if (RegExMatch(attrs, "i)\btitle\s*+=\s*+['`"]([^'`"]*+)['`"]", &mT) && mT[1] != "")
+        else if (RegExMatch(attrs, "i)\btitle\s*=\s*['`"]([^'`"]*)['`"]", &mT) && mT[1] != "")
           accessText := mT[1]
-        else if (RegExMatch(attrs, "i)\baria-label\s*+=\s*+['`"]([^'`"]*+)['`"]", &mL) && mL[1] != "")
+        else if (RegExMatch(attrs, "i)\baria-label\s*=\s*['`"]([^'`"]*)['`"]", &mL) && mL[1] != "")
           accessText := mL[1]
         replacement := (accessText = "") ? "" : "(img: " accessText ")"
         str := SubStr(str, 1, m.Pos - 1) replacement SubStr(str, m.Pos + m.Len)
@@ -1083,18 +1036,18 @@ class PasteMd {
     }
     ; <svg>…</svg> elements — same rule (aria-label, title attr, or <title> child).
     pos := 1
-    while RegExMatch(str, "is)<svg\b([^>]*+)>.*?</svg>", &m, pos) {
+    while RegExMatch(str, "is)<svg\b([^>]*)>.*?</svg>", &m, pos) {
       if (PasteMd.SHOW_IMG) {
         pos := m.Pos + m.Len
       } else {
         attrs := m[1]
         full  := m[0]
         accessText := ""
-        if (RegExMatch(attrs, "i)\baria-label\s*+=\s*+['`"]([^'`"]*+)['`"]", &mL) && mL[1] != "")
+        if (RegExMatch(attrs, "i)\baria-label\s*=\s*['`"]([^'`"]*)['`"]", &mL) && mL[1] != "")
           accessText := mL[1]
-        else if (RegExMatch(attrs, "i)\btitle\s*+=\s*+['`"]([^'`"]*+)['`"]", &mT) && mT[1] != "")
+        else if (RegExMatch(attrs, "i)\btitle\s*=\s*['`"]([^'`"]*)['`"]", &mT) && mT[1] != "")
           accessText := mT[1]
-        else if (RegExMatch(full, "i)<title\b[^>]*+>(.*?)</title>", &mTc) && mTc[1] != "")
+        else if (RegExMatch(full, "i)<title\b[^>]*>(.*?)</title>", &mTc) && mTc[1] != "")
           accessText := mTc[1]
         replacement := (accessText = "") ? "" : "(img: " accessText ")"
         str := SubStr(str, 1, m.Pos - 1) replacement SubStr(str, m.Pos + m.Len)
@@ -1158,23 +1111,23 @@ class PasteMd {
       return htmlPrep
 
     ; Explicit numeric markers in plain text indicate ordered intent.
-    if RegExMatch(plain, "m)^[ \t]*+\d++[.)](?:[ \t]++|$)")
+    if RegExMatch(plain, "m)^\s*\d+[.)](?:\s+|$)")
       return htmlPrep
 
     ; Only rewrite synthetic outer wrappers created as <ol>...</ol>.
-    if !RegExMatch(prepTrim, "is)^<ol\b[^>]*+>")
+    if !RegExMatch(prepTrim, "is)^<ol\b[^>]*>")
       return htmlPrep
-    if !RegExMatch(prepTrim, "is)</ol>[ \t\r\n]*+$")
+    if !RegExMatch(prepTrim, "is)</ol>\s*$")
       return htmlPrep
 
-    prepTrim := RegExReplace(prepTrim, "is)^<ol\b[^>]*+>", "<ul>", , 1)
-    prepTrim := RegExReplace(prepTrim, "is)</ol>[ \t\r\n]*+$", "</ul>", , 1)
+    prepTrim := RegExReplace(prepTrim, "is)^<ol\b[^>]*>", "<ul>", , 1)
+    prepTrim := RegExReplace(prepTrim, "is)</ol>\s*$", "</ul>", , 1)
 
     ; Drop trailing empty list items produced by selection range clipping.
     ; These become stray "-" bullets after pandoc if kept.
     prepTrim := RegExReplace(
       prepTrim,
-      "is)(?:<li\b[^>]*+>[ \t\r\n]*+(?:<p\b[^>]*+>[ \t\r\n]*+</p>[ \t\r\n]*+)?+</li>[ \t\r\n]*+)++(</ul>[ \t\r\n]*+)$",
+      "is)(?:<li\b[^>]*>\s*(?:<p\b[^>]*>\s*</p>\s*)?</li>\s*)+(</ul>\s*)$",
       "$1"
     )
     return prepTrim
@@ -1215,274 +1168,106 @@ class PasteMd {
   }
 
   /**
-   * Applies ordered-list start to the first ordered-list container in HTML.
-   * Used pre-pandoc so numbering comes from HTML intent, not post-markdown rewrites.
-   * @param {string} htmlPrep - Preprocessed HTML sent to pandoc
-   * @param {number} startNum - Desired ordered-list start index
-   * @returns {string} HTML with first <ol> start set when applicable
+   * Restores ordered-list start when converting a single <li> fragment.
+   * Pandoc renumbers isolated list-item fragments to 1.
+   * @param {string} md - Markdown output from conversion pipeline
+   * @param {string} plain - Plain clipboard text
+   * @param {string} htmlFrag - StartFragment HTML
+   * @param {string} cfHtml - Full CF_HTML payload
+   * @returns {string} Markdown with corrected ordered-list numbering
    */
-  static ApplyOrderedListStartToHtml(htmlPrep, startNum) {
-    if (htmlPrep = "" || startNum <= 1)
-      return htmlPrep
-
-    if !RegExMatch(htmlPrep, "is)<ol\b[^>]*+>", &mOl)
-      return htmlPrep
-
-    olTag := mOl[0]
-    q := Chr(34)
-    startAttr := "start=" q startNum q
-    if RegExMatch(olTag, "i)\bstart\s*+=")
-      newOlTag := RegExReplace(olTag, "i)\bstart\s*+=\s*+(?:['`"][^'`"]*+['`"]|[^\s>]++)", startAttr)
-    else
-      newOlTag := RegExReplace(olTag, ">$", " " startAttr ">")
-
-    return SubStr(htmlPrep, 1, mOl.Pos - 1) newOlTag SubStr(htmlPrep, mOl.Pos + mOl.Len)
-  }
-
-  /**
-   * Inserts a shell marker into list items that contain only a nested list.
-   * This prevents pandoc from collapsing them into malformed mixed list markers.
-   * @param {string} html - HTML prior to pandoc conversion
-   * @returns {string} HTML with shell markers inserted
-   */
-  static StabilizeShellOnlyListItemsHtml(html) {
-    if (html = "")
-      return html
-
-    pat := "is)(<li\b[^>]*+>)([ \t\r\n]*+)(?=<(?:ol|ul)\b)"
-    pos := 1
-    marker := PasteMd._shellListItemPlaceholder
-    while RegExMatch(html, pat, &m, pos) {
-      replacement := m[1] m[2] marker
-      html := SubStr(html, 1, m.Pos - 1) replacement SubStr(html, m.Pos + m.Len)
-      pos := m.Pos + StrLen(replacement)
-    }
-    return html
-  }
-
-  /**
-   * Removes shell list-item markers inserted pre-pandoc.
-   * @param {string} md - Markdown text after cleanup stages
-   * @returns {string} Markdown with shell markers removed
-   */
-  static RemoveListShellPlaceholders(md) {
-    marker := PasteMd._shellListItemPlaceholder
-    if !InStr(md, marker)
+  static RestoreOrderedListStart(md, plain, htmlFrag, cfHtml, expected := -1) {
+    md := StrReplace(md, "`r", "")
+    if (md = "")
       return md
 
-    md := StrReplace(md, marker, "")
-    ; Marker removal runs before QuoteMarkdown(), so only non-quoted list
-    ; markers need whitespace cleanup here.
-    md := RegExReplace(md, "m)^([ \t]*+\d++[.)])[ \t]++$", "$1")
-    md := RegExReplace(md, "m)^([ \t]*+[-+*])[ \t]++$", "$1")
-    return md
+    ; Fragment may be wrapped in container tags (e.g., <div>...<ol>...</ol>).
+    if !RegExMatch(htmlFrag, "is)<(?:li|ol)\b")
+      return md
+
+    ; Only patch markdown that starts as list item 1./1) (with or without body text).
+    if !RegExMatch(md, "^\s*1[.)](?:\s|$)")
+      return md
+
+    if (expected < 0) {
+      expected := this.GetExpectedOrderedListStart(htmlFrag, cfHtml, plain)
+    }
+    if (expected <= 1)
+      return md
+
+    return this.RenumberLeadingOrderedList(md, expected)
   }
 
   /**
-   * Prompts for ordered-list start when list intent is ordered but start is ambiguous.
-   * @param {string} htmlPrep - Preprocessed HTML (after list-intent normalization)
+   * Prompts user for ordered-list start when clipboard context is ambiguous.
+   * @param {string} md - Markdown output from conversion pipeline
    * @param {string} plain - Plain clipboard text
    * @param {string} htmlFrag - StartFragment HTML
    * @param {number} expected - Inferred start index from available context
-   * @returns {Map} {aborted:boolean, value:number}
+   * @returns {number} Selected start index, or original expected value
    */
-  static MaybePromptOrderedListStart(htmlPrep, plain, htmlFrag, expected) {
-    if !this.ShouldPromptOrderedListStart(htmlPrep, htmlFrag, expected)
-      return Map("aborted", false, "value", expected)
+  static MaybePromptOrderedListStart(md, plain, htmlFrag, expected) {
+    if !this.ShouldPromptOrderedListStart(md, htmlFrag, expected)
+      return expected
 
     defaultStart := 2
-    if RegExMatch(plain, "m)^[ \t]*+(\d++)[.)](?:[ \t]++|$)", &mPlain) {
+    if RegExMatch(plain, "^\s*(\d+)[.)](?:\s+|$)", &mPlain) {
       nPlain := Integer(mPlain[1])
-      if (nPlain >= 1)
+      if (nPlain > 1)
         defaultStart := nPlain
     }
 
-    promptFn := PasteMd._orderedListPromptFn
-    if !IsObject(promptFn)
-      promptFn := PasteMd._defaultOrderedListPromptFn
+    ib := InputBox(
+      "Original ordered-list index is missing from clipboard context.`nEnter starting number for this paste (Cancel keeps 1).",
+      "Paste as md: list start",
+      "w520 h160",
+      "" defaultStart
+    )
 
-    rawResponse := promptFn.Call(defaultStart, expected, plain, htmlFrag)
-    parsed := PasteMd.ParseOrderedListPromptResponse(rawResponse)
-    if (parsed["status"] = "cancel")
-      return Map("aborted", true, "value", expected)
-    if (parsed["status"] != "ok")
-      throw Error("Invalid ordered-list prompt response: " rawResponse)
-    return Map("aborted", false, "value", parsed["value"])
+    if (ib.Result != "OK")
+      return expected
+
+    value := Trim(ib.Value, " `t")
+    if !RegExMatch(value, "^\d+$")
+      return expected
+
+    n := Integer(value)
+    if (n < 1)
+      return expected
+
+    return n
   }
 
   /**
-   * Determines whether ordered-list start prompt should run pre-pandoc.
-   * @param {string} htmlPrep - Preprocessed HTML (after list-intent normalization)
+   * Determines whether ambiguous ordered-list prompting should run.
+   * Prompting is only relevant for single-item list fragments that start at 1.
+   * @param {string} md - Markdown output from conversion pipeline
    * @param {string} htmlFrag - StartFragment HTML
    * @param {number} expected - Inferred start index from available context
    * @returns {boolean} True when prompt should be shown
    */
-  static ShouldPromptOrderedListStart(htmlPrep, htmlFrag, expected) {
+  static ShouldPromptOrderedListStart(md, htmlFrag, expected) {
     if (expected > 1)
       return false
 
-    if (htmlPrep = "" || htmlFrag = "")
+    ; Fragment may be wrapped in container tags (e.g., <div>...<ol>...</ol>).
+    ; Some sources emit bare top-level <li> items without an <ol> wrapper.
+    if !RegExMatch(htmlFrag, "is)<(?:li|ol)\b")
       return false
 
-    prepTrim := LTrim(htmlPrep, " `t`r`n")
-    fragTrim := LTrim(htmlFrag, " `t`r`n")
-
-    ; Explicit unordered fragments are never prompted.
-    if RegExMatch(prepTrim, "is)^<ul\b")
-      return false
-    if RegExMatch(fragTrim, "is)^<ul\b")
+    ; Multi-item fragments are not ambiguous enough to prompt, even when
+    ; upstream omits explicit start metadata.
+    if (this.CountListItemsInFragment(htmlFrag) > 1)
       return false
 
-    ; Prompt for explicit ordered containers when start could not be inferred.
-    if RegExMatch(prepTrim, "is)^<ol\b")
-      return true
-    if RegExMatch(fragTrim, "is)^<ol\b")
-      return true
-
-    ; Bare top-level <li> fragments remain ambiguous.
-    if RegExMatch(fragTrim, "is)^<li\b")
-      return true
-
-    return false
-  }
-
-  /**
-   * Parses ordered-list prompt responses.
-   * Accepted responses are integer >= 1, or CANCEL.
-   * @param {any} response - Prompt callback return value
-   * @returns {Map} {status:"ok|cancel|invalid", value:number}
-   */
-  static ParseOrderedListPromptResponse(response) {
-    value := Trim("" response, " `t")
-    if (StrUpper(value) = "CANCEL")
-      return Map("status", "cancel", "value", 0)
-
-    if RegExMatch(value, "^\d++$") {
-      n := Integer(value)
-      if (n >= 1)
-        return Map("status", "ok", "value", n)
-    }
-
-    return Map("status", "invalid", "value", 0)
-  }
-
-  /**
-   * Runtime ordered-list prompt dialog with inline validation feedback.
-   * @param {number} defaultStart - Default list-start value shown in the input
-   * @returns {string|number} Integer >=1, or "CANCEL"
-   */
-  static _PromptOrderedListStartDialog(defaultStart, expected := 0, plain := "", htmlFrag := "") {
-    isDark := PasteMd._IsDarkModeEnabled()
-    state := { status: "cancel", value: 0 }
-
-    gui := Gui("+AlwaysOnTop +OwnDialogs", "Paste as md: list start")
-    gui.MarginX := 14
-    gui.MarginY := 12
-    if (isDark)
-      gui.BackColor := "202020"
-
-    gui.SetFont("s9", "Segoe UI")
-    if (isDark)
-      gui.SetFont("cE6E6E6")
-
-    gui.AddText("xm w460"
-      , "Original ordered-list index is missing from clipboard context."
-      . "`nEnter starting number (>= 1), or Cancel to abort paste.")
-    edit := gui.AddEdit("xm w140", "" defaultStart)
-
-    errOpts := "xm w460 Hidden "
-    errOpts .= isDark ? "cFF8A8A" : "cCC0000"
-    err := gui.AddText(errOpts, "Enter a whole number greater than or equal to 1.")
-
-    okBtn := gui.AddButton("xm w90 Default", "OK")
-    cancelBtn := gui.AddButton("x+8 w90", "Cancel")
-
-    if (isDark) {
-      edit.Opt("Background2B2B2B cF0F0F0")
-      okBtn.Opt("Background3A3A3A cF0F0F0")
-      cancelBtn.Opt("Background3A3A3A cF0F0F0")
-    }
-
-    okHandler := ObjBindMethod(PasteMd, "_PromptOrderedListSubmit", gui, edit, err, state)
-    cancelHandler := ObjBindMethod(PasteMd, "_PromptOrderedListCancel", gui, state)
-    okBtn.OnEvent("Click", okHandler)
-    cancelBtn.OnEvent("Click", cancelHandler)
-    gui.OnEvent("Close", cancelHandler)
-    gui.OnEvent("Escape", cancelHandler)
-
-    gui.Show("AutoSize")
-    PasteMd._TrySetDarkTitleBar(gui.Hwnd, isDark)
-    edit.Focus()
-    edit.Select()
-
-    WinWaitClose("ahk_id " gui.Hwnd)
-    return (state.status = "ok") ? state.value : "CANCEL"
-  }
-
-  /**
-   * Handles ordered-list prompt submission click.
-   */
-  static _PromptOrderedListSubmit(gui, edit, err, state, *) {
-    value := Trim(edit.Text, " `t")
-    if !RegExMatch(value, "^\d++$") || Integer(value) < 1 {
-      err.Visible := true
-      err.Redraw()
-      edit.Focus()
-      edit.Select()
-      return
-    }
-
-    state.status := "ok"
-    state.value := Integer(value)
-    if WinExist("ahk_id " gui.Hwnd)
-      gui.Destroy()
-  }
-
-  /**
-   * Handles ordered-list prompt cancellation events.
-   */
-  static _PromptOrderedListCancel(gui, state, *) {
-    state.status := "cancel"
-    if WinExist("ahk_id " gui.Hwnd)
-      gui.Destroy()
-  }
-
-  /**
-   * Returns true when Windows app theme is dark.
-   */
-  static _IsDarkModeEnabled() {
-    try {
-      val := RegRead(
-        "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
-        "AppsUseLightTheme",
-        1
-      )
-    } catch {
+    if !RegExMatch(md, "^\s*1[.)](?:\s|$)")
       return false
-    }
-    return ((val + 0) = 0)
-  }
 
-  /**
-   * Attempts to apply dark/light titlebar styling on Windows.
-   */
-  static _TrySetDarkTitleBar(hwnd, enableDark) {
-    value := enableDark ? 1 : 0
-    for attr in [20, 19] {
-      try {
-        hr := DllCall("dwmapi\DwmSetWindowAttribute"
-          , "ptr", hwnd
-          , "int", attr
-          , "int*", value
-          , "int", 4
-          , "int")
-        if (hr = 0)
-          return true
-      } catch {
-        return false
-      }
-    }
-    return false
+    ; Multi-item list fragments are not ambiguous enough to prompt.
+    if (this.CountLeadingOrderedListItems(md) > 1)
+      return false
+
+    return true
   }
 
   /**
@@ -1504,6 +1289,126 @@ class PasteMd {
   }
 
   /**
+   * Counts items in the leading ordered-list block of markdown text.
+   * @param {string} md - Markdown text
+   * @returns {number} Number of leading ordered-list item lines
+   */
+  static CountLeadingOrderedListItems(md) {
+    md := StrReplace(md, "`r", "")
+    if (md = "")
+      return 0
+
+    lines := StrSplit(md, "`n")
+    if (lines.Length = 0)
+      return 0
+
+    firstIdx := 1
+    while (firstIdx <= lines.Length && Trim(lines[firstIdx], " `t") = "")
+      firstIdx += 1
+    if (firstIdx > lines.Length)
+      return 0
+
+    if !RegExMatch(lines[firstIdx], "^\s*\d+[.)](?:\s|$)")
+      return 0
+
+    count := 0
+    started := false
+    Loop lines.Length {
+      idx := A_Index
+      if (idx < firstIdx)
+        continue
+
+      line := RTrim(lines[idx], " `t")
+      if RegExMatch(line, "^\s*\d+[.)](?:\s|$)") {
+        count += 1
+        started := true
+        continue
+      }
+
+      if (!started)
+        break
+
+      if (line = "" || RegExMatch(line, "^\s{2,}"))
+        continue
+
+      break
+    }
+
+    return count
+  }
+
+  /**
+   * Renumbers the leading ordered-list block in markdown.
+   * Starts at first non-empty numbered-list line and increments for each item.
+   * @param {string} md - Markdown text
+   * @param {number} startNum - Desired starting list number
+   * @returns {string} Markdown with renumbered leading ordered-list block
+   */
+  static RenumberLeadingOrderedList(md, startNum) {
+    hadTrailingBreak := RegExMatch(md, "\n$")
+    lines := StrSplit(md, "`n")
+    if (lines.Length = 0)
+      return md
+
+    firstIdx := 1
+    while (firstIdx <= lines.Length && Trim(lines[firstIdx], " `t") = "") {
+      firstIdx += 1
+    }
+    if (firstIdx > lines.Length)
+      return md
+
+    if !RegExMatch(lines[firstIdx], "^(\s*)\d+([.)])(?:(\s+)(.*)|\s*)$")
+      return md
+
+    current := startNum
+    started := false
+    drop := Map()
+
+    Loop lines.Length {
+      idx := A_Index
+      if (idx < firstIdx)
+        continue
+
+      line := lines[idx]
+      if RegExMatch(line, "^(\s*)\d+([.)])(?:(\s+)(.*)|\s*)$", &mLine) {
+        if (mLine[4] = "") {
+          drop[idx] := true
+        } else {
+          sep := mLine[3]
+          if (sep = "")
+            sep := " "
+          lines[idx] := mLine[1] current mLine[2] sep mLine[4]
+        }
+        current += 1
+        started := true
+        continue
+      }
+
+      if (!started)
+        break
+
+      ; Keep blank lines and indented continuation lines within list block.
+      if (Trim(line, " `t") = "" || RegExMatch(line, "^\s{2,}")) {
+        continue
+      }
+
+      break
+    }
+
+    out := ""
+    firstOut := true
+    Loop lines.Length {
+      if (drop.Has(A_Index))
+        continue
+      out .= (firstOut ? "" : "`n") lines[A_Index]
+      firstOut := false
+    }
+    if (hadTrailingBreak && out != "" && !RegExMatch(out, "\n$"))
+      out .= "`n"
+    return out
+  }
+
+  /**
    * Determines expected start index for selected ordered-list fragment.
    * Priority:
    * 1) <li value="N"> on fragment
@@ -1520,7 +1425,7 @@ class PasteMd {
    * @returns {number} Expected list index, or 0 when unknown
    */
   static GetExpectedOrderedListStart(htmlFrag, cfHtml, plain) {
-    if RegExMatch(htmlFrag, "is)<li\b[^>]*+\bvalue\s*+=\s*+['`"]?(\d++)", &mValue) {
+    if RegExMatch(htmlFrag, "is)<li\b[^>]*\bvalue\s*=\s*['`"]?(\d+)", &mValue) {
       return Integer(mValue[1])
     }
 
@@ -1528,11 +1433,11 @@ class PasteMd {
     if (n > 0)
       return n
 
-    if RegExMatch(htmlFrag, "is)^[ \t\r\n]*+<ol\b[^>]*+\bstart\s*+=\s*+['`"]?(\d++)", &mStart) {
+    if RegExMatch(htmlFrag, "is)^\s*<ol\b[^>]*\bstart\s*=\s*['`"]?(\d+)", &mStart) {
       return Integer(mStart[1])
     }
 
-    if RegExMatch(plain, "^[ \t]*+(\d++)[.)](?:[ \t]++|$)", &mPlain) {
+    if RegExMatch(plain, "^\s*(\d+)[.)](?:\s+|$)", &mPlain) {
       return Integer(mPlain[1])
     }
 
@@ -1563,7 +1468,7 @@ class PasteMd {
       if (htmlAll = "")
         return 0
 
-      if RegExMatch(htmlAll, "is)<!--[ \t\r\n]*+StartFragment[ \t\r\n]*+-->", &mStartFragment) {
+      if RegExMatch(htmlAll, "is)<!--\s*StartFragment\s*-->", &mStartFragment) {
         before := SubStr(htmlAll, 1, mStartFragment.Pos - 1)
       } else {
         fragLookup := Trim(htmlFrag, " `t`r`n")
@@ -1579,7 +1484,7 @@ class PasteMd {
     listStack := []
     pos := 1
 
-    while RegExMatch(before, "is)<(/?)(ol|ul|li)\b([^>]*+)>", &mTag, pos) {
+    while RegExMatch(before, "is)<(/?)(ol|ul|li)\b([^>]*)>", &mTag, pos) {
       isClose := (mTag[1] = "/")
       tagName := StrLower(mTag[2])
       attrs := mTag[3]
@@ -1587,7 +1492,7 @@ class PasteMd {
       if (!isClose) {
         if (tagName = "ol" || tagName = "ul") {
           ctx := { tag: tagName, start: 1, childLi: 0 }
-          if (tagName = "ol" && RegExMatch(attrs, "i)\bstart\s*+=\s*+['`"]?(\d++)", &mStart)) {
+          if (tagName = "ol" && RegExMatch(attrs, "i)\bstart\s*=\s*['`"]?(\d+)", &mStart)) {
             ctx.start := Integer(mStart[1])
           }
           listStack.Push(ctx)
@@ -1672,17 +1577,17 @@ class PasteMd {
       i := A_Index
       rawLine := lines[i]
       line := RTrim(rawLine, " `t")
-      if (line != "" && RegExMatch(rawLine, " {2,}+$"))
+      if (line != "" && RegExMatch(rawLine, " {2,}$"))
         line .= "  "
 
       ; Drop loose-list separator blanks between adjacent items of the same list type.
       if (line = "") {
         prev := (i > 1) ? RTrim(lines[i - 1], " `t") : ""
         next := (i < lines.Length) ? RTrim(lines[i + 1], " `t") : ""
-        if ((RegExMatch(prev, "^[ \t]*+\d++[.)](?:[ \t]++|$)")
-          && RegExMatch(next, "^[ \t]*+\d++[.)](?:[ \t]++|$)"))
-          || (RegExMatch(prev, "^[ \t]*+[-+*](?:[ \t]++|$)")
-          && RegExMatch(next, "^[ \t]*+[-+*](?:[ \t]++|$)"))) {
+        if ((RegExMatch(prev, "^\s*\d+[.)](?:\s+|$)")
+          && RegExMatch(next, "^\s*\d+[.)](?:\s+|$)"))
+          || (RegExMatch(prev, "^\s*[-+*](?:\s+|$)")
+          && RegExMatch(next, "^\s*[-+*](?:\s+|$)"))) {
           continue
         }
       }
@@ -1714,8 +1619,8 @@ class PasteMd {
       if (Trim(lines[i], " `t") != ">")
         continue
 
-      prevIsPosterHeading := (i > 1) && RegExMatch(RTrim(lines[i - 1], " `t"), "^##[ \t]++\S++")
-      nextIsPosterHeading := (i < lines.Length) && RegExMatch(RTrim(lines[i + 1], " `t"), "^##[ \t]++\S++")
+      prevIsPosterHeading := (i > 1) && RegExMatch(RTrim(lines[i - 1], " `t"), "^##\s+\S")
+      nextIsPosterHeading := (i < lines.Length) && RegExMatch(RTrim(lines[i + 1], " `t"), "^##\s+\S")
       if (prevIsPosterHeading || nextIsPosterHeading)
         lines[i] := ""
     }
@@ -1746,7 +1651,7 @@ class PasteMd {
 
     lines := StrSplit(tail, "`n")
     lastLine := RTrim(lines[lines.Length], " `t")
-    if !RegExMatch(lastLine, "^[ \t]*+(?:>[ \t]*+)?+(?:\d++[.)]|[-+*])(?:[ \t]++|$)")
+    if !RegExMatch(lastLine, "^\s*(?:>\s*)?(?:\d+[.)]|[-+*])(?:\s+|$)")
       return md
 
     return tail "`n"
