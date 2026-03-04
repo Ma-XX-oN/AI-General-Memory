@@ -490,8 +490,10 @@ class PasteMd {
         mdAfterClean := md
         mdAfterOrderedList := md
       } else {
+        expectedListStart := PasteMd.GetExpectedOrderedListStart(htmlFrag, cfHtml, plain)
         PasteMd._BusyUpdate("Preprocessing HTML")
         htmlPrep := PasteMd._PreprocessHtml(htmlFrag, cfHtml, showPoster)
+        htmlPrep := PasteMd.NormalizeIncidentalListIntentHtml(htmlPrep, htmlFrag, plain, expectedListStart)
 
         ; If no meaningful HTML tags remain after preprocessing (just styled
         ; spans wrapping plain text, or <p> wrappers around plain lines as
@@ -526,9 +528,6 @@ class PasteMd {
           mdAfterClean := md
         }
 
-        expectedListStart := PasteMd.GetExpectedOrderedListStart(htmlFrag, cfHtml, plain)
-        md := PasteMd.MaybeDemoteIncidentalOrderedList(md, plain, htmlFrag, expectedListStart)
-        mdAfterClean := md
         if (forcedListStart != "") {
           if RegExMatch(forcedListStart, "^\d+$")
             expectedListStart := Integer(forcedListStart)
@@ -1076,6 +1075,65 @@ class PasteMd {
   }
 
   /**
+   * Normalizes implicit list intent before pandoc conversion.
+   *
+   * Some sources emit bare top-level <li> fragments with no explicit <ol>/<ul>
+   * container. HtmlNorm wraps these in <ol> to keep valid structure for pandoc,
+   * but for incidental unordered selections this creates false numbering.
+   *
+   * This method converts the synthetic outer <ol> to <ul> for multi-item bare
+   * <li> fragments when ordered intent is not inferred from clipboard context.
+   *
+   * @param {string} htmlPrep - Preprocessed HTML sent to pandoc
+   * @param {string} htmlFrag - StartFragment HTML
+   * @param {string} plain - Plain clipboard text
+   * @param {number} expected - Inferred ordered-list start from context
+   * @returns {string} HTML with corrected outer list intent
+   */
+  static NormalizeIncidentalListIntentHtml(htmlPrep, htmlFrag, plain, expected := 0) {
+    if (htmlPrep = "" || htmlFrag = "")
+      return htmlPrep
+
+    if (expected > 1)
+      return htmlPrep
+
+    fragTrim := LTrim(htmlFrag, " `t`r`n")
+    prepTrim := LTrim(htmlPrep, " `t`r`n")
+
+    ; Only handle bare top-level <li> fragments; explicit list containers keep intent.
+    if !RegExMatch(fragTrim, "is)^<li\b")
+      return htmlPrep
+    if RegExMatch(fragTrim, "is)^<(?:ol|ul)\b")
+      return htmlPrep
+
+    ; Single-item fragments remain on ordered-list path (prompt/renumber logic).
+    if (this.CountListItemsInFragment(htmlFrag) < 2)
+      return htmlPrep
+
+    ; Explicit numeric markers in plain text indicate ordered intent.
+    if RegExMatch(plain, "m)^\s*\d+[.)](?:\s+|$)")
+      return htmlPrep
+
+    ; Only rewrite synthetic outer wrappers created as <ol>...</ol>.
+    if !RegExMatch(prepTrim, "is)^<ol\b[^>]*>")
+      return htmlPrep
+    if !RegExMatch(prepTrim, "is)</ol>\s*$")
+      return htmlPrep
+
+    prepTrim := RegExReplace(prepTrim, "is)^<ol\b[^>]*>", "<ul>", , 1)
+    prepTrim := RegExReplace(prepTrim, "is)</ol>\s*$", "</ul>", , 1)
+
+    ; Drop trailing empty list items produced by selection range clipping.
+    ; These become stray "-" bullets after pandoc if kept.
+    prepTrim := RegExReplace(
+      prepTrim,
+      "is)(?:<li\b[^>]*>\s*(?:<p\b[^>]*>\s*</p>\s*)?</li>\s*)+(</ul>\s*)$",
+      "$1"
+    )
+    return prepTrim
+  }
+
+  /**
    * Replaces ¤THINKING_N¤ placeholders with clean <details> HTML blocks.
    * @param {string} md - Markdown text containing placeholders
    * @returns {string} Markdown with thinking blocks restored as raw HTML
@@ -1138,189 +1196,6 @@ class PasteMd {
       return md
 
     return this.RenumberLeadingOrderedList(md, expected)
-  }
-
-  /**
-   * Demotes incidental ordered-list markdown back to plain lines when the
-   * fragment is multi-<li> text selection without explicit list intent.
-   * @param {string} md - Markdown output from conversion pipeline
-   * @param {string} plain - Plain clipboard text
-   * @param {string} htmlFrag - StartFragment HTML
-   * @param {number} expected - Inferred list start from context
-   * @returns {string} Possibly demoted markdown
-   */
-  static MaybeDemoteIncidentalOrderedList(md, plain, htmlFrag, expected := 0) {
-    md := StrReplace(md, "`r", "")
-    if (md = "")
-      return md
-    fragTrim := LTrim(htmlFrag, " `t`r`n")
-
-    ; Respect explicit/inferred non-1 starts.
-    if (expected > 1)
-      return md
-
-    ; Only demote leading ordered-list markdown that starts at 1.
-    if !RegExMatch(md, "^\s*1[.)](?:\s|$)")
-      return md
-
-    ; Fragment must contain list items.
-    if !RegExMatch(htmlFrag, "is)<li\b")
-      return md
-
-    ; Keep explicit list intent only when fragment itself starts with list container.
-    if RegExMatch(fragTrim, "is)^<(?:ol|ul)\b")
-      return md
-
-    ; Demote only multi-item fragments (single-item stays on numbered path).
-    if (this.CountListItemsInFragment(htmlFrag) < 2)
-      return md
-
-    ; If plain text already looks like a list, keep numbering.
-    if RegExMatch(plain, "m)^\s*(?:\d+[.)]|[-+*])(?:\s+|$)")
-      return md
-
-    ; Bare <li> fragments with nested <ul> are unordered selections.
-    if (RegExMatch(fragTrim, "is)^<li\b") && RegExMatch(htmlFrag, "is)<ul\b"))
-      return this.UnorderLeadingOrderedBlock(md)
-
-    return this.UnlistLeadingOrderedBlock(md)
-  }
-
-  /**
-   * Removes leading ordered-list markers from the first ordered-list block.
-   * Empty numbered items are dropped.
-   * @param {string} md - Markdown text
-   * @returns {string} Markdown without leading ordered-list markers
-   */
-  static UnlistLeadingOrderedBlock(md) {
-    hadTrailingBreak := RegExMatch(md, "\n$")
-    lines := StrSplit(md, "`n")
-    if (lines.Length = 0)
-      return md
-
-    firstIdx := 1
-    while (firstIdx <= lines.Length && Trim(lines[firstIdx], " `t") = "") {
-      firstIdx += 1
-    }
-    if (firstIdx > lines.Length)
-      return md
-
-    if !RegExMatch(lines[firstIdx], "^(\s*)\d+([.)])(?:(\s+)(.*)|\s*)$")
-      return md
-
-    started := false
-    drop := Map()
-    Loop lines.Length {
-      idx := A_Index
-      if (idx < firstIdx)
-        continue
-
-      line := lines[idx]
-      if RegExMatch(line, "^(\s*)\d+([.)])(?:(\s+)(.*)|\s*)$", &mLine) {
-        if (mLine[4] = "") {
-          drop[idx] := true
-        } else {
-          lines[idx] := mLine[1] mLine[4]
-        }
-        started := true
-        continue
-      }
-
-      if (!started)
-        break
-
-      ; Keep blank and indented continuation lines within the block.
-      if (Trim(line, " `t") = "" || RegExMatch(line, "^\s{2,}")) {
-        continue
-      }
-
-      break
-    }
-
-    out := ""
-    firstOut := true
-    Loop lines.Length {
-      if (drop.Has(A_Index))
-        continue
-      out .= (firstOut ? "" : "`n") lines[A_Index]
-      firstOut := false
-    }
-    if (hadTrailingBreak && out != "" && !RegExMatch(out, "\n$"))
-      out .= "`n"
-    return out
-  }
-
-  /**
-   * Converts leading ordered-list markers in the first block to unordered markers.
-   * Empty numbered items are dropped.
-   * @param {string} md - Markdown text
-   * @returns {string} Markdown with unordered leading block
-   */
-  static UnorderLeadingOrderedBlock(md) {
-    hadTrailingBreak := RegExMatch(md, "\n$")
-    lines := StrSplit(md, "`n")
-    if (lines.Length = 0)
-      return md
-
-    firstIdx := 1
-    while (firstIdx <= lines.Length && Trim(lines[firstIdx], " `t") = "") {
-      firstIdx += 1
-    }
-    if (firstIdx > lines.Length)
-      return md
-
-    if !RegExMatch(lines[firstIdx], "^(\s*)\d+([.)])(?:(\s+)(.*)|\s*)$")
-      return md
-
-    started := false
-    drop := Map()
-    Loop lines.Length {
-      idx := A_Index
-      if (idx < firstIdx)
-        continue
-
-      line := lines[idx]
-      if RegExMatch(line, "^(\s*)\d+([.)])(?:(\s+)(.*)|\s*)$", &mLine) {
-        if (mLine[4] = "") {
-          drop[idx] := true
-        } else {
-          lines[idx] := mLine[1] "- " mLine[4]
-        }
-        started := true
-        continue
-      }
-
-      if (!started)
-        break
-
-      ; Keep blank and indented continuation lines within the block.
-      if (Trim(line, " `t") = "") {
-        continue
-      }
-      if RegExMatch(line, "^ {4,}") {
-        ; Ordered-list continuations are typically 4-space indented.
-        ; Shift by 2 when converting to unordered so nested bullets stay compact.
-        lines[idx] := SubStr(line, 3)
-        continue
-      }
-      if RegExMatch(line, "^\s{2,}") {
-        continue
-      }
-
-      break
-    }
-
-    out := ""
-    firstOut := true
-    Loop lines.Length {
-      if (drop.Has(A_Index))
-        continue
-      out .= (firstOut ? "" : "`n") lines[A_Index]
-      firstOut := false
-    }
-    if (hadTrailingBreak && out != "" && !RegExMatch(out, "\n$"))
-      out .= "`n"
-    return out
   }
 
   /**
