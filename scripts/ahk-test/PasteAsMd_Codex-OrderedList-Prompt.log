@@ -1,0 +1,20 @@
+PasteAsMd debug — 2026-03-04 14:36:07
+case:prompt3, prompt:3
+case:cancel, prompt:CANCEL, expectAbort:1
+
+=== 1. plain (A_Clipboard minus CR) (len=43) ===
+OL-03 - Charlie Nickel¶
+OL-04 - Delta Cobalt
+
+=== 2. cfHtml (raw full payload) (len=1789) ===
+Version:0.9⏎¶
+StartHTML:0000000475⏎¶
+EndHTML:0000001789⏎¶
+StartFragment:0000000511⏎¶
+EndFragment:0000001753⏎¶
+SourceURL:vscode-webview://0sm6951fc3s1fe2g40vq8ni09j6l1jsdaenck51vtpgfh427ffk5/index.html?id=7fccb0da-7c3f-4b89-ad90-3ec4b953ab13&parentId=1&origin=8490f5f0-3f6e-45fa-b55e-e7ea32531261&swVersion=4&extensionId=openai.chatgpt&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net&parentOrigin=vscode-file%3A%2F%2Fvscode-app&purpose=webviewView⏎¶
+<html>⏎¶
+<body>⏎¶
+<!--StartFragment--><ol class="text-size-chat leading-relaxed extension:leading-normal list-decimal mt-1.5 mb-3 pl-8" start="1" style="box-sizing: border-box; border: 0px solid; margin: 6px 0px 12px; padding: 0px 0px 0px 32px; list-style: decimal; --tw-leading: 1.5; line-height: 1.5; font-size: 13px; color: rgb(204, 204, 204); font-family: &quot;Segoe WPC&quot;, &quot;Segoe UI&quot;, sans-serif; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial;"><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">OL-03 - Charlie Nickel</li><li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">OL-04 - Delta Cobalt</li></ol><!--EndFragment-->⏎¶
+</body>⏎¶
+</html>
