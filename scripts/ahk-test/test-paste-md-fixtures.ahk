@@ -19,6 +19,9 @@ fixtures := [
   { file: "PasteAsMd_Codex-EditedFile.log",         source: "codex",      withUser: false, assistantLabel: "Codex" },
   { file: "PasteAsMd_Codex-OrderedList-Parent.log", source: "unknown",    withUser: false, assistantLabel: "Codex" },
   { file: "PasteAsMd_Codex-OrderedList-Nested.log", source: "unknown",    withUser: false, assistantLabel: "Codex" },
+  { file: "PasteAsMd_Codex-OrderedList-Prompt.log", source: "codex",      withUser: false, assistantLabel: "Codex" },
+  { file: "PasteAsMd_Codex-NestedShell-UL.log",     source: "codex",      withUser: false, assistantLabel: "Codex" },
+  { file: "PasteAsMd_Codex-NestedShell-OL.log",     source: "codex",      withUser: false, assistantLabel: "Codex" },
   { file: "PasteAsMd_ChatGPT.log",                  source: "chatgpt",    withUser: false, assistantLabel: "ChatGPT" },
   { file: "PasteAsMd_ChatGPT-with-User.log",        source: "chatgpt",    withUser: true,  assistantLabel: "ChatGPT" },
   { file: "PasteAsMd_ChatGPT-with-User2.log",       source: "chatgpt",    withUser: true,  assistantLabel: "ChatGPT" },
@@ -35,8 +38,6 @@ required := [
 Log("── PasteAsMd fixture regressions ─────────────────────────────")
 for fx in fixtures {
   path := A_ScriptDir "\" fx.file
-  expectedPath := _SiblingWithSuffix(path, expectedSuffix)
-  actualPath := _SiblingWithSuffix(path, actualSuffix)
   Log("")
   Log("Fixture: " fx.file)
 
@@ -45,6 +46,11 @@ for fx in fixtures {
     continue
 
   logText := FileRead(path, "UTF-8")
+  scenarios := ParseFixtureScenarios(logText)
+  Chk("scenario metadata parsed", scenarios.Length > 0)
+  if (scenarios.Length = 0)
+    continue
+
   sections := ParseDbgSections(logText)
 
   missing := false
@@ -60,36 +66,176 @@ for fx in fixtures {
   ; Inputs for seam: plain + cfHtml decoded from captured debug sections.
   plain := SectionToText(sections["1. plain (A_Clipboard minus CR)"])
   cfHtml := SectionToText(sections["2. cfHtml (raw full payload)"])
+  for sc in scenarios {
+    caseId := sc["case"]
+    expectedPath := _SiblingWithSuffix(path, caseId = "" ? expectedSuffix : ("." caseId expectedSuffix))
+    actualPath := _SiblingWithSuffix(path, caseId = "" ? actualSuffix : ("." caseId actualSuffix))
+    Log("Scenario: " (caseId = "" ? "default" : caseId))
 
-  converted := PasteMd._ConvertFromCaptured(plain, cfHtml, true, fx.withUser, false, false, "")
+    prevPromptFn := ""
+    try {
+      if (sc["hasPrompt"]) {
+        if HasMethod(PasteMd, "SetOrderedListPromptProvider") {
+          promptFn := MakePromptProvider(sc["prompt"])
+          prevPromptFn := PasteMd.SetOrderedListPromptProvider(promptFn)
+        } else {
+          Log("  note: prompt scenario skipped (provider unavailable): " caseId)
+          continue
+        }
+      }
 
-  ChkEqNorm("source", converted["source"], fx.source)
+      converted := PasteMd._ConvertFromCaptured(plain, cfHtml, true, fx.withUser, false, sc["hasPrompt"])
+      ChkEqNorm("source", converted["source"], fx.source)
+      aborted := converted.Has("aborted") ? converted["aborted"] : false
 
-  finalMd := converted["finalMd"]
-  _WriteUtf8(actualPath, finalMd)
+      if (sc["expectAbort"]) {
+        Chk("conversion aborted", aborted)
+      } else {
+        Chk("conversion not aborted", !aborted)
+      }
 
-  if FileExist(expectedPath) {
-    expectedFinal := FileRead(expectedPath, "UTF-8")
-    ChkEqNorm("finalMd", finalMd, expectedFinal)
-  } else {
-    Log("  note: expected output missing, comparison skipped: " _Basename(expectedPath))
-  }
+      finalMd := converted["finalMd"]
+      _WriteUtf8(actualPath, finalMd)
 
-  Chk("no placeholder: ¤POSTER_", !InStr(finalMd, "¤POSTER_"))
-  Chk("no placeholder: ¤USERMSG_", !InStr(finalMd, "¤USERMSG_"))
-  Chk("no placeholder: ¤THINKING_", !InStr(finalMd, "¤THINKING_"))
-  Chk("no placeholder: ¤CHK¤", !InStr(finalMd, "¤CHK¤"))
-  Chk("no placeholder: ¤UNCHK¤", !InStr(finalMd, "¤UNCHK¤"))
+      if (aborted) {
+        if FileExist(expectedPath) {
+          expectedFinal := FileRead(expectedPath, "UTF-8")
+          ChkEqNorm("finalMd", finalMd, expectedFinal)
+        } else {
+          Log("  note: aborted scenario expected output missing, comparison skipped: " _Basename(expectedPath))
+        }
+        continue
+      }
 
-  if fx.withUser {
-    Chk("with-user has User label", InStr(finalMd, "## User"))
-    Chk("with-user has assistant label", InStr(finalMd, "## " fx.assistantLabel))
+      if FileExist(expectedPath) {
+        expectedFinal := FileRead(expectedPath, "UTF-8")
+        ChkEqNorm("finalMd", finalMd, expectedFinal)
+      } else {
+        Log("  note: expected output missing, comparison skipped: " _Basename(expectedPath))
+      }
+
+      Chk("no placeholder: ¤POSTER_", !InStr(finalMd, "¤POSTER_"))
+      Chk("no placeholder: ¤USERMSG_", !InStr(finalMd, "¤USERMSG_"))
+      Chk("no placeholder: ¤THINKING_", !InStr(finalMd, "¤THINKING_"))
+      Chk("no placeholder: ¤CHK¤", !InStr(finalMd, "¤CHK¤"))
+      Chk("no placeholder: ¤UNCHK¤", !InStr(finalMd, "¤UNCHK¤"))
+
+      if fx.withUser {
+        Chk("with-user has User label", InStr(finalMd, "## User"))
+        Chk("with-user has assistant label", InStr(finalMd, "## " fx.assistantLabel))
+      }
+    } finally {
+      if (prevPromptFn != "" && HasMethod(PasteMd, "SetOrderedListPromptProvider"))
+        PasteMd.SetOrderedListPromptProvider(prevPromptFn)
+    }
   }
 }
 
 Log("")
 Log("Results: " passed " passed, " failed " failed")
 ExitApp
+
+MakePromptProvider(response) {
+  return (defaultStart, expected, plain, htmlFrag) => response
+}
+
+ParseFixtureScenarios(logText) {
+  scenarios := []
+
+  if RegExMatch(logText, "m)^=== ", &mSec)
+    header := SubStr(logText, 1, mSec.Pos - 1)
+  else
+    header := logText
+
+  header := StrReplace(header, "`r", "")
+  lines := StrSplit(header, "`n")
+  metaLines := []
+
+  Loop lines.Length {
+    idx := A_Index
+    if (idx = 1)
+      continue
+    line := Trim(lines[idx], " `t")
+    if (line != "")
+      metaLines.Push(line)
+  }
+
+  if (metaLines.Length = 0) {
+    scenarios.Push(Map(
+      "case", "",
+      "hasPrompt", false,
+      "prompt", "",
+      "expectAbort", false
+    ))
+    return scenarios
+  }
+
+  for line in metaLines {
+    err := ""
+    sc := ParseFixtureScenarioLine(line, &err)
+    if (sc = 0) {
+      Log("  invalid scenario metadata: " line)
+      if (err != "")
+        Log("  parse error: " err)
+      return []
+    }
+    scenarios.Push(sc)
+  }
+  return scenarios
+}
+
+ParseFixtureScenarioLine(line, &err := "") {
+  err := ""
+  pairs := Map()
+
+  for part in StrSplit(line, ",") {
+    part := Trim(part, " `t")
+    if (part = "")
+      continue
+    if !RegExMatch(part, "i)^([a-z][a-z0-9_]*)\s*:\s*(.+)$", &mPair) {
+      err := "invalid key:value pair: " part
+      return 0
+    }
+    key := StrLower(mPair[1])
+    value := Trim(mPair[2], " `t")
+    pairs[key] := value
+  }
+
+  if !pairs.Has("case") || Trim(pairs["case"], " `t") = "" {
+    err := "case is required when metadata lines are present"
+    return 0
+  }
+
+  scenario := Map(
+    "case", pairs["case"],
+    "hasPrompt", false,
+    "prompt", "",
+    "expectAbort", false
+  )
+
+  if pairs.Has("prompt") {
+    promptValue := Trim(pairs["prompt"], " `t")
+    if (StrUpper(promptValue) != "CANCEL") {
+      if !RegExMatch(promptValue, "^\d+$") || Integer(promptValue) < 1 {
+        err := "prompt must be CANCEL or integer >= 1"
+        return 0
+      }
+    }
+    scenario["hasPrompt"] := true
+    scenario["prompt"] := promptValue
+  }
+
+  if pairs.Has("expectabort") {
+    val := Trim(pairs["expectabort"], " `t")
+    if !RegExMatch(val, "^[01]$") {
+      err := "expectAbort must be 0 or 1"
+      return 0
+    }
+    scenario["expectAbort"] := (val = "1")
+  }
+
+  return scenario
+}
 
 ParseDbgSections(logText) {
   sections := Map()

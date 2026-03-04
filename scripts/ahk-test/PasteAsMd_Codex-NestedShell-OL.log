@@ -1,0 +1,40 @@
+PasteAsMd debug — 2026-03-04 14:37:17
+
+=== 1. plain (A_Clipboard minus CR) (len=56) ===
+OL-04 - Delta Cobalt¶
+OL-05 - Echo Iron¶
+Parent UL item B¶
+
+
+=== 2. cfHtml (raw full payload) (len=3047) ===
+Version:0.9⏎¶
+StartHTML:0000000475⏎¶
+EndHTML:0000003047⏎¶
+StartFragment:0000000511⏎¶
+EndFragment:0000003011⏎¶
+SourceURL:vscode-webview://0sm6951fc3s1fe2g40vq8ni09j6l1jsdaenck51vtpgfh427ffk5/index.html?id=7fccb0da-7c3f-4b89-ad90-3ec4b953ab13&parentId=1&origin=8490f5f0-3f6e-45fa-b55e-e7ea32531261&swVersion=4&extensionId=openai.chatgpt&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net&parentOrigin=vscode-file%3A%2F%2Fvscode-app&purpose=webviewView⏎¶
+<html>⏎¶
+<body>⏎¶
+<!--StartFragment-->
+<ol class="text-size-chat leading-relaxed extension:leading-normal list-decimal mt-1.5 mb-3 pl-8" start="1" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 12px; padding: 0px 0px 0px 32px; list-style: decimal; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">
+<li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">
+<ul class="text-size-chat leading-relaxed extension:leading-normal mt-0 mb-4  list-disc pl-4" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 16px; padding: 0px 0px 0px 16px; list-style: disc; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">
+<li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">
+<ol class="text-size-chat leading-relaxed extension:leading-normal list-decimal mt-1.5 mb-3 pl-8" start="1" style="box-sizing: border-box; border: 0px solid; margin: 6px 0px 12px; padding: 0px 0px 0px 32px; list-style: decimal; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">
+<li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">
+OL-04 - Delta Cobalt</li>
+<li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">
+OL-05 - Echo Iron</li>
+</ol>
+</li>
+<li class="text-size-chat leading-relaxed extension:leading-normal mb-1.5" style="box-sizing: border-box; border: 0px solid; margin: 0px 0px 6px; padding: 0px; --tw-leading: 1.5; line-height: 1.5; font-size: 13px;">
+Parent UL item B</li>
+</ul>
+</li>
+</ol>
+<div class="bg-token-text-code-block-background border-token-input-background relative overflow-clip rounded-lg border contain-inline-size dark my-2" data-theme="dark" style="box-sizing: border-box; border: 1px solid rgb(49, 49, 49); margin: 0px; padding: 0px; position: relative; margin-block: 8px; overflow: clip; border-radius: 12.5px; background-color: rgb(43, 43, 43); --tw-contain-size: inline-size; contain: inline-size; corner-shape: superellipse(1.5);">
+<br class="Apple-interchange-newline">
+<!--EndFragment-->
+⏎¶
+</body>⏎¶
+</html>
