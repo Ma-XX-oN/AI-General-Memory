@@ -1,0 +1,88 @@
+﻿PasteAsMd debug — 2026-03-03 19:08:39
+
+=== 1. plain (A_Clipboard minus CR) (len=88) ===
+w¶
+t¶
+	​¶
+¶
+ = top flange width (total or per side)¶
+¶
+ℎ¶
+𝑟¶
+h¶
+r¶
+	​¶
+¶
+ = rib height (web height)
+
+=== 2. cfHtml (raw full payload) (len=1805) ===
+Version:0.9⏎¶
+StartHTML:0000000105⏎¶
+EndHTML:0000001805⏎¶
+StartFragment:0000000141⏎¶
+EndFragment:0000001769⏎¶
+<html>⏎¶
+<body>⏎¶
+<!--StartFragment--><li data-start="1260" data-end="1308"><p data-start="1262" data-end="1308"><span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="mord"><span class="mord mathnormal">w</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">â€‹</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span></span></span></span></span> = top flange width (total or per side)</p>¶
+</li>¶
+<li data-start="1309" data-end="1344">¶
+<p data-start="1311" data-end="1344"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>h</mi><mi>r</mi></msub></mrow><annotation encoding="application/x-tex">h_r</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut"></span><span class="mord"><span class="mord mathnormal">h</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">r</span></span></span></span><span class="vlist-s">â€‹</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span></span></span></span></span> = rib height (web height)</p>¶
+</li>¶
+<li data-start="1345" data-end="1413">¶
+<p data-start="1347" data-end="1413"></p></li><!--EndFragment-->⏎¶
+</body>⏎¶
+</html>
+
+=== 3. htmlFrag (CF_HTML fragment) (len=1624) ===
+<li data-start="1260" data-end="1308"><p data-start="1262" data-end="1308"><span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="mord"><span class="mord mathnormal">w</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span></span></span></span></span> = top flange width (total or per side)</p>¶
+</li>¶
+<li data-start="1309" data-end="1344">¶
+<p data-start="1311" data-end="1344"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>h</mi><mi>r</mi></msub></mrow><annotation encoding="application/x-tex">h_r</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut"></span><span class="mord"><span class="mord mathnormal">h</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">r</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span></span></span></span></span> = rib height (web height)</p>¶
+</li>¶
+<li data-start="1345" data-end="1413">¶
+<p data-start="1347" data-end="1413"></p></li>
+
+=== 2b. cfHtml offsets ===
+StartHTML: 105
+EndHTML: 1805
+StartFragment: 141
+EndFragment: 1769
+
+=== 3. htmlPrep (after _PreprocessHtml) (len=520) ===
+<ol><li data-start="1260" data-end="1308"><p data-start="1262" data-end="1308">wt​ = top flange width (total or per side)</p>¶
+</li>¶
+<li data-start="1309" data-end="1344">¶
+<p data-start="1311" data-end="1344"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>h</mi><mi>r</mi></msub></mrow><annotation encoding="application/x-tex">h_r</annotation></semantics></math>hr​ = rib height (web height)</p>¶
+</li>¶
+<li data-start="1345" data-end="1413">¶
+<p data-start="1347" data-end="1413"></p></li></ol>
+
+=== 4. mdRaw (pandoc output) (len=95) ===
+1.  wt​ = top flange width (total or per side)¶
+¶
+2.  $`h_r`$hr​ = rib height (web height)¶
+¶
+3.  ¶
+
+
+=== 5. md (after CleanMarkdown) (len=93) ===
+1.  wt​ = top flange width (total or per side)¶
+2.  $`h_r`$hr​ = rib height (web height)¶
+3.  ¶
+
+
+=== 5c. expected list start (ordered-list fix) (len=1) ===
+0
+
+=== 5d. md (after RestoreOrderedListStart) (len=93) ===
+1.  wt​ = top flange width (total or per side)¶
+2.  $`h_r`$hr​ = rib height (web height)¶
+3.  ¶
+
+
+=== 6. FINAL md (pasted) (len=93) ===
+1.  wt​ = top flange width (total or per side)¶
+2.  $`h_r`$hr​ = rib height (web height)¶
+3.  ¶
+
+

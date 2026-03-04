@@ -527,6 +527,8 @@ class PasteMd {
         }
 
         expectedListStart := PasteMd.GetExpectedOrderedListStart(htmlFrag, cfHtml, plain)
+        md := PasteMd.MaybeDemoteIncidentalOrderedList(md, plain, htmlFrag, expectedListStart)
+        mdAfterClean := md
         if (forcedListStart != "") {
           if RegExMatch(forcedListStart, "^\d+$")
             expectedListStart := Integer(forcedListStart)
@@ -1139,6 +1141,111 @@ class PasteMd {
   }
 
   /**
+   * Demotes incidental ordered-list markdown back to plain lines when the
+   * fragment is multi-<li> text selection without explicit list intent.
+   * @param {string} md - Markdown output from conversion pipeline
+   * @param {string} plain - Plain clipboard text
+   * @param {string} htmlFrag - StartFragment HTML
+   * @param {number} expected - Inferred list start from context
+   * @returns {string} Possibly demoted markdown
+   */
+  static MaybeDemoteIncidentalOrderedList(md, plain, htmlFrag, expected := 0) {
+    md := StrReplace(md, "`r", "")
+    if (md = "")
+      return md
+
+    ; Respect explicit/inferred non-1 starts.
+    if (expected > 1)
+      return md
+
+    ; Only demote leading ordered-list markdown that starts at 1.
+    if !RegExMatch(md, "^\s*1[.)](?:\s|$)")
+      return md
+
+    ; Fragment must contain list items.
+    if !RegExMatch(htmlFrag, "is)<li\b")
+      return md
+
+    ; If fragment already carries explicit list container tags, keep list intent.
+    if RegExMatch(htmlFrag, "is)<(?:ol|ul)\b")
+      return md
+
+    ; Demote only multi-item fragments (single-item stays on numbered path).
+    if (this.CountListItemsInFragment(htmlFrag) < 2)
+      return md
+
+    ; If plain text already looks like a list, keep numbering.
+    if RegExMatch(plain, "m)^\s*(?:\d+[.)]|[-+*])(?:\s+|$)")
+      return md
+
+    return this.UnlistLeadingOrderedBlock(md)
+  }
+
+  /**
+   * Removes leading ordered-list markers from the first ordered-list block.
+   * Empty numbered items are dropped.
+   * @param {string} md - Markdown text
+   * @returns {string} Markdown without leading ordered-list markers
+   */
+  static UnlistLeadingOrderedBlock(md) {
+    hadTrailingBreak := RegExMatch(md, "\n$")
+    lines := StrSplit(md, "`n")
+    if (lines.Length = 0)
+      return md
+
+    firstIdx := 1
+    while (firstIdx <= lines.Length && Trim(lines[firstIdx], " `t") = "") {
+      firstIdx += 1
+    }
+    if (firstIdx > lines.Length)
+      return md
+
+    if !RegExMatch(lines[firstIdx], "^(\s*)\d+([.)])(?:(\s+)(.*)|\s*)$")
+      return md
+
+    started := false
+    drop := Map()
+    Loop lines.Length {
+      idx := A_Index
+      if (idx < firstIdx)
+        continue
+
+      line := lines[idx]
+      if RegExMatch(line, "^(\s*)\d+([.)])(?:(\s+)(.*)|\s*)$", &mLine) {
+        if (mLine[4] = "") {
+          drop[idx] := true
+        } else {
+          lines[idx] := mLine[1] mLine[4]
+        }
+        started := true
+        continue
+      }
+
+      if (!started)
+        break
+
+      ; Keep blank and indented continuation lines within the block.
+      if (Trim(line, " `t") = "" || RegExMatch(line, "^\s{2,}")) {
+        continue
+      }
+
+      break
+    }
+
+    out := ""
+    firstOut := true
+    Loop lines.Length {
+      if (drop.Has(A_Index))
+        continue
+      out .= (firstOut ? "" : "`n") lines[A_Index]
+      firstOut := false
+    }
+    if (hadTrailingBreak && out != "" && !RegExMatch(out, "\n$"))
+      out .= "`n"
+    return out
+  }
+
+  /**
    * Prompts user for ordered-list start when clipboard context is ambiguous.
    * @param {string} md - Markdown output from conversion pipeline
    * @param {string} plain - Plain clipboard text
@@ -1147,15 +1254,7 @@ class PasteMd {
    * @returns {number} Selected start index, or original expected value
    */
   static MaybePromptOrderedListStart(md, plain, htmlFrag, expected) {
-    if (expected > 1)
-      return expected
-
-    ; Fragment may be wrapped in container tags (e.g., <div>...<ol>...</ol>).
-    ; Some sources emit bare top-level <li> items without an <ol> wrapper.
-    if !RegExMatch(htmlFrag, "is)<(?:li|ol)\b")
-      return expected
-
-    if !RegExMatch(md, "^\s*1[.)](?:\s|$)")
+    if !this.ShouldPromptOrderedListStart(md, htmlFrag, expected)
       return expected
 
     defaultStart := 2
@@ -1184,6 +1283,105 @@ class PasteMd {
       return expected
 
     return n
+  }
+
+  /**
+   * Determines whether ambiguous ordered-list prompting should run.
+   * Prompting is only relevant for single-item list fragments that start at 1.
+   * @param {string} md - Markdown output from conversion pipeline
+   * @param {string} htmlFrag - StartFragment HTML
+   * @param {number} expected - Inferred start index from available context
+   * @returns {boolean} True when prompt should be shown
+   */
+  static ShouldPromptOrderedListStart(md, htmlFrag, expected) {
+    if (expected > 1)
+      return false
+
+    ; Fragment may be wrapped in container tags (e.g., <div>...<ol>...</ol>).
+    ; Some sources emit bare top-level <li> items without an <ol> wrapper.
+    if !RegExMatch(htmlFrag, "is)<(?:li|ol)\b")
+      return false
+
+    ; Multi-item fragments are not ambiguous enough to prompt, even when
+    ; upstream omits explicit start metadata.
+    if (this.CountListItemsInFragment(htmlFrag) > 1)
+      return false
+
+    if !RegExMatch(md, "^\s*1[.)](?:\s|$)")
+      return false
+
+    ; Multi-item list fragments are not ambiguous enough to prompt.
+    if (this.CountLeadingOrderedListItems(md) > 1)
+      return false
+
+    return true
+  }
+
+  /**
+   * Counts <li> elements present in an HTML fragment.
+   * @param {string} htmlFrag - StartFragment HTML
+   * @returns {number} Number of <li> tags in fragment
+   */
+  static CountListItemsInFragment(htmlFrag) {
+    if (htmlFrag = "")
+      return 0
+
+    count := 0
+    pos := 1
+    while RegExMatch(htmlFrag, "is)<li\b", , pos) {
+      count += 1
+      pos += 3
+    }
+    return count
+  }
+
+  /**
+   * Counts items in the leading ordered-list block of markdown text.
+   * @param {string} md - Markdown text
+   * @returns {number} Number of leading ordered-list item lines
+   */
+  static CountLeadingOrderedListItems(md) {
+    md := StrReplace(md, "`r", "")
+    if (md = "")
+      return 0
+
+    lines := StrSplit(md, "`n")
+    if (lines.Length = 0)
+      return 0
+
+    firstIdx := 1
+    while (firstIdx <= lines.Length && Trim(lines[firstIdx], " `t") = "")
+      firstIdx += 1
+    if (firstIdx > lines.Length)
+      return 0
+
+    if !RegExMatch(lines[firstIdx], "^\s*\d+[.)](?:\s|$)")
+      return 0
+
+    count := 0
+    started := false
+    Loop lines.Length {
+      idx := A_Index
+      if (idx < firstIdx)
+        continue
+
+      line := RTrim(lines[idx], " `t")
+      if RegExMatch(line, "^\s*\d+[.)](?:\s|$)") {
+        count += 1
+        started := true
+        continue
+      }
+
+      if (!started)
+        break
+
+      if (line = "" || RegExMatch(line, "^\s{2,}"))
+        continue
+
+      break
+    }
+
+    return count
   }
 
   /**
