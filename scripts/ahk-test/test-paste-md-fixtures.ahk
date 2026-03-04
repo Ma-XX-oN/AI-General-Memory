@@ -173,17 +173,30 @@ NormalizeEol(s) {
   return s
 }
 
+StrRepeat(str, count) {
+  return StrReplace(Format("{: " count ".s}", ""), " ", str)
+}
+
+ChkGotExpectedDetail(gotN, expectedN, suffix := "") {
+  return "`n🢃🢃🢃🢃    got" suffix "   🢃🢃🢃🢃`n" gotN      "🢀`n" StrRepeat("🢁", 18 + StrLen(suffix))
+       . "`n🢃🢃🢃🢃 expected" suffix " 🢃🢃🢃🢃`n" expectedN "🢀`n" StrRepeat("🢁", 18 + StrLen(suffix))
+}
+
 ChkEqNorm(label, got, expected) {
   gotN := NormalizeEol(got)
   expectedN := NormalizeEol(expected)
   detail := "got len=" StrLen(gotN) " expected len=" StrLen(expectedN)
-  if (StrLen(gotN) <= 40 && StrLen(expectedN) <= 40) {
-    detail .= " got=`"" gotN "`" expected=`"" expectedN "`""
-  } else {
-    detail .= " got head=`"" SubStr(gotN, 1, 24) "`" expected head=`"" SubStr(expectedN, 1, 24) "`""
-    detail .= " got tail=`"" SubStr(gotN, -23) "`" expected tail=`"" SubStr(expectedN, -23) "`""
+  cond := gotN = expectedN
+  if (!cond) {
+    if (StrLen(gotN) <= 100 && StrLen(expectedN) <= 100) {
+      detail .= ChkGotExpectedDetail(gotN, expectedN)
+    } else {
+      len := 50
+      detail .= ChkGotExpectedDetail(SubStr(gotN, 1, len), SubStr(expectedN, 1, len), " head")
+      detail .= ChkGotExpectedDetail(SubStr(gotN, -len+1), SubStr(expectedN, -len+1),   " tail")
+    }
   }
-  Chk(label, gotN = expectedN, detail)
+  Chk(label, cond, detail)
 }
 
 _SiblingWithSuffix(path, suffix) {

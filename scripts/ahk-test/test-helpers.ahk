@@ -26,9 +26,9 @@ _TestFatalHandler(e, mode) {
 Log(s) {
   global _logPath
   try
-    FileAppend s "`n", _logPath
+    FileAppend s "`n", _logPath, "UTF-8"
   catch as e
-    FileAppend "Log write error: " e.Message " — " s "`n", "**"
+    FileAppend "Log write error: " e.Message " — " s "`n", "**", "UTF-8"
 }
 
 /**
