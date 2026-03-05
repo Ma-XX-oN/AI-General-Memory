@@ -326,23 +326,71 @@ StrRepeat(str, count) {
 }
 
 ChkGotExpectedDetail(gotN, expectedN, suffix := "") {
-  return "`n🢃🢃🢃🢃    got" suffix "   🢃🢃🢃🢃`n" gotN      "🢀`n" StrRepeat("🢁", 18 + StrLen(suffix))
+  return "`n🢃🢃🢃🢃    got" suffix "   🢃🢃🢃🢃`n" gotN      "🢀`n" StrRepeat("🢁", 18 + StrLen(suffix)) "`n"
        . "`n🢃🢃🢃🢃 expected" suffix " 🢃🢃🢃🢃`n" expectedN "🢀`n" StrRepeat("🢁", 18 + StrLen(suffix))
+}
+
+diff(gotN, expectedN) {
+  try {
+    gotName := A_Temp "\got_" A_ScriptHWnd ".txt"
+    FileAppend(gotN, gotName, "UTF-8")
+    expectedName := A_Temp "\expected_" A_ScriptHWnd ".txt"
+    FileAppend(expectedN, expectedName, "UTF-8")
+
+    cmd := "git diff "
+      ; . " --word-diff=color"
+      . " --word-diff-regex=`"([a-zA-Z_][a-zA-Z_0-9]*|0([xX]([0-9][a-fA-F])+|[0-7]+|[bB][01]+)|[1-9][0-9]*(\.[0-9]+)?([eE][0-9]+|[pP][0-9a-fA-F])?|\S|\s)`""
+      . " --no-index " expectedName " " gotName
+    stdout := StrReplace(exec(cmd).stdout, StrReplace(gotName, "\", "/"), "got",,,2)
+    stdout := StrReplace(stdout, StrReplace(expectedName, "\", "/"), "expected",,,2)
+    return "`n" StrRepeat("🢃", 80) "`n" stdout "`n" StrRepeat("🢁", 80)
+      . "`n" ChkGotExpectedDetail(gotN, expectedN)
+  } finally {
+    try FileDelete(gotName)
+    try FileDelete(expectedName)
+  }
+
+  ; shell := ComObject("WScript.Shell")
+  ; exec := shell.Exec(cmd)
+
+  ; while (exec.Status == 0) {
+  ;   Sleep 100
+  ; }
+  ; if 1
+  ; return exec.StdOut.ReadAll()
+}
+
+exec(cmd, id := "") {
+  try {
+    stdout := A_Temp "\" id "_stdout_" A_ScriptHWnd
+    stderr := A_Temp "\" id "_stderr_" A_ScriptHWnd
+    shellCmd := Format('{1} /d /c {2} > "{3}" 2> "{4}"'
+      , A_ComSpec, cmd, stdout, stderr)
+
+    ; FileAppend shellCmd, "**", "UTF-8"
+    shell := ComObject("WScript.Shell")
+    exitCode := shell.Run(shellCmd, 0, true) ; hidden, wait for completion
+
+    ; use 7 instead of 0 for minimized
+    result := {
+      stdout: FileRead(stdout, "UTF-8"),
+      stderr: FileRead(stderr, "UTF-8")
+    }
+    return result
+  } finally {
+    try FileDelete(stdout)
+    try FileDelete(stderr)
+  }
 }
 
 ChkEqNorm(label, got, expected) {
   gotN := NormalizeEol(got)
   expectedN := NormalizeEol(expected)
   detail := "`ngot len=" StrLen(gotN) " expected len=" StrLen(expectedN)
+
   cond := gotN = expectedN
-  ; len := 500
   if (!cond) {
-    ; if (StrLen(gotN) <= len*2 && StrLen(expectedN) <= len*2) {
-      detail .= ChkGotExpectedDetail(gotN, expectedN)
-    ; } else {
-    ;   detail .= ChkGotExpectedDetail(SubStr(gotN, 1, len), SubStr(expectedN, 1, len), " head")
-    ;   detail .= ChkGotExpectedDetail(SubStr(gotN, -len+1), SubStr(expectedN, -len+1),   " tail")
-    ; }
+    detail .= diff(gotN, expectedN)
   }
   Chk(label, cond, detail)
 }
