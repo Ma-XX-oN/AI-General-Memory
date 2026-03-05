@@ -5,6 +5,8 @@
 
 _logPath := A_ScriptDir "\test-paste-md-fixtures.log"
 try FileDelete _logPath
+; This is for individual logs for individual fixtures.  Names are the output name - ".md" + ".fixture.log"
+emitFixtureReplayLogs := true
 
 passed := 0
 failed := 0
@@ -70,6 +72,7 @@ for fx in fixtures {
     caseId := sc["case"]
     expectedPath := _SiblingWithSuffix(path, caseId = "" ? expectedSuffix : ("." caseId expectedSuffix))
     actualPath := _SiblingWithSuffix(path, caseId = "" ? actualSuffix : ("." caseId actualSuffix))
+    replayLogPath := _SiblingWithSuffix(path, caseId = "" ? ".fixture.log" : ("." caseId ".fixture.log"))
     Log("Scenario: " (caseId = "" ? "default" : caseId))
 
     prevPromptFn := ""
@@ -85,6 +88,8 @@ for fx in fixtures {
       }
 
       converted := PasteMd._ConvertFromCaptured(plain, cfHtml, true, fx.withUser, false, sc["hasPrompt"])
+      if (emitFixtureReplayLogs)
+        _WriteFixtureReplayLog(replayLogPath, plain, cfHtml, converted, true)
       ChkEqNorm("source", converted["source"], fx.source)
       aborted := converted.Has("aborted") ? converted["aborted"] : false
 
@@ -405,6 +410,42 @@ _WriteUtf8(path, text) {
   f := FileOpen(path, "w", "UTF-8")
   f.Write(text)
   f.Close()
+}
+
+_WriteFixtureReplayLog(path, plain, cfHtml, converted, asQuoted := true) {
+  f := FileOpen(path, "w", "UTF-8")
+  try {
+    f.Write("PasteAsMd debug — " FormatTime(, "yyyy-MM-dd HH:mm:ss") "`n`n")
+    PasteMd._DbgSection(f, "1. plain (A_Clipboard minus CR)", plain)
+    PasteMd._DbgSection(f, "2. cfHtml (raw full payload)", cfHtml)
+    PasteMd._DbgSection(f, "3. htmlFrag (CF_HTML fragment)", converted["htmlFrag"])
+    f.Write("=== 2b. cfHtml offsets ===`n")
+    f.Write("StartHTML: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartHTML:") "`n")
+    f.Write("EndHTML: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndHTML:") "`n")
+    f.Write("StartFragment: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartFragment:") "`n")
+    f.Write("EndFragment: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndFragment:") "`n`n")
+
+    if (converted["htmlFrag"] = "") {
+      PasteMd._DbgSection(f, "3. md (CleanPlainText – no HTML path)", converted["mdAfterClean"])
+    } else {
+      PasteMd._DbgSection(f, "3. htmlPrep (after _PreprocessHtml)", converted["htmlPrep"])
+      if (converted["usedNoTagPlainPath"]) {
+        PasteMd._DbgSection(f, "3b. md (no HTML tags → plain text path)", converted["mdAfterClean"])
+      } else {
+        PasteMd._DbgSection(f, "4. mdRaw (pandoc output)", converted["mdRaw"])
+        PasteMd._DbgSection(f, "5. md (after CleanMarkdown)", converted["mdAfterClean"])
+      }
+      PasteMd._DbgSection(f, "5c. expected list start (ordered-list fix)", "" converted["expectedListStart"])
+      PasteMd._DbgSection(f, "5d. md (after RestoreOrderedListStart)", converted["mdAfterOrderedList"])
+    }
+
+    if (asQuoted)
+      PasteMd._DbgSection(f, "5e. md (after SHOW_POSTER replacement)", converted["mdAfterPoster"])
+
+    PasteMd._DbgSection(f, "6. FINAL md (pasted)", converted["finalMd"])
+  } finally {
+    f.Close()
+  }
 }
 
 _Basename(path) {

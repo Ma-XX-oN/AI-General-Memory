@@ -31,3 +31,4 @@
 !scripts/ahk-test/**
 scripts/ahk-test/*.actual.md
 scripts/ahk-test/test-*.log
+scripts/ahk-test/*.fixture.log
