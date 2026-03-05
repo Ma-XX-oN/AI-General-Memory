@@ -1163,13 +1163,10 @@ class PasteMd {
     if (expected > 1)
       return htmlPrep
 
-    fragTrim := LTrim(htmlFrag, " `t`r`n")
-    prepTrim := LTrim(htmlPrep, " `t`r`n")
+    fragTop := PasteMd._FirstMeaningfulTopTagName(htmlFrag)
 
     ; Only handle bare top-level <li> fragments; explicit list containers keep intent.
-    if !RegExMatch(fragTrim, "is)^<li\b")
-      return htmlPrep
-    if RegExMatch(fragTrim, "is)^<(?:ol|ul)\b")
+    if (fragTop != "li")
       return htmlPrep
 
     ; Single-item fragments remain on ordered-list path (prompt/renumber logic).
