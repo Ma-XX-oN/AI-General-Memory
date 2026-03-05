@@ -1948,6 +1948,75 @@ class PasteMd {
       }
     }
 
+    beforeNodes := HtmlNorm._TryParseDomNodes(before, "PasteMd.GetListStartFromHtmlContext.before")
+    if (beforeNodes.Length > 0) {
+      nDom := PasteMd._InferOrderedListIndexFromBeforeDomNodes(beforeNodes)
+      if (nDom > 0)
+        return nDom
+    }
+
+    ; Prefix HTML before StartFragment is often structurally incomplete
+    ; (open ancestors continue inside the fragment). Keep the legacy token-scan
+    ; fallback for this specific unbalanced-input case.
+    return PasteMd._InferOrderedListIndexFromBeforeTagScan(before)
+  }
+
+  /**
+   * Attempts ordered-list index inference from parsed DOM prefix nodes.
+   * @param {Array} nodes - Parsed nodes for HTML before StartFragment
+   * @returns {number} Inferred index, or 0 when unknown
+   */
+  static _InferOrderedListIndexFromBeforeDomNodes(nodes) {
+    listStack := []
+    PasteMd._ScanListContextFromDomNodes(nodes, &listStack)
+    idx := listStack.Length
+    while (idx > 0 && listStack[idx].tag != "ol")
+      idx -= 1
+    if (idx = 0)
+      return 0
+    return listStack[idx].start + listStack[idx].childLi
+  }
+
+  /**
+   * Traverses DOM nodes in document order and updates list context state.
+   * @param {Array} nodes
+   * @param {Array} listStack
+   */
+  static _ScanListContextFromDomNodes(nodes, &listStack) {
+    for node in nodes {
+      if (!IsObject(node) || node.tag = "text")
+        continue
+
+      tagName := StrLower(node.tag)
+      if (tagName = "ol" || tagName = "ul") {
+        ctx := { tag: tagName, start: 1, childLi: 0 }
+        if (tagName = "ol") {
+          nStart := PasteMd._GetNumericAttr(node, "start")
+          if (nStart > 0)
+            ctx.start := nStart
+        }
+        listStack.Push(ctx)
+        if (node.children.Length > 0)
+          PasteMd._ScanListContextFromDomNodes(node.children, &listStack)
+        if (listStack.Length > 0)
+          listStack.Pop()
+        continue
+      }
+
+      if (tagName = "li" && listStack.Length > 0)
+        listStack[listStack.Length].childLi += 1
+
+      if (node.children.Length > 0)
+        PasteMd._ScanListContextFromDomNodes(node.children, &listStack)
+    }
+  }
+
+  /**
+   * Legacy tag-token scanner for unbalanced HTML prefixes.
+   * @param {string} before - HTML before StartFragment
+   * @returns {number} Inferred ordered-list index, or 0
+   */
+  static _InferOrderedListIndexFromBeforeTagScan(before) {
     listStack := []
     pos := 1
 
@@ -1987,12 +2056,10 @@ class PasteMd {
     }
 
     idx := listStack.Length
-    while (idx > 0 && listStack[idx].tag != "ol") {
+    while (idx > 0 && listStack[idx].tag != "ol")
       idx -= 1
-    }
     if (idx = 0)
       return 0
-
     return listStack[idx].start + listStack[idx].childLi
   }
 
