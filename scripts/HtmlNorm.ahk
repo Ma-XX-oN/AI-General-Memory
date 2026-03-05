@@ -115,6 +115,18 @@ class HtmlNorm {
      * @type {Array}
      */
     static _parseDiagnostics := []
+    /**
+     * Maximum HTML length allowed for DOM parse attempts.
+     * Set to <= 0 to disable this guard.
+     * @type {integer}
+     */
+    static DOM_PARSE_MAX_LEN := 0
+    /**
+     * Maximum '<' token count allowed for DOM parse attempts.
+     * Set to <= 0 to disable this guard.
+     * @type {integer}
+     */
+    static DOM_PARSE_MAX_LT_COUNT := 0
 
     /**
      * Clears collected parse diagnostics.
@@ -1806,8 +1818,38 @@ class HtmlNorm {
     static _TryParseDomNodes(html, context := "") {
         if (html = "")
             return []
+        len := StrLen(html)
+        if (HtmlNorm.DOM_PARSE_MAX_LEN > 0 && len > HtmlNorm.DOM_PARSE_MAX_LEN) {
+            HtmlNorm._AddParseDiagnostic(
+                context,
+                html,
+                "parser skipped by guard: len=" len " > maxLen=" HtmlNorm.DOM_PARSE_MAX_LEN
+            )
+            return []
+        }
+        if (HtmlNorm.DOM_PARSE_MAX_LT_COUNT > 0) {
+            ltCount := HtmlNorm._CountCharUpToLimit(html, "<", HtmlNorm.DOM_PARSE_MAX_LT_COUNT + 1)
+            if (ltCount > HtmlNorm.DOM_PARSE_MAX_LT_COUNT) {
+                HtmlNorm._AddParseDiagnostic(
+                    context,
+                    html,
+                    "parser skipped by guard: ltCount=" ltCount " > maxLtCount=" HtmlNorm.DOM_PARSE_MAX_LT_COUNT
+                )
+                return []
+            }
+        }
+        parseStart := A_TickCount
         try {
             nodes := HtmlParser.Parse(html)
+            parseMs := A_TickCount - parseStart
+            metrics := HtmlParser.GetParseMetrics()
+            if (parseMs >= 250) {
+                HtmlNorm._AddParseDiagnostic(
+                    context,
+                    html,
+                    "parser timing: " HtmlNorm._FormatParserMetrics(metrics)
+                )
+            }
             if (nodes is Array) {
                 if (nodes.Length = 0 && Trim(html, " `t`r`n") != "")
                     HtmlNorm._AddParseDiagnostic(context, html, "parser returned zero nodes")
@@ -1816,9 +1858,51 @@ class HtmlNorm {
             HtmlNorm._AddParseDiagnostic(context, html, "parser returned non-array result")
             return []
         } catch as e {
-            HtmlNorm._AddParseDiagnostic(context, html, e.Message)
+            metrics := HtmlParser.GetParseMetrics()
+            HtmlNorm._AddParseDiagnostic(
+                context,
+                html,
+                e.Message " | " HtmlNorm._FormatParserMetrics(metrics)
+            )
             return []
         }
+    }
+
+    /**
+     * Counts occurrences of a single-character token up to a limit.
+     * Stops early once limit is reached.
+     * @param {string} s
+     * @param {string} token
+     * @param {integer} limit
+     * @returns {integer}
+     */
+    static _CountCharUpToLimit(s, token, limit) {
+        if (limit <= 0)
+            return 0
+        count := 0
+        pos := 1
+        while (count < limit && (p := InStr(s, token, false, pos))) {
+            count += 1
+            pos := p + 1
+        }
+        return count
+    }
+
+    /**
+     * Formats parser metrics into a compact single-line diagnostic string.
+     * @param {Map} metrics
+     * @returns {string}
+     */
+    static _FormatParserMetrics(metrics) {
+        if !(metrics is Map)
+            return "metrics unavailable"
+        pct := Round(metrics["progress"] * 100, 3)
+        return "ms=" metrics["elapsedMs"]
+            . ", progress=" pct "%"
+            . ", tagOpen=" metrics["tagOpenCount"]
+            . ", events=" metrics["progressEventCount"]
+            . ", pos=" metrics["lastPos"] "/" metrics["hayLen"]
+            . ", idleMs=" metrics["idleMs"]
     }
 
     /**

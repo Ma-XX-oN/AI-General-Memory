@@ -43,6 +43,9 @@ class PasteMd {
   static DEBUG_PASTE_MD := true
   static DEBUG_PASTE_MD_LOG := A_ScriptDir "\PasteAsMd_debug.log"
   static PROMPT_ORDERED_LIST_START_ON_AMBIGUOUS := true
+  ; Avoid expensive DOM parse of large pre-StartFragment prefixes when inferring
+  ; ordered-list context. Legacy tag scan remains the primary path.
+  static LIST_CONTEXT_DOM_PARSE_MAX_LEN := 200000
 
   ; Number of rotated past-run logs to keep alongside the current one.
   static LOG_HISTORY_COUNT := 4
@@ -571,6 +574,7 @@ class PasteMd {
         mdAfterClean := md
         mdAfterOrderedList := md
       } else {
+        PasteMd._BusyUpdate("Inferring list context")
         expectedListStart := PasteMd.GetExpectedOrderedListStart(htmlFrag, cfHtml, plain)
         PasteMd._BusyUpdate("Preprocessing HTML")
         htmlPrep := PasteMd._PreprocessHtml(htmlFrag, cfHtml, showPoster)
@@ -1948,17 +1952,22 @@ class PasteMd {
       }
     }
 
+    ; Prefix HTML before StartFragment is often structurally incomplete
+    ; (open ancestors continue inside the fragment). Use the legacy token-scan
+    ; first (fast, tolerant). Only attempt DOM parse for smaller prefixes.
+    nScan := PasteMd._InferOrderedListIndexFromBeforeTagScan(before)
+    if (nScan > 0)
+      return nScan
+    if (StrLen(before) > PasteMd.LIST_CONTEXT_DOM_PARSE_MAX_LEN)
+      return 0
+
     beforeNodes := HtmlNorm._TryParseDomNodes(before, "PasteMd.GetListStartFromHtmlContext.before")
     if (beforeNodes.Length > 0) {
       nDom := PasteMd._InferOrderedListIndexFromBeforeDomNodes(beforeNodes)
       if (nDom > 0)
         return nDom
     }
-
-    ; Prefix HTML before StartFragment is often structurally incomplete
-    ; (open ancestors continue inside the fragment). Keep the legacy token-scan
-    ; fallback for this specific unbalanced-input case.
-    return PasteMd._InferOrderedListIndexFromBeforeTagScan(before)
+    return 0
   }
 
   /**

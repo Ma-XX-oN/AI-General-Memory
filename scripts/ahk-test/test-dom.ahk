@@ -26,13 +26,13 @@ WalkTags(node) {
 
 ; ── 1: Walk — pre-order depth-first ──────────────────────────────────────────
 Log("── 1: Walk pre-order ───────────────────────────────")
-r := Root("<a><b><c></c></b><d></d></a>")
+r := Root("<a><b><i></i></b><u></u></a>")
 tags := WalkTags(r)
 Chk("visits 4 nodes",   tags.Length = 4,              tags.Length)
 Chk("first = a",        tags.Length >= 1 && tags[1] = "a")
 Chk("second = b",       tags.Length >= 2 && tags[2] = "b")
-Chk("third = c",        tags.Length >= 3 && tags[3] = "c")
-Chk("fourth = d",       tags.Length >= 4 && tags[4] = "d")
+Chk("third = i",        tags.Length >= 3 && tags[3] = "i")
+Chk("fourth = u",       tags.Length >= 4 && tags[4] = "u")
 
 ; ── 2: Walk — includes text nodes ────────────────────────────────────────────
 Log("── 2: Walk includes text nodes ─────────────────────")
@@ -187,16 +187,16 @@ Chk("child parent set",      IsObject(c.parent) && ObjPtr(c.parent) = ObjPtr(r))
 
 ; ── 22: DOM API — insertBefore and append fallback ────────────────────────────
 Log("── 22: insertBefore ────────────────────────────────")
-r := Root("<div><a></a><c></c></div>")
+r := Root("<div><a></a><em></em></div>")
 b := DomNode("b")
 r.insertBefore(b, r.children[2])
-Chk("order a,b,c",           r.children.Length = 3
+Chk("order a,b,em",          r.children.Length = 3
   && r.children[1].tag = "a"
   && r.children[2].tag = "b"
-  && r.children[3].tag = "c")
-d := DomNode("d")
-r.insertBefore(d) ; no reference => append
-Chk("append on no ref",      r.children.Length = 4 && r.children[4].tag = "d")
+  && r.children[3].tag = "em")
+strong := DomNode("strong")
+r.insertBefore(strong) ; no reference => append
+Chk("append on no ref",      r.children.Length = 4 && r.children[4].tag = "strong")
 Chk("insert parent set",     IsObject(b.parent) && ObjPtr(b.parent) = ObjPtr(r))
 
 ; ── 23: DOM API — removeChild detaches and returns removed node ───────────────
@@ -206,8 +206,8 @@ Chk("returns removed node",  removed = b)
 Chk("removed parent cleared", b.parent = "")
 Chk("order after remove",    r.children.Length = 3
   && r.children[1].tag = "a"
-  && r.children[2].tag = "c"
-  && r.children[3].tag = "d")
+  && r.children[2].tag = "em"
+  && r.children[3].tag = "strong")
 
 ; ── 24: DOM API — replaceChild swaps node and detaches old ────────────────────
 Log("── 24: replaceChild ───────────────────────────────")
@@ -222,7 +222,7 @@ Chk("first is replacement",  r.children[1].tag = "x")
 Log("── 25: childNodes + first/last + hasChildNodes ─────")
 Chk("childNodes alias",      ObjPtr(r.childNodes) = ObjPtr(r.children))
 Chk("firstChild",            r.firstChild != "" && r.firstChild.tag = "x")
-Chk("lastChild",             r.lastChild  != "" && r.lastChild.tag = "d")
+Chk("lastChild",             r.lastChild  != "" && r.lastChild.tag = "strong")
 Chk("hasChildNodes true",    r.hasChildNodes())
 r.RemoveChildren((n) => true)
 Chk("hasChildNodes false",   !r.hasChildNodes())
