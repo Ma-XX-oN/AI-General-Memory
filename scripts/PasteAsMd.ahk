@@ -1184,23 +1184,28 @@ class PasteMd {
     if RegExMatch(plain, "m)^[ \t]*+\d++[.)](?:[ \t]++|$)")
       return htmlPrep
 
-    ; Only rewrite synthetic outer wrappers created as <ol>...</ol>.
-    if !RegExMatch(prepTrim, "is)^<ol\b[^>]*+>")
-      return htmlPrep
-    if !RegExMatch(prepTrim, "is)</ol>[ \t\r\n]*+$")
+    nodes := PasteMd._TryParseDomNodes(htmlPrep)
+    if (nodes.Length = 0)
       return htmlPrep
 
-    prepTrim := RegExReplace(prepTrim, "is)^<ol\b[^>]*+>", "<ul>", , 1)
-    prepTrim := RegExReplace(prepTrim, "is)</ol>[ \t\r\n]*+$", "</ul>", , 1)
+    top := PasteMd._TopLevelMeaningfulNodes(nodes)
+    if (top.Length != 1 || !PasteMd._IsTag(top[1], "ol"))
+      return htmlPrep
 
-    ; Drop trailing empty list items produced by selection range clipping.
-    ; These become stray "-" bullets after pandoc if kept.
-    prepTrim := RegExReplace(
-      prepTrim,
-      "is)(?:<li\b[^>]*+>[ \t\r\n]*+(?:<p\b[^>]*+>[ \t\r\n]*+</p>[ \t\r\n]*+)?+</li>[ \t\r\n]*+)++(</ul>[ \t\r\n]*+)$",
-      "$1"
-    )
-    return prepTrim
+    list := top[1]
+    list.tag := "ul"
+
+    ; Drop trailing empty list items produced by selection-range clipping.
+    idx := list.children.Length
+    while (idx >= 1) {
+      child := list.children[idx]
+      if (!PasteMd._IsTag(child, "li") || !PasteMd._IsEmptyListItemNode(child))
+        break
+      list.children.RemoveAt(idx)
+      idx -= 1
+    }
+
+    return PasteMd._SerializeDomNodes(nodes)
   }
 
   /**
@@ -1248,18 +1253,16 @@ class PasteMd {
     if (htmlPrep = "" || startNum <= 1)
       return htmlPrep
 
-    if !RegExMatch(htmlPrep, "is)<ol\b[^>]*+>", &mOl)
+    nodes := PasteMd._TryParseDomNodes(htmlPrep)
+    if (nodes.Length = 0)
       return htmlPrep
 
-    olTag := mOl[0]
-    q := Chr(34)
-    startAttr := "start=" q startNum q
-    if RegExMatch(olTag, "i)\bstart\s*+=")
-      newOlTag := RegExReplace(olTag, "i)\bstart\s*+=\s*+(?:['`"][^'`"]*+['`"]|[^\s>]++)", startAttr)
-    else
-      newOlTag := RegExReplace(olTag, ">$", " " startAttr ">")
+    ol := PasteMd._FindFirstByTag(nodes, "ol")
+    if !IsObject(ol)
+      return htmlPrep
 
-    return SubStr(htmlPrep, 1, mOl.Pos - 1) newOlTag SubStr(htmlPrep, mOl.Pos + mOl.Len)
+    PasteMd._SetAttrCI(ol, "start", "" startNum)
+    return PasteMd._SerializeDomNodes(nodes)
   }
 
   /**
@@ -1272,15 +1275,213 @@ class PasteMd {
     if (html = "")
       return html
 
-    pat := "is)(<li\b[^>]*+>)([ \t\r\n]*+)(?=<(?:ol|ul)\b)"
-    pos := 1
+    nodes := PasteMd._TryParseDomNodes(html)
+    if (nodes.Length = 0)
+      return html
+
     marker := PasteMd._shellListItemPlaceholder
-    while RegExMatch(html, pat, &m, pos) {
-      replacement := m[1] m[2] marker
-      html := SubStr(html, 1, m.Pos - 1) replacement SubStr(html, m.Pos + m.Len)
-      pos := m.Pos + StrLen(replacement)
+    listItems := []
+    PasteMd._CollectNodesByTag(nodes, "li", &listItems)
+    changed := false
+    for li in listItems {
+      idx := PasteMd._FirstMeaningfulChildIndex(li)
+      if (idx < 1)
+        continue
+      first := li.children[idx]
+      if !(PasteMd._IsTag(first, "ol") || PasteMd._IsTag(first, "ul"))
+        continue
+
+      if (PasteMd._LeadingListShellHasMarker(li, idx, marker))
+        continue
+
+      li.children.InsertAt(idx, DomNode("text", "", marker))
+      changed := true
     }
-    return html
+    return changed ? PasteMd._SerializeDomNodes(nodes) : html
+  }
+
+  /**
+   * Parses HTML into DOM nodes for pre-pandoc HTML rewrites.
+   * @param {string} html
+   * @returns {Array}
+   */
+  static _TryParseDomNodes(html) {
+    if (html = "")
+      return []
+    try {
+      return HtmlParser.Parse(html)
+    } catch {
+      return []
+    }
+  }
+
+  /**
+   * Serializes DOM nodes back to HTML.
+   * @param {Array} nodes
+   * @returns {string}
+   */
+  static _SerializeDomNodes(nodes) {
+    return HtmlNorm._SerializeDomNodes(nodes)
+  }
+
+  /**
+   * Returns meaningful top-level nodes (ignoring whitespace-only text nodes).
+   * @param {Array} nodes
+   * @returns {Array}
+   */
+  static _TopLevelMeaningfulNodes(nodes) {
+    out := []
+    for node in nodes
+      if !PasteMd._IsWhitespaceTextNode(node)
+        out.Push(node)
+    return out
+  }
+
+  /**
+   * True when node is a tag with the given case-insensitive name.
+   * @param {DomNode} node
+   * @param {string} tagName
+   * @returns {boolean}
+   */
+  static _IsTag(node, tagName) {
+    return IsObject(node)
+      && (Type(node) = "DomNode")
+      && (StrLower(node.tag) = StrLower(tagName))
+  }
+
+  /**
+   * True when text node contains only horizontal/vertical whitespace.
+   * @param {DomNode} node
+   * @returns {boolean}
+   */
+  static _IsWhitespaceTextNode(node) {
+    return IsObject(node)
+      && (Type(node) = "DomNode")
+      && (node.tag = "text")
+      && (Trim(node.text, " `t`r`n") = "")
+  }
+
+  /**
+   * Finds the first node by tag name in pre-order depth-first traversal.
+   * @param {Array} nodes
+   * @param {string} tagName
+   * @returns {DomNode|string}
+   */
+  static _FindFirstByTag(nodes, tagName) {
+    for node in nodes {
+      if PasteMd._IsTag(node, tagName)
+        return node
+      if (node.children.Length > 0) {
+        found := PasteMd._FindFirstByTag(node.children, tagName)
+        if IsObject(found)
+          return found
+      }
+    }
+    return ""
+  }
+
+  /**
+   * Sets/overwrites an attribute case-insensitively while preserving key casing.
+   * @param {DomNode} node
+   * @param {string} name
+   * @param {string} value
+   */
+  static _SetAttrCI(node, name, value) {
+    lower := StrLower(name)
+    for k in node.attrs {
+      if (StrLower(k) = lower) {
+        node.attrs[k] := value
+        return
+      }
+    }
+    node.attrs[name] := value
+  }
+
+  /**
+   * Collects all descendant nodes matching a tag name.
+   * @param {Array} nodes
+   * @param {string} tagName
+   * @param {Array} out
+   */
+  static _CollectNodesByTag(nodes, tagName, &out) {
+    for node in nodes {
+      if PasteMd._IsTag(node, tagName)
+        out.Push(node)
+      if (node.children.Length > 0)
+        PasteMd._CollectNodesByTag(node.children, tagName, &out)
+    }
+  }
+
+  /**
+   * Returns first direct-child index that is not whitespace text, or 0.
+   * @param {DomNode} node
+   * @returns {integer}
+   */
+  static _FirstMeaningfulChildIndex(node) {
+    idx := 1
+    while (idx <= node.children.Length) {
+      if !PasteMd._IsWhitespaceTextNode(node.children[idx])
+        return idx
+      idx += 1
+    }
+    return 0
+  }
+
+  /**
+   * Detects whether the leading shell area already contains the placeholder marker.
+   * @param {DomNode} li
+   * @param {integer} firstMeaningfulIdx
+   * @param {string} marker
+   * @returns {boolean}
+   */
+  static _LeadingListShellHasMarker(li, firstMeaningfulIdx, marker) {
+    idx := 1
+    while (idx < firstMeaningfulIdx) {
+      child := li.children[idx]
+      if ((child.tag = "text") && InStr(child.text, marker))
+        return true
+      idx += 1
+    }
+    return false
+  }
+
+  /**
+   * True when a list item is effectively empty:
+   * - only whitespace text children, or
+   * - a single empty <p> child with optional surrounding whitespace text.
+   * @param {DomNode} li
+   * @returns {boolean}
+   */
+  static _IsEmptyListItemNode(li) {
+    if !PasteMd._IsTag(li, "li")
+      return false
+
+    meaningful := []
+    for child in li.children
+      if !PasteMd._IsWhitespaceTextNode(child)
+        meaningful.Push(child)
+
+    if (meaningful.Length = 0)
+      return true
+
+    if (meaningful.Length = 1 && PasteMd._IsTag(meaningful[1], "p"))
+      return PasteMd._NodeTextRecursive(meaningful[1]) = ""
+
+    return false
+  }
+
+  /**
+   * Collects plain text recursively from a subtree.
+   * @param {DomNode} node
+   * @returns {string}
+   */
+  static _NodeTextRecursive(node) {
+    if (node.tag = "text")
+      return node.text
+    out := ""
+    for child in node.children
+      out .= PasteMd._NodeTextRecursive(child)
+    return out
   }
 
   /**
