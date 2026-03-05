@@ -159,16 +159,15 @@ class HtmlNorm {
         ;   - Promote inline-code spans.
         html := HtmlNorm._NormalizeTaskThinkingInlineDom(html)
 
-        ; 9. Extract whitespace-sensitive user message text.
-        html := HtmlNorm._ExtractUserMessages(html)
-
-        ; 10 + 11 + 11b + 12 + 13. Late DOM cleanup in one parse/serialize cycle:
+        ; 9 + 10 + 11 + 11b + 12 + 13. User message extraction + late cleanup
+        ; in one DOM parse/serialize cycle:
+        ;   - Extract whitespace-sensitive user message text.
         ;   - Strip Claude Web language-label divs (font-small + p-3*).
         ;   - Strip long footnote hrefs, keeping only #user-content-...
         ;   - Unwrap <p> inside footnote definition <li id="user-content-fn-*">.
         ;   - Strip residual <span> wrappers while preserving child order/content.
         ;   - Wrap bare top-level <li> siblings in <ol>.
-        html := HtmlNorm._NormalizeLateCleanupAndListWrapDom(html)
+        html := HtmlNorm._NormalizeUserMessagesAndLateCleanupDom(html)
 
         ; 14 + 15. Code normalization and nested-container unwrapping in one DOM pass.
         html := HtmlNorm._NormalizeCodeAndUnwrapDom(html)
@@ -722,6 +721,45 @@ class HtmlNorm {
         ; - <div class="whitespace-pre-wrap">...</div> (exact class match)
         ; Replace whole nodes with placeholder <p>¤USERMSG_N¤</p>.
         nodes := HtmlNorm._ExtractUserMessagesFullNodeDomNodes(nodes, &changed)
+
+        return changed ? HtmlNorm._SerializeDomNodes(nodes) : html
+    }
+
+    /**
+     * Runs stages 9/10/11/11b/12/13 in one DOM parse/serialize cycle.
+     *
+     * - user message placeholder extraction
+     * - Claude Web language-label div stripping
+     * - footnote href normalization
+     * - footnote <li><p>...</p></li> unwrap
+     * - residual span unwrap
+     * - bare top-level <li> wrapping
+     *
+     * @param {string} html
+     * @returns {string}
+     */
+    static _NormalizeUserMessagesAndLateCleanupDom(html) {
+        needUser := RegExMatch(html, "i)<(?:p|div)\b[^>]*\b(?:text-size-chat|content_xGDvVg|whitespace-pre-wrap)\b")
+        needLate := RegExMatch(html, "i)(<li\b|<div\b[^>]*\bclass=`"[^`"]*\bfont-small\b[^`"]*\bp-3[^`"]*`"|href=`"[^`"]*#user-content-|<li\b[^>]*\bid=`"user-content-fn-|</?span\b)")
+        if !(needUser || needLate)
+            return html
+
+        nodes := HtmlNorm._TryParseDomNodes(html)
+        if (nodes.Length = 0)
+            return html
+
+        changed := false
+        if needUser {
+            nodes := HtmlNorm._ExtractUserMessagesInlineContainerDomNodes(nodes, &changed)
+            nodes := HtmlNorm._ExtractUserMessagesFullNodeDomNodes(nodes, &changed)
+        }
+        if needLate {
+            if (HtmlNorm._NormalizeFootnoteAndSpanDomNodes(&nodes))
+                changed := true
+            nodes := HtmlNorm._WrapBareTopLevelLiDomNodes(nodes, &wrapped)
+            if wrapped
+                changed := true
+        }
 
         return changed ? HtmlNorm._SerializeDomNodes(nodes) : html
     }
