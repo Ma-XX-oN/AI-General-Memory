@@ -594,16 +594,12 @@ class PasteMd {
           expectedListStart := promptResult["value"]
         }
 
-        htmlPrep := PasteMd.ApplyOrderedListStartToHtml(htmlPrep, expectedListStart)
-        htmlPrep := PasteMd.StabilizeShellOnlyListItemsHtml(htmlPrep)
+        htmlPrep := PasteMd.ApplyOrderedListStartAndStabilizeShellHtml(htmlPrep, expectedListStart)
 
-        ; If no meaningful HTML tags remain after preprocessing (just styled
-        ; spans wrapping plain text, or <p> wrappers around plain lines as
-        ; in ProseMirror/Codex), skip pandoc — plain text already has
+        ; If no meaningful HTML tags remain after preprocessing (only <p>/<br>
+        ; wrappers around plain text), skip pandoc — plain text already has
         ; correct whitespace and indentation that pandoc would destroy.
-        stripped := RegExReplace(htmlPrep, "i)<br\b[^>]*+>", "")
-        stripped := RegExReplace(stripped, "i)</?p\b[^>]*+>", "")
-        if !RegExMatch(stripped, "<[^>]++>") {
+        if !PasteMd._HasMeaningfulHtmlForPandoc(htmlPrep) {
           PasteMd._BusyUpdate("Using plain text path")
           md := PasteMd.CleanPlainText(plain)
           usedNoTagPlainPath := true
@@ -1301,6 +1297,49 @@ class PasteMd {
   }
 
   /**
+   * Applies ordered-list start and shell-list-item stabilization in one DOM pass.
+   * This avoids reparsing between two sequential pre-pandoc rewrites.
+   * @param {string} html - HTML prior to pandoc conversion
+   * @param {number} startNum - Ordered-list start index (<=1 means no start rewrite)
+   * @returns {string} Rewritten HTML
+   */
+  static ApplyOrderedListStartAndStabilizeShellHtml(html, startNum) {
+    if (html = "")
+      return html
+
+    nodes := PasteMd._TryParseDomNodes(html)
+    if (nodes.Length = 0)
+      return html
+
+    changed := false
+    if (startNum > 1) {
+      ol := PasteMd._FindFirstByTag(nodes, "ol")
+      if IsObject(ol) {
+        PasteMd._SetAttrCI(ol, "start", "" startNum)
+        changed := true
+      }
+    }
+
+    marker := PasteMd._shellListItemPlaceholder
+    listItems := []
+    PasteMd._CollectNodesByTag(nodes, "li", &listItems)
+    for li in listItems {
+      idx := PasteMd._FirstMeaningfulChildIndex(li)
+      if (idx < 1)
+        continue
+      first := li.children[idx]
+      if !(PasteMd._IsTag(first, "ol") || PasteMd._IsTag(first, "ul"))
+        continue
+      if (PasteMd._LeadingListShellHasMarker(li, idx, marker))
+        continue
+      li.children.InsertAt(idx, DomNode("text", "", marker))
+      changed := true
+    }
+
+    return changed ? PasteMd._SerializeDomNodes(nodes) : html
+  }
+
+  /**
    * Parses HTML into DOM nodes for pre-pandoc HTML rewrites.
    * @param {string} html
    * @returns {Array}
@@ -1398,6 +1437,55 @@ class PasteMd {
   }
 
   /**
+   * Gets an attribute value case-insensitively, or "" when absent.
+   * @param {DomNode} node
+   * @param {string} name
+   * @returns {string}
+   */
+  static _GetAttrCI(node, name) {
+    lower := StrLower(name)
+    for k, v in node.attrs
+      if (StrLower(k) = lower)
+        return v
+    return ""
+  }
+
+  /**
+   * Returns positive integer from attribute value, or 0 when absent/invalid.
+   * @param {DomNode} node
+   * @param {string} name
+   * @returns {integer}
+   */
+  static _GetNumericAttr(node, name) {
+    value := Trim(PasteMd._GetAttrCI(node, name), " `t`r`n")
+    if RegExMatch(value, "^\d++$")
+      return Integer(value)
+    return 0
+  }
+
+  /**
+   * Finds first node with matching tag and a numeric attribute.
+   * @param {Array} nodes
+   * @param {string} tagName
+   * @param {string} attrName
+   * @returns {DomNode|string}
+   */
+  static _FindFirstByTagWithNumericAttr(nodes, tagName, attrName) {
+    for node in nodes {
+      if PasteMd._IsTag(node, tagName) {
+        if (PasteMd._GetNumericAttr(node, attrName) > 0)
+          return node
+      }
+      if (node.children.Length > 0) {
+        found := PasteMd._FindFirstByTagWithNumericAttr(node.children, tagName, attrName)
+        if IsObject(found)
+          return found
+      }
+    }
+    return ""
+  }
+
+  /**
    * Collects all descendant nodes matching a tag name.
    * @param {Array} nodes
    * @param {string} tagName
@@ -1482,6 +1570,46 @@ class PasteMd {
     for child in node.children
       out .= PasteMd._NodeTextRecursive(child)
     return out
+  }
+
+  /**
+   * True when HTML contains tags beyond plain-text wrappers (<p>/<br>).
+   * Used to decide whether pandoc conversion is necessary.
+   * @param {string} html
+   * @returns {boolean}
+   */
+  static _HasMeaningfulHtmlForPandoc(html) {
+    nodes := PasteMd._TryParseDomNodes(html)
+    if (nodes.Length = 0) {
+      ; Keep legacy behavior when parsing fails.
+      stripped := RegExReplace(html, "i)<br\b[^>]*+>", "")
+      stripped := RegExReplace(stripped, "i)</?p\b[^>]*+>", "")
+      return RegExMatch(stripped, "<[^>]++>")
+    }
+    return PasteMd._HasMeaningfulHtmlNode(nodes)
+  }
+
+  /**
+   * Recursive worker for _HasMeaningfulHtmlForPandoc.
+   * @param {Array|DomNode} nodeOrNodes
+   * @returns {boolean}
+   */
+  static _HasMeaningfulHtmlNode(nodeOrNodes) {
+    if (nodeOrNodes is Array) {
+      for node in nodeOrNodes
+        if PasteMd._HasMeaningfulHtmlNode(node)
+          return true
+      return false
+    }
+
+    node := nodeOrNodes
+    if (node.tag = "text")
+      return false
+    if (PasteMd._IsTag(node, "br"))
+      return false
+    if PasteMd._IsTag(node, "p")
+      return PasteMd._HasMeaningfulHtmlNode(node.children)
+    return true
   }
 
   /**
@@ -1740,16 +1868,27 @@ class PasteMd {
    * @returns {number} Expected list index, or 0 when unknown
    */
   static GetExpectedOrderedListStart(htmlFrag, cfHtml, plain) {
-    if RegExMatch(htmlFrag, "is)<li\b[^>]*+\bvalue\s*+=\s*+['`"]?(\d++)", &mValue) {
-      return Integer(mValue[1])
+    fragNodes := PasteMd._TryParseDomNodes(htmlFrag)
+    if (fragNodes.Length > 0) {
+      firstLiWithValue := PasteMd._FindFirstByTagWithNumericAttr(fragNodes, "li", "value")
+      if IsObject(firstLiWithValue) {
+        nValue := PasteMd._GetNumericAttr(firstLiWithValue, "value")
+        if (nValue > 0)
+          return nValue
+      }
     }
 
     n := this.GetListStartFromHtmlContext(cfHtml, htmlFrag)
     if (n > 0)
       return n
 
-    if RegExMatch(htmlFrag, "is)^[ \t\r\n]*+<ol\b[^>]*+\bstart\s*+=\s*+['`"]?(\d++)", &mStart) {
-      return Integer(mStart[1])
+    if (fragNodes.Length > 0) {
+      top := PasteMd._TopLevelMeaningfulNodes(fragNodes)
+      if (top.Length > 0 && PasteMd._IsTag(top[1], "ol")) {
+        nStart := PasteMd._GetNumericAttr(top[1], "start")
+        if (nStart > 0)
+          return nStart
+      }
     }
 
     if RegExMatch(plain, "^[ \t]*+(\d++)[.)](?:[ \t]++|$)", &mPlain) {
