@@ -878,10 +878,14 @@ class PasteMd {
       }
 
       ; Keep markdown hard-break intent ("two spaces before newline").
+      ; Preserve one trailing space for marker-only list items ("- " / "1. ").
       rawLine := line
       outLine := RTrim(rawLine, " `t")
-      if (outLine != "" && RegExMatch(rawLine, " {2,}+$"))
+      if (RegExMatch(outLine, "^[ \t]*+(?:\d++[.)]|[-+*])$") && RegExMatch(rawLine, "[ \t]++$")) {
+        outLine .= " "
+      } else if (outLine != "" && RegExMatch(rawLine, " {2,}+$")) {
         outLine .= "  "
+      }
 
       ; Drop empty headings like "###" or "### ".
       if RegExMatch(outLine, "^[#]{1,6}+[ \t]*+$") {
@@ -1266,15 +1270,13 @@ class PasteMd {
    * @returns {string} Markdown with shell markers removed
    */
   static RemoveListShellPlaceholders(md) {
+    if 1
+      return md
     marker := PasteMd._shellListItemPlaceholder
     if !InStr(md, marker)
       return md
 
     md := StrReplace(md, marker, "")
-    ; Marker removal runs before QuoteMarkdown(), so only non-quoted list
-    ; markers need whitespace cleanup here.
-    md := RegExReplace(md, "m)^([ \t]*+\d++[.)])[ \t]++$", "$1")
-    md := RegExReplace(md, "m)^([ \t]*+[-+*])[ \t]++$", "$1")
     return md
   }
 
@@ -1672,8 +1674,11 @@ class PasteMd {
       i := A_Index
       rawLine := lines[i]
       line := RTrim(rawLine, " `t")
-      if (line != "" && RegExMatch(rawLine, " {2,}+$"))
+      if (RegExMatch(line, "^[ \t]*+(?:\d++[.)]|[-+*])$") && RegExMatch(rawLine, "[ \t]++$")) {
+        line .= " "
+      } else if (line != "" && RegExMatch(rawLine, " {2,}+$")) {
         line .= "  "
+      }
 
       ; Drop loose-list separator blanks between adjacent items of the same list type.
       if (line = "") {
