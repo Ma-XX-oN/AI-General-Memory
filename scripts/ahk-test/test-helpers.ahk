@@ -13,7 +13,18 @@ OnError _TestFatalHandler
  * @returns {integer} -1 to suppress the error dialog.
  */
 _TestFatalHandler(e, mode) {
-  FileAppend "FATAL: " e.Message "`nStack:`n" e.Stack "`n", "**"
+  msg := "FATAL: " e.Message "`nStack:`n" e.Stack "`n"
+  try
+    FileAppend msg, "**", "UTF-8"
+  catch {
+    global _logPath
+    try {
+      if (IsSet(_logPath) && _logPath != "")
+        FileAppend msg, _logPath, "UTF-8"
+      else
+        FileAppend msg, A_Temp "\ahk-test-fatal.log", "UTF-8"
+    }
+  }
   return -1
 }
 
