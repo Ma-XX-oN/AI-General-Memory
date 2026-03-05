@@ -536,6 +536,7 @@ class PasteMd {
    */
   static _ConvertFromCaptured(plain, cfHtml, asQuoted, showPoster, showImg, promptOrderedList := false) {
     PasteMd._BusyUpdate("Inspecting clipboard data")
+    HtmlNorm.ResetParseDiagnostics()
     plain := StrReplace(plain, "`r", "")
     source := DetectSource(cfHtml)
     PasteMd._BusyUpdate("Reading HTML fragment")
@@ -553,6 +554,8 @@ class PasteMd {
     aborted := false
     usedNoHtmlPath := false
     usedNoTagPlainPath := false
+    parseFailureCount := 0
+    parseDiagnostics := ""
     prepNodes := []
 
     prevShowImg := PasteMd.SHOW_IMG
@@ -583,6 +586,8 @@ class PasteMd {
           promptResult := PasteMd.MaybePromptOrderedListStart(htmlPrep, plain, htmlFrag, expectedListStart)
           if (promptResult["aborted"]) {
             aborted := true
+            parseFailureCount := HtmlNorm.ParseDiagnosticsCount()
+            parseDiagnostics := HtmlNorm.ParseDiagnosticsText()
             return Map(
               "source", source,
               "htmlFrag", htmlFrag,
@@ -595,6 +600,8 @@ class PasteMd {
               "expectedListStart", expectedListStart,
               "usedNoHtmlPath", usedNoHtmlPath,
               "usedNoTagPlainPath", usedNoTagPlainPath,
+              "parseFailureCount", parseFailureCount,
+              "parseDiagnostics", parseDiagnostics,
               "aborted", true
             )
           }
@@ -698,6 +705,8 @@ class PasteMd {
 
       ; Remove CR unconditionally (LF-only).
       md := StrReplace(md, "`r", "")
+      parseFailureCount := HtmlNorm.ParseDiagnosticsCount()
+      parseDiagnostics := HtmlNorm.ParseDiagnosticsText()
 
       return Map(
         "source", source,
@@ -711,6 +720,8 @@ class PasteMd {
         "expectedListStart", expectedListStart,
         "usedNoHtmlPath", usedNoHtmlPath,
         "usedNoTagPlainPath", usedNoTagPlainPath,
+        "parseFailureCount", parseFailureCount,
+        "parseDiagnostics", parseDiagnostics,
         "aborted", aborted
       )
     } finally {
@@ -761,6 +772,8 @@ class PasteMd {
         PasteMd._DbgSection(dbgF, "1. plain (A_Clipboard minus CR)", plain)
         PasteMd._DbgSection(dbgF, "2. cfHtml (raw full payload)", cfHtml)
         PasteMd._DbgSection(dbgF, "3. htmlFrag (CF_HTML fragment)", converted["htmlFrag"])
+        if (converted["parseFailureCount"] > 0)
+          PasteMd._DbgSection(dbgF, "3a. parse diagnostics (DOM parse pass-through)", converted["parseDiagnostics"])
         dbgF.Write("=== 2b. cfHtml offsets ===`n")
         dbgF.Write("StartHTML: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartHTML:") "`n")
         dbgF.Write("EndHTML: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndHTML:") "`n")
@@ -1169,7 +1182,7 @@ class PasteMd {
    * @returns {string} HTML with corrected outer list intent
    */
   static NormalizeIncidentalListIntentHtml(htmlPrep, htmlFrag, plain, expected := 0) {
-    nodes := HtmlNorm._TryParseDomNodes(htmlPrep)
+    nodes := HtmlNorm._TryParseDomNodes(htmlPrep, "PasteMd.NormalizeIncidentalListIntentHtml")
     if (nodes.Length = 0)
       return htmlPrep
     return PasteMd._NormalizeIncidentalListIntentDomNodes(nodes, htmlFrag, plain, expected)
@@ -1222,7 +1235,7 @@ class PasteMd {
     if (htmlPrep = "" || startNum <= 1)
       return htmlPrep
 
-    nodes := HtmlNorm._TryParseDomNodes(htmlPrep)
+    nodes := HtmlNorm._TryParseDomNodes(htmlPrep, "PasteMd.ApplyOrderedListStartToHtml")
     if (nodes.Length = 0)
       return htmlPrep
 
@@ -1241,7 +1254,7 @@ class PasteMd {
     if (html = "")
       return html
 
-    nodes := HtmlNorm._TryParseDomNodes(html)
+    nodes := HtmlNorm._TryParseDomNodes(html, "PasteMd.StabilizeShellOnlyListItemsHtml")
     if (nodes.Length = 0)
       return html
 
@@ -1261,7 +1274,7 @@ class PasteMd {
     if (html = "")
       return html
 
-    nodes := HtmlNorm._TryParseDomNodes(html)
+    nodes := HtmlNorm._TryParseDomNodes(html, "PasteMd.ApplyOrderedListStartAndStabilizeShellHtml")
     if (nodes.Length = 0)
       return html
     return PasteMd._ApplyOrderedStartAndStabilizeShellDomNodes(nodes, startNum)
@@ -1291,7 +1304,7 @@ class PasteMd {
     if RegExMatch(plain, "m)^[ \t]*+\d++[.)](?:[ \t]++|$)")
       return false
 
-    top := PasteMd._TopLevelMeaningfulNodes(nodes)
+    top := HtmlNorm._TopLevelMeaningfulNodes(nodes)
     if (top.Length != 1 || !PasteMd._IsTag(top[1], "ol"))
       return false
 
@@ -1363,19 +1376,6 @@ class PasteMd {
       changed := true
     }
     return changed
-  }
-
-  /**
-   * Returns meaningful top-level nodes (ignoring whitespace-only text nodes).
-   * @param {Array} nodes
-   * @returns {Array}
-   */
-  static _TopLevelMeaningfulNodes(nodes) {
-    out := []
-    for node in nodes
-      if !PasteMd._IsWhitespaceTextNode(node)
-        out.Push(node)
-    return out
   }
 
   /**
@@ -1581,7 +1581,7 @@ class PasteMd {
    * @returns {boolean}
    */
   static _HasMeaningfulHtmlForPandoc(html) {
-    nodes := HtmlNorm._TryParseDomNodes(html)
+    nodes := HtmlNorm._TryParseDomNodes(html, "PasteMd._HasMeaningfulHtmlForPandoc")
     if (nodes.Length = 0)
       return true
     return PasteMd._HasMeaningfulHtmlNode(nodes)
@@ -1840,7 +1840,7 @@ class PasteMd {
     if (htmlFrag = "")
       return 0
 
-    nodes := HtmlNorm._TryParseDomNodes(htmlFrag)
+    nodes := HtmlNorm._TryParseDomNodes(htmlFrag, "PasteMd.CountListItemsInFragment")
     if (nodes.Length = 0)
       return 0
 
@@ -1855,10 +1855,10 @@ class PasteMd {
    * @returns {string}
    */
   static _FirstMeaningfulTopTagName(html) {
-    nodes := HtmlNorm._TryParseDomNodes(html)
+    nodes := HtmlNorm._TryParseDomNodes(html, "PasteMd._FirstMeaningfulTopTagName")
     if (nodes.Length = 0)
       return ""
-    top := PasteMd._TopLevelMeaningfulNodes(nodes)
+    top := HtmlNorm._TopLevelMeaningfulNodes(nodes)
     if (top.Length = 0)
       return ""
     return StrLower(top[1].tag)
@@ -1881,7 +1881,7 @@ class PasteMd {
    * @returns {number} Expected list index, or 0 when unknown
    */
   static GetExpectedOrderedListStart(htmlFrag, cfHtml, plain) {
-    fragNodes := HtmlNorm._TryParseDomNodes(htmlFrag)
+    fragNodes := HtmlNorm._TryParseDomNodes(htmlFrag, "PasteMd.GetExpectedOrderedListStart")
     if (fragNodes.Length > 0) {
       firstLiWithValue := PasteMd._FindFirstByTagWithNumericAttr(fragNodes, "li", "value")
       if IsObject(firstLiWithValue) {
@@ -1896,7 +1896,7 @@ class PasteMd {
       return n
 
     if (fragNodes.Length > 0) {
-      top := PasteMd._TopLevelMeaningfulNodes(fragNodes)
+      top := HtmlNorm._TopLevelMeaningfulNodes(fragNodes)
       if (top.Length > 0 && PasteMd._IsTag(top[1], "ol")) {
         nStart := PasteMd._GetNumericAttr(top[1], "start")
         if (nStart > 0)

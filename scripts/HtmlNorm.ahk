@@ -110,6 +110,41 @@ class HtmlNorm {
     static _domNodes := []
 
     /**
+     * Parse diagnostics collected by _TryParseDomNodes for the current run.
+     * Each entry is a one-line string with context, message, length, and snippet.
+     * @type {Array}
+     */
+    static _parseDiagnostics := []
+
+    /**
+     * Clears collected parse diagnostics.
+     */
+    static ResetParseDiagnostics() {
+        HtmlNorm._parseDiagnostics := []
+    }
+
+    /**
+     * Number of collected parse diagnostics.
+     * @returns {integer}
+     */
+    static ParseDiagnosticsCount() {
+        return HtmlNorm._parseDiagnostics.Length
+    }
+
+    /**
+     * Returns parse diagnostics joined by newlines.
+     * @returns {string}
+     */
+    static ParseDiagnosticsText() {
+        if (HtmlNorm._parseDiagnostics.Length = 0)
+            return ""
+        out := ""
+        for line in HtmlNorm._parseDiagnostics
+            out .= (out = "" ? "" : "`n") line
+        return out
+    }
+
+    /**
      * Normalizes an HTML fragment for pandoc processing.
      *
      * Transforms are applied in order:
@@ -156,7 +191,7 @@ class HtmlNorm {
             return html
         }
 
-        nodes := HtmlNorm._TryParseDomNodes(html)
+        nodes := HtmlNorm._TryParseDomNodes(html, "HtmlNorm.Normalize.pipeline")
         if (nodes.Length = 0) {
             HtmlNorm._domNodes := []
             return html
@@ -279,7 +314,7 @@ class HtmlNorm {
             HtmlNorm._InjectPosterForMatches(nodes, (n) => HtmlNorm._IsTag(n, "div")
                 && (HtmlNorm._GetAttrCI(n, "data-testid") = "user-message"), "¤POSTER_User¤")
         } else if (source = "chatgpt") {
-            ; Keep legacy behavior: assistant may be injected by either matcher.
+            ; Preserve current behavior: assistant may be injected by either matcher.
             HtmlNorm._InjectPosterForMatches(nodes, (n) => HtmlNorm._IsTag(n, "article")
                 && (HtmlNorm._GetAttrCI(n, "data-turn") = "assistant"), "¤POSTER_AI¤")
             HtmlNorm._InjectPosterForMatches(nodes, (n) => HtmlNorm._IsTag(n, "article")
@@ -834,7 +869,7 @@ class HtmlNorm {
     /**
      * Wraps bare top-level <li> siblings in parsed DOM nodes.
      *
-     * Matches legacy behavior without mutating input when wrapping does not apply.
+     * Preserves existing behavior without mutating input when wrapping does not apply.
      *
      * @param {Array} nodes
      * @param {boolean} changed
@@ -1553,6 +1588,19 @@ class HtmlNorm {
     }
 
     /**
+     * Returns meaningful top-level nodes (ignoring whitespace-only text nodes).
+     * @param {Array} nodes
+     * @returns {Array}
+     */
+    static _TopLevelMeaningfulNodes(nodes) {
+        out := []
+        for node in nodes
+            if !HtmlNorm._IsWhitespaceTextNode(node)
+                out.Push(node)
+        return out
+    }
+
+    /**
      * Gets a case-insensitive attribute value.
      * @param {DomNode} node
      * @param {string} attrName
@@ -1750,18 +1798,45 @@ class HtmlNorm {
 
     /**
      * Parses HTML into DomNode trees.
-     * Returns [] when parsing fails.
+     * Returns [] when parsing fails and records one parse diagnostic entry.
      * @param {string} html
+     * @param {string} context
      * @returns {Array}
      */
-    static _TryParseDomNodes(html) {
+    static _TryParseDomNodes(html, context := "") {
         if (html = "")
             return []
         try {
-            return HtmlParser.Parse(html)
-        } catch {
+            nodes := HtmlParser.Parse(html)
+            if (nodes is Array) {
+                if (nodes.Length = 0 && Trim(html, " `t`r`n") != "")
+                    HtmlNorm._AddParseDiagnostic(context, html, "parser returned zero nodes")
+                return nodes
+            }
+            HtmlNorm._AddParseDiagnostic(context, html, "parser returned non-array result")
+            return []
+        } catch as e {
+            HtmlNorm._AddParseDiagnostic(context, html, e.Message)
             return []
         }
+    }
+
+    /**
+     * Adds one parse-diagnostic line with context and HTML snippet.
+     * @param {string} context
+     * @param {string} html
+     * @param {string} message
+     */
+    static _AddParseDiagnostic(context, html, message) {
+        ctx := Trim(context, " `t`r`n")
+        if (ctx = "")
+            ctx := "unknown"
+
+        snippet := SubStr(html, 1, 160)
+        snippet := StrReplace(snippet, "`r", "⏎")
+        snippet := StrReplace(snippet, "`n", "¶")
+        line := "[" ctx "] " message " (len=" StrLen(html) ") " snippet
+        HtmlNorm._parseDiagnostics.Push(line)
     }
 
     /**
