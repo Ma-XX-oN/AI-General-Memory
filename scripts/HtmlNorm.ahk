@@ -624,33 +624,10 @@ class HtmlNorm {
      * @returns {string}
      */
     static _ExtractUserMessages(html) {
-        ; Codex user messages: <div class="text-size-chat whitespace-pre-wrap">
-        pos := 1
-        while RegExMatch(html, "is)(<div\b[^>]*\btext-size-chat\b[^>]*\bwhitespace-pre-wrap\b[^>]*>)(.*?)</div>", &m, pos) {
-            rawContent := m[2]
-            rawContent := RegExReplace(rawContent, "is)<code\b[^>]*\bfont-mono\b[^>]*>(.*?)</code>", "``$1``")
-            rawContent := RegExReplace(rawContent, "i)</?span\b[^>]*>", "")
-            rawContent := RegExReplace(rawContent, "<[^>]++>", "")
-            rawContent := HtmlNorm._DecodeBasicHtmlEntities(rawContent)
-            rawContent := StrReplace(rawContent, "`r", "")
-            rawContent := Trim(rawContent, "`n")
-            HtmlNorm._userMsgBlocks.Push(rawContent)
-            placeholder := "<p>¤USERMSG_" . HtmlNorm._userMsgBlocks.Length . "¤</p>"
-            newStr := m[1] . placeholder . "</div>"
-            html := SubStr(html, 1, m.Pos - 1) . newStr . SubStr(html, m.Pos + m.Len)
-            pos := m.Pos + StrLen(newStr)
-        }
-        ; Claude Code user messages: <div class="content_xGDvVg"><span>text</span>
-        pos := 1
-        while RegExMatch(html, "is)(<div\b[^>]*\bcontent_xGDvVg\b[^>]*>)\s*<span>(.*?)</span>", &m, pos) {
-            rawText := HtmlNorm._DecodeBasicHtmlEntities(m[2])
-            rawText := StrReplace(rawText, "`r", "")
-            HtmlNorm._userMsgBlocks.Push(rawText)
-            placeholder := "<p>¤USERMSG_" . HtmlNorm._userMsgBlocks.Length . "¤</p>"
-            newStr := m[1] . placeholder
-            html := SubStr(html, 1, m.Pos - 1) . newStr . SubStr(html, m.Pos + m.Len)
-            pos := m.Pos + StrLen(newStr)
-        }
+        ; Codex + Claude Code inline-container user messages:
+        ; - Codex: keep outer div, replace children with placeholder.
+        ; - Claude Code: replace first leading <span> with placeholder.
+        html := HtmlNorm._ExtractUserMessagesInlineContainerDom(html)
 
         ; Claude Web + ChatGPT full-node user messages:
         ; - <p class="whitespace-pre-wrap break-words">...</p>
@@ -659,6 +636,117 @@ class HtmlNorm {
         html := HtmlNorm._ExtractUserMessagesFullNodeDom(html)
 
         return html
+    }
+
+    /**
+     * Extracts user message text from inline-container variants (Codex / Claude Code)
+     * using DOM traversal while preserving source-specific replacement shape.
+     *
+     * @param {string} html
+     * @returns {string}
+     */
+    static _ExtractUserMessagesInlineContainerDom(html) {
+        if !RegExMatch(html, "i)<div\b[^>]*\b(?:text-size-chat|content_xGDvVg)\b")
+            return html
+
+        nodes := HtmlNorm._TryParseDomNodes(html)
+        if (nodes.Length = 0)
+            return html
+
+        changed := false
+        nodes := HtmlNorm._ExtractUserMessagesInlineContainerDomNodes(nodes, &changed)
+        return changed ? HtmlNorm._SerializeDomNodes(nodes) : html
+    }
+
+    /**
+     * Recursive worker entry for inline-container user message extraction.
+     * @param {Array} nodes
+     * @param {boolean} changed
+     * @returns {Array}
+     */
+    static _ExtractUserMessagesInlineContainerDomNodes(nodes, &changed) {
+        out := []
+        for node in nodes {
+            converted := HtmlNorm._ExtractUserMessagesInlineContainerDomNode(node, &changed)
+            for item in converted
+                out.Push(item)
+        }
+        return out
+    }
+
+    /**
+     * Node-level worker for inline-container user message extraction.
+     * @param {DomNode} node
+     * @param {boolean} changed
+     * @returns {Array}
+     */
+    static _ExtractUserMessagesInlineContainerDomNode(node, &changed) {
+        ; Codex: <div class="text-size-chat whitespace-pre-wrap">...</div>
+        if HtmlNorm._IsTag(node, "div")
+            && HtmlNorm._ClassHasToken(node, "text-size-chat")
+            && HtmlNorm._ClassHasToken(node, "whitespace-pre-wrap") {
+            rawContent := HtmlNorm._CodexUserMsgRawText(node)
+            rawContent := HtmlNorm._DecodeBasicHtmlEntities(rawContent)
+            rawContent := StrReplace(rawContent, "`r", "")
+            rawContent := Trim(rawContent, "`n")
+            HtmlNorm._userMsgBlocks.Push(rawContent)
+            node.children := [HtmlNorm._MakeUserMsgPlaceholderParagraph(HtmlNorm._userMsgBlocks.Length)]
+            changed := true
+            return [node]
+        }
+
+        ; Claude Code: <div class="content_xGDvVg"><span>text</span>...</div>
+        if HtmlNorm._IsTag(node, "div") && RegExMatch(HtmlNorm._GetAttrCI(node, "class"), "i)\bcontent_xGDvVg\b") {
+            first := HtmlNorm._FirstNonWhitespaceChild(node)
+            if IsObject(first) && HtmlNorm._IsTag(first, "span") {
+                rawText := HtmlNorm._DecodeBasicHtmlEntities(HtmlNorm._NodeTextRecursive(first))
+                rawText := StrReplace(rawText, "`r", "")
+                HtmlNorm._userMsgBlocks.Push(rawText)
+                placeholder := HtmlNorm._MakeUserMsgPlaceholderParagraph(HtmlNorm._userMsgBlocks.Length)
+
+                newChildren := [placeholder]
+                for child in node.children {
+                    if (ObjPtr(child) = ObjPtr(first))
+                        continue
+                    ; Match prior regex behavior: drop leading whitespace before first span.
+                    if (newChildren.Length = 1 && HtmlNorm._IsWhitespaceTextNode(child))
+                        continue
+                    newChildren.Push(child)
+                }
+                node.children := newChildren
+                changed := true
+                return [node]
+            }
+        }
+
+        if (node.children.Length > 0) {
+            newChildren := []
+            for child in node.children {
+                converted := HtmlNorm._ExtractUserMessagesInlineContainerDomNode(child, &changed)
+                for item in converted
+                    newChildren.Push(item)
+            }
+            node.children := newChildren
+        }
+        return [node]
+    }
+
+    /**
+     * Builds raw user-message text for Codex containers.
+     * - wraps <code class="font-mono">...</code> as ``...``
+     * - strips all other tags while preserving text order
+     * @param {DomNode} node
+     * @returns {string}
+     */
+    static _CodexUserMsgRawText(node) {
+        if (node.tag = "text")
+            return node.text
+        if HtmlNorm._IsTag(node, "code") && HtmlNorm._ClassHasToken(node, "font-mono")
+            return "``" . HtmlNorm._NodeTextRecursive(node) . "``"
+        out := ""
+        for child in node.children
+            out .= HtmlNorm._CodexUserMsgRawText(child)
+        return out
     }
 
     /**
@@ -744,6 +832,43 @@ class HtmlNorm {
         if HtmlNorm._IsTag(node, "div")
             return HtmlNorm._GetAttrCI(node, "class") = "whitespace-pre-wrap"
         return false
+    }
+
+    /**
+     * Returns first non-whitespace direct child, or "" if none.
+     * @param {DomNode} node
+     * @returns {DomNode|string}
+     */
+    static _FirstNonWhitespaceChild(node) {
+        for child in node.children {
+            if !HtmlNorm._IsWhitespaceTextNode(child)
+                return child
+        }
+        return ""
+    }
+
+    /**
+     * Returns direct children excluding whitespace-only text nodes.
+     * @param {DomNode} node
+     * @returns {Array}
+     */
+    static _MeaningfulChildren(node) {
+        out := []
+        for child in node.children
+            if !HtmlNorm._IsWhitespaceTextNode(child)
+                out.Push(child)
+        return out
+    }
+
+    /**
+     * Creates <p>¤USERMSG_N¤</p> placeholder node.
+     * @param {integer} idx
+     * @returns {DomNode}
+     */
+    static _MakeUserMsgPlaceholderParagraph(idx) {
+        p := DomNode("p")
+        p.Add(DomNode("text", "", "¤USERMSG_" . idx . "¤"))
+        return p
     }
 
     /**
@@ -977,6 +1102,12 @@ class HtmlNorm {
      * @returns {string}
      */
     static _UnwrapNestedContainers(html) {
+        domOut := HtmlNorm._UnwrapNestedContainersDom(html)
+        if (domOut != html)
+            return domOut
+
+        ; Fallback regex pass for any residual patterns not yet covered by
+        ; DOM simplification rules.
         prev := ""
         while (html != prev) {
             prev := html
@@ -995,6 +1126,95 @@ class HtmlNorm {
             html := RegExReplace(html, "is)<div\b[^>]*>\s*<div\b[^>]*>\s*(<code\b[^>]*>.*?</code>)\s*</div>\s*</div>", "$1")
         }
         return html
+    }
+
+    /**
+     * DOM-first container simplifier for code-block wrapper patterns.
+     * @param {string} html
+     * @returns {string}
+     */
+    static _UnwrapNestedContainersDom(html) {
+        nodes := HtmlNorm._TryParseDomNodes(html)
+        if (nodes.Length = 0)
+            return html
+
+        changedAny := false
+        Loop 10 {
+            changed := false
+            nodes := HtmlNorm._UnwrapNestedContainersDomNodes(nodes, &changed)
+            if !changed
+                break
+            changedAny := true
+        }
+        return changedAny ? HtmlNorm._SerializeDomNodes(nodes) : html
+    }
+
+    /**
+     * Recursive worker entry for DOM container simplification.
+     * @param {Array} nodes
+     * @param {boolean} changed
+     * @returns {Array}
+     */
+    static _UnwrapNestedContainersDomNodes(nodes, &changed) {
+        out := []
+        for node in nodes {
+            converted := HtmlNorm._UnwrapNestedContainersDomNode(node, &changed)
+            for item in converted
+                out.Push(item)
+        }
+        return out
+    }
+
+    /**
+     * Node-level worker for _UnwrapNestedContainersDomNodes.
+     * @param {DomNode} node
+     * @param {boolean} changed
+     * @returns {Array}
+     */
+    static _UnwrapNestedContainersDomNode(node, &changed) {
+        if (node.children.Length > 0)
+            node.children := HtmlNorm._UnwrapNestedContainersDomNodes(node.children, &changed)
+
+        if HtmlNorm._IsTag(node, "pre") {
+            if InStr(HtmlNorm._GetAttrCI(node, "class"), "code-block__code") {
+                node.attrs := Map()
+                changed := true
+            }
+            kids := HtmlNorm._MeaningfulChildren(node)
+            if (kids.Length = 1 && HtmlNorm._IsTag(kids[1], "pre")) {
+                changed := true
+                return [kids[1]]
+            }
+            return [node]
+        }
+
+        if HtmlNorm._IsTag(node, "div") {
+            if HtmlNorm._ClassHasToken(node, "sticky") {
+                changed := true
+                return []
+            }
+            kids := HtmlNorm._MeaningfulChildren(node)
+            if (kids.Length = 1 && HtmlNorm._IsTag(kids[1], "div")) {
+                inner := kids[1]
+                gkids := HtmlNorm._MeaningfulChildren(inner)
+                if (gkids.Length = 1) {
+                    target := gkids[1]
+                    if HtmlNorm._IsTag(target, "code") {
+                        changed := true
+                        return [target]
+                    }
+                    if HtmlNorm._IsTag(target, "pre") {
+                        tKids := HtmlNorm._MeaningfulChildren(target)
+                        if (tKids.Length = 1 && HtmlNorm._IsTag(tKids[1], "code")) {
+                            changed := true
+                            return [target]
+                        }
+                    }
+                }
+            }
+        }
+
+        return [node]
     }
 
     /**
