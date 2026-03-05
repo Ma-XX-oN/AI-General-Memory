@@ -867,7 +867,7 @@ class PasteMd {
       ; Fence detection without regex (avoids backtick-escape problems).
       if (SubStr(t, 1, StrLen(PasteMd.CODE_FENCE)) = PasteMd.CODE_FENCE) {
         inFence := !inFence
-        outLine := RTrim(line, " `t")
+        outLine := line
         out .= (out = "" ? "" : "`n") outLine
         continue
       }
@@ -877,15 +877,8 @@ class PasteMd {
         continue
       }
 
-      ; Keep markdown hard-break intent ("two spaces before newline").
-      ; Preserve one trailing space for marker-only list items ("- " / "1. ").
       rawLine := line
-      outLine := RTrim(rawLine, " `t")
-      if (RegExMatch(outLine, "^[ \t]*+(?:\d++[.)]|[-+*])$") && RegExMatch(rawLine, "[ \t]++$")) {
-        outLine .= " "
-      } else if (outLine != "" && RegExMatch(rawLine, " {2,}+$")) {
-        outLine .= "  "
-      }
+      outLine := rawLine
 
       ; Drop empty headings like "###" or "### ".
       if RegExMatch(outLine, "^[#]{1,6}+[ \t]*+$") {
@@ -899,37 +892,8 @@ class PasteMd {
       out .= (out = "" ? "" : "`n") outLine
     }
 
-    ; Drop loose-list separator blanks between adjacent items of the same list type.
-    ; Pandoc emits blank lines between <li> items when each contains a <p> wrapper ("loose list").
-    ; Only drops blanks where both neighbors are ordered OR both are unordered — preserves the
-    ; blank line between a closing unordered list and an opening ordered list (and vice-versa).
-    ; TODO: a cleaner alternative is to strip single-<p> wrappers from all <li> elements in
-    ;       HtmlNorm (as already done for footnote <li>s at step 10b), so pandoc never produces
-    ;       loose lists in the first place — removing the need for this post-pandoc cleanup.
-    outLines := StrSplit(out, "`n")
-    out2 := ""
-    firstOut2 := true
-    Loop outLines.Length {
-      idx := A_Index
-      line := outLines[idx]
-      if (Trim(line, " `t") = "") {
-        prev := (idx > 1) ? RTrim(outLines[idx - 1], " `t") : ""
-        next := (idx < outLines.Length) ? RTrim(outLines[idx + 1], " `t") : ""
-        if ((RegExMatch(prev, "^[ \t]*+\d++[.)](?:[ \t]++|$)") && RegExMatch(next, "^[ \t]*+\d++[.)](?:[ \t]++|$)"))
-          || (RegExMatch(prev, "^[ \t]*+[-+*](?:[ \t]++|$)") && RegExMatch(next, "^[ \t]*+[-+*](?:[ \t]++|$)"))) {
-          continue
-        }
-      }
-
-      out2 .= (firstOut2 ? "" : "`n") line
-      firstOut2 := false
-    }
-    out := out2
-
     ; Collapse runs of 3+ newlines to 2 (at most one blank line).
     out := RegExReplace(out, "\n{3,}+", "`n`n")
-
-    out := Trim(out, "`n")
     if (hadTrailingBreak && out != "")
       out .= "`n"
     return out
@@ -1270,8 +1234,6 @@ class PasteMd {
    * @returns {string} Markdown with shell markers removed
    */
   static RemoveListShellPlaceholders(md) {
-    if 1
-      return md
     marker := PasteMd._shellListItemPlaceholder
     if !InStr(md, marker)
       return md
@@ -1662,9 +1624,6 @@ class PasteMd {
     md := StrReplace(md, "`r", "")
     hadTrailingBreak := RegExMatch(md, "\n$")
     lines := StrSplit(md, "`n")
-    while (lines.Length > 0 && Trim(lines[lines.Length], " `t") = "") {
-      lines.Pop()
-    }
     if (lines.Length = 0)
       return ""
 
@@ -1673,24 +1632,7 @@ class PasteMd {
     Loop lines.Length {
       i := A_Index
       rawLine := lines[i]
-      line := RTrim(rawLine, " `t")
-      if (RegExMatch(line, "^[ \t]*+(?:\d++[.)]|[-+*])$") && RegExMatch(rawLine, "[ \t]++$")) {
-        line .= " "
-      } else if (line != "" && RegExMatch(rawLine, " {2,}+$")) {
-        line .= "  "
-      }
-
-      ; Drop loose-list separator blanks between adjacent items of the same list type.
-      if (line = "") {
-        prev := (i > 1) ? RTrim(lines[i - 1], " `t") : ""
-        next := (i < lines.Length) ? RTrim(lines[i + 1], " `t") : ""
-        if ((RegExMatch(prev, "^[ \t]*+\d++[.)](?:[ \t]++|$)")
-          && RegExMatch(next, "^[ \t]*+\d++[.)](?:[ \t]++|$)"))
-          || (RegExMatch(prev, "^[ \t]*+[-+*](?:[ \t]++|$)")
-          && RegExMatch(next, "^[ \t]*+[-+*](?:[ \t]++|$)"))) {
-          continue
-        }
-      }
+      line := rawLine
 
       q := (line = "") ? ">" : ("> " line)
       out .= (firstOut ? "" : "`n") q
