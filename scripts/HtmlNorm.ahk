@@ -326,31 +326,63 @@ class HtmlNorm {
      * @returns {string}
      */
     static _NormalizeSimpleDiffBlocks(html) {
-        pos := 1
-        while RegExMatch(html, "is)<diffs-container\b[^>]*>(.*?)</diffs-container>", &mDiff, pos) {
-            inner := mDiff[1]
-            fileName := ""
-            ; The editable filename appears in a button before the diff block.
-            ; Some captures include very large inline style payloads between header
-            ; and diff body, so scan the full prefix and keep the last non-empty
-            ; button label.
-            before := SubStr(html, 1, mDiff.Pos - 1)
-            btnPos := 1
-            while RegExMatch(before, "is)<button\b[^>]*>(.*?)</button>", &mBtn, btnPos) {
-                btnText := RegExReplace(mBtn[1], "<[^>]++>", "")
-                btnText := HtmlNorm._DecodeBasicHtmlEntities(btnText)
-                btnText := Trim(btnText, " `t`r`n")
-                if (btnText != "")
-                    fileName := btnText
-                btnPos := mBtn.Pos + mBtn.Len
-            }
-            linePos := 1
+        if !RegExMatch(html, "i)<diffs-container\b")
+            return html
+
+        nodes := HtmlNorm._TryParseDomNodes(html)
+        if (nodes.Length = 0)
+            return html
+
+        changed := false
+        lastButton := ""
+        nodes := HtmlNorm._NormalizeSimpleDiffBlocksDomNodes(nodes, &lastButton, &changed)
+        return changed ? HtmlNorm._SerializeDomNodes(nodes) : html
+    }
+
+    /**
+     * Recursive worker entry for simple diff-block normalization.
+     * Tracks last non-empty button label seen in document order.
+     * @param {Array} nodes
+     * @param {string} lastButton
+     * @param {boolean} changed
+     * @returns {Array}
+     */
+    static _NormalizeSimpleDiffBlocksDomNodes(nodes, &lastButton, &changed) {
+        out := []
+        for node in nodes {
+            converted := HtmlNorm._NormalizeSimpleDiffBlocksDomNode(node, &lastButton, &changed)
+            for item in converted
+                out.Push(item)
+        }
+        return out
+    }
+
+    /**
+     * Node-level worker for _NormalizeSimpleDiffBlocksDomNodes.
+     * @param {DomNode} node
+     * @param {string} lastButton
+     * @param {boolean} changed
+     * @returns {Array}
+     */
+    static _NormalizeSimpleDiffBlocksDomNode(node, &lastButton, &changed) {
+        if HtmlNorm._IsTag(node, "button") {
+            btnText := HtmlNorm._DecodeBasicHtmlEntities(HtmlNorm._NodeTextRecursive(node))
+            btnText := Trim(btnText, " `t`r`n")
+            if (btnText != "")
+                lastButton := btnText
+        }
+
+        if HtmlNorm._IsTag(node, "diffs-container") {
+            rows := []
+            HtmlNorm._CollectMatchingNodes(node.children
+                , (n) => HtmlNorm._IsTag(n, "div")
+                    && HtmlNorm._HasAttrCI(n, "data-line-type")
+                , &rows)
+
             diffLines := []
-            while RegExMatch(inner, "is)<div\b[^>]*\bdata-line-type\s*=\s*['`"]([^'`"]+)['`"][^>]*>(.*?)</div>", &mLine, linePos) {
-                lineType := StrLower(mLine[1])
-                lineHtml := mLine[2]
-                lineText := RegExReplace(lineHtml, "<[^>]++>", "")
-                lineText := HtmlNorm._DecodeBasicHtmlEntities(lineText)
+            for row in rows {
+                lineType := StrLower(HtmlNorm._GetAttrCI(row, "data-line-type"))
+                lineText := HtmlNorm._DecodeBasicHtmlEntities(HtmlNorm._NodeTextRecursive(row))
                 lineText := StrReplace(lineText, "`r", "")
                 lineText := Trim(lineText, "`n")
                 prefix := " "
@@ -359,36 +391,42 @@ class HtmlNorm {
                 else if InStr(lineType, "addition")
                     prefix := "+"
                 diffLines.Push(prefix . lineText)
-                linePos := mLine.Pos + mLine.Len
             }
 
-            if (diffLines.Length = 0) {
-                pos := mDiff.Pos + mDiff.Len
-                continue
-            }
+            if (diffLines.Length = 0)
+                return [node]
 
             diffText := ""
-            for _, line in diffLines
+            for line in diffLines
                 diffText .= (diffText = "" ? "" : "`n") . line
-
-            ; Escape for safe embedding inside <code>.
             diffText := StrReplace(diffText, "&", "&amp;")
             diffText := StrReplace(diffText, "<", "&lt;")
             diffText := StrReplace(diffText, ">", "&gt;")
 
-            header := ""
-            if (fileName != "") {
-                fileNameEsc := StrReplace(fileName, "&", "&amp;")
+            outNodes := []
+            if (lastButton != "") {
+                fileNameEsc := StrReplace(lastButton, "&", "&amp;")
                 fileNameEsc := StrReplace(fileNameEsc, "<", "&lt;")
                 fileNameEsc := StrReplace(fileNameEsc, ">", "&gt;")
-                header := "<p><code>" . fileNameEsc . "</code></p>"
+                p := DomNode("p")
+                c := DomNode("code")
+                c.Add(DomNode("text", "", fileNameEsc))
+                p.Add(c)
+                outNodes.Push(p)
             }
 
-            replacement := header . '<pre><code class="language-diff">' . diffText . '</code></pre>'
-            html := SubStr(html, 1, mDiff.Pos - 1) . replacement . SubStr(html, mDiff.Pos + mDiff.Len)
-            pos := mDiff.Pos + StrLen(replacement)
+            pre := DomNode("pre")
+            code := DomNode("code", Map("class", "language-diff"))
+            code.Add(DomNode("text", "", diffText))
+            pre.Add(code)
+            outNodes.Push(pre)
+            changed := true
+            return outNodes
         }
-        return html
+
+        if (node.children.Length > 0)
+            node.children := HtmlNorm._NormalizeSimpleDiffBlocksDomNodes(node.children, &lastButton, &changed)
+        return [node]
     }
 
     /**
@@ -408,30 +446,71 @@ class HtmlNorm {
      * @returns {string}
      */
     static _NormalizeChatGptCodeBlocks(html) {
-        pos := 1
-        while RegExMatch(html, "is)<pre\b[^>]*\boverflow-visible\b[^>]*>(.*?)</pre>", &m, pos) {
-            inner := m[1]
-            ; Convert <br> to newlines before stripping all other tags.
-            inner := RegExReplace(inner, "i)<br\b[^>]*>", "`n")
-            ; Strip all HTML tags - leaves only the plain code text plus structural whitespace.
-            codeText := RegExReplace(inner, "<[^>]++>", "")
+        if !RegExMatch(html, "i)<pre\b[^>]*\boverflow-visible\b[^>]*>")
+            return html
+
+        nodes := HtmlNorm._TryParseDomNodes(html)
+        if (nodes.Length = 0)
+            return html
+
+        changed := false
+        nodes := HtmlNorm._NormalizeChatGptCodeBlocksDomNodes(nodes, &changed)
+        return changed ? HtmlNorm._SerializeDomNodes(nodes) : html
+    }
+
+    /**
+     * Recursive worker entry for ChatGPT CodeMirror <pre> normalization.
+     * @param {Array} nodes
+     * @param {boolean} changed
+     * @returns {Array}
+     */
+    static _NormalizeChatGptCodeBlocksDomNodes(nodes, &changed) {
+        out := []
+        for node in nodes {
+            converted := HtmlNorm._NormalizeChatGptCodeBlocksDomNode(node, &changed)
+            for item in converted
+                out.Push(item)
+        }
+        return out
+    }
+
+    /**
+     * Node-level worker for _NormalizeChatGptCodeBlocksDomNodes.
+     * Converts <pre class="... overflow-visible ...">...</pre> to
+     * <pre><code>escaped-text</code></pre>.
+     * @param {DomNode} node
+     * @param {boolean} changed
+     * @returns {Array}
+     */
+    static _NormalizeChatGptCodeBlocksDomNode(node, &changed) {
+        if HtmlNorm._IsTag(node, "pre") && InStr(HtmlNorm._GetAttrCI(node, "class"), "overflow-visible") {
+            codeText := HtmlNorm._NodeTextWithBr(node)
             codeText := StrReplace(codeText, "`r", "")
             codeText := Trim(codeText, " `t`n")
-            if (codeText = "") {
-                pos := m.Pos + m.Len
-                continue
-            }
-            ; Decode HTML entities so the raw code characters are correct.
+            if (codeText = "")
+                return [node]
             codeText := HtmlNorm._DecodeBasicHtmlEntities(codeText)
-            ; Re-encode for safe embedding inside <code>…</code>.
             codeText := StrReplace(codeText, "&", "&amp;")
             codeText := StrReplace(codeText, "<", "&lt;")
             codeText := StrReplace(codeText, ">", "&gt;")
-            replacement := "<pre><code>" . codeText . "</code></pre>"
-            html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
-            pos := m.Pos + StrLen(replacement)
+            preOut := DomNode("pre")
+            codeOut := DomNode("code")
+            codeOut.Add(DomNode("text", "", codeText))
+            preOut.Add(codeOut)
+            changed := true
+            return [preOut]
         }
-        return html
+
+        if (node.children.Length > 0) {
+            newChildren := []
+            for child in node.children {
+                converted := HtmlNorm._NormalizeChatGptCodeBlocksDomNode(child, &changed)
+                for item in converted
+                    newChildren.Push(item)
+            }
+            node.children := newChildren
+        }
+        return [node]
     }
 
     /**
@@ -572,40 +651,115 @@ class HtmlNorm {
             html := SubStr(html, 1, m.Pos - 1) . newStr . SubStr(html, m.Pos + m.Len)
             pos := m.Pos + StrLen(newStr)
         }
-        ; Claude Web user messages: <p class="whitespace-pre-wrap break-words">
-        ; Replace the entire <p>...</p> with the placeholder (not nested inside the
-        ; original <p>, which would produce invalid nested <p> elements).
-        pos := 1
-        while RegExMatch(html, "is)(<p\b[^>]*\bclass=`"whitespace-pre-wrap break-words`"[^>]*>)(.*?)</p>", &m, pos) {
-            rawContent := m[2]
-            rawContent := RegExReplace(rawContent, "i)<br\b[^>]*>", "`n")
-            rawContent := RegExReplace(rawContent, "<[^>]++>", "")
-            rawContent := HtmlNorm._DecodeBasicHtmlEntities(rawContent)
-            rawContent := StrReplace(rawContent, "`r", "")
-            rawContent := Trim(rawContent, "`n")
-            HtmlNorm._userMsgBlocks.Push(rawContent)
-            placeholder := "<p>¤USERMSG_" . HtmlNorm._userMsgBlocks.Length . "¤</p>"
-            html := SubStr(html, 1, m.Pos - 1) . placeholder . SubStr(html, m.Pos + m.Len)
-            pos := m.Pos + StrLen(placeholder)
-        }
-        ; ChatGPT user messages: <div class="whitespace-pre-wrap"> (exact sole class).
-        ; Exact-value match avoids re-matching Codex's "text-size-chat whitespace-pre-wrap"
-        ; outer tag, which still carries the class after Codex extraction above.
-        ; Replace the entire <div>...</div> with the placeholder.
-        pos := 1
-        while RegExMatch(html, "is)(<div\b[^>]*\bclass=`"whitespace-pre-wrap`"[^>]*>)(.*?)</div>", &m, pos) {
-            rawContent := m[2]
-            rawContent := RegExReplace(rawContent, "i)<br\b[^>]*>", "`n")
-            rawContent := RegExReplace(rawContent, "<[^>]++>", "")
-            rawContent := HtmlNorm._DecodeBasicHtmlEntities(rawContent)
-            rawContent := StrReplace(rawContent, "`r", "")
-            rawContent := Trim(rawContent, "`n")
-            HtmlNorm._userMsgBlocks.Push(rawContent)
-            placeholder := "<p>¤USERMSG_" . HtmlNorm._userMsgBlocks.Length . "¤</p>"
-            html := SubStr(html, 1, m.Pos - 1) . placeholder . SubStr(html, m.Pos + m.Len)
-            pos := m.Pos + StrLen(placeholder)
-        }
+
+        ; Claude Web + ChatGPT full-node user messages:
+        ; - <p class="whitespace-pre-wrap break-words">...</p>
+        ; - <div class="whitespace-pre-wrap">...</div> (exact class match)
+        ; Replace whole nodes with placeholder <p>¤USERMSG_N¤</p>.
+        html := HtmlNorm._ExtractUserMessagesFullNodeDom(html)
+
         return html
+    }
+
+    /**
+     * Extracts and replaces full-node user message containers (Claude Web /
+     * ChatGPT) via DOM traversal.
+     *
+     * Targets:
+     * - <p class="whitespace-pre-wrap break-words">...</p>
+     * - <div class="whitespace-pre-wrap">...</div>
+     *
+     * @param {string} html
+     * @returns {string}
+     */
+    static _ExtractUserMessagesFullNodeDom(html) {
+        if !RegExMatch(html, "i)<(?:p|div)\b[^>]*\bclass=`"(?:whitespace-pre-wrap break-words|whitespace-pre-wrap)`"")
+            return html
+
+        nodes := HtmlNorm._TryParseDomNodes(html)
+        if (nodes.Length = 0)
+            return html
+
+        changed := false
+        nodes := HtmlNorm._ExtractUserMessagesFullNodeDomNodes(nodes, &changed)
+        return changed ? HtmlNorm._SerializeDomNodes(nodes) : html
+    }
+
+    /**
+     * Recursive worker entry for full-node user message extraction.
+     * @param {Array} nodes
+     * @param {boolean} changed
+     * @returns {Array}
+     */
+    static _ExtractUserMessagesFullNodeDomNodes(nodes, &changed) {
+        out := []
+        for node in nodes {
+            converted := HtmlNorm._ExtractUserMessagesFullNodeDomNode(node, &changed)
+            for item in converted
+                out.Push(item)
+        }
+        return out
+    }
+
+    /**
+     * Node-level worker for full-node user message extraction.
+     * @param {DomNode} node
+     * @param {boolean} changed
+     * @returns {Array}
+     */
+    static _ExtractUserMessagesFullNodeDomNode(node, &changed) {
+        if HtmlNorm._IsFullNodeUserMsgTarget(node) {
+            rawContent := HtmlNorm._NodeTextWithBr(node)
+            rawContent := HtmlNorm._DecodeBasicHtmlEntities(rawContent)
+            rawContent := StrReplace(rawContent, "`r", "")
+            rawContent := Trim(rawContent, "`n")
+            HtmlNorm._userMsgBlocks.Push(rawContent)
+            marker := "¤USERMSG_" . HtmlNorm._userMsgBlocks.Length . "¤"
+            p := DomNode("p")
+            p.Add(DomNode("text", "", marker))
+            changed := true
+            return [p]
+        }
+
+        if (node.children.Length > 0) {
+            newChildren := []
+            for child in node.children {
+                converted := HtmlNorm._ExtractUserMessagesFullNodeDomNode(child, &changed)
+                for item in converted
+                    newChildren.Push(item)
+            }
+            node.children := newChildren
+        }
+        return [node]
+    }
+
+    /**
+     * True when node is a full-node user message container we replace directly.
+     * @param {DomNode} node
+     * @returns {boolean}
+     */
+    static _IsFullNodeUserMsgTarget(node) {
+        if HtmlNorm._IsTag(node, "p")
+            return HtmlNorm._GetAttrCI(node, "class") = "whitespace-pre-wrap break-words"
+        if HtmlNorm._IsTag(node, "div")
+            return HtmlNorm._GetAttrCI(node, "class") = "whitespace-pre-wrap"
+        return false
+    }
+
+    /**
+     * Collects visible text from a subtree, converting <br> tags to newlines.
+     * @param {DomNode} node
+     * @returns {string}
+     */
+    static _NodeTextWithBr(node) {
+        if (node.tag = "text")
+            return node.text
+        if HtmlNorm._IsTag(node, "br")
+            return "`n"
+        out := ""
+        for child in node.children
+            out .= HtmlNorm._NodeTextWithBr(child)
+        return out
     }
 
     /**
@@ -726,35 +880,94 @@ class HtmlNorm {
      * @returns {string}
      */
     static _NormalizeCodeElements(html) {
-        pos := 1
-        while RegExMatch(html, "is)<code\b([^>]*)>(.*?)</code>", &m, pos) {
-            content := m[2]
-            attrs   := m[1]
-            ; Normalize line-break representations inside the code.
-            content := RegExReplace(content, "i)<br\b[^>]*>", "`n")
-            content := RegExReplace(content, "i)</div>\s*<div\b[^>]*>", "`n")
-            content := RegExReplace(content, "<[^>]++>", "")
-            content := StrReplace(content, "`r", "")
+        if !RegExMatch(html, "i)<code\b")
+            return html
+
+        nodes := HtmlNorm._TryParseDomNodes(html)
+        if (nodes.Length = 0)
+            return html
+
+        nodes := HtmlNorm._NormalizeCodeElementsDomNodes(nodes, false)
+        return HtmlNorm._SerializeDomNodes(nodes)
+    }
+
+    /**
+     * Recursively normalizes <code> nodes in parsed DOM.
+     * @param {Array} nodes
+     * @param {boolean} insidePre
+     * @returns {Array}
+     */
+    static _NormalizeCodeElementsDomNodes(nodes, insidePre) {
+        out := []
+        for node in nodes {
+            converted := HtmlNorm._NormalizeCodeElementsDomNode(node, insidePre)
+            for item in converted
+                out.Push(item)
+        }
+        return out
+    }
+
+    /**
+     * Node-level worker for _NormalizeCodeElementsDomNodes.
+     * @param {DomNode} node
+     * @param {boolean} insidePre
+     * @returns {Array}
+     */
+    static _NormalizeCodeElementsDomNode(node, insidePre) {
+        if HtmlNorm._IsTag(node, "code") {
+            content := HtmlNorm._CodeNodeNormalizedText(node)
             if InStr(content, "`n") {
                 content := HtmlNorm._DecodeBasicHtmlEntities(content)
-                ; Extract language identifier; discard pure-CSS classes.
-                langAttr := ""
-                if RegExMatch(attrs, "i)language-(\w+)", &langM)
-                    langAttr := ' class="language-' . langM[1] . '"'
-                ; Check whether this <code> is already the direct child of a <pre>.
-                beforeSnippet := SubStr(html, Max(1, m.Pos - 100), Min(100, m.Pos - 1))
-                if RegExMatch(beforeSnippet, "i)<pre\b[^>]*>\s*$")
-                    replacement := "<code" . langAttr . ">" . content . "</code>"
-                else
-                    replacement := "<pre><code" . langAttr . ">" . content . "</code></pre>"
-            } else {
-                ; Single-line: leave as inline <code>.
-                replacement := "<code" . attrs . ">" . content . "</code>"
+                codeOut := DomNode("code")
+                lang := HtmlNorm._CodeNodeLanguage(node)
+                if (lang != "")
+                    codeOut.attrs["class"] := "language-" . lang
+                codeOut.Add(DomNode("text", "", content))
+                if insidePre
+                    return [codeOut]
+                preOut := DomNode("pre")
+                preOut.Add(codeOut)
+                return [preOut]
             }
-            html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
-            pos := m.Pos + StrLen(replacement)
+            ; Single-line: keep inline <code> and existing attrs.
+            node.children := [DomNode("text", "", content)]
+            return [node]
         }
-        return html
+
+        if (node.children.Length > 0) {
+            childInsidePre := insidePre || HtmlNorm._IsTag(node, "pre")
+            node.children := HtmlNorm._NormalizeCodeElementsDomNodes(node.children, childInsidePre)
+        }
+        return [node]
+    }
+
+    /**
+     * Produces normalized text content for one <code> node.
+     * Converts <br> and </div><div> boundaries to newlines, strips tags.
+     * @param {DomNode} codeNode
+     * @returns {string}
+     */
+    static _CodeNodeNormalizedText(codeNode) {
+        innerHtml := ""
+        for child in codeNode.children
+            innerHtml .= HtmlNorm._SerializeDomNode(child)
+        innerHtml := RegExReplace(innerHtml, "i)<br\b[^>]*>", "`n")
+        innerHtml := RegExReplace(innerHtml, "i)</div>\s*<div\b[^>]*>", "`n")
+        innerHtml := RegExReplace(innerHtml, "<[^>]++>", "")
+        innerHtml := StrReplace(innerHtml, "`r", "")
+        return innerHtml
+    }
+
+    /**
+     * Extracts language id from class="language-xxx" on a <code> node.
+     * @param {DomNode} codeNode
+     * @returns {string}
+     */
+    static _CodeNodeLanguage(codeNode) {
+        classAttr := HtmlNorm._GetAttrCI(codeNode, "class")
+        if RegExMatch(classAttr, "i)language-(\w+)", &mLang)
+            return mLang[1]
+        return ""
     }
 
     /**
