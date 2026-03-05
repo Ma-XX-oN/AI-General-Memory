@@ -166,15 +166,13 @@ class HtmlNorm {
         ; 9. Extract whitespace-sensitive user message text.
         html := HtmlNorm._ExtractUserMessages(html)
 
-        ; 10 + 11 + 11b + 12. Late DOM cleanup:
+        ; 10 + 11 + 11b + 12 + 13. Late DOM cleanup in one parse/serialize cycle:
         ;   - Strip Claude Web language-label divs (font-small + p-3*).
         ;   - Strip long footnote hrefs, keeping only #user-content-...
         ;   - Unwrap <p> inside footnote definition <li id="user-content-fn-*">.
         ;   - Strip residual <span> wrappers while preserving child order/content.
-        html := HtmlNorm._NormalizeFootnoteAndSpanDom(html)
-
-        ; 13. Wrap bare top-level <li> siblings in <ol>.
-        html := HtmlNorm._WrapBareTopLevelLiDom(html)
+        ;   - Wrap bare top-level <li> siblings in <ol>.
+        html := HtmlNorm._NormalizeLateCleanupAndListWrapDom(html)
 
         ; 14 + 15. Code normalization and nested-container unwrapping in one DOM pass.
         html := HtmlNorm._NormalizeCodeAndUnwrapDom(html)
@@ -961,6 +959,29 @@ class HtmlNorm {
     }
 
     /**
+     * Runs stages 10/11/11b/12/13 in one DOM parse/serialize cycle.
+     * @param {string} html
+     * @returns {string}
+     */
+    static _NormalizeLateCleanupAndListWrapDom(html) {
+        if !RegExMatch(html, "i)(<li\b|<div\b[^>]*\bclass=`"[^`"]*\bfont-small\b[^`"]*\bp-3[^`"]*`"|href=`"[^`"]*#user-content-|<li\b[^>]*\bid=`"user-content-fn-|</?span\b)")
+            return html
+
+        nodes := HtmlNorm._TryParseDomNodes(html)
+        if (nodes.Length = 0)
+            return html
+
+        changed := false
+        if (HtmlNorm._NormalizeFootnoteAndSpanDomNodes(&nodes))
+            changed := true
+        nodes := HtmlNorm._WrapBareTopLevelLiDomNodes(nodes, &wrapped)
+        if wrapped
+            changed := true
+
+        return changed ? HtmlNorm._SerializeDomNodes(nodes) : html
+    }
+
+    /**
      * Wraps bare top-level <li> siblings in an <ol> container.
      *
      * Mirrors the prior regex behavior:
@@ -979,32 +1000,55 @@ class HtmlNorm {
         if (nodes.Length = 0)
             return html
 
-        ; Drop trailing <br> and trailing whitespace text nodes.
-        while (nodes.Length > 0) {
-            tail := nodes[nodes.Length]
+        nodes := HtmlNorm._WrapBareTopLevelLiDomNodes(nodes, &wrapped)
+        if !wrapped
+            return html
+        return HtmlNorm._SerializeDomNodes(nodes)
+    }
+
+    /**
+     * Wraps bare top-level <li> siblings in parsed DOM nodes.
+     *
+     * Matches legacy behavior without mutating input when wrapping does not apply.
+     *
+     * @param {Array} nodes
+     * @param {boolean} changed
+     * @returns {Array}
+     */
+    static _WrapBareTopLevelLiDomNodes(nodes, &changed := false) {
+        changed := false
+        if (nodes.Length = 0)
+            return nodes
+
+        ; Ignore trailing <br> and trailing whitespace text nodes for matching.
+        endIdx := nodes.Length
+        while (endIdx >= 1) {
+            tail := nodes[endIdx]
             if (HtmlNorm._IsTag(tail, "br") || HtmlNorm._IsWhitespaceTextNode(tail))
-                nodes.RemoveAt(nodes.Length)
+                endIdx -= 1
             else
                 break
         }
-        if (nodes.Length = 0)
-            return html
+        if (endIdx < 1)
+            return nodes
 
         liNodes := []
-        for node in nodes {
+        Loop endIdx {
+            node := nodes[A_Index]
             if HtmlNorm._IsWhitespaceTextNode(node)
                 continue
             if !HtmlNorm._IsTag(node, "li")
-                return html
+                return nodes
             liNodes.Push(node)
         }
         if (liNodes.Length = 0)
-            return html
+            return nodes
 
         wrapper := DomNode("ol")
         for li in liNodes
             wrapper.Add(li)
-        return HtmlNorm._SerializeDomNodes([wrapper])
+        changed := true
+        return [wrapper]
     }
 
     /**
@@ -1346,6 +1390,17 @@ class HtmlNorm {
         if (nodes.Length = 0)
             return html
 
+        if !HtmlNorm._NormalizeFootnoteAndSpanDomNodes(&nodes)
+            return html
+        return HtmlNorm._SerializeDomNodes(nodes)
+    }
+
+    /**
+     * Normalizes footnote/span constructs in parsed DOM nodes.
+     * @param {Array} nodes
+     * @returns {boolean} True when any node/attribute was changed
+     */
+    static _NormalizeFootnoteAndSpanDomNodes(&nodes) {
         changed := false
 
         labelDivs := []
@@ -1409,7 +1464,7 @@ class HtmlNorm {
             changed := true
         }
 
-        return changed ? HtmlNorm._SerializeDomNodes(nodes) : html
+        return changed
     }
 
     ; ─────────────────────────────────────────────────────────────────────────
