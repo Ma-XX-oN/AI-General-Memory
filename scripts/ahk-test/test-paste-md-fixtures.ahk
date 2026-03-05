@@ -1,3 +1,10 @@
+/**
+ * End-to-end fixture harness:
+ * - reads captured PasteAsMd debug logs (plain + CF_HTML sections)
+ * - runs PasteMd._ConvertFromCaptured via seam inputs
+ * - compares final markdown to checked-in expected outputs
+ * - optionally writes per-scenario fixture output logs
+ */
 #ErrorStdOut
 #Requires AutoHotkey v2.0
 #Include ../PasteAsMd.ahk
@@ -5,12 +12,16 @@
 
 _logPath := A_ScriptDir "\test-paste-md-fixtures.log"
 try FileDelete _logPath
-; This is for individual logs for individual fixtures.  Names are the output name - ".md" + ".fixture.log"
-emitFixtureReplayLogs := true
+; Per-fixture output logs are controlled via CLI only: /fixtureOutputLogs:0|1
+emitFixtureOutputLogs := false
 
 passed := 0
 failed := 0
 
+/**
+ * Fixture registry: one source fixture log per entry.
+ * Each descriptor defines expected source detection and with-user assertions.
+ */
 fixtures := [
   { file: "PasteAsMd_ClaudeCode.log",               source: "claudecode", withUser: false, assistantLabel: "Claude Code" },
   { file: "PasteAsMd_ClaudeCode-with-User.log",     source: "claudecode", withUser: true,  assistantLabel: "Claude Code" },
@@ -29,9 +40,31 @@ fixtures := [
   { file: "PasteAsMd_ChatGPT-with-User2.log",       source: "chatgpt",    withUser: true,  assistantLabel: "ChatGPT" },
 ]
 
+opts := ParseHarnessOptions(A_Args, fixtures.Length)
+if (opts["error"] != "") {
+  Log("Argument error: " opts["error"])
+  ExitApp 2
+}
+
+if (opts["listOnly"]) {
+  ListFixtures(fixtures)
+  ExitApp
+}
+
+if (opts["fixtureIndex"] > 0) {
+  idx := opts["fixtureIndex"]
+  fixtures := [fixtures[idx]]
+}
+
+emitFixtureOutputLogs := opts["emitFixtureOutputLogs"]
+
 expectedSuffix := ".expected.md"
 actualSuffix := ".actual.md"
 
+/**
+ * Required debug sections that must exist in each fixture source log.
+ * These provide seam inputs for _ConvertFromCaptured.
+ */
 required := [
   "1. plain (A_Clipboard minus CR)",
   "2. cfHtml (raw full payload)",
@@ -65,14 +98,20 @@ for fx in fixtures {
   if missing
     continue
 
-  ; Inputs for seam: plain + cfHtml decoded from captured debug sections.
+  /**
+   * Seam inputs decoded from captured debug sections.
+   */
   plain := SectionToText(sections["1. plain (A_Clipboard minus CR)"])
   cfHtml := SectionToText(sections["2. cfHtml (raw full payload)"])
   for sc in scenarios {
     caseId := sc["case"]
+    /**
+     * Default scenario uses unsuffixed files.
+     * Metadata scenarios use .<CASE> suffixes.
+     */
     expectedPath := _SiblingWithSuffix(path, caseId = "" ? expectedSuffix : ("." caseId expectedSuffix))
     actualPath := _SiblingWithSuffix(path, caseId = "" ? actualSuffix : ("." caseId actualSuffix))
-    replayLogPath := _SiblingWithSuffix(path, caseId = "" ? ".fixture.log" : ("." caseId ".fixture.log"))
+    outputLogPath := _SiblingWithSuffix(path, caseId = "" ? ".fixture.log" : ("." caseId ".fixture.log"))
     Log("Scenario: " (caseId = "" ? "default" : caseId))
 
     prevPromptFn := ""
@@ -87,9 +126,12 @@ for fx in fixtures {
         }
       }
 
+      /**
+       * Fixture conversion uses quoted mode for parity with expected outputs.
+       */
       converted := PasteMd._ConvertFromCaptured(plain, cfHtml, true, fx.withUser, false, sc["hasPrompt"])
-      if (emitFixtureReplayLogs)
-        _WriteFixtureReplayLog(replayLogPath, plain, cfHtml, converted, true)
+      if (emitFixtureOutputLogs)
+        _WriteFixtureOutputLog(outputLogPath, plain, cfHtml, converted, true)
       ChkEqNorm("source", converted["source"], fx.source)
       aborted := converted.Has("aborted") ? converted["aborted"] : false
 
@@ -140,10 +182,81 @@ Log("")
 Log("Results: " passed " passed, " failed " failed")
 ExitApp
 
+/**
+ * Parses fixture harness CLI arguments.
+ * Supported switches:
+ * - /ls
+ * - /fixture:<n>
+ * - /fixtureOutputLogs:0|1
+ * @param {Array} args - Raw CLI args (A_Args).
+ * @param {integer} fixtureCount - Number of available fixtures.
+ * @returns {Map} Parsed options map with optional error text.
+ */
+ParseHarnessOptions(args, fixtureCount) {
+  opts := Map(
+    "error", "",
+    "listOnly", false,
+    "fixtureIndex", 0,
+    "emitFixtureOutputLogs", false
+  )
+
+  for arg in args {
+    if RegExMatch(arg, "i)^/ls$") {
+      opts["listOnly"] := true
+      continue
+    }
+    if RegExMatch(arg, "i)^/fixture:(\d+)$", &mFixture) {
+      idx := Integer(mFixture[1])
+      if (idx < 1 || idx > fixtureCount) {
+        opts["error"] := "/fixture index out of range: " idx " (valid 1.." fixtureCount ")"
+        return opts
+      }
+      if (opts["fixtureIndex"] > 0) {
+        opts["error"] := "duplicate /fixture argument"
+        return opts
+      }
+      opts["fixtureIndex"] := idx
+      continue
+    }
+    if RegExMatch(arg, "i)^/fixtureOutputLogs:([01])$", &mOutput) {
+      opts["emitFixtureOutputLogs"] := (mOutput[1] = "1")
+      continue
+    }
+
+    opts["error"] := "unknown argument: " arg
+    return opts
+  }
+
+  return opts
+}
+
+/**
+ * Writes the numbered fixture list to the harness log.
+ * Used by /ls so users can target /fixture:<n>.
+ * @param {Array} fixtures - Fixture descriptor objects.
+ */
+ListFixtures(fixtures) {
+  Log("Fixture list")
+  for fx in fixtures {
+    Log("  " A_Index ". " fx.file " (source=" fx.source ", withUser=" (fx.withUser ? "1" : "0") ")")
+  }
+}
+
+/**
+ * Creates a deterministic prompt provider callback for scenario testing.
+ * @param {string} response - Prompt response to return.
+ * @returns {Func} Callback matching ordered-list prompt signature.
+ */
 MakePromptProvider(response) {
   return (defaultStart, expected, plain, htmlFrag) => response
 }
 
+/**
+ * Expands fixture scenario metadata from the fixture log header.
+ * If no metadata lines exist, returns a single default scenario.
+ * @param {string} logText - Full fixture source log text.
+ * @returns {Array} Scenario maps.
+ */
 ParseFixtureScenarios(logText) {
   scenarios := []
 
@@ -189,6 +302,13 @@ ParseFixtureScenarios(logText) {
   return scenarios
 }
 
+/**
+ * Parses one metadata scenario line.
+ * Accepted keys: case, prompt, expectAbort.
+ * @param {string} line - One metadata line.
+ * @param {string} err - Output parse/validation error text.
+ * @returns {Map|integer} Scenario map, or 0 on parse error.
+ */
 ParseFixtureScenarioLine(line, &err := "") {
   err := ""
   pairs := Map()
@@ -204,6 +324,18 @@ ParseFixtureScenarioLine(line, &err := "") {
     key := StrLower(mPair[1])
     value := Trim(mPair[2], " `t")
     pairs[key] := value
+  }
+
+  allowed := Map(
+    "case", true,
+    "prompt", true,
+    "expectabort", true
+  )
+  for key, _ in pairs {
+    if !allowed.Has(key) {
+      err := "unknown metadata key: " key
+      return 0
+    }
   }
 
   if !pairs.Has("case") || Trim(pairs["case"], " `t") = "" {
@@ -242,6 +374,11 @@ ParseFixtureScenarioLine(line, &err := "") {
   return scenario
 }
 
+/**
+ * Splits a debug log into named sections declared by "=== ... (len=n) ===".
+ * @param {string} logText - Full debug log text.
+ * @returns {Map} Section map: label -> { raw, len }.
+ */
 ParseDbgSections(logText) {
   sections := Map()
   pat := "ms)^=== ([^\r\n]+?) \(len=(\d+)\) ===\R"
@@ -262,6 +399,11 @@ ParseDbgSections(logText) {
   return sections
 }
 
+/**
+ * Removes trailing spacing added between logged sections.
+ * @param {string} s - Raw section payload substring.
+ * @returns {string} Trimmed payload.
+ */
 TrimDbgSectionContent(s) {
   if (SubStr(s, -3) = "`r`n`r`n")
     return SubStr(s, 1, StrLen(s) - 4)
@@ -270,6 +412,11 @@ TrimDbgSectionContent(s) {
   return s
 }
 
+/**
+ * Decodes one parsed debug section and enforces declared length.
+ * @param {Map} section - Section object containing raw and len.
+ * @returns {string} Decoded section text.
+ */
 SectionToText(section) {
   s := DecodeDbgExact(section.raw)
   if (StrLen(s) > section.len)
@@ -277,6 +424,12 @@ SectionToText(section) {
   return s
 }
 
+/**
+ * Reverses PasteMd._DbgSection visible EOL markers back to text EOLs.
+ * Supports current LF-only logs and legacy markers normalized to LF.
+ * @param {string} s - Marker-encoded section text.
+ * @returns {string} Decoded text with original EOL semantics.
+ */
 DecodeDbgExact(s) {
   ; Reverse _DbgSection marker stream for:
   ; - current LF-only logger output
@@ -320,21 +473,45 @@ DecodeDbgExact(s) {
   return out
 }
 
+/**
+ * Normalizes line endings to LF for stable comparisons.
+ * @param {string} s - Input text.
+ * @returns {string} LF-normalized text.
+ */
 NormalizeEol(s) {
   s := StrReplace(s, "`r`n", "`n")
   s := StrReplace(s, "`r", "`n")
   return s
 }
 
+/**
+ * Repeats a string count times.
+ * @param {string} str - Token to repeat.
+ * @param {integer} count - Repeat count.
+ * @returns {string} Repeated string.
+ */
 StrRepeat(str, count) {
   return StrReplace(Format("{: " count ".s}", ""), " ", str)
 }
 
+/**
+ * Formats a full got/expected detail block for failure logs.
+ * @param {string} gotN - Normalized actual text.
+ * @param {string} expectedN - Normalized expected text.
+ * @param {string} suffix - Optional label suffix.
+ * @returns {string} Formatted detail block.
+ */
 ChkGotExpectedDetail(gotN, expectedN, suffix := "") {
   return "`n🢃🢃🢃🢃    got" suffix "   🢃🢃🢃🢃`n" gotN      "🢀`n" StrRepeat("🢁", 18 + StrLen(suffix)) "`n"
        . "`n🢃🢃🢃🢃 expected" suffix " 🢃🢃🢃🢃`n" expectedN "🢀`n" StrRepeat("🢁", 18 + StrLen(suffix))
 }
 
+/**
+ * Generates a git-style no-index word diff for failure diagnostics.
+ * @param {string} gotN - Normalized actual text.
+ * @param {string} expectedN - Normalized expected text.
+ * @returns {string} Diff and full got/expected detail text.
+ */
 diff(gotN, expectedN) {
   try {
     gotName := A_Temp "\got_" A_ScriptHWnd ".txt"
@@ -365,6 +542,12 @@ diff(gotN, expectedN) {
   ; return exec.StdOut.ReadAll()
 }
 
+/**
+ * Executes a shell command and captures stdout/stderr.
+ * @param {string} cmd - Command line to execute.
+ * @param {string} id - Optional temp-file id prefix.
+ * @returns {Map} Map with stdout and stderr text.
+ */
 exec(cmd, id := "") {
   try {
     stdout := A_Temp "\" id "_stdout_" A_ScriptHWnd
@@ -388,6 +571,13 @@ exec(cmd, id := "") {
   }
 }
 
+/**
+ * Compares expected/actual text after EOL normalization.
+ * Logs an annotated diff block on mismatch.
+ * @param {string} label - Assertion label.
+ * @param {string} got - Actual text.
+ * @param {string} expected - Expected text.
+ */
 ChkEqNorm(label, got, expected) {
   gotN := NormalizeEol(got)
   expectedN := NormalizeEol(expected)
@@ -400,19 +590,39 @@ ChkEqNorm(label, got, expected) {
   Chk(label, cond, detail)
 }
 
+/**
+ * Replaces a .log suffix with a sibling suffix.
+ * @param {string} path - Source path.
+ * @param {string} suffix - Replacement suffix.
+ * @returns {string} Derived sibling path.
+ */
 _SiblingWithSuffix(path, suffix) {
   if RegExMatch(path, "i)\.log$")
     return RegExReplace(path, "i)\.log$", suffix)
   return path . suffix
 }
 
+/**
+ * Writes UTF-8 text to a file path.
+ * @param {string} path - Output file path.
+ * @param {string} text - Text payload.
+ */
 _WriteUtf8(path, text) {
   f := FileOpen(path, "w", "UTF-8")
   f.Write(text)
   f.Close()
 }
 
-_WriteFixtureReplayLog(path, plain, cfHtml, converted, asQuoted := true) {
+/**
+ * Writes a replay-style output log for one fixture scenario.
+ * Uses the same stage labels as runtime PasteAsMd debug logs.
+ * @param {string} path - Output .fixture.log path.
+ * @param {string} plain - Plain text seam input.
+ * @param {string} cfHtml - CF_HTML seam input.
+ * @param {Map} converted - Stage outputs from _ConvertFromCaptured.
+ * @param {boolean} asQuoted - Whether quoted stage is present.
+ */
+_WriteFixtureOutputLog(path, plain, cfHtml, converted, asQuoted := true) {
   f := FileOpen(path, "w", "UTF-8")
   try {
     f.Write("PasteAsMd debug — " FormatTime(, "yyyy-MM-dd HH:mm:ss") "`n`n")
@@ -448,6 +658,11 @@ _WriteFixtureReplayLog(path, plain, cfHtml, converted, asQuoted := true) {
   }
 }
 
+/**
+ * Returns filename component from a path.
+ * @param {string} path - Input path.
+ * @returns {string} Basename only.
+ */
 _Basename(path) {
   SplitPath(path, &name)
   return name
