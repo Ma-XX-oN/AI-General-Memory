@@ -144,7 +144,6 @@ class HtmlNorm {
 
     /**
      * Single-parse DOM normalization pipeline.
-     * Falls back to legacy staged flow when initial parse fails.
      * @param {string} html
      * @param {string} source
      * @param {boolean} showPoster
@@ -159,10 +158,7 @@ class HtmlNorm {
 
         nodes := HtmlNorm._TryParseDomNodes(html)
         if (nodes.Length = 0) {
-            ; Preserve prior behavior as a safe fallback.
-            html := HtmlNorm._NormalizeLeadAndEarlyDom(html, source, showPoster, showImg)
-            html := HtmlNorm._NormalizeMidAndLateDom(html)
-            html := HtmlNorm._NormalizeCodeUnwrapAndCaptureDom(html)
+            HtmlNorm._domNodes := []
             return html
         }
 
@@ -295,150 +291,6 @@ class HtmlNorm {
     }
 
     /**
-     * Runs shared early DOM stages with one parse/serialize cycle.
-     * @param {string} html
-     * @param {string} source
-     * @param {boolean} showPoster
-     * @param {boolean} showImg
-     * @returns {string}
-     */
-    static _NormalizeLeadDom(html, source, showPoster, showImg) {
-        needPoster := showPoster
-        if (showImg && !needPoster)
-            return html
-
-        nodes := HtmlNorm._TryParseDomNodes(html)
-        if (nodes.Length = 0)
-            return html
-
-        needImg := !showImg && HtmlNorm._HasImgLikeNode(nodes)
-        if !(needImg || needPoster)
-            return html
-
-        if needImg
-            nodes := HtmlNorm._ProcessImgTagsDomNodes(nodes)
-        if needPoster
-            HtmlNorm._InjectPosterPlaceholdersDomNodes(nodes, source)
-        return HtmlNorm._SerializeDomNodes(nodes)
-    }
-
-    /**
-     * Runs stages 3, 4, and 5 in one DOM parse/serialize cycle.
-     *
-     * - diff widget normalization
-     * - button stripping
-     * - ChatGPT overflow-visible <pre> normalization
-     *
-     * @param {string} html
-     * @param {string} source
-     * @returns {string}
-     */
-    static _NormalizeDiffButtonCodeDom(html, source) {
-        nodes := HtmlNorm._TryParseDomNodes(html)
-        if (nodes.Length = 0)
-            return html
-
-        needDiff := HtmlNorm._AnyNodeMatches(nodes, (n) => HtmlNorm._IsTag(n, "diffs-container"))
-        needButton := HtmlNorm._AnyNodeMatches(nodes, (n) => HtmlNorm._IsTag(n, "button"))
-        needChatPre := (source = "chatgpt") && HtmlNorm._NeedsChatGptPreNormalization(nodes)
-        if !(needDiff || needButton || needChatPre)
-            return html
-
-        changed := false
-
-        if needDiff {
-            lastButton := ""
-            nodes := HtmlNorm._NormalizeSimpleDiffBlocksDomNodes(nodes, &lastButton, &changed)
-        }
-
-        if needButton {
-            btnNodes := []
-            HtmlNorm._CollectMatchingNodes(nodes, (n) => HtmlNorm._IsTag(n, "button"), &btnNodes)
-            if (btnNodes.Length > 0) {
-                nodes := HtmlNorm._RemoveMatchingDomNodes(nodes, (n) => HtmlNorm._IsTag(n, "button"))
-                changed := true
-            }
-        }
-
-        if needChatPre
-            nodes := HtmlNorm._NormalizeChatGptCodeBlocksDomNodes(nodes, &changed)
-
-        return changed ? HtmlNorm._SerializeDomNodes(nodes) : html
-    }
-
-    /**
-     * Runs stages 1 through 5 in one DOM parse/serialize cycle.
-     *
-     * - image/svg normalization
-     * - poster placeholder injection
-     * - diff widget normalization
-     * - button stripping
-     * - ChatGPT overflow-visible <pre> normalization
-     *
-     * @param {string} html
-     * @param {string} source
-     * @param {boolean} showPoster
-     * @param {boolean} showImg
-     * @returns {string}
-     */
-    static _NormalizeLeadAndEarlyDom(html, source, showPoster, showImg) {
-        nodes := HtmlNorm._TryParseDomNodes(html)
-        if (nodes.Length = 0)
-            return html
-
-        needImg := !showImg && HtmlNorm._HasImgLikeNode(nodes)
-        needPoster := showPoster
-        needDiff := HtmlNorm._AnyNodeMatches(nodes, (n) => HtmlNorm._IsTag(n, "diffs-container"))
-        needButton := HtmlNorm._AnyNodeMatches(nodes, (n) => HtmlNorm._IsTag(n, "button"))
-        needChatPre := (source = "chatgpt") && HtmlNorm._NeedsChatGptPreNormalization(nodes)
-        if !(needImg || needPoster || needDiff || needButton || needChatPre)
-            return html
-
-        changed := false
-        if needImg {
-            nodes := HtmlNorm._ProcessImgTagsDomNodes(nodes)
-            changed := true
-        }
-        if needPoster {
-            HtmlNorm._InjectPosterPlaceholdersDomNodes(nodes, source)
-            changed := true
-        }
-        if needDiff {
-            lastButton := ""
-            nodes := HtmlNorm._NormalizeSimpleDiffBlocksDomNodes(nodes, &lastButton, &changed)
-        }
-        if needButton {
-            btnNodes := []
-            HtmlNorm._CollectMatchingNodes(nodes, (n) => HtmlNorm._IsTag(n, "button"), &btnNodes)
-            if (btnNodes.Length > 0) {
-                nodes := HtmlNorm._RemoveMatchingDomNodes(nodes, (n) => HtmlNorm._IsTag(n, "button"))
-                changed := true
-            }
-        }
-        if needChatPre
-            nodes := HtmlNorm._NormalizeChatGptCodeBlocksDomNodes(nodes, &changed)
-
-        return changed ? HtmlNorm._SerializeDomNodes(nodes) : html
-    }
-
-    /**
-     * Injects ¤POSTER_AI¤ / ¤POSTER_User¤ paragraph placeholders at the start
-     * of each detected message container.  Only the patterns for the detected
-     * source are applied; this prevents cross-source false positives (e.g. the
-     * Codex flex-col patterns matching inner divs inside ChatGPT articles).
-     * @param {string} html
-     * @param {string} source - Source identifier from DetectSource()
-     * @returns {string}
-     */
-    static _InjectPosterPlaceholders(html, source) {
-        nodes := HtmlNorm._TryParseDomNodes(html)
-        if (nodes.Length = 0)
-            return html
-        HtmlNorm._InjectPosterPlaceholdersDomNodes(nodes, source)
-        return HtmlNorm._SerializeDomNodes(nodes)
-    }
-
-    /**
      * Injects poster placeholders in parsed DOM nodes by source-specific selectors.
      * @param {Array} nodes
      * @param {string} source
@@ -493,19 +345,6 @@ class HtmlNorm {
      * @param {string} html
      * @returns {string}
      */
-    static _NormalizeSimpleDiffBlocks(html) {
-        nodes := HtmlNorm._TryParseDomNodes(html)
-        if (nodes.Length = 0)
-            return html
-        if !HtmlNorm._AnyNodeMatches(nodes, (n) => HtmlNorm._IsTag(n, "diffs-container"))
-            return html
-
-        changed := false
-        lastButton := ""
-        nodes := HtmlNorm._NormalizeSimpleDiffBlocksDomNodes(nodes, &lastButton, &changed)
-        return changed ? HtmlNorm._SerializeDomNodes(nodes) : html
-    }
-
     /**
      * Recursive worker entry for simple diff-block normalization.
      * Tracks last non-empty button label seen in document order.
@@ -612,18 +451,6 @@ class HtmlNorm {
      * @param {string} html
      * @returns {string}
      */
-    static _NormalizeChatGptCodeBlocks(html) {
-        nodes := HtmlNorm._TryParseDomNodes(html)
-        if (nodes.Length = 0)
-            return html
-        if !HtmlNorm._NeedsChatGptPreNormalization(nodes)
-            return html
-
-        changed := false
-        nodes := HtmlNorm._NormalizeChatGptCodeBlocksDomNodes(nodes, &changed)
-        return changed ? HtmlNorm._SerializeDomNodes(nodes) : html
-    }
-
     /**
      * Recursive worker entry for ChatGPT CodeMirror <pre> normalization.
      * @param {Array} nodes
@@ -689,28 +516,6 @@ class HtmlNorm {
      * @param {string} html
      * @returns {string}
      */
-    static _NormalizeTaskThinkingInlineDom(html) {
-        nodes := HtmlNorm._TryParseDomNodes(html)
-        if (nodes.Length = 0)
-            return html
-        if !HtmlNorm._NeedsMidDomStage(nodes)
-            return html
-
-        changed := false
-
-        if (HtmlNorm._NormalizeTaskListItemsDomNodes(nodes))
-            changed := true
-
-        thinkCount := HtmlNorm._thinkingBlocks.Length
-        nodes := HtmlNorm._ExtractThinkingBlocksDomNodes(nodes)
-        if (HtmlNorm._thinkingBlocks.Length != thinkCount)
-            changed := true
-
-        if (HtmlNorm._PromoteInlineCodeSpansDomNodes(nodes))
-            changed := true
-
-        return changed ? HtmlNorm._SerializeDomNodes(nodes) : html
-    }
 
     /**
      * Runs stages 6 through 13 in one DOM parse/serialize cycle.
@@ -725,44 +530,6 @@ class HtmlNorm {
      * @param {string} html
      * @returns {string}
      */
-    static _NormalizeMidAndLateDom(html) {
-        nodes := HtmlNorm._TryParseDomNodes(html)
-        if (nodes.Length = 0)
-            return html
-
-        needMid := HtmlNorm._NeedsMidDomStage(nodes)
-        needUser := HtmlNorm._NeedsUserDomStage(nodes)
-        needLate := HtmlNorm._NeedsLateDomStage(nodes)
-        if !(needMid || needUser || needLate)
-            return html
-
-        changed := false
-        if needMid {
-            if (HtmlNorm._NormalizeTaskListItemsDomNodes(nodes))
-                changed := true
-            thinkCount := HtmlNorm._thinkingBlocks.Length
-            nodes := HtmlNorm._ExtractThinkingBlocksDomNodes(nodes)
-            if (HtmlNorm._thinkingBlocks.Length != thinkCount)
-                changed := true
-            if (HtmlNorm._PromoteInlineCodeSpansDomNodes(nodes))
-                changed := true
-        }
-
-        if needUser {
-            nodes := HtmlNorm._ExtractUserMessagesInlineContainerDomNodes(nodes, &changed)
-            nodes := HtmlNorm._ExtractUserMessagesFullNodeDomNodes(nodes, &changed)
-        }
-
-        if needLate {
-            if (HtmlNorm._NormalizeFootnoteAndSpanDomNodes(&nodes))
-                changed := true
-            nodes := HtmlNorm._WrapBareTopLevelLiDomNodes(nodes, &wrapped)
-            if wrapped
-                changed := true
-        }
-
-        return changed ? HtmlNorm._SerializeDomNodes(nodes) : html
-    }
 
     /**
      * Normalizes task-list `<li>` elements to a canonical checkbox-input form.
@@ -779,18 +546,6 @@ class HtmlNorm {
      * @param {string} html
      * @returns {string}
      */
-    static _NormalizeTaskListItems(html) {
-        nodes := HtmlNorm._TryParseDomNodes(html)
-        if (nodes.Length = 0)
-            return html
-        if !HtmlNorm._AnyNodeMatches(nodes, (n) => HtmlNorm._IsTag(n, "li"))
-            return html
-
-        if !HtmlNorm._NormalizeTaskListItemsDomNodes(nodes)
-            return html
-
-        return HtmlNorm._SerializeDomNodes(nodes)
-    }
 
     /**
      * Normalizes task-list `<li>` nodes in parsed DOM.
@@ -851,17 +606,6 @@ class HtmlNorm {
      * @param {string} html
      * @returns {string}
      */
-    static _ExtractThinkingBlocks(html) {
-        nodes := HtmlNorm._TryParseDomNodes(html)
-        if (nodes.Length = 0)
-            return html
-        if !HtmlNorm._AnyNodeMatches(nodes
-            , (n) => HtmlNorm._IsTag(n, "details") && HtmlNorm._ClassHasToken(n, "thinking"))
-            return html
-
-        nodes := HtmlNorm._ExtractThinkingBlocksDomNodes(nodes)
-        return HtmlNorm._SerializeDomNodes(nodes)
-    }
 
     /**
      * Extracts whitespace-sensitive user message text into ¤USERMSG_N¤ placeholders.
@@ -881,28 +625,6 @@ class HtmlNorm {
      * @param {string} html
      * @returns {string}
      */
-    static _ExtractUserMessages(html) {
-        nodes := HtmlNorm._TryParseDomNodes(html)
-        if (nodes.Length = 0)
-            return html
-        if !HtmlNorm._NeedsUserDomStage(nodes)
-            return html
-
-        changed := false
-
-        ; Codex + Claude Code inline-container user messages:
-        ; - Codex: keep outer div, replace children with placeholder.
-        ; - Claude Code: replace first leading <span> with placeholder.
-        nodes := HtmlNorm._ExtractUserMessagesInlineContainerDomNodes(nodes, &changed)
-
-        ; Claude Web + ChatGPT full-node user messages:
-        ; - <p class="whitespace-pre-wrap break-words">...</p>
-        ; - <div class="whitespace-pre-wrap">...</div> (exact class match)
-        ; Replace whole nodes with placeholder <p>¤USERMSG_N¤</p>.
-        nodes := HtmlNorm._ExtractUserMessagesFullNodeDomNodes(nodes, &changed)
-
-        return changed ? HtmlNorm._SerializeDomNodes(nodes) : html
-    }
 
     /**
      * Runs stages 9/10/11/11b/12/13 in one DOM parse/serialize cycle.
@@ -917,31 +639,6 @@ class HtmlNorm {
      * @param {string} html
      * @returns {string}
      */
-    static _NormalizeUserMessagesAndLateCleanupDom(html) {
-        nodes := HtmlNorm._TryParseDomNodes(html)
-        if (nodes.Length = 0)
-            return html
-
-        needUser := HtmlNorm._NeedsUserDomStage(nodes)
-        needLate := HtmlNorm._NeedsLateDomStage(nodes)
-        if !(needUser || needLate)
-            return html
-
-        changed := false
-        if needUser {
-            nodes := HtmlNorm._ExtractUserMessagesInlineContainerDomNodes(nodes, &changed)
-            nodes := HtmlNorm._ExtractUserMessagesFullNodeDomNodes(nodes, &changed)
-        }
-        if needLate {
-            if (HtmlNorm._NormalizeFootnoteAndSpanDomNodes(&nodes))
-                changed := true
-            nodes := HtmlNorm._WrapBareTopLevelLiDomNodes(nodes, &wrapped)
-            if wrapped
-                changed := true
-        }
-
-        return changed ? HtmlNorm._SerializeDomNodes(nodes) : html
-    }
 
     /**
      * Extracts user message text from inline-container variants (Codex / Claude Code)
@@ -950,20 +647,6 @@ class HtmlNorm {
      * @param {string} html
      * @returns {string}
      */
-    static _ExtractUserMessagesInlineContainerDom(html) {
-        nodes := HtmlNorm._TryParseDomNodes(html)
-        if (nodes.Length = 0)
-            return html
-        if !HtmlNorm._AnyNodeMatches(nodes
-            , (n) => HtmlNorm._IsTag(n, "div")
-                && (HtmlNorm._ClassHasToken(n, "text-size-chat")
-                    || HtmlNorm._ClassHasPrefix(n, "content_xGDvVg")))
-            return html
-
-        changed := false
-        nodes := HtmlNorm._ExtractUserMessagesInlineContainerDomNodes(nodes, &changed)
-        return changed ? HtmlNorm._SerializeDomNodes(nodes) : html
-    }
 
     /**
      * Recursive worker entry for inline-container user message extraction.
@@ -1067,17 +750,6 @@ class HtmlNorm {
      * @param {string} html
      * @returns {string}
      */
-    static _ExtractUserMessagesFullNodeDom(html) {
-        nodes := HtmlNorm._TryParseDomNodes(html)
-        if (nodes.Length = 0)
-            return html
-        if !HtmlNorm._AnyNodeMatches(nodes, (n) => HtmlNorm._IsFullNodeUserMsgTarget(n))
-            return html
-
-        changed := false
-        nodes := HtmlNorm._ExtractUserMessagesFullNodeDomNodes(nodes, &changed)
-        return changed ? HtmlNorm._SerializeDomNodes(nodes) : html
-    }
 
     /**
      * Recursive worker entry for full-node user message extraction.
@@ -1194,73 +866,6 @@ class HtmlNorm {
     }
 
     /**
-     * Removes all nodes with the given tag name from the DOM tree.
-     *
-     * @param {string} html
-     * @param {string} tagName
-     * @returns {string}
-     */
-    static _StripTagDom(html, tagName) {
-        nodes := HtmlNorm._TryParseDomNodes(html)
-        if (nodes.Length = 0)
-            return html
-
-        matches := []
-        HtmlNorm._CollectMatchingNodes(nodes, (n) => HtmlNorm._IsTag(n, tagName), &matches)
-        if (matches.Length = 0)
-            return html
-
-        nodes := HtmlNorm._RemoveMatchingDomNodes(nodes, (n) => HtmlNorm._IsTag(n, tagName))
-        return HtmlNorm._SerializeDomNodes(nodes)
-    }
-
-    /**
-     * Runs stages 10/11/11b/12/13 in one DOM parse/serialize cycle.
-     * @param {string} html
-     * @returns {string}
-     */
-    static _NormalizeLateCleanupAndListWrapDom(html) {
-        nodes := HtmlNorm._TryParseDomNodes(html)
-        if (nodes.Length = 0)
-            return html
-        if !HtmlNorm._NeedsLateDomStage(nodes)
-            return html
-
-        changed := false
-        if (HtmlNorm._NormalizeFootnoteAndSpanDomNodes(&nodes))
-            changed := true
-        nodes := HtmlNorm._WrapBareTopLevelLiDomNodes(nodes, &wrapped)
-        if wrapped
-            changed := true
-
-        return changed ? HtmlNorm._SerializeDomNodes(nodes) : html
-    }
-
-    /**
-     * Wraps bare top-level <li> siblings in an <ol> container.
-     *
-     * Mirrors the prior regex behavior:
-     * - allows whitespace text nodes between/around top-level <li> nodes
-     * - ignores trailing top-level <br> and whitespace-only text nodes
-     * - does nothing when any non-<li> meaningful top-level node exists
-     *
-     * @param {string} html
-     * @returns {string}
-     */
-    static _WrapBareTopLevelLiDom(html) {
-        nodes := HtmlNorm._TryParseDomNodes(html)
-        if (nodes.Length = 0)
-            return html
-        if !HtmlNorm._AnyNodeMatches(nodes, (n) => HtmlNorm._IsTag(n, "li"))
-            return html
-
-        nodes := HtmlNorm._WrapBareTopLevelLiDomNodes(nodes, &wrapped)
-        if !wrapped
-            return html
-        return HtmlNorm._SerializeDomNodes(nodes)
-    }
-
-    /**
      * Wraps bare top-level <li> siblings in parsed DOM nodes.
      *
      * Matches legacy behavior without mutating input when wrapping does not apply.
@@ -1306,36 +911,6 @@ class HtmlNorm {
     }
 
     /**
-     * Promotes styled inline-code spans to semantic <code> tags.
-     *
-     * Converts:
-     *   <span class="... inline-markdown ...">...</span>
-     *   <span class="... font-mono ...">...</span>
-     * to:
-     *   <code>...</code>
-     *
-     * All attributes are dropped, while child content/order is preserved.
-     *
-     * @param {string} html
-     * @returns {string}
-     */
-    static _PromoteInlineCodeSpansDom(html) {
-        nodes := HtmlNorm._TryParseDomNodes(html)
-        if (nodes.Length = 0)
-            return html
-        if !HtmlNorm._AnyNodeMatches(nodes
-            , (n) => HtmlNorm._IsTag(n, "span")
-                && (HtmlNorm._ClassHasToken(n, "inline-markdown")
-                    || HtmlNorm._ClassHasToken(n, "font-mono")))
-            return html
-
-        if !HtmlNorm._PromoteInlineCodeSpansDomNodes(nodes)
-            return html
-
-        return HtmlNorm._SerializeDomNodes(nodes)
-    }
-
-    /**
      * Promotes inline-code span nodes to semantic `<code>` in parsed DOM.
      * @param {Array} nodes
      * @returns {boolean} True when any span was promoted
@@ -1355,90 +930,6 @@ class HtmlNorm {
             node.attrs := Map()
         }
         return true
-    }
-
-    /**
-     * Runs stages 14 and 15 in one DOM parse/serialize cycle.
-     *
-     * - Normalize <code> elements
-     * - Unwrap nested containers that obscure code blocks
-     *
-     * @param {string} html
-     * @returns {string}
-     */
-    static _NormalizeCodeAndUnwrapDom(html) {
-        nodes := HtmlNorm._TryParseDomNodes(html)
-        if (nodes.Length = 0)
-            return html
-
-        hadCode := HtmlNorm._AnyNodeMatches(nodes, (n) => HtmlNorm._IsTag(n, "code"))
-        if hadCode
-            nodes := HtmlNorm._NormalizeCodeElementsDomNodes(nodes, false)
-
-        changedAny := false
-        Loop 10 {
-            changed := false
-            nodes := HtmlNorm._UnwrapNestedContainersDomNodes(nodes, &changed)
-            if !changed
-                break
-            changedAny := true
-        }
-
-        if (hadCode || changedAny)
-            return HtmlNorm._SerializeDomNodes(nodes)
-        return html
-    }
-
-    /**
-     * Runs stages 14 and 15 and captures final parsed DOM for callers that need
-     * both canonical HTML and a reusable DOM snapshot.
-     *
-     * @param {string} html
-     * @returns {string}
-     */
-    static _NormalizeCodeUnwrapAndCaptureDom(html) {
-        nodes := HtmlNorm._TryParseDomNodes(html)
-        if (nodes.Length = 0) {
-            HtmlNorm._domNodes := []
-            return html
-        }
-
-        hadCode := HtmlNorm._AnyNodeMatches(nodes, (n) => HtmlNorm._IsTag(n, "code"))
-        if hadCode
-            nodes := HtmlNorm._NormalizeCodeElementsDomNodes(nodes, false)
-
-        changedAny := false
-        Loop 10 {
-            changed := false
-            nodes := HtmlNorm._UnwrapNestedContainersDomNodes(nodes, &changed)
-            if !changed
-                break
-            changedAny := true
-        }
-
-        HtmlNorm._domNodes := nodes
-        if (hadCode || changedAny)
-            return HtmlNorm._SerializeDomNodes(nodes)
-        return html
-    }
-
-    /**
-     * Processes each `<code>` element: converts `<br>` and `</div><div>` sequences
-     * to newlines, strips inner tags, and wraps multi-line content in `<pre>` if
-     * not already inside one.  Preserves `class="language-xxx"` on the `<code>`
-     * element while discarding other CSS utility classes.
-     * @param {string} html
-     * @returns {string}
-     */
-    static _NormalizeCodeElements(html) {
-        nodes := HtmlNorm._TryParseDomNodes(html)
-        if (nodes.Length = 0)
-            return html
-        if !HtmlNorm._AnyNodeMatches(nodes, (n) => HtmlNorm._IsTag(n, "code"))
-            return html
-
-        nodes := HtmlNorm._NormalizeCodeElementsDomNodes(nodes, false)
-        return HtmlNorm._SerializeDomNodes(nodes)
     }
 
     /**
@@ -1655,31 +1146,6 @@ class HtmlNorm {
         }
 
         return [node]
-    }
-
-    /**
-     * Normalizes footnote-specific HTML constructs via DOM traversal.
-     *
-     * - Removes Claude Web language-label containers:
-     *   <div class="... font-small ... p-3* ...">...</div>
-     * - Rewrites long hrefs to fragment-only form:
-     *   "...#user-content-foo" -> "#user-content-foo"
-     * - Unwraps single <p> wrappers in footnote definition list items:
-     *   <li id="user-content-fn-N"><p>...</p></li> -> <li id="...">...</li>
-     *
-     * @param {string} html
-     * @returns {string}
-     */
-    static _NormalizeFootnoteAndSpanDom(html) {
-        nodes := HtmlNorm._TryParseDomNodes(html)
-        if (nodes.Length = 0)
-            return html
-        if !HtmlNorm._NeedsLateDomStage(nodes)
-            return html
-
-        if !HtmlNorm._NormalizeFootnoteAndSpanDomNodes(&nodes)
-            return html
-        return HtmlNorm._SerializeDomNodes(nodes)
     }
 
     /**
