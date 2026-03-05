@@ -157,14 +157,11 @@ class HtmlNorm {
         if (source = "chatgpt")
             html := HtmlNorm._NormalizeChatGptCodeBlocks(html)
 
-        ; 6. Normalize task-list checkboxes.
-        html := HtmlNorm._NormalizeTaskListItems(html)
-
-        ; 7. Extract thinking blocks.
-        html := HtmlNorm._ExtractThinkingBlocks(html)
-
-        ; 8. Promote inline-code spans.
-        html := HtmlNorm._PromoteInlineCodeSpansDom(html)
+        ; 6 + 7 + 8. Mid DOM cleanup in one parse/serialize cycle:
+        ;   - Normalize task-list checkboxes.
+        ;   - Extract thinking blocks.
+        ;   - Promote inline-code spans.
+        html := HtmlNorm._NormalizeTaskThinkingInlineDom(html)
 
         ; 9. Extract whitespace-sensitive user message text.
         html := HtmlNorm._ExtractUserMessages(html)
@@ -515,6 +512,43 @@ class HtmlNorm {
     }
 
     /**
+     * Runs stages 6, 7, and 8 in one DOM parse/serialize cycle.
+     *
+     * - Task-list checkbox normalization
+     * - Thinking block extraction
+     * - Inline-code span promotion
+     *
+     * @param {string} html
+     * @returns {string}
+     */
+    static _NormalizeTaskThinkingInlineDom(html) {
+        if !RegExMatch(
+            html,
+            "i)(<li\b|<details\b[^>]*+\bclass=`"[^`"]*+\bthinking\b[^`"]*+`"|<span\b[^>]*+\bclass=`"[^`"]*+\b(?:inline-markdown|font-mono)\b[^`"]*+`")"
+        )
+            return html
+
+        nodes := HtmlNorm._TryParseDomNodes(html)
+        if (nodes.Length = 0)
+            return html
+
+        changed := false
+
+        if (HtmlNorm._NormalizeTaskListItemsDomNodes(nodes))
+            changed := true
+
+        thinkCount := HtmlNorm._thinkingBlocks.Length
+        nodes := HtmlNorm._ExtractThinkingBlocksDomNodes(nodes)
+        if (HtmlNorm._thinkingBlocks.Length != thinkCount)
+            changed := true
+
+        if (HtmlNorm._PromoteInlineCodeSpansDomNodes(nodes))
+            changed := true
+
+        return changed ? HtmlNorm._SerializeDomNodes(nodes) : html
+    }
+
+    /**
      * Normalizes task-list `<li>` elements to a canonical checkbox-input form.
      *
      * Processes any `<li class="task-list-item">` that contains
@@ -537,6 +571,18 @@ class HtmlNorm {
         if (nodes.Length = 0)
             return html
 
+        if !HtmlNorm._NormalizeTaskListItemsDomNodes(nodes)
+            return html
+
+        return HtmlNorm._SerializeDomNodes(nodes)
+    }
+
+    /**
+     * Normalizes task-list `<li>` nodes in parsed DOM.
+     * @param {Array} nodes
+     * @returns {boolean} True when any task-list item was rewritten
+     */
+    static _NormalizeTaskListItemsDomNodes(nodes) {
         taskLis := []
         HtmlNorm._CollectMatchingNodes(nodes
             , (n) => HtmlNorm._IsTag(n, "li")
@@ -544,7 +590,7 @@ class HtmlNorm {
                     || HtmlNorm._ClassHasPrefix(n, "todoItem_"))
             , &taskLis)
         if (taskLis.Length = 0)
-            return html
+            return false
 
         changed := false
         for li in taskLis {
@@ -580,11 +626,7 @@ class HtmlNorm {
             li.children := newChildren
             changed := true
         }
-
-        if !changed
-            return html
-
-        return HtmlNorm._SerializeDomNodes(nodes)
+        return changed
     }
 
     /**
@@ -625,18 +667,27 @@ class HtmlNorm {
      * @returns {string}
      */
     static _ExtractUserMessages(html) {
+        if !RegExMatch(html, "i)<(?:p|div)\b[^>]*\b(?:text-size-chat|content_xGDvVg|whitespace-pre-wrap)\b")
+            return html
+
+        nodes := HtmlNorm._TryParseDomNodes(html)
+        if (nodes.Length = 0)
+            return html
+
+        changed := false
+
         ; Codex + Claude Code inline-container user messages:
         ; - Codex: keep outer div, replace children with placeholder.
         ; - Claude Code: replace first leading <span> with placeholder.
-        html := HtmlNorm._ExtractUserMessagesInlineContainerDom(html)
+        nodes := HtmlNorm._ExtractUserMessagesInlineContainerDomNodes(nodes, &changed)
 
         ; Claude Web + ChatGPT full-node user messages:
         ; - <p class="whitespace-pre-wrap break-words">...</p>
         ; - <div class="whitespace-pre-wrap">...</div> (exact class match)
         ; Replace whole nodes with placeholder <p>¤USERMSG_N¤</p>.
-        html := HtmlNorm._ExtractUserMessagesFullNodeDom(html)
+        nodes := HtmlNorm._ExtractUserMessagesFullNodeDomNodes(nodes, &changed)
 
-        return html
+        return changed ? HtmlNorm._SerializeDomNodes(nodes) : html
     }
 
     /**
@@ -981,6 +1032,18 @@ class HtmlNorm {
         if (nodes.Length = 0)
             return html
 
+        if !HtmlNorm._PromoteInlineCodeSpansDomNodes(nodes)
+            return html
+
+        return HtmlNorm._SerializeDomNodes(nodes)
+    }
+
+    /**
+     * Promotes inline-code span nodes to semantic `<code>` in parsed DOM.
+     * @param {Array} nodes
+     * @returns {boolean} True when any span was promoted
+     */
+    static _PromoteInlineCodeSpansDomNodes(nodes) {
         matches := []
         HtmlNorm._CollectMatchingNodes(nodes
             , (n) => HtmlNorm._IsTag(n, "span")
@@ -988,13 +1051,13 @@ class HtmlNorm {
                     || HtmlNorm._ClassHasToken(n, "font-mono"))
             , &matches)
         if (matches.Length = 0)
-            return html
+            return false
 
         for node in matches {
             node.tag := "code"
             node.attrs := Map()
         }
-        return HtmlNorm._SerializeDomNodes(nodes)
+        return true
     }
 
     /**
