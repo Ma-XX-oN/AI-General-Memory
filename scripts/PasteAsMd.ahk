@@ -1672,23 +1672,23 @@ class PasteMd {
     if (htmlPrep = "" || htmlFrag = "")
       return false
 
-    prepTrim := LTrim(htmlPrep, " `t`r`n")
-    fragTrim := LTrim(htmlFrag, " `t`r`n")
+    prepTop := PasteMd._FirstMeaningfulTopTagName(htmlPrep)
+    fragTop := PasteMd._FirstMeaningfulTopTagName(htmlFrag)
 
     ; Explicit unordered fragments are never prompted.
-    if RegExMatch(prepTrim, "is)^<ul\b")
+    if (prepTop = "ul")
       return false
-    if RegExMatch(fragTrim, "is)^<ul\b")
+    if (fragTop = "ul")
       return false
 
     ; Prompt for explicit ordered containers when start could not be inferred.
-    if RegExMatch(prepTrim, "is)^<ol\b")
+    if (prepTop = "ol")
       return true
-    if RegExMatch(fragTrim, "is)^<ol\b")
+    if (fragTop = "ol")
       return true
 
     ; Bare top-level <li> fragments remain ambiguous.
-    if RegExMatch(fragTrim, "is)^<li\b")
+    if (fragTop = "li")
       return true
 
     return false
@@ -1842,13 +1842,35 @@ class PasteMd {
     if (htmlFrag = "")
       return 0
 
-    count := 0
-    pos := 1
-    while RegExMatch(htmlFrag, "is)<li\b", , pos) {
-      count += 1
-      pos += 3
+    nodes := PasteMd._TryParseDomNodes(htmlFrag)
+    if (nodes.Length = 0) {
+      count := 0
+      pos := 1
+      while RegExMatch(htmlFrag, "is)<li\b", , pos) {
+        count += 1
+        pos += 3
+      }
+      return count
     }
-    return count
+
+    out := []
+    PasteMd._CollectNodesByTag(nodes, "li", &out)
+    return out.Length
+  }
+
+  /**
+   * Returns the first meaningful top-level tag name, or "".
+   * @param {string} html
+   * @returns {string}
+   */
+  static _FirstMeaningfulTopTagName(html) {
+    nodes := PasteMd._TryParseDomNodes(html)
+    if (nodes.Length = 0)
+      return ""
+    top := PasteMd._TopLevelMeaningfulNodes(nodes)
+    if (top.Length = 0)
+      return ""
+    return StrLower(top[1].tag)
   }
 
   /**
