@@ -1,14 +1,48 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; HtmlNorm — Source detection and HTML normalization for PasteAsMd
+; HtmlNorm - Source detection and HTML normalization for PasteAsMd
 ;
 ; Replaces PreprocessHtmlCodeBlocks in PasteAsMd.ahk with a more accurate
 ; normalizer that handles Codex, Claude Code, Claude Web, and ChatGPT web.
 ;
-; No dependencies — does not require HtmlParser.ahk.
+; Depends on HtmlParser.ahk for DOM parse artifacts used downstream by PasteAsMd.
 ;
 ; FUCKING CLAUDE!!!!  YOU THINK WE DID THAT WORK FOR SHITS AND GIGGLES?!?!?
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+#Include HtmlParser.ahk
+/*
+ * Moved from HtmlDom.ahk as that was generic for all DOMs and this is specific
+ * for chat HTML.  Not sure if this will stay here though.
+ * 
+ * ## Defined tag names
+ *
+ * **Root**
+ * - `"chat"` - root node; children are `"turn"` nodes.
+ *
+ * **Turn-level**
+ * - `"turn"` - one message turn.
+ *   - attr `role` {string} `"user"` or `"ai"`
+ *   - children: block nodes
+ *
+ * **Block-level**
+ * - `"text"` - raw HTML fragment passed through to pandoc.
+ *   - `text` {string} raw HTML
+ * - `"code"` - fenced code block.
+ *   - attr `lang` {string} language identifier, or `""` when unknown
+ *   - `text` {string} plain-text source code
+ * - `"task-list"` - GFM task list.
+ *   - children: `"task-item"` nodes
+ * - `"task-item"` - single task-list entry.
+ *   - attr `checked` {string} `"1"` if checked, `"0"` otherwise
+ *   - `text` {string} plain-text item label
+ * - `"user-msg"` - user message text extracted before pandoc to preserve
+ *   line structure.
+ *   - `text` {string} plain text (may contain backtick inline code)
+ * - `"thinking"` - Claude thinking block.
+ *   - `text` {string} plain text
+ * - `"poster"` - speaker label placeholder (injected when SHOW_POSTER is on).
+ *   - attr `role` {string} `"user"` or `"ai"`
+ */
 /**
  * Detects the source application from a full CF_HTML clipboard payload.
  *
@@ -21,7 +55,7 @@
  *                 content_xGDvVg class (Claude.ai web)
  * - "codex"       extensionId contains "openai.chatgpt" (ChatGPT VS Code ext)
  * - "chatgpt"     no extensionId; HTML fragment contains `data-turn-id=` attribute
- *                 (ChatGPT web — no SourceURL header in its CF_HTML payload)
+ *                 (ChatGPT web - no SourceURL header in its CF_HTML payload)
  * - "unknown"     none of the above
  *
  * @param {string} cfHtml - Full CF_HTML clipboard payload (not just the fragment)
@@ -49,8 +83,8 @@ DetectSource(cfHtml) {
  * Normalizes an HTML fragment from clipboard for downstream pandoc conversion.
  *
  * Populated arrays after `Normalize()` returns:
- *   - `HtmlNorm._thinkingBlocks` — inner texts of thinking blocks (¤THINKING_N¤)
- *   - `HtmlNorm._userMsgBlocks`  — user message raw text (¤USERMSG_N¤)
+ *   - `HtmlNorm._thinkingBlocks` - inner texts of thinking blocks (¤THINKING_N¤)
+ *   - `HtmlNorm._userMsgBlocks`  - user message raw text (¤USERMSG_N¤)
  *
  * These must be copied into `PasteMd._thinkingBlocks` / `_userMsgBlocks` by
  * the caller before invoking `RestoreThinkingBlocks` / `RestoreUserMsgBlocks`.
@@ -67,6 +101,13 @@ class HtmlNorm {
      * @type {Array}
      */
     static _userMsgBlocks := []
+
+    /**
+     * Parsed DOM nodes for the most recent Normalize() result.
+     * This is consumed by PasteAsMd for post-normalization structural edits.
+     * @type {Array}
+     */
+    static _domNodes := []
 
     /**
      * Normalizes an HTML fragment for pandoc processing.
@@ -97,20 +138,20 @@ class HtmlNorm {
     static Normalize(htmlFrag, source, showPoster, showImg) {
         HtmlNorm._thinkingBlocks := []
         HtmlNorm._userMsgBlocks  := []
+        HtmlNorm._domNodes       := []
         html := htmlFrag
 
-        ; 1. Handle <img> tags.
-        html := HtmlNorm._ProcessImgTags(html, showImg)
-
-        ; 2. Inject poster-label placeholders.
-        if showPoster
-            html := HtmlNorm._InjectPosterPlaceholders(html, source)
+        ; 1 + 2. DOM lead-stage normalization:
+        ;   - Handle <img>/<svg> replacement when showImg is off.
+        ;   - Inject poster-label placeholders when showPoster is on.
+        ; Uses a single parse/serialize cycle when either operation is enabled.
+        html := HtmlNorm._NormalizeLeadDom(html, source, showPoster, showImg)
 
         ; 3. Convert tool diff containers into canonical language-diff code blocks.
         html := HtmlNorm._NormalizeSimpleDiffBlocks(html)
 
         ; 4. Strip UI buttons.
-        html := RegExReplace(html, "is)<button\b[^>]*>.*?</button>", "")
+        html := HtmlNorm._StripTagDom(html, "button")
 
         ; 5. ChatGPT: normalize CodeMirror code blocks before any span stripping.
         if (source = "chatgpt")
@@ -123,37 +164,28 @@ class HtmlNorm {
         html := HtmlNorm._ExtractThinkingBlocks(html)
 
         ; 8. Promote inline-code spans.
-        html := RegExReplace(html, "is)<span\b[^>]*\bclass=`"[^`"]*\b(?:inline-markdown|font-mono)\b[^`"]*`"[^>]*>(.*?)</span>", "<code>$1</code>")
+        html := HtmlNorm._PromoteInlineCodeSpansDom(html)
 
         ; 9. Extract whitespace-sensitive user message text.
         html := HtmlNorm._ExtractUserMessages(html)
 
-        ; 10. Strip Claude Web language-label divs (font-small p-3.5 pb-0).
-        html := RegExReplace(html, "is)<div\b[^>]*\bclass=`"[^`"]*\bfont-small\b[^`"]*\bp-3[^`"]*`"[^>]*>.*?</div>", "")
-
-        ; 11. Strip long footnote hrefs, keeping only the #fragment.
-        html := RegExReplace(html, "i)href=`"[^`"]*#(user-content-[^`"]*)`"", "href=`"#$1`"")
-
-        ; 11b. Strip <p> wrapper inside footnote definition <li> elements.
-        ;      <li id="user-content-fn-N"><p>text</p></li> → <li id="...">text</li>
-        ;      Without this, pandoc renders footnote lists in loose format (number on
-        ;      its own line, content indented), instead of tight (number + content inline).
-        html := RegExReplace(html, "is)(<li\b[^>]*\bid=`"user-content-fn-[^`"]*`"[^>]*>)\s*<p\b[^>]*>(.*?)</p>\s*(</li>)", "$1$2$3")
-
-        ; 12. Strip residual <span> tags.
-        html := RegExReplace(html, "i)</?span\b[^>]*>", "")
+        ; 10 + 11 + 11b + 12. Late DOM cleanup:
+        ;   - Strip Claude Web language-label divs (font-small + p-3*).
+        ;   - Strip long footnote hrefs, keeping only #user-content-...
+        ;   - Unwrap <p> inside footnote definition <li id="user-content-fn-*">.
+        ;   - Strip residual <span> wrappers while preserving child order/content.
+        html := HtmlNorm._NormalizeFootnoteAndSpanDom(html)
 
         ; 13. Wrap bare top-level <li> siblings in <ol>.
-        htmlNoTrailingBr := RegExReplace(html, "is)(?:<br\b[^>]*>\s*)+$", "")
-        trimmed := Trim(htmlNoTrailingBr, " `t`r`n")
-        if (trimmed != "" && RegExMatch(trimmed, "is)^(?:<li\b[^>]*>.*?</li>\s*)+$"))
-            html := "<ol>" . trimmed . "</ol>"
+        html := HtmlNorm._WrapBareTopLevelLiDom(html)
 
         ; 14. Normalize <code> elements.
         html := HtmlNorm._NormalizeCodeElements(html)
 
         ; 15. Unwrap nested containers that obscure code blocks.
         html := HtmlNorm._UnwrapNestedContainers(html)
+
+        HtmlNorm._domNodes := HtmlNorm._TryParseDomNodes(html)
 
         return html
     }
@@ -171,6 +203,8 @@ class HtmlNorm {
      *
      * When showImg is true, leaves elements in place for pandoc.
      *
+     * DOM parse failures are non-fatal and return the original html unchanged.
+     *
      * @param {string} html
      * @param {boolean} showImg
      * @returns {string}
@@ -178,38 +212,46 @@ class HtmlNorm {
     static _ProcessImgTags(html, showImg) {
         if showImg
             return html
-        ; <img> tags (self-closing).
-        pos := 1
-        while RegExMatch(html, "i)<img\b([^>]*?)>", &m, pos) {
-            attrs := m[1]
-            accessText := ""
-            if (RegExMatch(attrs, "i)\balt\s*=\s*['`"]([^'`"]*)[`"']", &mA) && mA[1] != "")
-                accessText := mA[1]
-            else if (RegExMatch(attrs, "i)\btitle\s*=\s*['`"]([^'`"]*)[`"']", &mT) && mT[1] != "")
-                accessText := mT[1]
-            else if (RegExMatch(attrs, "i)\baria-label\s*=\s*['`"]([^'`"]*)[`"']", &mL) && mL[1] != "")
-                accessText := mL[1]
-            replacement := (accessText = "") ? "" : "(img: " . accessText . ")"
-            html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
-            pos := m.Pos + StrLen(replacement)
+        ; Keep HTML byte-stable when no image-like elements exist.
+        if !RegExMatch(html, "i)<(?:img|svg)\b")
+            return html
+        rootNodes := HtmlNorm._TryParseDomNodes(html)
+        wrapped := false
+        if (rootNodes.Length = 0) {
+            rootNodes := HtmlNorm._TryParseDomNodes("<ul>" . html . "</ul>")
+            if (rootNodes.Length = 1 && HtmlNorm._IsTag(rootNodes[1], "ul"))
+                wrapped := true
+            else
+                return html
         }
-        ; <svg>…</svg> elements — same rule, checking aria-label, title attr, or <title> child.
-        pos := 1
-        while RegExMatch(html, "is)<svg\b([^>]*)>.*?</svg>", &m, pos) {
-            attrs := m[1]
-            full  := m[0]
-            accessText := ""
-            if (RegExMatch(attrs, "i)\baria-label\s*=\s*['`"]([^'`"]*)[`"']", &mL) && mL[1] != "")
-                accessText := mL[1]
-            else if (RegExMatch(attrs, "i)\btitle\s*=\s*['`"]([^'`"]*)[`"']", &mT) && mT[1] != "")
-                accessText := mT[1]
-            else if (RegExMatch(full, "i)<title\b[^>]*>(.*?)</title>", &mTc) && mTc[1] != "")
-                accessText := HtmlNorm._DecodeBasicHtmlEntities(mTc[1])
-            replacement := (accessText = "") ? "" : "(img: " . accessText . ")"
-            html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
-            pos := m.Pos + StrLen(replacement)
-        }
-        return html
+        nodes := wrapped ? rootNodes[1].children : rootNodes
+        nodes := HtmlNorm._ProcessImgTagsDomNodes(nodes)
+        return HtmlNorm._SerializeDomNodes(nodes)
+    }
+
+    /**
+     * Runs shared early DOM stages with one parse/serialize cycle.
+     * @param {string} html
+     * @param {string} source
+     * @param {boolean} showPoster
+     * @param {boolean} showImg
+     * @returns {string}
+     */
+    static _NormalizeLeadDom(html, source, showPoster, showImg) {
+        needImg := !showImg && RegExMatch(html, "i)<(?:img|svg)\b")
+        needPoster := showPoster
+        if !(needImg || needPoster)
+            return html
+
+        nodes := HtmlNorm._TryParseDomNodes(html)
+        if (nodes.Length = 0)
+            return html
+
+        if needImg
+            nodes := HtmlNorm._ProcessImgTagsDomNodes(nodes)
+        if needPoster
+            HtmlNorm._InjectPosterPlaceholdersDomNodes(nodes, source)
+        return HtmlNorm._SerializeDomNodes(nodes)
     }
 
     /**
@@ -222,31 +264,43 @@ class HtmlNorm {
      * @returns {string}
      */
     static _InjectPosterPlaceholders(html, source) {
+        nodes := HtmlNorm._TryParseDomNodes(html)
+        if (nodes.Length = 0)
+            return html
+        HtmlNorm._InjectPosterPlaceholdersDomNodes(nodes, source)
+        return HtmlNorm._SerializeDomNodes(nodes)
+    }
+
+    /**
+     * Injects poster placeholders in parsed DOM nodes by source-specific selectors.
+     * @param {Array} nodes
+     * @param {string} source
+     */
+    static _InjectPosterPlaceholdersDomNodes(nodes, source) {
         if (source = "claudecode") {
-            ; AI turn
-            html := RegExReplace(html, "i)(<div\b[^>]*\bdata-testid=`"assistant-message`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
-            ; user turn (class has both message_* and userMessageContainer_*)
-            html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bmessage_\w+\s+[^`"]*\buserMessageContainer_[^>]*>)", "$1<p>¤POSTER_User¤</p>")
+            HtmlNorm._InjectPosterForMatches(nodes, (n) => HtmlNorm._IsTag(n, "div")
+                && (HtmlNorm._GetAttrCI(n, "data-testid") = "assistant-message"), "¤POSTER_AI¤")
+            HtmlNorm._InjectPosterForMatches(nodes, (n) => HtmlNorm._IsTag(n, "div")
+                && RegExMatch(HtmlNorm._GetAttrCI(n, "class"), "\bmessage_\w+\s+") && InStr(HtmlNorm._GetAttrCI(n, "class"), "userMessageContainer_"), "¤POSTER_User¤")
         } else if (source = "codex") {
-            ; AI turn (group min-w-0 flex-col)
-            html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bgroup\b[^`"]*\bmin-w-0\b[^`"]*\bflex-col\b[^`"]*`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
-            ; user turn (flex-col items-end)
-            html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bflex-col\b[^`"]*\bitems-end\b[^`"]*`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
+            HtmlNorm._InjectPosterForMatches(nodes, (n) => HtmlNorm._IsTag(n, "div")
+                && HtmlNorm._ClassHasToken(n, "group") && HtmlNorm._ClassHasToken(n, "min-w-0") && HtmlNorm._ClassHasToken(n, "flex-col"), "¤POSTER_AI¤")
+            HtmlNorm._InjectPosterForMatches(nodes, (n) => HtmlNorm._IsTag(n, "div")
+                && HtmlNorm._ClassHasToken(n, "flex-col") && HtmlNorm._ClassHasToken(n, "items-end"), "¤POSTER_User¤")
         } else if (source = "claudeweb") {
-            ; AI turn (data-is-streaming or font-claude-response)
-            html := RegExReplace(html, "i)(<div\b[^>]*(?:\bdata-is-streaming\b|\bclass=`"[^`"]*\bfont-claude-response\b[^`"]*`")[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
-            ; user turn (data-testid="user-message")
-            html := RegExReplace(html, "i)(<div\b[^>]*\bdata-testid=`"user-message`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
+            HtmlNorm._InjectPosterForMatches(nodes, (n) => HtmlNorm._IsTag(n, "div")
+                && (HtmlNorm._HasAttrCI(n, "data-is-streaming") || HtmlNorm._ClassHasToken(n, "font-claude-response")), "¤POSTER_AI¤")
+            HtmlNorm._InjectPosterForMatches(nodes, (n) => HtmlNorm._IsTag(n, "div")
+                && (HtmlNorm._GetAttrCI(n, "data-testid") = "user-message"), "¤POSTER_User¤")
         } else if (source = "chatgpt") {
-            ; AI turn: prefer data-turn="assistant"; fall back to legacy data-turn-id="request-WEB:..." prefix.
-            ; Both patterns may match the same article in older captures — the duplicate dedup in
-            ; PasteMarkdown collapses consecutive same-type markers, so double injection is harmless.
-            html := RegExReplace(html, "i)(<article\b[^>]*\bdata-turn=`"assistant`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
-            html := RegExReplace(html, "i)(<article\b[^>]*\bdata-turn-id=`"request-WEB:[^`"]*`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
-            ; User turn: prefer data-turn="user"; fall back to legacy plain-UUID data-turn-id.
-            html := RegExReplace(html, "i)(<article\b[^>]*\bdata-turn=`"user`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
+            ; Keep legacy behavior: assistant may be injected by either matcher.
+            HtmlNorm._InjectPosterForMatches(nodes, (n) => HtmlNorm._IsTag(n, "article")
+                && (HtmlNorm._GetAttrCI(n, "data-turn") = "assistant"), "¤POSTER_AI¤")
+            HtmlNorm._InjectPosterForMatches(nodes, (n) => HtmlNorm._IsTag(n, "article")
+                && RegExMatch(HtmlNorm._GetAttrCI(n, "data-turn-id"), "^request-WEB:"), "¤POSTER_AI¤")
+            HtmlNorm._InjectPosterForMatches(nodes, (n) => HtmlNorm._IsTag(n, "article")
+                && (HtmlNorm._GetAttrCI(n, "data-turn") = "user"), "¤POSTER_User¤")
         }
-        return html
     }
 
     /**
@@ -359,7 +413,7 @@ class HtmlNorm {
             inner := m[1]
             ; Convert <br> to newlines before stripping all other tags.
             inner := RegExReplace(inner, "i)<br\b[^>]*>", "`n")
-            ; Strip all HTML tags — leaves only the plain code text plus structural whitespace.
+            ; Strip all HTML tags - leaves only the plain code text plus structural whitespace.
             codeText := RegExReplace(inner, "<[^>]++>", "")
             codeText := StrReplace(codeText, "`r", "")
             codeText := Trim(codeText, " `t`n")
@@ -396,52 +450,61 @@ class HtmlNorm {
      * @returns {string}
      */
     static _NormalizeTaskListItems(html) {
-        pos := 1
-        while RegExMatch(html, "is)<li\b([^>]*)>(.*?)</li>", &mTask, pos) {
-            liAttrs := mTask[1]
-            liInner := mTask[2]
-            ; Supported task-list containers:
-            ; - Standard markdown renderers: class contains task-list-item
-            ; - Claude Code todo tool rows: class contains todoItem_*
-            if (!RegExMatch(liAttrs, "i)\btask-list-item\b")
-                && !RegExMatch(liAttrs, "i)\btodoItem_")) {
-                pos := mTask.Pos + mTask.Len
+        if !RegExMatch(html, "i)<li\b")
+            return html
+
+        nodes := HtmlNorm._TryParseDomNodes(html)
+        if (nodes.Length = 0)
+            return html
+
+        taskLis := []
+        HtmlNorm._CollectMatchingNodes(nodes
+            , (n) => HtmlNorm._IsTag(n, "li")
+                && (HtmlNorm._ClassHasToken(n, "task-list-item")
+                    || RegExMatch(HtmlNorm._GetAttrCI(n, "class"), "i)\btodoItem_"))
+            , &taskLis)
+        if (taskLis.Length = 0)
+            return html
+
+        changed := false
+        for li in taskLis {
+            checkbox := li.FindFirst((n) => HtmlNorm._IsTag(n, "input")
+                && (StrLower(HtmlNorm._GetAttrCI(n, "type")) = "checkbox"))
+            if !IsObject(checkbox)
                 continue
-            }
-            ; Find <input type="checkbox"> anywhere inside the item
-            ; (direct child OR inside a <p> wrapper, as ChatGPT does).
-            if !RegExMatch(liInner, "is)<input\b[^>]*\btype\s*=\s*['`"]checkbox['`"][^>]*>", &mInput) {
-                pos := mTask.Pos + mTask.Len
-                continue
-            }
-            checked := RegExMatch(liInner, "i)\bchecked\b")
-            if (!checked) {
-                if RegExMatch(liAttrs, "i)\bcompleted_")
+
+            checked := HtmlNorm._HasAttrCI(checkbox, "checked")
+            if !checked {
+                if RegExMatch(HtmlNorm._GetAttrCI(li, "class"), "i)\bcompleted_")
                     checked := true
-                else if RegExMatch(liInner, "i)\btext-decoration\s*:\s*line-through\b")
+                else if HtmlNorm._SubtreeHasLineThroughStyle(li)
                     checked := true
             }
-            ; Capture text that follows the <input> tag.
-            text := SubStr(liInner, mInput.Pos + mInput.Len)
-            text := RegExReplace(text, "is)<span\b[^>]*>\s*</span>", "")
-            text := RegExReplace(text, "<[^>]++>", "")
+
+            text := HtmlNorm._CollectTextAfterFirstCheckbox(li)
             text := HtmlNorm._DecodeBasicHtmlEntities(text)
             text := Trim(text, " `t`r`n" . Chr(160))
-            ; Re-encode for HTML context.
             text := StrReplace(text, "&", "&amp;")
             text := StrReplace(text, "<", "&lt;")
             text := StrReplace(text, ">", "&gt;")
-            inputTag := checked
+
+            inputHtml := checked
                 ? '<input type="checkbox" disabled checked />'
                 : '<input type="checkbox" disabled />'
-            replacement := "<li>" . inputTag
+
+            newChildren := [DomNode("text", "", inputHtml)]
             if (text != "")
-                replacement .= " " . text
-            replacement .= "</li>"
-            html := SubStr(html, 1, mTask.Pos - 1) . replacement . SubStr(html, mTask.Pos + mTask.Len)
-            pos := mTask.Pos + StrLen(replacement)
+                newChildren.Push(DomNode("text", "", " " . text))
+
+            li.attrs := Map()
+            li.children := newChildren
+            changed := true
         }
-        return html
+
+        if !changed
+            return html
+
+        return HtmlNorm._SerializeDomNodes(nodes)
     }
 
     /**
@@ -452,19 +515,15 @@ class HtmlNorm {
      * @returns {string}
      */
     static _ExtractThinkingBlocks(html) {
-        pos := 1
-        while RegExMatch(html, "is)<details\b[^>]*\bclass=`"[^`"]*\bthinking\b[^`"]*`"[^>]*>(.*?)</details>", &m, pos) {
-            inner := m[1]
-            inner := RegExReplace(inner, "is)<summary\b[^>]*>.*?</summary>", "")
-            inner := RegExReplace(inner, "<[^>]++>", "")
-            inner := HtmlNorm._DecodeBasicHtmlEntities(inner)
-            inner := Trim(inner, " `t`n`r")
-            HtmlNorm._thinkingBlocks.Push(inner)
-            placeholder := "¤THINKING_" . HtmlNorm._thinkingBlocks.Length . "¤"
-            html := SubStr(html, 1, m.Pos - 1) . placeholder . SubStr(html, m.Pos + m.Len)
-            pos := m.Pos + StrLen(placeholder)
-        }
-        return html
+        if !RegExMatch(html, "i)<details\b[^>]*\bclass=`"[^`"]*\bthinking\b[^`"]*`"")
+            return html
+
+        nodes := HtmlNorm._TryParseDomNodes(html)
+        if (nodes.Length = 0)
+            return html
+
+        nodes := HtmlNorm._ExtractThinkingBlocksDomNodes(nodes)
+        return HtmlNorm._SerializeDomNodes(nodes)
     }
 
     /**
@@ -476,9 +535,9 @@ class HtmlNorm {
      * - Codex: `<div class="text-size-chat whitespace-pre-wrap">` with mixed
      *   `<span>` and `<code class="font-mono">` children.
      * - Claude Code: `<div class="content_xGDvVg">` with a single `<span>` child.
-     * - Claude Web: `<p class="whitespace-pre-wrap break-words">` — plain text with
+     * - Claude Web: `<p class="whitespace-pre-wrap break-words">` - plain text with
      *   embedded literal newlines; `<br>` tags possible.
-     * - ChatGPT: `<div class="whitespace-pre-wrap">` (exact sole class value) —
+     * - ChatGPT: `<div class="whitespace-pre-wrap">` (exact sole class value) -
      *   plain text with embedded literal newlines.
      *
      * `PasteMd.RestoreUserMsgBlocks()` restores the plain text after pandoc.
@@ -550,6 +609,115 @@ class HtmlNorm {
     }
 
     /**
+     * Removes all nodes with the given tag name from the DOM tree.
+     *
+     * @param {string} html
+     * @param {string} tagName
+     * @returns {string}
+     */
+    static _StripTagDom(html, tagName) {
+        if !RegExMatch(html, "i)</?" . tagName . "\b")
+            return html
+
+        nodes := HtmlNorm._TryParseDomNodes(html)
+        if (nodes.Length = 0)
+            return html
+
+        matches := []
+        HtmlNorm._CollectMatchingNodes(nodes, (n) => HtmlNorm._IsTag(n, tagName), &matches)
+        if (matches.Length = 0)
+            return html
+
+        nodes := HtmlNorm._RemoveMatchingDomNodes(nodes, (n) => HtmlNorm._IsTag(n, tagName))
+        return HtmlNorm._SerializeDomNodes(nodes)
+    }
+
+    /**
+     * Wraps bare top-level <li> siblings in an <ol> container.
+     *
+     * Mirrors the prior regex behavior:
+     * - allows whitespace text nodes between/around top-level <li> nodes
+     * - ignores trailing top-level <br> and whitespace-only text nodes
+     * - does nothing when any non-<li> meaningful top-level node exists
+     *
+     * @param {string} html
+     * @returns {string}
+     */
+    static _WrapBareTopLevelLiDom(html) {
+        if !RegExMatch(html, "i)<li\b")
+            return html
+
+        nodes := HtmlNorm._TryParseDomNodes(html)
+        if (nodes.Length = 0)
+            return html
+
+        ; Drop trailing <br> and trailing whitespace text nodes.
+        while (nodes.Length > 0) {
+            tail := nodes[nodes.Length]
+            if (HtmlNorm._IsTag(tail, "br") || HtmlNorm._IsWhitespaceTextNode(tail))
+                nodes.RemoveAt(nodes.Length)
+            else
+                break
+        }
+        if (nodes.Length = 0)
+            return html
+
+        liNodes := []
+        for node in nodes {
+            if HtmlNorm._IsWhitespaceTextNode(node)
+                continue
+            if !HtmlNorm._IsTag(node, "li")
+                return html
+            liNodes.Push(node)
+        }
+        if (liNodes.Length = 0)
+            return html
+
+        wrapper := DomNode("ol")
+        for li in liNodes
+            wrapper.Add(li)
+        return HtmlNorm._SerializeDomNodes([wrapper])
+    }
+
+    /**
+     * Promotes styled inline-code spans to semantic <code> tags.
+     *
+     * Converts:
+     *   <span class="... inline-markdown ...">...</span>
+     *   <span class="... font-mono ...">...</span>
+     * to:
+     *   <code>...</code>
+     *
+     * All attributes are dropped, while child content/order is preserved.
+     *
+     * @param {string} html
+     * @returns {string}
+     */
+    static _PromoteInlineCodeSpansDom(html) {
+        if !RegExMatch(html, "i)<span\b[^>]*\bclass=`"[^`"]*\b(?:inline-markdown|font-mono)\b[^`"]*`"")
+            return html
+
+        nodes := HtmlNorm._TryParseDomNodes(html)
+        if (nodes.Length = 0)
+            return html
+
+        matches := []
+        HtmlNorm._CollectMatchingNodes(nodes
+            , (n) => HtmlNorm._IsTag(n, "span")
+                && (HtmlNorm._ClassHasToken(n, "inline-markdown")
+                    || HtmlNorm._ClassHasToken(n, "font-mono"))
+            , &matches)
+        if (matches.Length = 0)
+            return html
+
+        for node in matches {
+            node.tag := "code"
+            node.attrs := Map()
+        }
+        return HtmlNorm._SerializeDomNodes(nodes)
+    }
+
+    /**
      * Processes each `<code>` element: converts `<br>` and `</div><div>` sequences
      * to newlines, strips inner tags, and wraps multi-line content in `<pre>` if
      * not already inside one.  Preserves `class="language-xxx"` on the `<code>`
@@ -616,9 +784,553 @@ class HtmlNorm {
         return html
     }
 
+    /**
+     * Normalizes footnote-specific HTML constructs via DOM traversal.
+     *
+     * - Removes Claude Web language-label containers:
+     *   <div class="... font-small ... p-3* ...">...</div>
+     * - Rewrites long hrefs to fragment-only form:
+     *   "...#user-content-foo" -> "#user-content-foo"
+     * - Unwraps single <p> wrappers in footnote definition list items:
+     *   <li id="user-content-fn-N"><p>...</p></li> -> <li id="...">...</li>
+     *
+     * @param {string} html
+     * @returns {string}
+     */
+    static _NormalizeFootnoteAndSpanDom(html) {
+        if !RegExMatch(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bfont-small\b[^`"]*\bp-3[^`"]*`"|href=`"[^`"]*#user-content-|<li\b[^>]*\bid=`"user-content-fn-|</?span\b)")
+            return html
+
+        nodes := HtmlNorm._TryParseDomNodes(html)
+        if (nodes.Length = 0)
+            return html
+
+        changed := false
+
+        labelDivs := []
+        HtmlNorm._CollectMatchingNodes(nodes
+            , (n) => HtmlNorm._IsTag(n, "div")
+                && HtmlNorm._ClassHasToken(n, "font-small")
+                && RegExMatch(HtmlNorm._GetAttrCI(n, "class"), "(?:^|\s)p-3[^ ]*(?:\s|$)")
+            , &labelDivs)
+        if (labelDivs.Length > 0) {
+            nodes := HtmlNorm._RemoveMatchingDomNodes(nodes
+                , (n) => HtmlNorm._IsTag(n, "div")
+                    && HtmlNorm._ClassHasToken(n, "font-small")
+                    && RegExMatch(HtmlNorm._GetAttrCI(n, "class"), "(?:^|\s)p-3[^ ]*(?:\s|$)"))
+            changed := true
+        }
+
+        anchors := []
+        HtmlNorm._CollectMatchingNodes(nodes, (n) => HtmlNorm._IsTag(n, "a"), &anchors)
+        for anchor in anchors {
+            for key, value in anchor.attrs {
+                if (StrLower(key) != "href")
+                    continue
+                if !RegExMatch(value, "i)#(user-content-[^#?`"]+)", &mHref)
+                    continue
+                newValue := "#" . mHref[1]
+                if (value != newValue) {
+                    anchor.attrs[key] := newValue
+                    changed := true
+                }
+            }
+        }
+
+        footnoteLis := []
+        HtmlNorm._CollectMatchingNodes(nodes
+            , (n) => HtmlNorm._IsTag(n, "li")
+                && RegExMatch(HtmlNorm._GetAttrCI(n, "id"), "^user-content-fn-")
+            , &footnoteLis)
+
+        for li in footnoteLis {
+            contentCount := 0
+            onlyContent := ""
+            for child in li.children {
+                if HtmlNorm._IsWhitespaceTextNode(child)
+                    continue
+                contentCount += 1
+                if (contentCount = 1)
+                    onlyContent := child
+            }
+            if (contentCount != 1)
+                continue
+            if !IsObject(onlyContent) || !HtmlNorm._IsTag(onlyContent, "p")
+                continue
+            li.children := onlyContent.children
+            changed := true
+        }
+
+        spanNodes := []
+        HtmlNorm._CollectMatchingNodes(nodes, (n) => HtmlNorm._IsTag(n, "span"), &spanNodes)
+        if (spanNodes.Length > 0) {
+            nodes := HtmlNorm._UnwrapTagDomNodes(nodes, "span")
+            changed := true
+        }
+
+        return changed ? HtmlNorm._SerializeDomNodes(nodes) : html
+    }
+
     ; ─────────────────────────────────────────────────────────────────────────
     ; Shared helpers
     ; ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Applies image/SVG replacement on parsed DOM nodes.
+     * @param {Array} nodes
+     * @returns {Array}
+     */
+    static _ProcessImgTagsDomNodes(nodes) {
+        out := []
+        for node in nodes {
+            converted := HtmlNorm._ProcessImgTagsDomNode(node)
+            for item in converted
+                out.Push(item)
+        }
+        return out
+    }
+
+    /**
+     * DOM recursive worker for image/SVG replacement.
+     * Returns 0..n nodes to support drop/replace behavior.
+     * @param {DomNode} node
+     * @returns {Array}
+     */
+    static _ProcessImgTagsDomNode(node) {
+        tag := StrLower(node.tag)
+
+        if (tag = "img") {
+            accessText := HtmlNorm._GetAttrCI(node, "alt")
+            if (accessText = "")
+                accessText := HtmlNorm._GetAttrCI(node, "title")
+            if (accessText = "")
+                accessText := HtmlNorm._GetAttrCI(node, "aria-label")
+            return (accessText = "") ? [] : [DomNode("text", "", "(img: " . accessText . ")")]
+        }
+
+        if (tag = "svg") {
+            accessText := HtmlNorm._GetAttrCI(node, "aria-label")
+            if (accessText = "")
+                accessText := HtmlNorm._GetAttrCI(node, "title")
+            if (accessText = "") {
+                titleNode := HtmlNorm._FirstDescendantByTag(node, "title")
+                if IsObject(titleNode)
+                    accessText := HtmlNorm._DecodeBasicHtmlEntities(HtmlNorm._NodeTextRecursive(titleNode))
+            }
+            return (accessText = "") ? [] : [DomNode("text", "", "(img: " . accessText . ")")]
+        }
+
+        if (node.children.Length > 0) {
+            newChildren := []
+            for child in node.children {
+                converted := HtmlNorm._ProcessImgTagsDomNode(child)
+                for item in converted
+                    newChildren.Push(item)
+            }
+            node.children := newChildren
+        }
+        return [node]
+    }
+
+    /**
+     * Recursively extracts thinking <details> blocks into placeholders.
+     * @param {Array} nodes
+     * @returns {Array}
+     */
+    static _ExtractThinkingBlocksDomNodes(nodes) {
+        out := []
+        for node in nodes {
+            converted := HtmlNorm._ExtractThinkingBlocksDomNode(node)
+            for item in converted
+                out.Push(item)
+        }
+        return out
+    }
+
+    /**
+     * Node-level worker for _ExtractThinkingBlocksDomNodes.
+     * @param {DomNode} node
+     * @returns {Array}
+     */
+    static _ExtractThinkingBlocksDomNode(node) {
+        if HtmlNorm._IsTag(node, "details") && HtmlNorm._ClassHasToken(node, "thinking") {
+            inner := ""
+            for child in node.children {
+                if HtmlNorm._IsTag(child, "summary")
+                    continue
+                inner .= HtmlNorm._NodeTextRecursive(child)
+            }
+            inner := HtmlNorm._DecodeBasicHtmlEntities(inner)
+            inner := Trim(inner, " `t`n`r")
+            HtmlNorm._thinkingBlocks.Push(inner)
+            marker := "¤THINKING_" . HtmlNorm._thinkingBlocks.Length . "¤"
+            return [DomNode("text", "", marker)]
+        }
+
+        if (node.children.Length > 0) {
+            newChildren := []
+            for child in node.children {
+                converted := HtmlNorm._ExtractThinkingBlocksDomNode(child)
+                for item in converted
+                    newChildren.Push(item)
+            }
+            node.children := newChildren
+        }
+        return [node]
+    }
+
+    /**
+     * True when any node in subtree has text-decoration: line-through style.
+     * @param {DomNode} root
+     * @returns {boolean}
+     */
+    static _SubtreeHasLineThroughStyle(root) {
+        hit := root.FindFirst((n) => RegExMatch(HtmlNorm._GetAttrCI(n, "style")
+            , "i)\btext-decoration\s*:\s*line-through\b"))
+        return IsObject(hit)
+    }
+
+    /**
+     * Collects text occurring after the first checkbox input in subtree order.
+     * @param {DomNode} root
+     * @returns {string}
+     */
+    static _CollectTextAfterFirstCheckbox(root) {
+        found := false
+        out := ""
+        HtmlNorm._CollectTextAfterFirstCheckboxNode(root, &found, &out)
+        return out
+    }
+
+    /**
+     * Recursive worker for _CollectTextAfterFirstCheckbox.
+     * @param {DomNode} node
+     * @param {boolean} found
+     * @param {string} out
+     */
+    static _CollectTextAfterFirstCheckboxNode(node, &found, &out) {
+        if (node.tag = "text") {
+            if found
+                out .= node.text
+            return
+        }
+
+        if HtmlNorm._IsTag(node, "input")
+            && (StrLower(HtmlNorm._GetAttrCI(node, "type")) = "checkbox") {
+            if !found
+                found := true
+            return
+        }
+
+        for child in node.children
+            HtmlNorm._CollectTextAfterFirstCheckboxNode(child, &found, &out)
+    }
+
+    /**
+     * Recursively unwraps matching tag nodes while keeping child content/order.
+     * @param {Array} nodes
+     * @param {string} tagName
+     * @returns {Array}
+     */
+    static _UnwrapTagDomNodes(nodes, tagName) {
+        out := []
+        for node in nodes {
+            converted := HtmlNorm._UnwrapTagDomNode(node, tagName)
+            for item in converted
+                out.Push(item)
+        }
+        return out
+    }
+
+    /**
+     * Node-level worker for _UnwrapTagDomNodes.
+     * Returns 0..n nodes so wrappers can be removed in-place.
+     * @param {DomNode} node
+     * @param {string} tagName
+     * @returns {Array}
+     */
+    static _UnwrapTagDomNode(node, tagName) {
+        if (StrLower(node.tag) = tagName) {
+            unwrapped := []
+            for child in node.children {
+                converted := HtmlNorm._UnwrapTagDomNode(child, tagName)
+                for item in converted
+                    unwrapped.Push(item)
+            }
+            return unwrapped
+        }
+        if (node.children.Length > 0) {
+            newChildren := []
+            for child in node.children {
+                converted := HtmlNorm._UnwrapTagDomNode(child, tagName)
+                for item in converted
+                    newChildren.Push(item)
+            }
+            node.children := newChildren
+        }
+        return [node]
+    }
+
+    /**
+     * Recursively removes nodes matching a predicate.
+     * Matching nodes are dropped entirely with their subtrees.
+     * @param {Array} nodes
+     * @param {Func} pred
+     * @returns {Array}
+     */
+    static _RemoveMatchingDomNodes(nodes, pred) {
+        out := []
+        for node in nodes {
+            converted := HtmlNorm._RemoveMatchingDomNode(node, pred)
+            for item in converted
+                out.Push(item)
+        }
+        return out
+    }
+
+    /**
+     * Node-level worker for _RemoveMatchingDomNodes.
+     * Returns 0..n nodes to allow removing current node in-place.
+     * @param {DomNode} node
+     * @param {Func} pred
+     * @returns {Array}
+     */
+    static _RemoveMatchingDomNode(node, pred) {
+        if pred.Call(node)
+            return []
+        if (node.children.Length > 0) {
+            newChildren := []
+            for child in node.children {
+                converted := HtmlNorm._RemoveMatchingDomNode(child, pred)
+                for item in converted
+                    newChildren.Push(item)
+            }
+            node.children := newChildren
+        }
+        return [node]
+    }
+
+    /**
+     * Inserts poster placeholder paragraphs into all nodes matching predicate.
+     * @param {Array} nodes
+     * @param {Func} pred
+     * @param {string} marker
+     */
+    static _InjectPosterForMatches(nodes, pred, marker) {
+        matches := []
+        HtmlNorm._CollectMatchingNodes(nodes, pred, &matches)
+        for node in matches
+            HtmlNorm._InjectPosterIntoNode(node, marker)
+    }
+
+    /**
+     * Recursively collects nodes matching predicate.
+     * @param {Array} nodes
+     * @param {Func} pred
+     * @param {Array} out
+     */
+    static _CollectMatchingNodes(nodes, pred, &out) {
+        for node in nodes {
+            if pred.Call(node)
+                out.Push(node)
+            if (node.children.Length > 0)
+                HtmlNorm._CollectMatchingNodes(node.children, pred, &out)
+        }
+    }
+
+    /**
+     * Inserts <p>marker</p> as the first child of a node.
+     * @param {DomNode} node
+     * @param {string} marker
+     */
+    static _InjectPosterIntoNode(node, marker) {
+        p := DomNode("p")
+        p.Add(DomNode("text", "", marker))
+        node.children.InsertAt(1, p)
+    }
+
+    /**
+     * Returns first descendant node with tag, including self.
+     * @param {DomNode} node
+     * @param {string} tagName
+     * @returns {DomNode|string}
+     */
+    static _FirstDescendantByTag(node, tagName) {
+        if (StrLower(node.tag) = tagName)
+            return node
+        for child in node.children {
+            hit := HtmlNorm._FirstDescendantByTag(child, tagName)
+            if IsObject(hit)
+                return hit
+        }
+        return ""
+    }
+
+    /**
+     * Concatenates all text-node content in a subtree.
+     * @param {DomNode} node
+     * @returns {string}
+     */
+    static _NodeTextRecursive(node) {
+        if (node.tag = "text")
+            return node.text
+        out := ""
+        for child in node.children
+            out .= HtmlNorm._NodeTextRecursive(child)
+        return out
+    }
+
+    /**
+     * True when node is a whitespace-only text node.
+     * @param {DomNode} node
+     * @returns {boolean}
+     */
+    static _IsWhitespaceTextNode(node) {
+        return (node.tag = "text" && Trim(node.text, " `t`r`n") = "")
+    }
+
+    /**
+     * Gets a case-insensitive attribute value.
+     * @param {DomNode} node
+     * @param {string} attrName
+     * @returns {string}
+     */
+    static _GetAttrCI(node, attrName) {
+        keyLower := StrLower(attrName)
+        for key, value in node.attrs
+            if (StrLower(key) = keyLower)
+                return value
+        return ""
+    }
+
+    /**
+     * True when an attribute exists, case-insensitive.
+     * @param {DomNode} node
+     * @param {string} attrName
+     * @returns {boolean}
+     */
+    static _HasAttrCI(node, attrName) {
+        keyLower := StrLower(attrName)
+        for key, _ in node.attrs
+            if (StrLower(key) = keyLower)
+                return true
+        return false
+    }
+
+    /**
+     * True when node tag matches tagName (case-insensitive).
+     * @param {DomNode} node
+     * @param {string} tagName
+     * @returns {boolean}
+     */
+    static _IsTag(node, tagName) {
+        return (StrLower(node.tag) = tagName)
+    }
+
+    /**
+     * True when class attribute contains exact token.
+     * @param {DomNode} node
+     * @param {string} token
+     * @returns {boolean}
+     */
+    static _ClassHasToken(node, token) {
+        classAttr := HtmlNorm._GetAttrCI(node, "class")
+        if (classAttr = "")
+            return false
+        return RegExMatch(classAttr, "(?:^|\s)" . token . "(?:\s|$)")
+    }
+
+    /**
+     * Serializes parsed DOM nodes back to HTML.
+     * @param {Array} nodes
+     * @returns {string}
+     */
+    static _SerializeDomNodes(nodes) {
+        out := ""
+        for node in nodes
+            out .= HtmlNorm._SerializeDomNode(node)
+        return out
+    }
+
+    /**
+     * Serializes one DOM node subtree to HTML.
+     * @param {DomNode} node
+     * @returns {string}
+     */
+    static _SerializeDomNode(node) {
+        if (node.tag = "text")
+            return node.text
+
+        attrs := ""
+        for key, value in node.attrs {
+            if (value = "")
+                attrs .= " " . key
+            else
+                attrs .= " " . key . '="' . HtmlNorm._EscapeAttr(value) . '"'
+        }
+
+        tag := node.tag
+        if (HtmlNorm._IsVoidTag(tag))
+            return "<" . tag . attrs . ">"
+
+        inner := ""
+        for child in node.children
+            inner .= HtmlNorm._SerializeDomNode(child)
+        return "<" . tag . attrs . ">" . inner . "</" . tag . ">"
+    }
+
+    /**
+     * Escapes text for use in HTML attribute values.
+     * @param {string} value
+     * @returns {string}
+     */
+    static _EscapeAttr(value) {
+        s := "" . value
+        s := StrReplace(s, "&", "&amp;")
+        s := StrReplace(s, '"', "&quot;")
+        s := StrReplace(s, "<", "&lt;")
+        s := StrReplace(s, ">", "&gt;")
+        return s
+    }
+
+    /**
+     * True when tag is a void HTML element.
+     * @param {string} tag
+     * @returns {boolean}
+     */
+    static _IsVoidTag(tag) {
+        tag := StrLower(tag)
+        return (tag = "area"
+            || tag = "base"
+            || tag = "br"
+            || tag = "col"
+            || tag = "embed"
+            || tag = "hr"
+            || tag = "img"
+            || tag = "input"
+            || tag = "link"
+            || tag = "meta"
+            || tag = "param"
+            || tag = "source"
+            || tag = "track"
+            || tag = "wbr")
+    }
+
+    /**
+     * Parses HTML into DomNode trees.
+     * Returns [] when parsing fails.
+     * @param {string} html
+     * @returns {Array}
+     */
+    static _TryParseDomNodes(html) {
+        if (html = "")
+            return []
+        try {
+            return HtmlParser.Parse(html)
+        } catch {
+            return []
+        }
+    }
 
     /**
      * Decodes the HTML entities most commonly found in clipboard fragments.
