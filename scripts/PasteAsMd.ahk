@@ -1600,12 +1600,8 @@ class PasteMd {
    */
   static _HasMeaningfulHtmlForPandoc(html) {
     nodes := PasteMd._TryParseDomNodes(html)
-    if (nodes.Length = 0) {
-      ; Keep legacy behavior when parsing fails.
-      stripped := RegExReplace(html, "i)<br\b[^>]*+>", "")
-      stripped := RegExReplace(stripped, "i)</?p\b[^>]*+>", "")
-      return RegExMatch(stripped, "<[^>]++>")
-    }
+    if (nodes.Length = 0)
+      return true
     return PasteMd._HasMeaningfulHtmlNode(nodes)
   }
 
@@ -1863,15 +1859,8 @@ class PasteMd {
       return 0
 
     nodes := PasteMd._TryParseDomNodes(htmlFrag)
-    if (nodes.Length = 0) {
-      count := 0
-      pos := 1
-      while RegExMatch(htmlFrag, "is)<li\b", , pos) {
-        count += 1
-        pos += 3
-      }
-      return count
-    }
+    if (nodes.Length = 0)
+      return 0
 
     out := []
     PasteMd._CollectNodesByTag(nodes, "li", &out)
