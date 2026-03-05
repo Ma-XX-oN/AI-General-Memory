@@ -281,7 +281,8 @@ class HtmlNorm {
             HtmlNorm._InjectPosterForMatches(nodes, (n) => HtmlNorm._IsTag(n, "div")
                 && (HtmlNorm._GetAttrCI(n, "data-testid") = "assistant-message"), "¤POSTER_AI¤")
             HtmlNorm._InjectPosterForMatches(nodes, (n) => HtmlNorm._IsTag(n, "div")
-                && RegExMatch(HtmlNorm._GetAttrCI(n, "class"), "\bmessage_\w+\s+") && InStr(HtmlNorm._GetAttrCI(n, "class"), "userMessageContainer_"), "¤POSTER_User¤")
+                && HtmlNorm._ClassHasPrefix(n, "message_")
+                && HtmlNorm._ClassHasPrefix(n, "userMessageContainer_"), "¤POSTER_User¤")
         } else if (source = "codex") {
             HtmlNorm._InjectPosterForMatches(nodes, (n) => HtmlNorm._IsTag(n, "div")
                 && HtmlNorm._ClassHasToken(n, "group") && HtmlNorm._ClassHasToken(n, "min-w-0") && HtmlNorm._ClassHasToken(n, "flex-col"), "¤POSTER_AI¤")
@@ -297,7 +298,7 @@ class HtmlNorm {
             HtmlNorm._InjectPosterForMatches(nodes, (n) => HtmlNorm._IsTag(n, "article")
                 && (HtmlNorm._GetAttrCI(n, "data-turn") = "assistant"), "¤POSTER_AI¤")
             HtmlNorm._InjectPosterForMatches(nodes, (n) => HtmlNorm._IsTag(n, "article")
-                && RegExMatch(HtmlNorm._GetAttrCI(n, "data-turn-id"), "^request-WEB:"), "¤POSTER_AI¤")
+                && HtmlNorm._StartsWithCI(HtmlNorm._GetAttrCI(n, "data-turn-id"), "request-WEB:"), "¤POSTER_AI¤")
             HtmlNorm._InjectPosterForMatches(nodes, (n) => HtmlNorm._IsTag(n, "article")
                 && (HtmlNorm._GetAttrCI(n, "data-turn") = "user"), "¤POSTER_User¤")
         }
@@ -540,7 +541,7 @@ class HtmlNorm {
         HtmlNorm._CollectMatchingNodes(nodes
             , (n) => HtmlNorm._IsTag(n, "li")
                 && (HtmlNorm._ClassHasToken(n, "task-list-item")
-                    || RegExMatch(HtmlNorm._GetAttrCI(n, "class"), "i)\btodoItem_"))
+                    || HtmlNorm._ClassHasPrefix(n, "todoItem_"))
             , &taskLis)
         if (taskLis.Length = 0)
             return html
@@ -554,7 +555,7 @@ class HtmlNorm {
 
             checked := HtmlNorm._HasAttrCI(checkbox, "checked")
             if !checked {
-                if RegExMatch(HtmlNorm._GetAttrCI(li, "class"), "i)\bcompleted_")
+                if HtmlNorm._ClassHasPrefix(li, "completed_")
                     checked := true
                 else if HtmlNorm._SubtreeHasLineThroughStyle(li)
                     checked := true
@@ -696,7 +697,7 @@ class HtmlNorm {
         }
 
         ; Claude Code: <div class="content_xGDvVg"><span>text</span>...</div>
-        if HtmlNorm._IsTag(node, "div") && RegExMatch(HtmlNorm._GetAttrCI(node, "class"), "i)\bcontent_xGDvVg\b") {
+        if HtmlNorm._IsTag(node, "div") && HtmlNorm._ClassHasPrefix(node, "content_xGDvVg") {
             first := HtmlNorm._FirstNonWhitespaceChild(node)
             if IsObject(first) && HtmlNorm._IsTag(first, "span") {
                 rawText := HtmlNorm._DecodeBasicHtmlEntities(HtmlNorm._NodeTextRecursive(first))
@@ -1073,14 +1074,47 @@ class HtmlNorm {
      * @returns {string}
      */
     static _CodeNodeNormalizedText(codeNode) {
-        innerHtml := ""
-        for child in codeNode.children
-            innerHtml .= HtmlNorm._SerializeDomNode(child)
-        innerHtml := RegExReplace(innerHtml, "i)<br\b[^>]*>", "`n")
-        innerHtml := RegExReplace(innerHtml, "i)</div>\s*<div\b[^>]*>", "`n")
-        innerHtml := RegExReplace(innerHtml, "<[^>]++>", "")
-        innerHtml := StrReplace(innerHtml, "`r", "")
-        return innerHtml
+        out := HtmlNorm._CodeChildrenToText(codeNode.children)
+        out := StrReplace(out, "`r", "")
+        return out
+    }
+
+    /**
+     * Converts child nodes to code text, preserving code-line boundaries:
+     * - <br> => newline
+     * - adjacent sibling <div> blocks => newline between blocks
+     * @param {Array} children
+     * @returns {string}
+     */
+    static _CodeChildrenToText(children) {
+        out := ""
+        prevWasDiv := false
+        for child in children {
+            if HtmlNorm._IsTag(child, "br") {
+                out .= "`n"
+                prevWasDiv := false
+                continue
+            }
+            isDiv := HtmlNorm._IsTag(child, "div")
+            if (isDiv && prevWasDiv)
+                out .= "`n"
+            out .= HtmlNorm._CodeNodeToText(child)
+            prevWasDiv := isDiv
+        }
+        return out
+    }
+
+    /**
+     * Recursive worker for _CodeChildrenToText.
+     * @param {DomNode} node
+     * @returns {string}
+     */
+    static _CodeNodeToText(node) {
+        if (node.tag = "text")
+            return node.text
+        if HtmlNorm._IsTag(node, "br")
+            return "`n"
+        return HtmlNorm._CodeChildrenToText(node.children)
     }
 
     /**
@@ -1090,8 +1124,13 @@ class HtmlNorm {
      */
     static _CodeNodeLanguage(codeNode) {
         classAttr := HtmlNorm._GetAttrCI(codeNode, "class")
-        if RegExMatch(classAttr, "i)language-(\w+)", &mLang)
-            return mLang[1]
+        for token in StrSplit(classAttr, " ") {
+            t := Trim(token, " `t`r`n")
+            if (t = "")
+                continue
+            if HtmlNorm._StartsWithCI(t, "language-")
+                return SubStr(t, StrLen("language-") + 1)
+        }
         return ""
     }
 
@@ -1102,30 +1141,7 @@ class HtmlNorm {
      * @returns {string}
      */
     static _UnwrapNestedContainers(html) {
-        domOut := HtmlNorm._UnwrapNestedContainersDom(html)
-        if (domOut != html)
-            return domOut
-
-        ; Fallback regex pass for any residual patterns not yet covered by
-        ; DOM simplification rules.
-        prev := ""
-        while (html != prev) {
-            prev := html
-            ; Outer <pre class="..."> wrapping an inner <pre><code>.
-            html := RegExReplace(html, "is)<pre\b[^>]+>\s*(<pre\b[^>]*><code\b[^>]*>.*?</code></pre>)\s*</pre>", "$1")
-            ; Claude Web: <pre class="code-block__code ..."> directly wrapping <code>.
-            ; Strip the outer pre's class so pandoc uses the <code class="language-xxx">
-            ; for the language identifier, not the pre's CSS utility class.
-            html := RegExReplace(html, "is)<pre\b[^>]*\bcode-block__code\b[^>]*>\s*(<code\b[^>]*>.*?</code>)\s*</pre>", "<pre>$1</pre>")
-            ; Claude Web copy-button overlay: <div class="sticky ..."><div ...></div></div>
-            ; Strip it so the remaining structure is a simple two-div wrap around <pre><code>.
-            html := RegExReplace(html, "is)<div\b[^>]*\bsticky\b[^>]*>.*?</div>\s*</div>", "")
-            ; Two nested <div>s wrapping <pre><code>.
-            html := RegExReplace(html, "is)<div\b[^>]*>\s*<div\b[^>]*>\s*(<pre><code\b[^>]*>.*?</code></pre>)\s*</div>\s*</div>", "$1")
-            ; Two nested <div>s wrapping an inline <code>.
-            html := RegExReplace(html, "is)<div\b[^>]*>\s*<div\b[^>]*>\s*(<code\b[^>]*>.*?</code>)\s*</div>\s*</div>", "$1")
-        }
-        return html
+        return HtmlNorm._UnwrapNestedContainersDom(html)
     }
 
     /**
@@ -1244,13 +1260,13 @@ class HtmlNorm {
         HtmlNorm._CollectMatchingNodes(nodes
             , (n) => HtmlNorm._IsTag(n, "div")
                 && HtmlNorm._ClassHasToken(n, "font-small")
-                && RegExMatch(HtmlNorm._GetAttrCI(n, "class"), "(?:^|\s)p-3[^ ]*(?:\s|$)")
+                && HtmlNorm._ClassHasPrefix(n, "p-3")
             , &labelDivs)
         if (labelDivs.Length > 0) {
             nodes := HtmlNorm._RemoveMatchingDomNodes(nodes
                 , (n) => HtmlNorm._IsTag(n, "div")
                     && HtmlNorm._ClassHasToken(n, "font-small")
-                    && RegExMatch(HtmlNorm._GetAttrCI(n, "class"), "(?:^|\s)p-3[^ ]*(?:\s|$)"))
+                    && HtmlNorm._ClassHasPrefix(n, "p-3"))
             changed := true
         }
 
@@ -1260,9 +1276,9 @@ class HtmlNorm {
             for key, value in anchor.attrs {
                 if (StrLower(key) != "href")
                     continue
-                if !RegExMatch(value, "i)#(user-content-[^#?`"]+)", &mHref)
+                newValue := HtmlNorm._NormalizeFootnoteHref(value)
+                if (newValue = "")
                     continue
-                newValue := "#" . mHref[1]
                 if (value != newValue) {
                     anchor.attrs[key] := newValue
                     changed := true
@@ -1273,7 +1289,7 @@ class HtmlNorm {
         footnoteLis := []
         HtmlNorm._CollectMatchingNodes(nodes
             , (n) => HtmlNorm._IsTag(n, "li")
-                && RegExMatch(HtmlNorm._GetAttrCI(n, "id"), "^user-content-fn-")
+                && HtmlNorm._StartsWithCI(HtmlNorm._GetAttrCI(n, "id"), "user-content-fn-")
             , &footnoteLis)
 
         for li in footnoteLis {
@@ -1418,8 +1434,7 @@ class HtmlNorm {
      * @returns {boolean}
      */
     static _SubtreeHasLineThroughStyle(root) {
-        hit := root.FindFirst((n) => RegExMatch(HtmlNorm._GetAttrCI(n, "style")
-            , "i)\btext-decoration\s*:\s*line-through\b"))
+        hit := root.FindFirst((n) => HtmlNorm._StyleHasLineThrough(n))
         return IsObject(hit)
     }
 
@@ -1670,7 +1685,76 @@ class HtmlNorm {
         classAttr := HtmlNorm._GetAttrCI(node, "class")
         if (classAttr = "")
             return false
-        return RegExMatch(classAttr, "(?:^|\s)" . token . "(?:\s|$)")
+        for item in StrSplit(classAttr, " ") {
+            t := Trim(item, " `t`r`n")
+            if (t = "")
+                continue
+            if (t = token)
+                return true
+        }
+        return false
+    }
+
+    /**
+     * True when any class token starts with the given prefix.
+     * @param {DomNode} node
+     * @param {string} prefix
+     * @returns {boolean}
+     */
+    static _ClassHasPrefix(node, prefix) {
+        classAttr := HtmlNorm._GetAttrCI(node, "class")
+        if (classAttr = "")
+            return false
+        for item in StrSplit(classAttr, " ") {
+            t := Trim(item, " `t`r`n")
+            if (t = "")
+                continue
+            if (SubStr(t, 1, StrLen(prefix)) = prefix)
+                return true
+        }
+        return false
+    }
+
+    /**
+     * Case-insensitive starts-with.
+     * @param {string} s
+     * @param {string} prefix
+     * @returns {boolean}
+     */
+    static _StartsWithCI(s, prefix) {
+        return (StrLower(SubStr(s, 1, StrLen(prefix))) = StrLower(prefix))
+    }
+
+    /**
+     * Returns canonical "#user-content-..." href when value contains it,
+     * else returns "".
+     * @param {string} href
+     * @returns {string}
+     */
+    static _NormalizeFootnoteHref(href) {
+        marker := "#user-content-"
+        pos := InStr(StrLower(href), marker)
+        if (pos < 1)
+            return ""
+        tail := SubStr(href, pos + 1) ; keep without leading '#'
+        qPos := InStr(tail, "?")
+        if (qPos > 0)
+            tail := SubStr(tail, 1, qPos - 1)
+        hashPos := InStr(tail, "#")
+        if (hashPos > 0)
+            tail := SubStr(tail, 1, hashPos - 1)
+        tail := Trim(tail, " `t`r`n")
+        return (tail = "") ? "" : ("#" . tail)
+    }
+
+    /**
+     * True when node style contains text-decoration: line-through.
+     * @param {DomNode} node
+     * @returns {boolean}
+     */
+    static _StyleHasLineThrough(node) {
+        style := StrLower(HtmlNorm._GetAttrCI(node, "style"))
+        return (InStr(style, "text-decoration") > 0 && InStr(style, "line-through") > 0)
     }
 
     /**
