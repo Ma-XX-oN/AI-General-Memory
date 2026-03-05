@@ -1,5 +1,5 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; HtmlParser — PCRE callout-based structural HTML parser
+; HtmlParser - PCRE callout-based structural HTML parser
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 #Include HtmlDom.ahk
@@ -10,29 +10,29 @@
  * Drives a PCRE recursive subroutine pattern with these callouts:
  *
  *   Regular tag path (first alternative of `(?<tag>...)`):
- *     `(?C:dom_snapshot_push)` — saves {dom,frames} lengths before each tag attempt
- *     `(?C:_HP_TagOpen)`       — fires after tag name, before attributes; pushes frame
- *     `(?C:_HP_Attr)`          — fires after each name=value (or boolean) attribute
- *     `(?C:_HP_Tag)`           — fires after matching `</tag>`; completes the node
+ *     `(?C:dom_snapshot_push)` - saves {dom,frames} lengths before each tag attempt
+ *     `(?C:_HP_TagOpen)`       - fires after tag name, before attributes; pushes frame
+ *     `(?C:_HP_Attr)`          - fires after each name=value (or boolean) attribute
+ *     `(?C:_HP_Tag)`           - fires after matching `</tag>`; completes the node
  *
  *   Void-element fallback (second alternative, reached when first alt fails):
- *     `(?C:dom_reset)`          — peeks saved snapshot; restores _dom and _frames to
+ *     `(?C:dom_reset)`          - peeks saved snapshot; restores _dom and _frames to
  *                                pre-attempt lengths, discarding side effects of the
  *                                failed first alt
- *     `(?C:_HP_TagOpen)`        — same as above; pushes a fresh frame for the bare tag
- *     `(?C:_HP_Tag_not_closed)` — completes the node; throws if tag is not a known
+ *     `(?C:_HP_TagOpen)`        - same as above; pushes a fresh frame for the bare tag
+ *     `(?C:_HP_Tag_not_closed)` - completes the node; throws if tag is not a known
  *                                HTML void element
  *
  *   Both paths (fires at end of `(?<tag>...)` on any successful match):
- *     `(?C:dom_snapshot_pop)` — pops the saved snapshot
+ *     `(?C:dom_snapshot_pop)` - pops the saved snapshot
  *
  *   Text nodes:
- *     `(?C:_HP_Text)` — fires after each text chunk between tags
+ *     `(?C:_HP_Text)` - fires after each text chunk between tags
  *
  * Three shared stacks are maintained:
- *   `HtmlParser._dom`      — completed DomNode objects; returned when parsing finishes
- *   `HtmlParser._frames`   — one frame per open tag (name, attrs, childStart)
- *   `HtmlParser._snapshot` — {dom,frames} checkpoints pushed by `dom_snapshot_push`,
+ *   `HtmlParser._dom`      - completed DomNode objects; returned when parsing finishes
+ *   `HtmlParser._frames`   - one frame per open tag (name, attrs, childStart)
+ *   `HtmlParser._snapshot` - {dom,frames} checkpoints pushed by `dom_snapshot_push`,
  *                            peeked+restored by `dom_reset`, popped by `dom_snapshot_pop`
  *
  * ## Pattern entry points
@@ -73,14 +73,14 @@ class HtmlParser {
    * PCRE pattern for recursive HTML tag matching.
    *
    * Subroutines (in DEFINE block):
-   *   symbol   — valid XML/HTML name token (letters, digits, `_`, `-`)
-   *   sq / dq  — single- or double-quoted string (including surrounding quotes)
-   *   attr     — one attribute: name optionally followed by `=value`
-   *   void_tag — void-element fallback: `dom_reset`, then match bare `<tag>`;
+   *   symbol   - valid XML/HTML name token (letters, digits, `_`, `-`)
+   *   sq / dq  - single- or double-quoted string (including surrounding quotes)
+   *   attr     - one attribute: name optionally followed by `=value`
+   *   void_tag - void-element fallback: `dom_reset`, then match bare `<tag>`;
    *              captures the name into `(?<void_name>)` (distinct from
    *              `(?<tag_name>)` in `tag`) so that `\k<tag_name>` and
    *              `m["tag_name"]` in the outer `tag` call are never corrupted
-   *   tag      — one element: opening tag, optional children, closing tag
+   *   tag      - one element: opening tag, optional children, closing tag
    *              (or self-closing with `/>`, or delegates to `(?&void_tag)`)
    *
    * The `(?<tag>...)` subroutine opens with `< (?!/)` so that closing tags
@@ -111,7 +111,7 @@ class HtmlParser {
         (?C:_HP_Attr)
       `)
 
-      (?<void_tag> (?# void element fallback — entered when the first alt of tag fails )
+      (?<void_tag> (?# void element fallback - entered when the first alt of tag fails )
         (?C:dom_reset)
         (?<void_name> (?&symbol) ) (?C:_HP_TagOpen) \s*+ (?&attr)*+ >
         (?C:_HP_Tag_not_closed)
@@ -238,14 +238,14 @@ class HtmlParser {
    * the top snapshot and restores _dom and _frames to the lengths recorded
    * before this tag attempt began.  `dom_snapshot_pop` (at the end of
    * `(?<tag>...)`) owns the pop for successful matches; for a completely-failed
-   * tag (both alts fail — only possible for `<!...>` style non-element tags
+   * tag (both alts fail - only possible for `<!...>` style non-element tags
    * that pass `(?!/)`) the snapshot is left as a harmless 1-entry leak that
    * `Parse()` clears on the next call.
    */
   static _DomReset(*) {
     if (HtmlParser._snapshot.Length = 0)
       return
-    s := HtmlParser._snapshot[HtmlParser._snapshot.Length]   ; peek — do NOT pop
+    s := HtmlParser._snapshot[HtmlParser._snapshot.Length]   ; peek - do NOT pop
     while (HtmlParser._dom.Length > s.dom)
       HtmlParser._dom.Pop()
     while (HtmlParser._frames.Length > s.frames)
@@ -280,7 +280,7 @@ class HtmlParser {
 }
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; Global shims — AHK resolves (?C:Name) callouts as global function lookups.
+; Global shims - AHK resolves (?C:Name) callouts as global function lookups.
 ; These thin wrappers delegate to the HtmlParser static methods above.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
