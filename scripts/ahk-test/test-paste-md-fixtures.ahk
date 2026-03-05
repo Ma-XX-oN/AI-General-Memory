@@ -134,6 +134,11 @@ for fx in fixtures {
         _WriteFixtureOutputLog(outputLogPath, plain, cfHtml, converted, true)
       ChkEqNorm("source", converted["source"], fx.source)
       aborted := converted.Has("aborted") ? converted["aborted"] : false
+      parseFailureCount := converted.Has("parseFailureCount") ? converted["parseFailureCount"] : 0
+      if (sc["expectParse"]) {
+        parseDetail := converted.Has("parseDiagnostics") ? converted["parseDiagnostics"] : ""
+        Chk("expected parse succeeded (no parse diagnostics)", parseFailureCount = 0, parseDetail)
+      }
 
       if (sc["expectAbort"]) {
         Chk("conversion aborted", aborted)
@@ -283,7 +288,8 @@ ParseFixtureScenarios(logText) {
       "case", "",
       "hasPrompt", false,
       "prompt", "",
-      "expectAbort", false
+      "expectAbort", false,
+      "expectParse", false
     ))
     return scenarios
   }
@@ -304,7 +310,7 @@ ParseFixtureScenarios(logText) {
 
 /**
  * Parses one metadata scenario line.
- * Accepted keys: case, prompt, expectAbort.
+ * Accepted keys: case, prompt, expectAbort, expectParse.
  * @param {string} line - One metadata line.
  * @param {string} err - Output parse/validation error text.
  * @returns {Map|integer} Scenario map, or 0 on parse error.
@@ -329,7 +335,8 @@ ParseFixtureScenarioLine(line, &err := "") {
   allowed := Map(
     "case", true,
     "prompt", true,
-    "expectabort", true
+    "expectabort", true,
+    "expectparse", true
   )
   for key, _ in pairs {
     if !allowed.Has(key) {
@@ -347,7 +354,8 @@ ParseFixtureScenarioLine(line, &err := "") {
     "case", pairs["case"],
     "hasPrompt", false,
     "prompt", "",
-    "expectAbort", false
+    "expectAbort", false,
+    "expectParse", false
   )
 
   if pairs.Has("prompt") {
@@ -369,6 +377,15 @@ ParseFixtureScenarioLine(line, &err := "") {
       return 0
     }
     scenario["expectAbort"] := (val = "1")
+  }
+
+  if pairs.Has("expectparse") {
+    val := Trim(pairs["expectparse"], " `t")
+    if !RegExMatch(val, "^[01]$") {
+      err := "expectParse must be 0 or 1"
+      return 0
+    }
+    scenario["expectParse"] := (val = "1")
   }
 
   return scenario
@@ -629,6 +646,8 @@ _WriteFixtureOutputLog(path, plain, cfHtml, converted, asQuoted := true) {
     PasteMd._DbgSection(f, "1. plain (A_Clipboard minus CR)", plain)
     PasteMd._DbgSection(f, "2. cfHtml (raw full payload)", cfHtml)
     PasteMd._DbgSection(f, "3. htmlFrag (CF_HTML fragment)", converted["htmlFrag"])
+    if (converted.Has("parseFailureCount") && converted["parseFailureCount"] > 0)
+      PasteMd._DbgSection(f, "3a. parse diagnostics (DOM parse pass-through)", converted["parseDiagnostics"])
     f.Write("=== 2b. cfHtml offsets ===`n")
     f.Write("StartHTML: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartHTML:") "`n")
     f.Write("EndHTML: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndHTML:") "`n")
