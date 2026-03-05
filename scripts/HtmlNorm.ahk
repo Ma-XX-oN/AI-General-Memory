@@ -257,40 +257,6 @@ class HtmlNorm {
     ; ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Replaces `<img>` and `<svg>` elements according to the showImg flag.
-     *
-     * When showImg is false:
-     *   - No accessible text (alt / title / aria-label / SVG `<title>`): dropped.
-     *   - Has accessible text: replaced with `(img: <text>)`.
-     *
-     * When showImg is true, leaves elements in place for pandoc.
-     *
-     * DOM parse failures are non-fatal and return the original html unchanged.
-     *
-     * @param {string} html
-     * @param {boolean} showImg
-     * @returns {string}
-     */
-    static _ProcessImgTags(html, showImg) {
-        if showImg
-            return html
-        rootNodes := HtmlNorm._TryParseDomNodes(html)
-        wrapped := false
-        if (rootNodes.Length = 0) {
-            rootNodes := HtmlNorm._TryParseDomNodes("<ul>" . html . "</ul>")
-            if (rootNodes.Length = 1 && HtmlNorm._IsTag(rootNodes[1], "ul"))
-                wrapped := true
-            else
-                return html
-        }
-        nodes := wrapped ? rootNodes[1].children : rootNodes
-        if !HtmlNorm._HasImgLikeNode(nodes)
-            return html
-        nodes := HtmlNorm._ProcessImgTagsDomNodes(nodes)
-        return HtmlNorm._SerializeDomNodes(nodes)
-    }
-
-    /**
      * Injects poster placeholders in parsed DOM nodes by source-specific selectors.
      * @param {Array} nodes
      * @param {string} source
@@ -1047,37 +1013,6 @@ class HtmlNorm {
                 return SubStr(t, StrLen("language-") + 1)
         }
         return ""
-    }
-
-    /**
-     * Unwraps redundant container elements that wrap canonical `<pre><code>` blocks.
-     * Repeats until no further simplification is possible.
-     * @param {string} html
-     * @returns {string}
-     */
-    static _UnwrapNestedContainers(html) {
-        return HtmlNorm._UnwrapNestedContainersDom(html)
-    }
-
-    /**
-     * DOM-first container simplifier for code-block wrapper patterns.
-     * @param {string} html
-     * @returns {string}
-     */
-    static _UnwrapNestedContainersDom(html) {
-        nodes := HtmlNorm._TryParseDomNodes(html)
-        if (nodes.Length = 0)
-            return html
-
-        changedAny := false
-        Loop 10 {
-            changed := false
-            nodes := HtmlNorm._UnwrapNestedContainersDomNodes(nodes, &changed)
-            if !changed
-                break
-            changedAny := true
-        }
-        return changedAny ? HtmlNorm._SerializeDomNodes(nodes) : html
     }
 
     /**
