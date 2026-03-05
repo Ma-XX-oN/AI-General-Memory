@@ -147,15 +147,11 @@ class HtmlNorm {
         ; Uses a single parse/serialize cycle when either operation is enabled.
         html := HtmlNorm._NormalizeLeadDom(html, source, showPoster, showImg)
 
-        ; 3. Convert tool diff containers into canonical language-diff code blocks.
-        html := HtmlNorm._NormalizeSimpleDiffBlocks(html)
-
-        ; 4. Strip UI buttons.
-        html := HtmlNorm._StripTagDom(html, "button")
-
-        ; 5. ChatGPT: normalize CodeMirror code blocks before any span stripping.
-        if (source = "chatgpt")
-            html := HtmlNorm._NormalizeChatGptCodeBlocks(html)
+        ; 3 + 4 + 5. Early code/widget cleanup in one DOM parse/serialize cycle:
+        ;   - Convert tool diff containers into canonical language-diff code blocks.
+        ;   - Strip UI buttons.
+        ;   - ChatGPT: normalize CodeMirror code blocks before any span stripping.
+        html := HtmlNorm._NormalizeDiffButtonCodeDom(html, source)
 
         ; 6 + 7 + 8. Mid DOM cleanup in one parse/serialize cycle:
         ;   - Normalize task-list checkboxes.
@@ -244,6 +240,51 @@ class HtmlNorm {
         if needPoster
             HtmlNorm._InjectPosterPlaceholdersDomNodes(nodes, source)
         return HtmlNorm._SerializeDomNodes(nodes)
+    }
+
+    /**
+     * Runs stages 3, 4, and 5 in one DOM parse/serialize cycle.
+     *
+     * - diff widget normalization
+     * - button stripping
+     * - ChatGPT overflow-visible <pre> normalization
+     *
+     * @param {string} html
+     * @param {string} source
+     * @returns {string}
+     */
+    static _NormalizeDiffButtonCodeDom(html, source) {
+        needDiff := RegExMatch(html, "i)<diffs-container\b")
+        needButton := RegExMatch(html, "i)</?button\b")
+        needChatPre := (source = "chatgpt")
+            && RegExMatch(html, "i)<pre\b[^>]*\boverflow-visible\b[^>]*>")
+        if !(needDiff || needButton || needChatPre)
+            return html
+
+        nodes := HtmlNorm._TryParseDomNodes(html)
+        if (nodes.Length = 0)
+            return html
+
+        changed := false
+
+        if needDiff {
+            lastButton := ""
+            nodes := HtmlNorm._NormalizeSimpleDiffBlocksDomNodes(nodes, &lastButton, &changed)
+        }
+
+        if needButton {
+            btnNodes := []
+            HtmlNorm._CollectMatchingNodes(nodes, (n) => HtmlNorm._IsTag(n, "button"), &btnNodes)
+            if (btnNodes.Length > 0) {
+                nodes := HtmlNorm._RemoveMatchingDomNodes(nodes, (n) => HtmlNorm._IsTag(n, "button"))
+                changed := true
+            }
+        }
+
+        if needChatPre
+            nodes := HtmlNorm._NormalizeChatGptCodeBlocksDomNodes(nodes, &changed)
+
+        return changed ? HtmlNorm._SerializeDomNodes(nodes) : html
     }
 
     /**
