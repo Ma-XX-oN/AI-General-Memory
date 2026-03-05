@@ -1,66 +1,62 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; HtmlParser - PCRE callout-based structural HTML parser
+; HtmlParser - MSHTML-backed structural HTML parser
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 #Include HtmlDom.ahk
 
 /**
- * Parses an HTML fragment into a flat array of top-level DomNode trees.
+ * Parses HTML fragments through MSHTML (`HTMLFILE`) and converts them into
+ * `DomNode` trees consumed by HtmlNorm/PasteAsMd.
  *
- * Drives a PCRE recursive subroutine pattern with these callouts:
- *
- *   Regular tag path (first alternative of `(?<tag>...)`):
- *     `(?C:dom_snapshot_push)` - saves {dom,frames} lengths before each tag attempt
- *     `(?C:_HP_TagOpen)`       - fires after tag name, before attributes; pushes frame
- *     `(?C:_HP_Attr)`          - fires after each name=value (or boolean) attribute
- *     `(?C:_HP_Tag)`           - fires after matching `</tag>`; completes the node
- *
- *   Void-element fallback (second alternative, reached when first alt fails):
- *     `(?C:dom_reset)`          - peeks saved snapshot; restores _dom and _frames to
- *                                pre-attempt lengths, discarding side effects of the
- *                                failed first alt
- *     `(?C:_HP_TagOpen)`        - same as above; pushes a fresh frame for the bare tag
- *     `(?C:_HP_Tag_not_closed)` - completes the node; throws if tag is not a known
- *                                HTML void element
- *
- *   Both paths (fires at end of `(?<tag>...)` on any successful match):
- *     `(?C:dom_snapshot_pop)` - pops the saved snapshot
- *
- *   Text nodes:
- *     `(?C:_HP_Text)` - fires after each text chunk between tags
- *
- * Three shared stacks are maintained:
- *   `HtmlParser._dom`      - completed DomNode objects; returned when parsing finishes
- *   `HtmlParser._frames`   - one frame per open tag (name, attrs, childStart)
- *   `HtmlParser._snapshot` - {dom,frames} checkpoints pushed by `dom_snapshot_push`,
- *                            peeked+restored by `dom_reset`, popped by `dom_snapshot_pop`
- *
- * ## Pattern entry points
- *
- * The regex uses a `(?(DEFINE)...)` block to declare all subroutines without
- * matching, followed by `(?&tag)` as the sole entry point.  `RegExMatch` is
- * called in a loop so every top-level tag in the fragment is visited.
- *
- * @param {string} html - Raw HTML fragment to parse
- * @returns {Array} Flat array of top-level DomNode trees
+ * Notes:
+ * - Output remains a flat Array of top-level element DomNode roots.
+ * - Text nodes are preserved as `DomNode("text", "", text)`.
+ * - Comments/doctype nodes are ignored in output.
  */
 class HtmlParser {
-  /** @type {Array} DomNode work-stack; top-level nodes accumulate here. */
-  static _dom      := []
-
-  /** @type {Array} Open-tag frame stack; each element is an Object. */
-  static _frames   := []
-
   /**
-   * Snapshot stack for void-element backtracking.
-   * Each entry is `{dom: int, frames: int}` recording the _dom and _frames
-   * lengths at the start of a `(?<tag>...)` attempt.
-   * @type {Array}
+   * Parse progress for the current/most recent Parse call (0..1).
+   * @type {float}
    */
-  static _snapshot := []
+  static progress := 0.0
+
+  /** @type {integer} Input HTML length for current/most recent parse. */
+  static _parseHayLen := 0
+  /** @type {integer} A_TickCount at Parse start. */
+  static _parseStartTick := 0
+  /** @type {integer} A_TickCount of most recent node-visit update. */
+  static _parseLastTick := 0
+  /** @type {integer} Number of visited nodes converted to DomNode. */
+  static _parseVisitedCount := 0
+  /** @type {integer} Estimated total node count for progress normalization. */
+  static _parseTotalCount := 0
+  /** @type {integer} Last processed node position (visited-count proxy). */
+  static _parseLastPos := 0
+  /** @type {integer} Number of visited element nodes. */
+  static _parseTagOpenCount := 0
+  /** @type {integer} Number of progress-bearing events (visited nodes). */
+  static _parseProgressEventCount := 0
+  /** @type {integer} Next heartbeat tick for profile logging. */
+  static _profileNextTick := 0
 
   /**
-   * Known HTML void element names (elements that never have a closing tag).
+   * Enables lightweight parser heartbeat logging.
+   * @type {boolean}
+   */
+  static PROFILE_ENABLED := true
+  /** @type {integer} Heartbeat cadence in milliseconds. */
+  static PROFILE_INTERVAL_MS := 500
+  /** @type {string} Heartbeat log path. */
+  static PROFILE_PATH := "c:\\ahk\\HtmlParser_profile.log"
+  /**
+   * Maximum parse time budget in milliseconds.
+   * Set <= 0 to disable timeout aborts.
+   * @type {integer}
+   */
+  static PARSE_MAX_MS := 5000
+
+  /**
+   * Known HTML void element names.
    * @type {Map}
    */
   static _voidTags := Map(
@@ -70,71 +66,11 @@ class HtmlParser {
   )
 
   /**
-   * PCRE pattern for recursive HTML tag matching.
-   *
-   * Subroutines (in DEFINE block):
-   *   symbol   - valid XML/HTML name token (letters, digits, `_`, `-`)
-   *   sq / dq  - single- or double-quoted string (including surrounding quotes)
-   *   attr     - one attribute: name optionally followed by `=value`
-   *   void_tag - void-element fallback: `dom_reset`, then match bare `<tag>`;
-   *              captures the name into `(?<void_name>)` (distinct from
-   *              `(?<tag_name>)` in `tag`) so that `\k<tag_name>` and
-   *              `m["tag_name"]` in the outer `tag` call are never corrupted
-   *   tag      - one element: opening tag, optional children, closing tag
-   *              (or self-closing with `/>`, or delegates to `(?&void_tag)`)
-   *
-   * The `(?<tag>...)` subroutine opens with `< (?!/)` so that closing tags
-   * (`</foo>`) never enter the pattern and never fire any callouts.
-   * `dom_snapshot_push` fires after the `<` but before the tag name, so the
-   * snapshot is always taken before any frame is pushed.  `dom_snapshot_pop`
-   * fires at the end of the subroutine on any successful match (first or
-   * second alternative); `dom_reset` peeks and restores state for the
-   * `void_tag` attempt without consuming the snapshot.
-   *
-   * @type {string}
+   * Throws on obvious malformed single unclosed non-void tags.
+   * Keeps historical test behaviour for `<div>no closing tag`.
+   * @type {boolean}
    */
-  static _RE := "
-  (
-    xs)
-    (?(DEFINE)
-
-      (?<symbol>  [a-zA-Z_][a-zA-Z_\d\-]*+ )
-
-      (?<sq>  '[^']*+' )
-      (?<dq>  "[^"]*+" )
-      (?<uq>  [^\s"'=<>]+ )
-
-      (?<attr>
-        (?<attr_name>  (?&symbol) )
-        (?: \s*+ = \s*+ (?<attr_val> (?:(?&sq)|(?&dq)|(?&uq)) ) )?+
-        \s*+
-        (?C:_HP_Attr)
-      `)
-
-      (?<void_tag> (?# void element fallback - entered when the first alt of tag fails )
-        (?C:dom_reset)
-        (?<void_name> (?&symbol) ) (?C:_HP_TagOpen) \s*+ (?&attr)*+ >
-        (?C:_HP_Tag_not_closed)
-      `)
-
-      (?<tag> (?# assumes that the first character is a `<` )
-        < (?!/)
-        (?C:dom_snapshot_push)
-        (?:
-          (?<tag_name> (?&symbol) ) (?C:_HP_TagOpen) \s*+ (?&attr)*+ (?<closed>/)?+>
-          (?(closed)
-          | (?: (?<text_chunk>[^<]++) (?C:_HP_Text) | (?&tag) )*+
-            </ \k<tag_name> >
-          `)
-          (?C:_HP_Tag)
-        |
-          (?&void_tag)
-        `)
-        (?C:dom_snapshot_pop)
-      `)
-    `)
-    (?&tag)
-  )"
+  static STRICT_UNCLOSED_NONVOID_CHECK := true
 
   /**
    * Parses `html` and returns an array of top-level DomNode trees.
@@ -142,161 +78,379 @@ class HtmlParser {
    * @returns {Array} Top-level DomNode objects
    */
   static Parse(html) {
-    HtmlParser._dom      := []
-    HtmlParser._frames   := []
-    HtmlParser._snapshot := []
-    pos := 1
-    while RegExMatch(html, HtmlParser._RE, &m, pos)
-      pos := m.Pos + m.Len
-    return HtmlParser._dom
-  }
+    HtmlParser._ResetMetrics(html)
+    HtmlParser._WriteProfileLine("START len=" HtmlParser._parseHayLen)
 
-  /**
-   * PCRE callout `(?C:_HP_TagOpen)`: fires after tag name, before attributes.
-   * Pushes a new frame onto the frame stack.
-   * @param {RegExMatchInfo} m - Match state at callout point
-   */
-  static _TagOpen(m, *) {
-    HtmlParser._frames.Push({
-      name:       m["void_name"] != "" ? m["void_name"] : m["tag_name"],
-      attrs:      Map(),
-      childStart: HtmlParser._dom.Length
-    })
-  }
-
-  /**
-   * PCRE callout `(?C:_HP_Attr)`: fires after each attribute (name[=value]).
-   * Adds the attribute to the topmost frame.  Boolean attributes (no value)
-   * are stored with an empty string value.
-   * @param {RegExMatchInfo} m - Match state at callout point
-   */
-  static _Attr(m, *) {
-    if (HtmlParser._frames.Length = 0)
-      return
-    frame   := HtmlParser._frames[HtmlParser._frames.Length]
-    attrVal := m["attr_val"]
-    ; Strip surrounding quotes only when the value is quoted.
-    if (attrVal != "") {
-      first := SubStr(attrVal, 1, 1)
-      last  := SubStr(attrVal, -1)
-      if (StrLen(attrVal) >= 2 && (first = "'" || first = '"') && last = first)
-        attrVal := SubStr(attrVal, 2, StrLen(attrVal) - 2)
+    if (html = "") {
+      HtmlParser.progress := 1.0
+      HtmlParser._WriteProfileLine("END " HtmlParser._FormatProfileStatus())
+      return []
     }
-    frame.attrs[m["attr_name"]] := attrVal
+
+    if (HtmlParser.STRICT_UNCLOSED_NONVOID_CHECK)
+      HtmlParser._ThrowIfObviouslyUnclosedNonVoid(html)
+
+    doc := HtmlParser._CreateHtmlDocument(html)
+    roots := HtmlParser._CollectFragmentRootNodes(doc)
+
+    HtmlParser._parseTotalCount := HtmlParser._CountConvertibleNodes(roots)
+    if (HtmlParser._parseTotalCount <= 0)
+      HtmlParser._parseTotalCount := 1
+
+    out := []
+    for rootCom in roots {
+      dom := HtmlParser._ConvertComNode(rootCom)
+      if IsObject(dom)
+        out.Push(dom)
+    }
+
+    HtmlParser.progress := 1.0
+    HtmlParser._parseLastTick := A_TickCount
+    HtmlParser._WriteProfileLine("END " HtmlParser._FormatProfileStatus())
+    return out
   }
 
   /**
-   * PCRE callout `(?C:_HP_Text)`: fires after each raw text chunk between tags.
-   * Pushes a `DomNode("text")` whose `text` field holds the matched string.
-   * The node appears as a child of the enclosing element in document order.
-   * @param {RegExMatchInfo} m - Match state at callout point
+   * Returns parse-progress metrics for diagnostics/profiling.
+   * @returns {Map}
    */
-  static _Text(m, *) {
-    if (HtmlParser._frames.Length = 0)
+  static GetParseMetrics() {
+    now := A_TickCount
+    elapsed := (HtmlParser._parseStartTick = 0) ? 0 : (now - HtmlParser._parseStartTick)
+    idle := (HtmlParser._parseLastTick = 0) ? elapsed : (now - HtmlParser._parseLastTick)
+    return Map(
+      "elapsedMs", elapsed,
+      "hayLen", HtmlParser._parseHayLen,
+      "progress", HtmlParser.progress,
+      "tagOpenCount", HtmlParser._parseTagOpenCount,
+      "progressEventCount", HtmlParser._parseProgressEventCount,
+      "lastPos", HtmlParser._parseLastPos,
+      "idleMs", idle
+    )
+  }
+
+  /**
+   * Resets parser metrics before each Parse() call.
+   * @param {string} html
+   */
+  static _ResetMetrics(html) {
+    HtmlParser.progress := 0.0
+    HtmlParser._parseHayLen := StrLen(html)
+    HtmlParser._parseStartTick := A_TickCount
+    HtmlParser._parseLastTick := 0
+    HtmlParser._parseVisitedCount := 0
+    HtmlParser._parseTotalCount := 0
+    HtmlParser._parseLastPos := 0
+    HtmlParser._parseTagOpenCount := 0
+    HtmlParser._parseProgressEventCount := 0
+    HtmlParser._profileNextTick := HtmlParser._parseStartTick
+  }
+
+  /**
+   * Creates an MSHTML document and loads fragment HTML.
+   * @param {string} html
+   * @returns {ComObject}
+   */
+  static _CreateHtmlDocument(html) {
+    doc := ComObject("HTMLFILE")
+    doc.write(html)
+    doc.close()
+    return doc
+  }
+
+  /**
+   * Collects top-level fragment roots from Start/EndFragment comments when
+   * available, otherwise falls back to element children of body.
+   * @param {ComObject} doc
+   * @returns {Array}
+   */
+  static _CollectFragmentRootNodes(doc) {
+    roots := []
+    body := ""
+    try body := doc.body
+    if !IsObject(body)
+      return roots
+
+    start := HtmlParser._FindFragmentBoundaryComment(body, "StartFragment")
+    stop := HtmlParser._FindFragmentBoundaryComment(body, "EndFragment")
+    if (IsObject(start) && IsObject(stop)) {
+      node := ""
+      try node := start.nextSibling
+      while IsObject(node) {
+        if (ObjPtr(node) = ObjPtr(stop))
+          break
+        try {
+          if (node.nodeType = 1)
+            roots.Push(node)
+        }
+        next := ""
+        try next := node.nextSibling
+        node := next
+      }
+      if (roots.Length > 0)
+        return roots
+    }
+
+    node := ""
+    try node := body.firstChild
+    while IsObject(node) {
+      nodeType := 0
+      try nodeType := node.nodeType
+      if (nodeType = 1)
+        roots.Push(node)
+      next := ""
+      try next := node.nextSibling
+      node := next
+    }
+    return roots
+  }
+
+  /**
+   * Finds a comment node containing `label` in subtree rooted at `node`.
+   * @param {ComObject} node
+   * @param {string} label
+   * @returns {ComObject|string}
+   */
+  static _FindFragmentBoundaryComment(node, label) {
+    if !IsObject(node)
+      return ""
+    nodeType := 0
+    try nodeType := node.nodeType
+    if (nodeType = 8) {
+      text := ""
+      try text := "" node.nodeValue
+      if InStr(text, label)
+        return node
+    }
+    child := ""
+    try child := node.firstChild
+    while IsObject(child) {
+      found := HtmlParser._FindFragmentBoundaryComment(child, label)
+      if IsObject(found)
+        return found
+      next := ""
+      try next := child.nextSibling
+      child := next
+    }
+    return ""
+  }
+
+  /**
+   * Counts convertible nodes (elements + text nodes) under root COM nodes.
+   * @param {Array} roots
+   * @returns {integer}
+   */
+  static _CountConvertibleNodes(roots) {
+    count := 0
+    stack := []
+    for root in roots
+      stack.Push(root)
+    while (stack.Length > 0) {
+      cur := stack.Pop()
+      nodeType := 0
+      try nodeType := cur.nodeType
+      if (nodeType = 1 || nodeType = 3)
+        count += 1
+      if (nodeType = 1) {
+        child := ""
+        try child := cur.firstChild
+        while IsObject(child) {
+          stack.Push(child)
+          next := ""
+          try next := child.nextSibling
+          child := next
+        }
+      }
+    }
+    return count
+  }
+
+  /**
+   * Converts an MSHTML node into DomNode recursively.
+   * @param {ComObject} comNode
+   * @returns {DomNode|string}
+   */
+  static _ConvertComNode(comNode) {
+    if !IsObject(comNode)
+      return ""
+
+    nodeType := 0
+    try nodeType := comNode.nodeType
+
+    if (nodeType != 1 && nodeType != 3)
+      return ""
+
+    HtmlParser._OnProgressEvent(nodeType = 1)
+
+    if (nodeType = 3) {
+      text := ""
+      try text := "" comNode.nodeValue
+      return DomNode("text", "", text)
+    }
+
+    tag := ""
+    try tag := StrLower("" comNode.nodeName)
+    attrs := HtmlParser._ExtractAttributes(comNode)
+    node := DomNode(tag, attrs)
+
+    kids := ""
+    try kids := comNode.firstChild
+    childCom := kids
+    while IsObject(childCom) {
+      childNode := HtmlParser._ConvertComNode(childCom)
+      if IsObject(childNode)
+        node.Add(childNode)
+      next := ""
+      try next := childCom.nextSibling
+      childCom := next
+    }
+    return node
+  }
+
+  /**
+   * Extracts element attributes into a lowercase-key Map.
+   * @param {ComObject} comNode
+   * @returns {Map}
+   */
+  static _ExtractAttributes(comNode) {
+    attrs := Map()
+    attrList := ""
+    try attrList := comNode.attributes
+    if !IsObject(attrList)
+      return attrs
+    attrLen := HtmlParser._CollectionLength(attrList)
+    Loop attrLen {
+      attr := HtmlParser._CollectionItem(attrList, A_Index - 1)
+      if !IsObject(attr)
+        continue
+      name := ""
+      try name := StrLower("" attr.nodeName)
+      if (name = "")
+        continue
+      specified := true
+      try specified := attr.specified
+      if !specified
+        continue
+      val := ""
+      try val := comNode.getAttribute(name, 2)
+      if (val = "")
+        try val := attr.nodeValue
+      attrs[name] := (val = "" ? "" : "" val)
+    }
+    return attrs
+  }
+
+  /**
+   * Returns COM collection length (0 when unavailable).
+   * @param {ComObject} coll
+   * @returns {integer}
+   */
+  static _CollectionLength(coll) {
+    if !IsObject(coll)
+      return 0
+    len := 0
+    try len := coll.length
+    if (len = "")
+      return 0
+    return Integer(len)
+  }
+
+  /**
+   * Returns COM collection item by 0-based index.
+   * @param {ComObject} coll
+   * @param {integer} idx
+   * @returns {ComObject|string}
+   */
+  static _CollectionItem(coll, idx) {
+    if !IsObject(coll)
+      return ""
+    item := ""
+    try item := coll.item(idx)
+    return item
+  }
+
+  /**
+   * Updates progress counters, profile heartbeat, and timeout budget checks.
+   * @param {boolean} isElement
+   */
+  static _OnProgressEvent(isElement) {
+    HtmlParser._parseVisitedCount += 1
+    HtmlParser._parseProgressEventCount += 1
+    if isElement
+      HtmlParser._parseTagOpenCount += 1
+    HtmlParser._parseLastPos := HtmlParser._parseVisitedCount
+
+    total := HtmlParser._parseTotalCount
+    HtmlParser.progress := (total > 0) ? (HtmlParser._parseVisitedCount / total) : 0.0
+    if (HtmlParser.progress < 0)
+      HtmlParser.progress := 0.0
+    else if (HtmlParser.progress > 1)
+      HtmlParser.progress := 1.0
+
+    now := A_TickCount
+    HtmlParser._parseLastTick := now
+
+    if (HtmlParser.PARSE_MAX_MS > 0 && (now - HtmlParser._parseStartTick) > HtmlParser.PARSE_MAX_MS) {
+      status := HtmlParser._FormatProfileStatus()
+      HtmlParser._WriteProfileLine("ABORT timeout(ms=" HtmlParser.PARSE_MAX_MS "): " status)
+      throw Error("HtmlParser: parse timeout after " HtmlParser.PARSE_MAX_MS "ms | " status, -1)
+    }
+    if (HtmlParser.PROFILE_ENABLED && now >= HtmlParser._profileNextTick) {
+      HtmlParser._WriteProfileLine(HtmlParser._FormatProfileStatus())
+      HtmlParser._profileNextTick := now + HtmlParser.PROFILE_INTERVAL_MS
+    }
+  }
+
+  /**
+   * Detects simple malformed single-element input with missing close tag.
+   * @param {string} html
+   */
+  static _ThrowIfObviouslyUnclosedNonVoid(html) {
+    if !RegExMatch(html, "is)^\s*<([a-zA-Z][a-zA-Z0-9:_-]*)\b([^>]*)>(.*)$", &m)
       return
-    HtmlParser._dom.Push(DomNode("text", "", m["text_chunk"]))
-  }
+    tag := StrLower(m[1])
+    attrs := m[2]
+    rest := m[3]
 
-  /**
-   * PCRE callout `(?C:_HP_Tag)`: fires after tag content (or immediately for
-   * self-closing tags).  Pops the current frame, harvests any DomNode children
-   * that were pushed to `_dom` after the frame was opened, and pushes the
-   * completed DomNode.
-   * @param {RegExMatchInfo} m - Match state at callout point
-   */
-  static _Tag(m, *) {
-    if (HtmlParser._frames.Length = 0)
+    ; Self-closing and known voids are valid without an explicit close tag.
+    if RegExMatch(attrs, "/\s*$") || HtmlParser._voidTags.Has(tag)
       return
-    frame := HtmlParser._frames.Pop()
 
-    ; Harvest children: everything added to _dom after this frame opened.
-    children := []
-    while (HtmlParser._dom.Length > frame.childStart)
-      children.InsertAt(1, HtmlParser._dom.Pop())
-
-    node := DomNode(frame.name, frame.attrs)
-    for child in children
-      node.Add(child)
-    HtmlParser._dom.Push(node)
-  }
-
-  /**
-   * PCRE callout `(?C:dom_snapshot_push)`: fires after `<` (before tag name)
-   * at the start of each `(?<tag>...)` attempt.  Records the current _dom and
-   * _frames lengths so a failed first-alternative attempt can be rolled back.
-   */
-  static _DomSnapshotPush(*) {
-    HtmlParser._snapshot.Push({
-      dom:    HtmlParser._dom.Length,
-      frames: HtmlParser._frames.Length
-    })
-  }
-
-  /**
-   * PCRE callout `(?C:dom_reset)`: fires at the start of the second
-   * alternative when the first alternative has failed.  Peeks (does NOT pop)
-   * the top snapshot and restores _dom and _frames to the lengths recorded
-   * before this tag attempt began.  `dom_snapshot_pop` (at the end of
-   * `(?<tag>...)`) owns the pop for successful matches; for a completely-failed
-   * tag (both alts fail - only possible for `<!...>` style non-element tags
-   * that pass `(?!/)`) the snapshot is left as a harmless 1-entry leak that
-   * `Parse()` clears on the next call.
-   */
-  static _DomReset(*) {
-    if (HtmlParser._snapshot.Length = 0)
+    ; If a proper closing tag exists anywhere, this isn't the simple malformed case.
+    if RegExMatch(rest, "is)</\s*" tag "\s*>")
       return
-    s := HtmlParser._snapshot[HtmlParser._snapshot.Length]   ; peek - do NOT pop
-    while (HtmlParser._dom.Length > s.dom)
-      HtmlParser._dom.Pop()
-    while (HtmlParser._frames.Length > s.frames)
-      HtmlParser._frames.Pop()
+
+    ; Preserve historical behaviour for a simple unclosed non-void fragment.
+    if !RegExMatch(rest, "is)<")
+      throw Error("HtmlParser: unclosed non-void element <" tag ">", -1)
   }
 
   /**
-   * PCRE callout `(?C:dom_snapshot_pop)`: fires at the end of `(?<tag>...)`
-   * after either alternative has matched successfully.  Pops the snapshot
-   * pushed by `dom_snapshot_push`.
+   * Builds one compact parser-status line for profile logging.
+   * @returns {string}
    */
-  static _DomSnapshotPop(*) {
-    if (HtmlParser._snapshot.Length > 0)
-      HtmlParser._snapshot.Pop()
+  static _FormatProfileStatus() {
+    m := HtmlParser.GetParseMetrics()
+    pct := Round(m["progress"] * 100, 3)
+    return "ms=" m["elapsedMs"]
+      . " progress=" pct "%"
+      . " visited=" m["lastPos"] "/" HtmlParser._parseTotalCount
+      . " events=" m["progressEventCount"]
+      . " tagOpen=" m["tagOpenCount"]
+      . " idleMs=" m["idleMs"]
   }
 
   /**
-   * PCRE callout `(?C:_HP_Tag_not_closed)`: fires after a bare `<tag>` with
-   * no matching `</tag>` was matched by the second alternative.  Creates a
-   * void DomNode (no children).  Throws if the tag name is not a known HTML
-   * void element, since that indicates malformed HTML.
-   * @param {RegExMatchInfo} m - Match state at callout point
+   * Appends one UTF-8 line to the parser profile log.
+   * @param {string} line
    */
-  static _TagNotClosed(m, *) {
-    if (HtmlParser._frames.Length = 0)
+  static _WriteProfileLine(line) {
+    if !HtmlParser.PROFILE_ENABLED
       return
-    frame := HtmlParser._frames.Pop()
-    if !HtmlParser._voidTags.Has(frame.name)
-      throw Error("HtmlParser: unclosed non-void element <" frame.name ">", -1)
-    HtmlParser._dom.Push(DomNode(frame.name, frame.attrs))
+    try FileAppend(
+      FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss") "." SubStr("000" A_MSec, -3) " " line "`n",
+      HtmlParser.PROFILE_PATH,
+      "UTF-8"
+    )
   }
 }
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; Global shims - AHK resolves (?C:Name) callouts as global function lookups.
-; These thin wrappers delegate to the HtmlParser static methods above.
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-/** @param {RegExMatchInfo} m */
-_HP_TagOpen(m, *)        => HtmlParser._TagOpen(m)
-/** @param {RegExMatchInfo} m */
-_HP_Attr(m, *)           => HtmlParser._Attr(m)
-/** @param {RegExMatchInfo} m */
-_HP_Tag(m, *)            => HtmlParser._Tag(m)
-/** @param {RegExMatchInfo} m */
-_HP_Text(m, *)           => HtmlParser._Text(m)
-/** @param {RegExMatchInfo} m */
-_HP_Tag_not_closed(m, *) => HtmlParser._TagNotClosed(m)
-/** Snapshot push/reset/pop shims for void-element backtracking. */
-dom_snapshot_push(m, *)  => HtmlParser._DomSnapshotPush(m)
-/** @param {RegExMatchInfo} m */
-dom_reset(m, *)          => HtmlParser._DomReset(m)
-/** @param {RegExMatchInfo} m */
-dom_snapshot_pop(m, *)   => HtmlParser._DomSnapshotPop(m)
