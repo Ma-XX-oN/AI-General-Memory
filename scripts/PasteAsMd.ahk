@@ -23,8 +23,8 @@ class PasteMd {
     PasteMd.gPasteMenu.Disable("Pinned &full names")
     if (PasteMd.BUSY_SPIN_INTERVAL_MS <= 0)
       throw Error("PasteMd.BUSY_SPIN_INTERVAL_MS must be > 0.")
-    if (PasteMd._busySpinner.Length == 0)
-      throw Error("PasteMd._busySpinner must contain at least one element.")
+    ; if (PasteMd._busySpinner.Length == 0)
+    ;   throw Error("PasteMd._busySpinner must contain at least one element.")
     PasteMd._busyTimerFn := ObjBindMethod(PasteMd, "_BusyUpdate")
     PasteMd._defaultOrderedListPromptFn := ObjBindMethod(PasteMd, "_PromptOrderedListStartDialog")
     PasteMd._orderedListPromptFn := PasteMd._defaultOrderedListPromptFn
@@ -37,7 +37,7 @@ class PasteMd {
   static PASTE_SENTINEL_DELAY_MS := 200
   static PASTE_DELAY_MS := 500
   static BUSY_TT_SHOW_DELAY_MS := 500
-  static BUSY_SPIN_INTERVAL_MS := 200
+  static BUSY_SPIN_INTERVAL_MS := 1000
 
   ; Set to true to dump pipeline stages to a log file for debugging.
   static DEBUG_PASTE_MD := true
@@ -66,7 +66,7 @@ class PasteMd {
   static _busyStartTick := 0
   static _busyLabel := ""
   static _busyTimerFn := 0
-  static _busySpinner := ["", ".", "..", "..."]
+  ; static _busySpinner := ["", ".", "..", "..."]
   static _defaultOrderedListPromptFn := 0
   static _orderedListPromptFn := 0
   static _shellListItemPlaceholder := "¤LI_SHELL¤"
@@ -305,11 +305,15 @@ class PasteMd {
       return
     }
 
-    spinnerCount := PasteMd._busySpinner.Length
-    spinInterval := PasteMd.BUSY_SPIN_INTERVAL_MS
-    spinnerIndex := Mod(Floor(elapsed / spinInterval), spinnerCount) + 1
-    spinner := PasteMd._busySpinner[spinnerIndex]
-    ToolTip(PasteMd._busyLabel spinner)
+    ; spinnerCount := PasteMd._busySpinner.Length
+    ; spinInterval := PasteMd.BUSY_SPIN_INTERVAL_MS
+    ; spinnerIndex := Mod(Floor(elapsed / spinInterval), spinnerCount) + 1
+    ; spinner := PasteMd._busySpinner[spinnerIndex]
+
+    sec := elapsed / 1000
+    min := sec / 60
+    sec := Mod(sec, 60)
+    ToolTip(Format("{:02d}:{:02d} {}", min, sec, PasteMd._busyLabel))
   }
 
   /**
