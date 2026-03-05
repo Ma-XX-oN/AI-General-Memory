@@ -1371,13 +1371,7 @@ class PasteMd {
    * @returns {Array}
    */
   static _TryParseDomNodes(html) {
-    if (html = "")
-      return []
-    try {
-      return HtmlParser.Parse(html)
-    } catch {
-      return []
-    }
+    return HtmlNorm._TryParseDomNodes(html)
   }
 
   /**
