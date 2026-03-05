@@ -157,8 +157,8 @@ class PasteMd {
   }
 
   /**
-   * Menu callback: immediately copies the current debug log to a timestamped
-   * pinned file so rotation cannot overwrite it.
+   * Menu callback: copies current debug log to a timestamped pinned file.
+   * When pinning, prompts for an optional filename comment suffix.
    * @param {string} ItemName - Menu item label
    * @param {number} ItemPos - Menu item position
    * @param {object} MenuObj - Menu object
@@ -175,7 +175,16 @@ class PasteMd {
       ; Not pinned — pin.
       if !FileExist(PasteMd.DEBUG_PASTE_MD_LOG)
         return
-      pinPath := PasteMd._PinLogPath()
+      ib := InputBox(
+        "Optional comment for pinned log filename.`nLeave blank for timestamp-only name.",
+        "Pin current log comment",
+        "w520 h160"
+      )
+      if (ib.Result != "OK") {
+        PasteMd.ShowPasteMenu(false)
+        return
+      }
+      pinPath := PasteMd._PinLogPath(ib.Value)
       FileCopy(PasteMd.DEBUG_PASTE_MD_LOG, pinPath)
       PasteMd._lastPinPath := pinPath
       PasteMd.gPasteMenu.Check("Pin current &log")
@@ -412,18 +421,49 @@ class PasteMd {
 
   /**
    * Returns a timestamped path for a pinned log snapshot.
-   * @returns {string} File path with yyyyMMdd_HHmmss timestamp suffix
+   * If comment is provided, appends a sanitized suffix:
+   * PasteAsMd_debug_<timestamp>_<comment>.log
+   * @param {string} comment - Optional user comment for filename suffix
+   * @returns {string} Unique pinned log path
    */
-  static _PinLogPath() {
-    return RegExReplace(PasteMd.DEBUG_PASTE_MD_LOG, "\.log$", "_" FormatTime(, "yyyyMMdd_HHmmss") ".log")
+  static _PinLogPath(comment := "") {
+    base := RegExReplace(PasteMd.DEBUG_PASTE_MD_LOG, "\.log$", "_" FormatTime(, "yyyyMMdd_HHmmss"))
+    commentToken := PasteMd._SanitizePinComment(comment)
+    if (commentToken != "")
+      base .= "_" commentToken
+    path := base ".log"
+    if !FileExist(path)
+      return path
+    idx := 2
+    while FileExist(base "_" idx ".log")
+      idx += 1
+    return base "_" idx ".log"
   }
 
   /**
-   * Returns an array of paths for all pinned (timestamped) log files.
-   * @returns {Array} Absolute paths matching the timestamped filename pattern
+   * Sanitizes user comment for safe use in Windows filenames.
+   * @param {string} comment - Raw user comment
+   * @returns {string} Sanitized token, or "" when empty/invalid
+   */
+  static _SanitizePinComment(comment) {
+    s := Trim(comment, " `t")
+    if (s = "")
+      return ""
+    s := RegExReplace(s, "\s++", "_")
+    s := RegExReplace(s, "[<>:\x22/\\|?*\x00-\x1F]++", "-")
+    s := RegExReplace(s, "_{2,}", "_")
+    s := RegExReplace(s, "-{2,}", "-")
+    s := Trim(s, " ._-")
+    return s
+  }
+
+  /**
+   * Returns an array of paths for all pinned log files.
+   * Matches both timestamp-only and timestamp+comment filenames.
+   * @returns {Array} Absolute paths matching pinned filename pattern
    */
   static _PinnedLogFiles() {
-    pattern := RegExReplace(PasteMd.DEBUG_PASTE_MD_LOG, "\.log$", "_????????_??????.log")
+    pattern := RegExReplace(PasteMd.DEBUG_PASTE_MD_LOG, "\.log$", "_*.log")
     files := []
     Loop Files, pattern
       files.Push(A_LoopFileFullPath)
