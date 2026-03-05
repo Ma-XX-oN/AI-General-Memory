@@ -132,6 +132,7 @@ Comma-separated `key:value` pairs, for example:
 ```text
 case:renumber3,prompt:3
 case:cancel,prompt:CANCEL,expectAbort:1
+case:strict-parse,expectParse:1
 ```
 
 Supported keys:
@@ -139,6 +140,7 @@ Supported keys:
 - `case` (required on each metadata line; if you want the default unsuffixed scenario, omit metadata lines entirely)
 - `prompt` (optional): `CANCEL` or integer `> = 1`
 - `expectAbort` (optional): `0` or `1` (default `0`)
+- `expectParse` (optional): `0` or `1` (default `0`). When `1`, fixture fails if parse diagnostics were recorded.
 
 Unknown keys fail metadata parsing.
 
@@ -153,6 +155,7 @@ Generated outputs:
 
 - markdown output: `PasteAsMd_<NAME>.actual.md` or `PasteAsMd_<NAME>.<CASE>.actual.md`
 - fixture output log (when `/fixtureOutputLogs:1`): `PasteAsMd_<NAME>.fixture.log` or `PasteAsMd_<NAME>.<CASE>.fixture.log`
+  - includes `3a. parse diagnostics (DOM parse pass-through)` when parse issues occur
 
 See also: [Fixture-Logging-Reference.md](Fixture-Logging-Reference.md).
 
