@@ -574,7 +574,7 @@ class PasteMd {
         prepNodes := HtmlNorm._domNodes
         if (prepNodes.Length > 0) {
           if PasteMd._NormalizeIncidentalListIntentDomNodes(prepNodes, htmlFrag, plain, expectedListStart)
-            htmlPrep := PasteMd._SerializeDomNodes(prepNodes)
+            htmlPrep := HtmlNorm._SerializeDomNodes(prepNodes)
         } else {
           htmlPrep := PasteMd.NormalizeIncidentalListIntentHtml(htmlPrep, htmlFrag, plain, expectedListStart)
         }
@@ -603,7 +603,7 @@ class PasteMd {
 
         if (prepNodes.Length > 0) {
           if PasteMd._ApplyOrderedStartAndStabilizeShellDomNodes(prepNodes, expectedListStart)
-            htmlPrep := PasteMd._SerializeDomNodes(prepNodes)
+            htmlPrep := HtmlNorm._SerializeDomNodes(prepNodes)
         } else {
           htmlPrep := PasteMd.ApplyOrderedListStartAndStabilizeShellHtml(htmlPrep, expectedListStart)
         }
@@ -1169,11 +1169,11 @@ class PasteMd {
    * @returns {string} HTML with corrected outer list intent
    */
   static NormalizeIncidentalListIntentHtml(htmlPrep, htmlFrag, plain, expected := 0) {
-    nodes := PasteMd._TryParseDomNodes(htmlPrep)
+    nodes := HtmlNorm._TryParseDomNodes(htmlPrep)
     if (nodes.Length = 0)
       return htmlPrep
     return PasteMd._NormalizeIncidentalListIntentDomNodes(nodes, htmlFrag, plain, expected)
-      ? PasteMd._SerializeDomNodes(nodes)
+      ? HtmlNorm._SerializeDomNodes(nodes)
       : htmlPrep
   }
 
@@ -1222,12 +1222,12 @@ class PasteMd {
     if (htmlPrep = "" || startNum <= 1)
       return htmlPrep
 
-    nodes := PasteMd._TryParseDomNodes(htmlPrep)
+    nodes := HtmlNorm._TryParseDomNodes(htmlPrep)
     if (nodes.Length = 0)
       return htmlPrep
 
     return PasteMd._ApplyOrderedStartDomNodes(nodes, startNum)
-      ? PasteMd._SerializeDomNodes(nodes)
+      ? HtmlNorm._SerializeDomNodes(nodes)
       : htmlPrep
   }
 
@@ -1241,12 +1241,12 @@ class PasteMd {
     if (html = "")
       return html
 
-    nodes := PasteMd._TryParseDomNodes(html)
+    nodes := HtmlNorm._TryParseDomNodes(html)
     if (nodes.Length = 0)
       return html
 
     return PasteMd._StabilizeShellOnlyListItemsDomNodes(nodes)
-      ? PasteMd._SerializeDomNodes(nodes)
+      ? HtmlNorm._SerializeDomNodes(nodes)
       : html
   }
 
@@ -1261,11 +1261,11 @@ class PasteMd {
     if (html = "")
       return html
 
-    nodes := PasteMd._TryParseDomNodes(html)
+    nodes := HtmlNorm._TryParseDomNodes(html)
     if (nodes.Length = 0)
       return html
     return PasteMd._ApplyOrderedStartAndStabilizeShellDomNodes(nodes, startNum)
-      ? PasteMd._SerializeDomNodes(nodes)
+      ? HtmlNorm._SerializeDomNodes(nodes)
       : html
   }
 
@@ -1363,24 +1363,6 @@ class PasteMd {
       changed := true
     }
     return changed
-  }
-
-  /**
-   * Parses HTML into DOM nodes for pre-pandoc HTML rewrites.
-   * @param {string} html
-   * @returns {Array}
-   */
-  static _TryParseDomNodes(html) {
-    return HtmlNorm._TryParseDomNodes(html)
-  }
-
-  /**
-   * Serializes DOM nodes back to HTML.
-   * @param {Array} nodes
-   * @returns {string}
-   */
-  static _SerializeDomNodes(nodes) {
-    return HtmlNorm._SerializeDomNodes(nodes)
   }
 
   /**
@@ -1599,7 +1581,7 @@ class PasteMd {
    * @returns {boolean}
    */
   static _HasMeaningfulHtmlForPandoc(html) {
-    nodes := PasteMd._TryParseDomNodes(html)
+    nodes := HtmlNorm._TryParseDomNodes(html)
     if (nodes.Length = 0)
       return true
     return PasteMd._HasMeaningfulHtmlNode(nodes)
@@ -1858,7 +1840,7 @@ class PasteMd {
     if (htmlFrag = "")
       return 0
 
-    nodes := PasteMd._TryParseDomNodes(htmlFrag)
+    nodes := HtmlNorm._TryParseDomNodes(htmlFrag)
     if (nodes.Length = 0)
       return 0
 
@@ -1873,7 +1855,7 @@ class PasteMd {
    * @returns {string}
    */
   static _FirstMeaningfulTopTagName(html) {
-    nodes := PasteMd._TryParseDomNodes(html)
+    nodes := HtmlNorm._TryParseDomNodes(html)
     if (nodes.Length = 0)
       return ""
     top := PasteMd._TopLevelMeaningfulNodes(nodes)
@@ -1899,7 +1881,7 @@ class PasteMd {
    * @returns {number} Expected list index, or 0 when unknown
    */
   static GetExpectedOrderedListStart(htmlFrag, cfHtml, plain) {
-    fragNodes := PasteMd._TryParseDomNodes(htmlFrag)
+    fragNodes := HtmlNorm._TryParseDomNodes(htmlFrag)
     if (fragNodes.Length > 0) {
       firstLiWithValue := PasteMd._FindFirstByTagWithNumericAttr(fragNodes, "li", "value")
       if IsObject(firstLiWithValue) {
