@@ -176,6 +176,59 @@ catch Error as e
   threw := true
 Chk("throws Error",      threw)
 
+; ── 21: DOM API — appendChild sets parent and returns appended node ───────────
+Log("── 21: appendChild ─────────────────────────────────")
+r := Root("<div></div>")
+c := DomNode("p")
+ret := r.appendChild(c)
+Chk("returns appended node", ret = c)
+Chk("child count",           r.children.Length = 1, r.children.Length)
+Chk("child parent set",      IsObject(c.parent) && ObjPtr(c.parent) = ObjPtr(r))
+
+; ── 22: DOM API — insertBefore and append fallback ────────────────────────────
+Log("── 22: insertBefore ────────────────────────────────")
+r := Root("<div><a></a><c></c></div>")
+b := DomNode("b")
+r.insertBefore(b, r.children[2])
+Chk("order a,b,c",           r.children.Length = 3
+  && r.children[1].tag = "a"
+  && r.children[2].tag = "b"
+  && r.children[3].tag = "c")
+d := DomNode("d")
+r.insertBefore(d) ; no reference => append
+Chk("append on no ref",      r.children.Length = 4 && r.children[4].tag = "d")
+Chk("insert parent set",     IsObject(b.parent) && ObjPtr(b.parent) = ObjPtr(r))
+
+; ── 23: DOM API — removeChild detaches and returns removed node ───────────────
+Log("── 23: removeChild ────────────────────────────────")
+removed := r.removeChild(b)
+Chk("returns removed node",  removed = b)
+Chk("removed parent cleared", b.parent = "")
+Chk("order after remove",    r.children.Length = 3
+  && r.children[1].tag = "a"
+  && r.children[2].tag = "c"
+  && r.children[3].tag = "d")
+
+; ── 24: DOM API — replaceChild swaps node and detaches old ────────────────────
+Log("── 24: replaceChild ───────────────────────────────")
+x := DomNode("x")
+old := r.replaceChild(x, r.children[1])
+Chk("returns old child",     old.tag = "a")
+Chk("old parent cleared",    old.parent = "")
+Chk("new parent set",        IsObject(x.parent) && ObjPtr(x.parent) = ObjPtr(r))
+Chk("first is replacement",  r.children[1].tag = "x")
+
+; ── 25: DOM API — childNodes/firstChild/lastChild/hasChildNodes ───────────────
+Log("── 25: childNodes + first/last + hasChildNodes ─────")
+Chk("childNodes alias",      ObjPtr(r.childNodes) = ObjPtr(r.children))
+Chk("firstChild",            r.firstChild != "" && r.firstChild.tag = "x")
+Chk("lastChild",             r.lastChild  != "" && r.lastChild.tag = "d")
+Chk("hasChildNodes true",    r.hasChildNodes())
+r.RemoveChildren((n) => true)
+Chk("hasChildNodes false",   !r.hasChildNodes())
+Chk("firstChild empty",      r.firstChild = "")
+Chk("lastChild empty",       r.lastChild = "")
+
 ; ── summary ───────────────────────────────────────────────────────────────────
 Log("")
 Log("Results: " passed " passed, " failed " failed")
