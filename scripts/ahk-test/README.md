@@ -28,6 +28,13 @@ set AHK="C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe"
 
 Results are written to `*.log` files alongside each test script.
 
+Clean generated test logs:
+
+```bat
+%AHK% ahk-test\test-clean.ahk
+%AHK% test-clean.ahk
+```
+
 ## Test files
 
 | Script | What it tests | Count |
@@ -37,6 +44,7 @@ Results are written to `*.log` files alongside each test script.
 | `test-paste-md-fixtures.ahk` | End-to-end fixture tests: reads `PasteAsMd_*.log`, converts, compares `*.expected.md` | 130 |
 | `test-parser.ahk` | `HtmlParser` unit tests | 45 |
 | `test-dom.ahk` | `HtmlDom` / `DomNode` API tests | 53 |
+| `test-clean.ahk` | Cleanup helper: deletes generated `test-*.log`, `PasteAsMd_*.actual.md`, and `PasteAsMd_*.fixture.log` files | — |
 | `test-helpers.ahk` | Shared helpers (`Log`, `Chk`, `DumpNode`) — not run directly | — |
 
 ## Fixture files
@@ -50,6 +58,103 @@ decoded by the fixture runner:
 
 `PasteAsMd_*.expected.md` files are the expected markdown output for each fixture.
 `PasteAsMd_*.actual.md` files are generated at test time and excluded from git.
+
+### Pinned runtime logs (`Pin current log`)
+
+From `PasteAsMd` menu:
+
+- `Pin current log` prompts for an optional comment.
+- Blank comment creates: `PasteAsMd_debug_<TIMESTAMP>.log`
+- Comment creates: `PasteAsMd_debug_<TIMESTAMP>_<COMMENT>.log`
+
+Pinned-log features (`Delete pinned history`, `Pinned file names`, `Pinned full names`)
+match both filename forms.
+
+### Converting pinned logs into fixtures
+
+1. Pin a runtime debug log from the menu.
+2. Copy it into `ahk-test/` and rename it to `PasteAsMd_<NAME>.log`.
+3. Ensure it includes at least these sections:
+   - `1. plain (A_Clipboard minus CR)`
+   - `2. cfHtml (raw full payload)`
+4. Add expected markdown:
+   - default: `PasteAsMd_<NAME>.expected.md`
+   - scenario case: `PasteAsMd_<NAME>.<CASE>.expected.md`
+5. (Optional) Add scenario metadata lines in the log header (after title line, before first `===`).
+
+## Fixture Harness CLI
+
+`test-paste-md-fixtures.ahk` supports these switches:
+
+| Switch | Effect |
+|---|---|
+| `/ls` | Lists fixture indices/files and exits. |
+| `/fixture:<n>` | Runs only fixture index `n` from `/ls`. |
+| `/fixtureOutputLogs:0\|1` | Enables/disables per-scenario fixture output logs (`0` default, `1` enabled). |
+
+Examples:
+
+```bat
+%AHK% ahk-test\test-paste-md-fixtures.ahk
+%AHK% ahk-test\test-paste-md-fixtures.ahk /ls
+%AHK% ahk-test\test-paste-md-fixtures.ahk /fixture:7
+%AHK% ahk-test\test-paste-md-fixtures.ahk /fixture:7 /fixtureOutputLogs:1
+%AHK% ahk-test\test-paste-md-fixtures.ahk /fixtureOutputLogs:1
+```
+
+No switches run the full fixture suite.
+`/fixtureOutputLogs:1` with no other switch runs the full fixture set and emits
+per-scenario `.fixture.log` files.
+
+Cleanup is handled by `test-clean.ahk`:
+
+- deletes generated `test-*.log` files
+- deletes generated `PasteAsMd_*.actual.md` files
+- deletes generated `PasteAsMd_*.fixture.log` files
+- does **not** delete fixture source captures (`PasteAsMd_*.log`)
+- does **not** delete expected outputs (`*.expected.md`)
+
+## Fixture Metadata (in `.log` header)
+
+Fixture scenario metadata lives in the fixture `.log` header:
+
+1. Keep line 1 as the title (`PasteAsMd debug — ...`).
+2. Put scenario metadata lines after line 1.
+3. Metadata parsing stops at the first `===` section marker.
+4. Each non-blank metadata line is one scenario.
+
+If there are no metadata lines, the harness runs one default scenario.
+
+### Metadata line format
+
+Comma-separated `key:value` pairs, for example:
+
+```text
+case:renumber3,prompt:3
+case:cancel,prompt:CANCEL,expectAbort:1
+```
+
+Supported keys:
+
+- `case` (required on each metadata line; if you want the default unsuffixed scenario, omit metadata lines entirely)
+- `prompt` (optional): `CANCEL` or integer `> = 1`
+- `expectAbort` (optional): `0` or `1` (default `0`)
+
+Unknown keys fail metadata parsing.
+
+### File mapping per scenario
+
+For fixture file `PasteAsMd_<NAME>.log`:
+
+- default (no metadata): expects `PasteAsMd_<NAME>.expected.md`
+- scenario `case:<CASE>`: expects `PasteAsMd_<NAME>.<CASE>.expected.md`
+
+Generated outputs:
+
+- markdown output: `PasteAsMd_<NAME>.actual.md` or `PasteAsMd_<NAME>.<CASE>.actual.md`
+- fixture output log (when `/fixtureOutputLogs:1`): `PasteAsMd_<NAME>.fixture.log` or `PasteAsMd_<NAME>.<CASE>.fixture.log`
+
+See also: [Fixture-Logging-Reference.md](Fixture-Logging-Reference.md).
 
 ## Change Log
 
