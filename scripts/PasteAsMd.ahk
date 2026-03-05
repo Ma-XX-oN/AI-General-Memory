@@ -553,6 +553,7 @@ class PasteMd {
     aborted := false
     usedNoHtmlPath := false
     usedNoTagPlainPath := false
+    prepNodes := []
 
     prevShowImg := PasteMd.SHOW_IMG
     prevPromptOrderedList := PasteMd.PROMPT_ORDERED_LIST_START_ON_AMBIGUOUS
@@ -570,7 +571,13 @@ class PasteMd {
         expectedListStart := PasteMd.GetExpectedOrderedListStart(htmlFrag, cfHtml, plain)
         PasteMd._BusyUpdate("Preprocessing HTML")
         htmlPrep := PasteMd._PreprocessHtml(htmlFrag, cfHtml, showPoster)
-        htmlPrep := PasteMd.NormalizeIncidentalListIntentHtml(htmlPrep, htmlFrag, plain, expectedListStart)
+        prepNodes := HtmlNorm._domNodes
+        if (prepNodes.Length > 0) {
+          if PasteMd._NormalizeIncidentalListIntentDomNodes(prepNodes, htmlFrag, plain, expectedListStart)
+            htmlPrep := PasteMd._SerializeDomNodes(prepNodes)
+        } else {
+          htmlPrep := PasteMd.NormalizeIncidentalListIntentHtml(htmlPrep, htmlFrag, plain, expectedListStart)
+        }
 
         if (promptOrderedList) {
           promptResult := PasteMd.MaybePromptOrderedListStart(htmlPrep, plain, htmlFrag, expectedListStart)
@@ -594,7 +601,12 @@ class PasteMd {
           expectedListStart := promptResult["value"]
         }
 
-        htmlPrep := PasteMd.ApplyOrderedListStartAndStabilizeShellHtml(htmlPrep, expectedListStart)
+        if (prepNodes.Length > 0) {
+          if PasteMd._ApplyOrderedStartAndStabilizeShellDomNodes(prepNodes, expectedListStart)
+            htmlPrep := PasteMd._SerializeDomNodes(prepNodes)
+        } else {
+          htmlPrep := PasteMd.ApplyOrderedListStartAndStabilizeShellHtml(htmlPrep, expectedListStart)
+        }
 
         ; If no meaningful HTML tags remain after preprocessing (only <p>/<br>
         ; wrappers around plain text), skip pandoc — plain text already has
@@ -1157,48 +1169,12 @@ class PasteMd {
    * @returns {string} HTML with corrected outer list intent
    */
   static NormalizeIncidentalListIntentHtml(htmlPrep, htmlFrag, plain, expected := 0) {
-    if (htmlPrep = "" || htmlFrag = "")
-      return htmlPrep
-
-    if (expected > 1)
-      return htmlPrep
-
-    fragTop := PasteMd._FirstMeaningfulTopTagName(htmlFrag)
-
-    ; Only handle bare top-level <li> fragments; explicit list containers keep intent.
-    if (fragTop != "li")
-      return htmlPrep
-
-    ; Single-item fragments remain on ordered-list path (prompt/renumber logic).
-    if (this.CountListItemsInFragment(htmlFrag) < 2)
-      return htmlPrep
-
-    ; Explicit numeric markers in plain text indicate ordered intent.
-    if RegExMatch(plain, "m)^[ \t]*+\d++[.)](?:[ \t]++|$)")
-      return htmlPrep
-
     nodes := PasteMd._TryParseDomNodes(htmlPrep)
     if (nodes.Length = 0)
       return htmlPrep
-
-    top := PasteMd._TopLevelMeaningfulNodes(nodes)
-    if (top.Length != 1 || !PasteMd._IsTag(top[1], "ol"))
-      return htmlPrep
-
-    list := top[1]
-    list.tag := "ul"
-
-    ; Drop trailing empty list items produced by selection-range clipping.
-    idx := list.children.Length
-    while (idx >= 1) {
-      child := list.children[idx]
-      if (!PasteMd._IsTag(child, "li") || !PasteMd._IsEmptyListItemNode(child))
-        break
-      list.children.RemoveAt(idx)
-      idx -= 1
-    }
-
-    return PasteMd._SerializeDomNodes(nodes)
+    return PasteMd._NormalizeIncidentalListIntentDomNodes(nodes, htmlFrag, plain, expected)
+      ? PasteMd._SerializeDomNodes(nodes)
+      : htmlPrep
   }
 
   /**
@@ -1307,7 +1283,60 @@ class PasteMd {
     nodes := PasteMd._TryParseDomNodes(html)
     if (nodes.Length = 0)
       return html
+    return PasteMd._ApplyOrderedStartAndStabilizeShellDomNodes(nodes, startNum)
+      ? PasteMd._SerializeDomNodes(nodes)
+      : html
+  }
 
+  /**
+   * Node-level worker for incidental list-intent normalization.
+   * Converts synthetic top-level <ol> wrappers to <ul> for multi-item bare-<li>
+   * fragments when ordered intent cannot be inferred.
+   * @param {Array} nodes
+   * @param {string} htmlFrag
+   * @param {string} plain
+   * @param {number} expected
+   * @returns {boolean} True when DOM was changed
+   */
+  static _NormalizeIncidentalListIntentDomNodes(nodes, htmlFrag, plain, expected := 0) {
+    if (htmlFrag = "")
+      return false
+    if (expected > 1)
+      return false
+    if (PasteMd._FirstMeaningfulTopTagName(htmlFrag) != "li")
+      return false
+    if (this.CountListItemsInFragment(htmlFrag) < 2)
+      return false
+    if RegExMatch(plain, "m)^[ \t]*+\d++[.)](?:[ \t]++|$)")
+      return false
+
+    top := PasteMd._TopLevelMeaningfulNodes(nodes)
+    if (top.Length != 1 || !PasteMd._IsTag(top[1], "ol"))
+      return false
+
+    list := top[1]
+    list.tag := "ul"
+    changed := true
+
+    ; Drop trailing empty list items produced by selection-range clipping.
+    idx := list.children.Length
+    while (idx >= 1) {
+      child := list.children[idx]
+      if (!PasteMd._IsTag(child, "li") || !PasteMd._IsEmptyListItemNode(child))
+        break
+      list.children.RemoveAt(idx)
+      idx -= 1
+    }
+    return changed
+  }
+
+  /**
+   * Node-level worker for ordered-list start and shell-list-item stabilization.
+   * @param {Array} nodes
+   * @param {number} startNum
+   * @returns {boolean} True when DOM was changed
+   */
+  static _ApplyOrderedStartAndStabilizeShellDomNodes(nodes, startNum) {
     changed := false
     if (startNum > 1) {
       ol := PasteMd._FindFirstByTag(nodes, "ol")
@@ -1332,8 +1361,7 @@ class PasteMd {
       li.children.InsertAt(idx, DomNode("text", "", marker))
       changed := true
     }
-
-    return changed ? PasteMd._SerializeDomNodes(nodes) : html
+    return changed
   }
 
   /**
