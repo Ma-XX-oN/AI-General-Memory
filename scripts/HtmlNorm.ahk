@@ -166,20 +166,17 @@ class HtmlNorm {
             return html
         }
 
-        needImg := !showImg && RegExMatch(html, "i)<(?:img|svg)\b")
+        needImg := !showImg && HtmlNorm._HasImgLikeNode(nodes)
         needPoster := showPoster
-        needDiff := RegExMatch(html, "i)<diffs-container\b")
-        needButton := RegExMatch(html, "i)</?button\b")
-        needChatPre := (source = "chatgpt")
-            && RegExMatch(html, "i)<pre\b[^>]*\boverflow-visible\b[^>]*>")
+        needDiff := HtmlNorm._AnyNodeMatches(nodes, (n) => HtmlNorm._IsTag(n, "diffs-container"))
+        needButton := HtmlNorm._AnyNodeMatches(nodes, (n) => HtmlNorm._IsTag(n, "button"))
+        needChatPre := (source = "chatgpt") && HtmlNorm._NeedsChatGptPreNormalization(nodes)
 
-        needMid := RegExMatch(
-            html,
-            "i)(<li\b|<details\b[^>]*+\bclass=`"[^`"]*+\bthinking\b[^`"]*+`"|<span\b[^>]*+\bclass=`"[^`"]*+\b(?:inline-markdown|font-mono)\b[^`"]*+`")"
-        )
-        needUser := RegExMatch(html, "i)<(?:p|div)\b[^>]*\b(?:text-size-chat|content_xGDvVg|whitespace-pre-wrap)\b")
-        needLate := RegExMatch(html, "i)(<li\b|<div\b[^>]*\bclass=`"[^`"]*\bfont-small\b[^`"]*\bp-3[^`"]*`"|href=`"[^`"]*#user-content-|<li\b[^>]*\bid=`"user-content-fn-|</?span\b)")
-        needCode := RegExMatch(html, "i)<code\b")
+        needMid := HtmlNorm._NeedsMidDomStage(nodes)
+        needUser := HtmlNorm._NeedsUserDomStage(nodes)
+        needLate := HtmlNorm._NeedsLateDomStage(nodes)
+
+        needCode := HtmlNorm._AnyNodeMatches(nodes, (n) => HtmlNorm._IsTag(n, "code"))
 
         changedAny := false
 
@@ -281,9 +278,6 @@ class HtmlNorm {
     static _ProcessImgTags(html, showImg) {
         if showImg
             return html
-        ; Keep HTML byte-stable when no image-like elements exist.
-        if !RegExMatch(html, "i)<(?:img|svg)\b")
-            return html
         rootNodes := HtmlNorm._TryParseDomNodes(html)
         wrapped := false
         if (rootNodes.Length = 0) {
@@ -294,6 +288,8 @@ class HtmlNorm {
                 return html
         }
         nodes := wrapped ? rootNodes[1].children : rootNodes
+        if !HtmlNorm._HasImgLikeNode(nodes)
+            return html
         nodes := HtmlNorm._ProcessImgTagsDomNodes(nodes)
         return HtmlNorm._SerializeDomNodes(nodes)
     }
@@ -307,13 +303,16 @@ class HtmlNorm {
      * @returns {string}
      */
     static _NormalizeLeadDom(html, source, showPoster, showImg) {
-        needImg := !showImg && RegExMatch(html, "i)<(?:img|svg)\b")
         needPoster := showPoster
-        if !(needImg || needPoster)
+        if (showImg && !needPoster)
             return html
 
         nodes := HtmlNorm._TryParseDomNodes(html)
         if (nodes.Length = 0)
+            return html
+
+        needImg := !showImg && HtmlNorm._HasImgLikeNode(nodes)
+        if !(needImg || needPoster)
             return html
 
         if needImg
@@ -335,15 +334,14 @@ class HtmlNorm {
      * @returns {string}
      */
     static _NormalizeDiffButtonCodeDom(html, source) {
-        needDiff := RegExMatch(html, "i)<diffs-container\b")
-        needButton := RegExMatch(html, "i)</?button\b")
-        needChatPre := (source = "chatgpt")
-            && RegExMatch(html, "i)<pre\b[^>]*\boverflow-visible\b[^>]*>")
-        if !(needDiff || needButton || needChatPre)
-            return html
-
         nodes := HtmlNorm._TryParseDomNodes(html)
         if (nodes.Length = 0)
+            return html
+
+        needDiff := HtmlNorm._AnyNodeMatches(nodes, (n) => HtmlNorm._IsTag(n, "diffs-container"))
+        needButton := HtmlNorm._AnyNodeMatches(nodes, (n) => HtmlNorm._IsTag(n, "button"))
+        needChatPre := (source = "chatgpt") && HtmlNorm._NeedsChatGptPreNormalization(nodes)
+        if !(needDiff || needButton || needChatPre)
             return html
 
         changed := false
@@ -384,17 +382,16 @@ class HtmlNorm {
      * @returns {string}
      */
     static _NormalizeLeadAndEarlyDom(html, source, showPoster, showImg) {
-        needImg := !showImg && RegExMatch(html, "i)<(?:img|svg)\b")
-        needPoster := showPoster
-        needDiff := RegExMatch(html, "i)<diffs-container\b")
-        needButton := RegExMatch(html, "i)</?button\b")
-        needChatPre := (source = "chatgpt")
-            && RegExMatch(html, "i)<pre\b[^>]*\boverflow-visible\b[^>]*>")
-        if !(needImg || needPoster || needDiff || needButton || needChatPre)
-            return html
-
         nodes := HtmlNorm._TryParseDomNodes(html)
         if (nodes.Length = 0)
+            return html
+
+        needImg := !showImg && HtmlNorm._HasImgLikeNode(nodes)
+        needPoster := showPoster
+        needDiff := HtmlNorm._AnyNodeMatches(nodes, (n) => HtmlNorm._IsTag(n, "diffs-container"))
+        needButton := HtmlNorm._AnyNodeMatches(nodes, (n) => HtmlNorm._IsTag(n, "button"))
+        needChatPre := (source = "chatgpt") && HtmlNorm._NeedsChatGptPreNormalization(nodes)
+        if !(needImg || needPoster || needDiff || needButton || needChatPre)
             return html
 
         changed := false
@@ -497,11 +494,10 @@ class HtmlNorm {
      * @returns {string}
      */
     static _NormalizeSimpleDiffBlocks(html) {
-        if !RegExMatch(html, "i)<diffs-container\b")
-            return html
-
         nodes := HtmlNorm._TryParseDomNodes(html)
         if (nodes.Length = 0)
+            return html
+        if !HtmlNorm._AnyNodeMatches(nodes, (n) => HtmlNorm._IsTag(n, "diffs-container"))
             return html
 
         changed := false
@@ -617,11 +613,10 @@ class HtmlNorm {
      * @returns {string}
      */
     static _NormalizeChatGptCodeBlocks(html) {
-        if !RegExMatch(html, "i)<pre\b[^>]*\boverflow-visible\b[^>]*>")
-            return html
-
         nodes := HtmlNorm._TryParseDomNodes(html)
         if (nodes.Length = 0)
+            return html
+        if !HtmlNorm._NeedsChatGptPreNormalization(nodes)
             return html
 
         changed := false
@@ -695,14 +690,10 @@ class HtmlNorm {
      * @returns {string}
      */
     static _NormalizeTaskThinkingInlineDom(html) {
-        if !RegExMatch(
-            html,
-            "i)(<li\b|<details\b[^>]*+\bclass=`"[^`"]*+\bthinking\b[^`"]*+`"|<span\b[^>]*+\bclass=`"[^`"]*+\b(?:inline-markdown|font-mono)\b[^`"]*+`")"
-        )
-            return html
-
         nodes := HtmlNorm._TryParseDomNodes(html)
         if (nodes.Length = 0)
+            return html
+        if !HtmlNorm._NeedsMidDomStage(nodes)
             return html
 
         changed := false
@@ -735,17 +726,14 @@ class HtmlNorm {
      * @returns {string}
      */
     static _NormalizeMidAndLateDom(html) {
-        needMid := RegExMatch(
-            html,
-            "i)(<li\b|<details\b[^>]*+\bclass=`"[^`"]*+\bthinking\b[^`"]*+`"|<span\b[^>]*+\bclass=`"[^`"]*+\b(?:inline-markdown|font-mono)\b[^`"]*+`")"
-        )
-        needUser := RegExMatch(html, "i)<(?:p|div)\b[^>]*\b(?:text-size-chat|content_xGDvVg|whitespace-pre-wrap)\b")
-        needLate := RegExMatch(html, "i)(<li\b|<div\b[^>]*\bclass=`"[^`"]*\bfont-small\b[^`"]*\bp-3[^`"]*`"|href=`"[^`"]*#user-content-|<li\b[^>]*\bid=`"user-content-fn-|</?span\b)")
-        if !(needMid || needUser || needLate)
-            return html
-
         nodes := HtmlNorm._TryParseDomNodes(html)
         if (nodes.Length = 0)
+            return html
+
+        needMid := HtmlNorm._NeedsMidDomStage(nodes)
+        needUser := HtmlNorm._NeedsUserDomStage(nodes)
+        needLate := HtmlNorm._NeedsLateDomStage(nodes)
+        if !(needMid || needUser || needLate)
             return html
 
         changed := false
@@ -792,11 +780,10 @@ class HtmlNorm {
      * @returns {string}
      */
     static _NormalizeTaskListItems(html) {
-        if !RegExMatch(html, "i)<li\b")
-            return html
-
         nodes := HtmlNorm._TryParseDomNodes(html)
         if (nodes.Length = 0)
+            return html
+        if !HtmlNorm._AnyNodeMatches(nodes, (n) => HtmlNorm._IsTag(n, "li"))
             return html
 
         if !HtmlNorm._NormalizeTaskListItemsDomNodes(nodes)
@@ -865,11 +852,11 @@ class HtmlNorm {
      * @returns {string}
      */
     static _ExtractThinkingBlocks(html) {
-        if !RegExMatch(html, "i)<details\b[^>]*\bclass=`"[^`"]*\bthinking\b[^`"]*`"")
-            return html
-
         nodes := HtmlNorm._TryParseDomNodes(html)
         if (nodes.Length = 0)
+            return html
+        if !HtmlNorm._AnyNodeMatches(nodes
+            , (n) => HtmlNorm._IsTag(n, "details") && HtmlNorm._ClassHasToken(n, "thinking"))
             return html
 
         nodes := HtmlNorm._ExtractThinkingBlocksDomNodes(nodes)
@@ -895,11 +882,10 @@ class HtmlNorm {
      * @returns {string}
      */
     static _ExtractUserMessages(html) {
-        if !RegExMatch(html, "i)<(?:p|div)\b[^>]*\b(?:text-size-chat|content_xGDvVg|whitespace-pre-wrap)\b")
-            return html
-
         nodes := HtmlNorm._TryParseDomNodes(html)
         if (nodes.Length = 0)
+            return html
+        if !HtmlNorm._NeedsUserDomStage(nodes)
             return html
 
         changed := false
@@ -932,13 +918,13 @@ class HtmlNorm {
      * @returns {string}
      */
     static _NormalizeUserMessagesAndLateCleanupDom(html) {
-        needUser := RegExMatch(html, "i)<(?:p|div)\b[^>]*\b(?:text-size-chat|content_xGDvVg|whitespace-pre-wrap)\b")
-        needLate := RegExMatch(html, "i)(<li\b|<div\b[^>]*\bclass=`"[^`"]*\bfont-small\b[^`"]*\bp-3[^`"]*`"|href=`"[^`"]*#user-content-|<li\b[^>]*\bid=`"user-content-fn-|</?span\b)")
-        if !(needUser || needLate)
-            return html
-
         nodes := HtmlNorm._TryParseDomNodes(html)
         if (nodes.Length = 0)
+            return html
+
+        needUser := HtmlNorm._NeedsUserDomStage(nodes)
+        needLate := HtmlNorm._NeedsLateDomStage(nodes)
+        if !(needUser || needLate)
             return html
 
         changed := false
@@ -965,11 +951,13 @@ class HtmlNorm {
      * @returns {string}
      */
     static _ExtractUserMessagesInlineContainerDom(html) {
-        if !RegExMatch(html, "i)<div\b[^>]*\b(?:text-size-chat|content_xGDvVg)\b")
-            return html
-
         nodes := HtmlNorm._TryParseDomNodes(html)
         if (nodes.Length = 0)
+            return html
+        if !HtmlNorm._AnyNodeMatches(nodes
+            , (n) => HtmlNorm._IsTag(n, "div")
+                && (HtmlNorm._ClassHasToken(n, "text-size-chat")
+                    || HtmlNorm._ClassHasPrefix(n, "content_xGDvVg")))
             return html
 
         changed := false
@@ -1080,11 +1068,10 @@ class HtmlNorm {
      * @returns {string}
      */
     static _ExtractUserMessagesFullNodeDom(html) {
-        if !RegExMatch(html, "i)<(?:p|div)\b[^>]*\bclass=`"(?:whitespace-pre-wrap break-words|whitespace-pre-wrap)`"")
-            return html
-
         nodes := HtmlNorm._TryParseDomNodes(html)
         if (nodes.Length = 0)
+            return html
+        if !HtmlNorm._AnyNodeMatches(nodes, (n) => HtmlNorm._IsFullNodeUserMsgTarget(n))
             return html
 
         changed := false
@@ -1214,9 +1201,6 @@ class HtmlNorm {
      * @returns {string}
      */
     static _StripTagDom(html, tagName) {
-        if !RegExMatch(html, "i)</?" . tagName . "\b")
-            return html
-
         nodes := HtmlNorm._TryParseDomNodes(html)
         if (nodes.Length = 0)
             return html
@@ -1236,11 +1220,10 @@ class HtmlNorm {
      * @returns {string}
      */
     static _NormalizeLateCleanupAndListWrapDom(html) {
-        if !RegExMatch(html, "i)(<li\b|<div\b[^>]*\bclass=`"[^`"]*\bfont-small\b[^`"]*\bp-3[^`"]*`"|href=`"[^`"]*#user-content-|<li\b[^>]*\bid=`"user-content-fn-|</?span\b)")
-            return html
-
         nodes := HtmlNorm._TryParseDomNodes(html)
         if (nodes.Length = 0)
+            return html
+        if !HtmlNorm._NeedsLateDomStage(nodes)
             return html
 
         changed := false
@@ -1265,11 +1248,10 @@ class HtmlNorm {
      * @returns {string}
      */
     static _WrapBareTopLevelLiDom(html) {
-        if !RegExMatch(html, "i)<li\b")
-            return html
-
         nodes := HtmlNorm._TryParseDomNodes(html)
         if (nodes.Length = 0)
+            return html
+        if !HtmlNorm._AnyNodeMatches(nodes, (n) => HtmlNorm._IsTag(n, "li"))
             return html
 
         nodes := HtmlNorm._WrapBareTopLevelLiDomNodes(nodes, &wrapped)
@@ -1338,11 +1320,13 @@ class HtmlNorm {
      * @returns {string}
      */
     static _PromoteInlineCodeSpansDom(html) {
-        if !RegExMatch(html, "i)<span\b[^>]*\bclass=`"[^`"]*\b(?:inline-markdown|font-mono)\b[^`"]*`"")
-            return html
-
         nodes := HtmlNorm._TryParseDomNodes(html)
         if (nodes.Length = 0)
+            return html
+        if !HtmlNorm._AnyNodeMatches(nodes
+            , (n) => HtmlNorm._IsTag(n, "span")
+                && (HtmlNorm._ClassHasToken(n, "inline-markdown")
+                    || HtmlNorm._ClassHasToken(n, "font-mono")))
             return html
 
         if !HtmlNorm._PromoteInlineCodeSpansDomNodes(nodes)
@@ -1387,7 +1371,7 @@ class HtmlNorm {
         if (nodes.Length = 0)
             return html
 
-        hadCode := RegExMatch(html, "i)<code\b")
+        hadCode := HtmlNorm._AnyNodeMatches(nodes, (n) => HtmlNorm._IsTag(n, "code"))
         if hadCode
             nodes := HtmlNorm._NormalizeCodeElementsDomNodes(nodes, false)
 
@@ -1419,7 +1403,7 @@ class HtmlNorm {
             return html
         }
 
-        hadCode := RegExMatch(html, "i)<code\b")
+        hadCode := HtmlNorm._AnyNodeMatches(nodes, (n) => HtmlNorm._IsTag(n, "code"))
         if hadCode
             nodes := HtmlNorm._NormalizeCodeElementsDomNodes(nodes, false)
 
@@ -1447,11 +1431,10 @@ class HtmlNorm {
      * @returns {string}
      */
     static _NormalizeCodeElements(html) {
-        if !RegExMatch(html, "i)<code\b")
-            return html
-
         nodes := HtmlNorm._TryParseDomNodes(html)
         if (nodes.Length = 0)
+            return html
+        if !HtmlNorm._AnyNodeMatches(nodes, (n) => HtmlNorm._IsTag(n, "code"))
             return html
 
         nodes := HtmlNorm._NormalizeCodeElementsDomNodes(nodes, false)
@@ -1688,11 +1671,10 @@ class HtmlNorm {
      * @returns {string}
      */
     static _NormalizeFootnoteAndSpanDom(html) {
-        if !RegExMatch(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bfont-small\b[^`"]*\bp-3[^`"]*`"|href=`"[^`"]*#user-content-|<li\b[^>]*\bid=`"user-content-fn-|</?span\b)")
-            return html
-
         nodes := HtmlNorm._TryParseDomNodes(html)
         if (nodes.Length = 0)
+            return html
+        if !HtmlNorm._NeedsLateDomStage(nodes)
             return html
 
         if !HtmlNorm._NormalizeFootnoteAndSpanDomNodes(&nodes)
@@ -2036,6 +2018,86 @@ class HtmlNorm {
             if (node.children.Length > 0)
                 HtmlNorm._CollectMatchingNodes(node.children, pred, &out)
         }
+    }
+
+    /**
+     * True when any node in a DOM node list matches the predicate.
+     * @param {Array} nodes
+     * @param {Func} pred
+     * @returns {boolean}
+     */
+    static _AnyNodeMatches(nodes, pred) {
+        for node in nodes {
+            if pred.Call(node)
+                return true
+            if (node.children.Length > 0 && HtmlNorm._AnyNodeMatches(node.children, pred))
+                return true
+        }
+        return false
+    }
+
+    /**
+     * True when any <img> or <svg> node exists in a DOM list.
+     * @param {Array} nodes
+     * @returns {boolean}
+     */
+    static _HasImgLikeNode(nodes) {
+        return HtmlNorm._AnyNodeMatches(nodes
+            , (n) => HtmlNorm._IsTag(n, "img") || HtmlNorm._IsTag(n, "svg"))
+    }
+
+    /**
+     * True when ChatGPT overflow-visible pre blocks exist in a DOM list.
+     * @param {Array} nodes
+     * @returns {boolean}
+     */
+    static _NeedsChatGptPreNormalization(nodes) {
+        return HtmlNorm._AnyNodeMatches(nodes
+            , (n) => HtmlNorm._IsTag(n, "pre")
+                && (InStr(StrLower(HtmlNorm._GetAttrCI(n, "class")), "overflow-visible") > 0))
+    }
+
+    /**
+     * True when task-list / thinking / inline-code stages should run.
+     * @param {Array} nodes
+     * @returns {boolean}
+     */
+    static _NeedsMidDomStage(nodes) {
+        return HtmlNorm._AnyNodeMatches(nodes
+            , (n) => HtmlNorm._IsTag(n, "li")
+                || (HtmlNorm._IsTag(n, "details") && HtmlNorm._ClassHasToken(n, "thinking"))
+                || (HtmlNorm._IsTag(n, "span")
+                    && (HtmlNorm._ClassHasToken(n, "inline-markdown")
+                        || HtmlNorm._ClassHasToken(n, "font-mono"))))
+    }
+
+    /**
+     * True when user-message extraction stages should run.
+     * @param {Array} nodes
+     * @returns {boolean}
+     */
+    static _NeedsUserDomStage(nodes) {
+        return HtmlNorm._AnyNodeMatches(nodes
+            , (n) => (HtmlNorm._IsTag(n, "p") || HtmlNorm._IsTag(n, "div"))
+                && (HtmlNorm._ClassHasToken(n, "text-size-chat")
+                    || HtmlNorm._ClassHasToken(n, "content_xGDvVg")
+                    || HtmlNorm._ClassHasToken(n, "whitespace-pre-wrap")))
+    }
+
+    /**
+     * True when footnote/span cleanup or bare-li wrapping stages should run.
+     * @param {Array} nodes
+     * @returns {boolean}
+     */
+    static _NeedsLateDomStage(nodes) {
+        return HtmlNorm._AnyNodeMatches(nodes
+            , (n) => HtmlNorm._IsTag(n, "li")
+                || HtmlNorm._IsTag(n, "span")
+                || (HtmlNorm._IsTag(n, "div")
+                    && HtmlNorm._ClassHasToken(n, "font-small")
+                    && HtmlNorm._ClassHasPrefix(n, "p-3"))
+                || (HtmlNorm._IsTag(n, "a")
+                    && (InStr(StrLower(HtmlNorm._GetAttrCI(n, "href")), "#user-content-") > 0)))
     }
 
     /**
