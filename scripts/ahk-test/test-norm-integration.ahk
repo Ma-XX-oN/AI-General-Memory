@@ -106,7 +106,7 @@ ccLiChk := '<li class="task-list-item">'
 ccLiUnchk := '<li class="task-list-item">'
     . '<input type="checkbox" disabled="" style="appearance: none; border-color: rgb(69, 69, 69); border-style: solid;">'
     . '<span> </span>Unchecked item</li>'
-normCCLi := HtmlNorm._NormalizeTaskListItems(ccLiChk . ccLiUnchk)
+normCCLi := HtmlNorm.Normalize(ccLiChk . ccLiUnchk, "claudecode", false, false)
 Chk("CC tasklist: checked canonical input",
     InStr(normCCLi, '<input type="checkbox" disabled checked />'))
 Chk("CC tasklist: unchecked canonical input",
@@ -131,7 +131,7 @@ ccTodoUnchk := '<li class="todoItem_xheXVQ" style="display: flex;">'
     . '<input type="checkbox" class="checkbox_xheXVQ" disabled=""'
     . ' style="appearance: none;">'
     . '<div class="content_xheXVQ">Fix [img] → ![alt](src)</div></li>'
-normCCTodo := HtmlNorm._NormalizeTaskListItems(ccTodoChk . ccTodoUnchk)
+normCCTodo := HtmlNorm.Normalize(ccTodoChk . ccTodoUnchk, "claudecode", false, false)
 Chk("CC todo rows: completed_* infers checked",
     InStr(normCCTodo, '<li><input type="checkbox" disabled checked /> Fix DetectSource — ClaudeCode detected as claudeweb</li>'))
 Chk("CC todo rows: non-completed stays unchecked",
@@ -152,7 +152,7 @@ gpLiChk := '<li class="task-list-item" data-start="367" data-end="377">`n'
 gpLiUnchk := '<li class="task-list-item" data-start="378" data-end="392">`n'
     . '<p data-start="384" data-end="392"><input disabled="" type="checkbox"> Not done</p>`n'
     . '</li>'
-normGPLi := HtmlNorm._NormalizeTaskListItems(gpLiChk . gpLiUnchk)
+normGPLi := HtmlNorm.Normalize(gpLiChk . gpLiUnchk, "chatgpt", false, false)
 Chk("GP tasklist: p-wrapped checked canonical input",
     InStr(normGPLi, '<input type="checkbox" disabled checked />'))
 Chk("GP tasklist: p-wrapped unchecked canonical input",
@@ -200,7 +200,7 @@ gpCodeRaw := '<pre class="overflow-visible! px-0!" data-start="175">'
     . '<span class="ͼv">def</span><span> </span><span class="ͼ11">greet</span><span>(name):</span><br>'
     . '<span>  </span><span class="ͼv">return</span><span> </span><span class="ͼz">"hi"</span>'
     . '</div></div></pre>'
-normGPCode := HtmlNorm._NormalizeChatGptCodeBlocks(gpCodeRaw)
+normGPCode := HtmlNorm.Normalize(gpCodeRaw, "chatgpt", false, false)
 Chk("GP code: overflow-visible! class gone",   !InStr(normGPCode, "overflow-visible"))
 Chk("GP code: canonical pre/code emitted",     InStr(normGPCode, "<pre><code>"))
 Chk("GP code: def greet preserved",            InStr(normGPCode, "def greet"))
@@ -309,7 +309,7 @@ HtmlNorm._userMsgBlocks := []
 cwUserHtml := "<div data-testid=`"user-message`">"
     . "<p class=`"whitespace-pre-wrap break-words`">Line one`nLine two`nLine three</p>"
     . "</div>"
-cwUserOut := HtmlNorm._ExtractUserMessages(cwUserHtml)
+cwUserOut := HtmlNorm.Normalize(cwUserHtml, "claudeweb", false, false)
 Chk("CW usermsg: placeholder injected",      InStr(cwUserOut, "¤USERMSG_1¤"))
 Chk("CW usermsg: 1 block stored",            HtmlNorm._userMsgBlocks.Length = 1)
 Chk("CW usermsg: newlines preserved",        InStr(HtmlNorm._userMsgBlocks[1], "`n"))
@@ -320,7 +320,7 @@ HtmlNorm._userMsgBlocks := []
 gpUserHtml := "<article data-turn-id=`"abc-123`">"
     . "<div class=`"whitespace-pre-wrap`">Hello`nWorld</div>"
     . "</article>"
-gpUserOut := HtmlNorm._ExtractUserMessages(gpUserHtml)
+gpUserOut := HtmlNorm.Normalize(gpUserHtml, "chatgpt", false, false)
 Chk("GP usermsg: placeholder injected",      InStr(gpUserOut, "¤USERMSG_1¤"))
 Chk("GP usermsg: 1 block stored",            HtmlNorm._userMsgBlocks.Length = 1)
 Chk("GP usermsg: newlines preserved",        InStr(HtmlNorm._userMsgBlocks[1], "`n"))
@@ -329,7 +329,7 @@ Chk("GP usermsg: text content correct",      HtmlNorm._userMsgBlocks[1] = "Hello
 ; Codex's "text-size-chat whitespace-pre-wrap" must NOT be matched by ChatGPT block
 HtmlNorm._userMsgBlocks := []
 cxStillHtml := "<div class=`"text-size-chat whitespace-pre-wrap`">CX msg</div>"
-cxStillOut := HtmlNorm._ExtractUserMessages(cxStillHtml)
+cxStillOut := HtmlNorm.Normalize(cxStillHtml, "codex", false, false)
 Chk("CX usermsg: not re-extracted by ChatGPT pattern after Codex extraction",
     !InStr(SubStr(cxStillOut, InStr(cxStillOut, "¤USERMSG_") + 10), "¤USERMSG_"))
 
