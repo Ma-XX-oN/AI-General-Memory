@@ -1226,12 +1226,9 @@ class PasteMd {
     if (nodes.Length = 0)
       return htmlPrep
 
-    ol := PasteMd._FindFirstByTag(nodes, "ol")
-    if !IsObject(ol)
-      return htmlPrep
-
-    PasteMd._SetAttrCI(ol, "start", "" startNum)
-    return PasteMd._SerializeDomNodes(nodes)
+    return PasteMd._ApplyOrderedStartDomNodes(nodes, startNum)
+      ? PasteMd._SerializeDomNodes(nodes)
+      : htmlPrep
   }
 
   /**
@@ -1248,25 +1245,9 @@ class PasteMd {
     if (nodes.Length = 0)
       return html
 
-    marker := PasteMd._shellListItemPlaceholder
-    listItems := []
-    PasteMd._CollectNodesByTag(nodes, "li", &listItems)
-    changed := false
-    for li in listItems {
-      idx := PasteMd._FirstMeaningfulChildIndex(li)
-      if (idx < 1)
-        continue
-      first := li.children[idx]
-      if !(PasteMd._IsTag(first, "ol") || PasteMd._IsTag(first, "ul"))
-        continue
-
-      if (PasteMd._LeadingListShellHasMarker(li, idx, marker))
-        continue
-
-      li.children.InsertAt(idx, DomNode("text", "", marker))
-      changed := true
-    }
-    return changed ? PasteMd._SerializeDomNodes(nodes) : html
+    return PasteMd._StabilizeShellOnlyListItemsDomNodes(nodes)
+      ? PasteMd._SerializeDomNodes(nodes)
+      : html
   }
 
   /**
@@ -1337,18 +1318,38 @@ class PasteMd {
    * @returns {boolean} True when DOM was changed
    */
   static _ApplyOrderedStartAndStabilizeShellDomNodes(nodes, startNum) {
-    changed := false
-    if (startNum > 1) {
-      ol := PasteMd._FindFirstByTag(nodes, "ol")
-      if IsObject(ol) {
-        PasteMd._SetAttrCI(ol, "start", "" startNum)
-        changed := true
-      }
-    }
+    changed := PasteMd._ApplyOrderedStartDomNodes(nodes, startNum)
+    if PasteMd._StabilizeShellOnlyListItemsDomNodes(nodes)
+      changed := true
+    return changed
+  }
 
+  /**
+   * Node-level worker that applies ordered-list start to first <ol>.
+   * @param {Array} nodes
+   * @param {number} startNum
+   * @returns {boolean}
+   */
+  static _ApplyOrderedStartDomNodes(nodes, startNum) {
+    if (startNum <= 1)
+      return false
+    ol := PasteMd._FindFirstByTag(nodes, "ol")
+    if !IsObject(ol)
+      return false
+    PasteMd._SetAttrCI(ol, "start", "" startNum)
+    return true
+  }
+
+  /**
+   * Node-level worker that inserts shell markers for list items with nested lists.
+   * @param {Array} nodes
+   * @returns {boolean}
+   */
+  static _StabilizeShellOnlyListItemsDomNodes(nodes) {
     marker := PasteMd._shellListItemPlaceholder
     listItems := []
     PasteMd._CollectNodesByTag(nodes, "li", &listItems)
+    changed := false
     for li in listItems {
       idx := PasteMd._FirstMeaningfulChildIndex(li)
       if (idx < 1)
