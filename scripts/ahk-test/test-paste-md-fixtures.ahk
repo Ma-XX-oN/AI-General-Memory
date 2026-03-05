@@ -109,7 +109,7 @@ for fx in fixtures {
 
       if FileExist(expectedPath) {
         expectedFinal := FileRead(expectedPath, "UTF-8")
-        ChkEqNorm("finalMd", finalMd, expectedFinal)
+        ChkEqNorm("finalMd from " expectedPath, finalMd, expectedFinal)
       } else {
         Log("  note: expected output missing, comparison skipped: " _Basename(expectedPath))
       }
@@ -333,16 +333,16 @@ ChkGotExpectedDetail(gotN, expectedN, suffix := "") {
 ChkEqNorm(label, got, expected) {
   gotN := NormalizeEol(got)
   expectedN := NormalizeEol(expected)
-  detail := "got len=" StrLen(gotN) " expected len=" StrLen(expectedN)
+  detail := "`ngot len=" StrLen(gotN) " expected len=" StrLen(expectedN)
   cond := gotN = expectedN
+  ; len := 500
   if (!cond) {
-    if (StrLen(gotN) <= 100 && StrLen(expectedN) <= 100) {
+    ; if (StrLen(gotN) <= len*2 && StrLen(expectedN) <= len*2) {
       detail .= ChkGotExpectedDetail(gotN, expectedN)
-    } else {
-      len := 50
-      detail .= ChkGotExpectedDetail(SubStr(gotN, 1, len), SubStr(expectedN, 1, len), " head")
-      detail .= ChkGotExpectedDetail(SubStr(gotN, -len+1), SubStr(expectedN, -len+1),   " tail")
-    }
+    ; } else {
+    ;   detail .= ChkGotExpectedDetail(SubStr(gotN, 1, len), SubStr(expectedN, 1, len), " head")
+    ;   detail .= ChkGotExpectedDetail(SubStr(gotN, -len+1), SubStr(expectedN, -len+1),   " tail")
+    ; }
   }
   Chk(label, cond, detail)
 }
