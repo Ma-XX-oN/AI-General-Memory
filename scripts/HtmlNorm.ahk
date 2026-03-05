@@ -176,11 +176,8 @@ class HtmlNorm {
         ; 13. Wrap bare top-level <li> siblings in <ol>.
         html := HtmlNorm._WrapBareTopLevelLiDom(html)
 
-        ; 14. Normalize <code> elements.
-        html := HtmlNorm._NormalizeCodeElements(html)
-
-        ; 15. Unwrap nested containers that obscure code blocks.
-        html := HtmlNorm._UnwrapNestedContainers(html)
+        ; 14 + 15. Code normalization and nested-container unwrapping in one DOM pass.
+        html := HtmlNorm._NormalizeCodeAndUnwrapDom(html)
 
         HtmlNorm._domNodes := HtmlNorm._TryParseDomNodes(html)
 
@@ -1058,6 +1055,38 @@ class HtmlNorm {
             node.attrs := Map()
         }
         return true
+    }
+
+    /**
+     * Runs stages 14 and 15 in one DOM parse/serialize cycle.
+     *
+     * - Normalize <code> elements
+     * - Unwrap nested containers that obscure code blocks
+     *
+     * @param {string} html
+     * @returns {string}
+     */
+    static _NormalizeCodeAndUnwrapDom(html) {
+        nodes := HtmlNorm._TryParseDomNodes(html)
+        if (nodes.Length = 0)
+            return html
+
+        hadCode := RegExMatch(html, "i)<code\b")
+        if hadCode
+            nodes := HtmlNorm._NormalizeCodeElementsDomNodes(nodes, false)
+
+        changedAny := false
+        Loop 10 {
+            changed := false
+            nodes := HtmlNorm._UnwrapNestedContainersDomNodes(nodes, &changed)
+            if !changed
+                break
+            changedAny := true
+        }
+
+        if (hadCode || changedAny)
+            return HtmlNorm._SerializeDomNodes(nodes)
+        return html
     }
 
     /**
