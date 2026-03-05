@@ -139,33 +139,124 @@ class HtmlNorm {
         HtmlNorm._thinkingBlocks := []
         HtmlNorm._userMsgBlocks  := []
         HtmlNorm._domNodes       := []
-        html := htmlFrag
+        return HtmlNorm._NormalizeSingleDomPipeline(htmlFrag, source, showPoster, showImg)
+    }
 
-        ; 1..5. Lead + early code/widget cleanup in one DOM parse/serialize cycle:
-        ;   - Handle <img>/<svg> replacement when showImg is off.
-        ;   - Inject poster-label placeholders when showPoster is on.
-        ;   - Convert tool diff containers into canonical language-diff code blocks.
-        ;   - Strip UI buttons.
-        ;   - ChatGPT: normalize CodeMirror code blocks before any span stripping.
-        html := HtmlNorm._NormalizeLeadAndEarlyDom(html, source, showPoster, showImg)
+    /**
+     * Single-parse DOM normalization pipeline.
+     * Falls back to legacy staged flow when initial parse fails.
+     * @param {string} html
+     * @param {string} source
+     * @param {boolean} showPoster
+     * @param {boolean} showImg
+     * @returns {string}
+     */
+    static _NormalizeSingleDomPipeline(html, source, showPoster, showImg) {
+        if (html = "") {
+            HtmlNorm._domNodes := []
+            return html
+        }
 
-        ; 6..13. Mid + late DOM cleanup in one parse/serialize cycle:
-        ;   - Normalize task-list checkboxes.
-        ;   - Extract thinking blocks.
-        ;   - Promote inline-code spans.
-        ;   - Extract whitespace-sensitive user message text.
-        ;   - Strip Claude Web language-label divs (font-small + p-3*).
-        ;   - Strip long footnote hrefs, keeping only #user-content-...
-        ;   - Unwrap <p> inside footnote definition <li id="user-content-fn-*">.
-        ;   - Strip residual <span> wrappers while preserving child order/content.
-        ;   - Wrap bare top-level <li> siblings in <ol>.
-        html := HtmlNorm._NormalizeMidAndLateDom(html)
+        nodes := HtmlNorm._TryParseDomNodes(html)
+        if (nodes.Length = 0) {
+            ; Preserve prior behavior as a safe fallback.
+            html := HtmlNorm._NormalizeLeadAndEarlyDom(html, source, showPoster, showImg)
+            html := HtmlNorm._NormalizeMidAndLateDom(html)
+            html := HtmlNorm._NormalizeCodeUnwrapAndCaptureDom(html)
+            return html
+        }
 
-        ; 14 + 15. Code normalization and nested-container unwrapping in one
-        ; DOM pass, while capturing final DOM nodes for downstream consumers.
-        html := HtmlNorm._NormalizeCodeUnwrapAndCaptureDom(html)
+        needImg := !showImg && RegExMatch(html, "i)<(?:img|svg)\b")
+        needPoster := showPoster
+        needDiff := RegExMatch(html, "i)<diffs-container\b")
+        needButton := RegExMatch(html, "i)</?button\b")
+        needChatPre := (source = "chatgpt")
+            && RegExMatch(html, "i)<pre\b[^>]*\boverflow-visible\b[^>]*>")
 
-        return html
+        needMid := RegExMatch(
+            html,
+            "i)(<li\b|<details\b[^>]*+\bclass=`"[^`"]*+\bthinking\b[^`"]*+`"|<span\b[^>]*+\bclass=`"[^`"]*+\b(?:inline-markdown|font-mono)\b[^`"]*+`")"
+        )
+        needUser := RegExMatch(html, "i)<(?:p|div)\b[^>]*\b(?:text-size-chat|content_xGDvVg|whitespace-pre-wrap)\b")
+        needLate := RegExMatch(html, "i)(<li\b|<div\b[^>]*\bclass=`"[^`"]*\bfont-small\b[^`"]*\bp-3[^`"]*`"|href=`"[^`"]*#user-content-|<li\b[^>]*\bid=`"user-content-fn-|</?span\b)")
+        needCode := RegExMatch(html, "i)<code\b")
+
+        changedAny := false
+
+        if needImg {
+            nodes := HtmlNorm._ProcessImgTagsDomNodes(nodes)
+            changedAny := true
+        }
+        if needPoster {
+            HtmlNorm._InjectPosterPlaceholdersDomNodes(nodes, source)
+            changedAny := true
+        }
+        if needDiff {
+            lastButton := ""
+            changed := false
+            nodes := HtmlNorm._NormalizeSimpleDiffBlocksDomNodes(nodes, &lastButton, &changed)
+            if changed
+                changedAny := true
+        }
+        if needButton {
+            btnNodes := []
+            HtmlNorm._CollectMatchingNodes(nodes, (n) => HtmlNorm._IsTag(n, "button"), &btnNodes)
+            if (btnNodes.Length > 0) {
+                nodes := HtmlNorm._RemoveMatchingDomNodes(nodes, (n) => HtmlNorm._IsTag(n, "button"))
+                changedAny := true
+            }
+        }
+        if needChatPre {
+            changed := false
+            nodes := HtmlNorm._NormalizeChatGptCodeBlocksDomNodes(nodes, &changed)
+            if changed
+                changedAny := true
+        }
+
+        if needMid {
+            if (HtmlNorm._NormalizeTaskListItemsDomNodes(nodes))
+                changedAny := true
+
+            thinkCount := HtmlNorm._thinkingBlocks.Length
+            nodes := HtmlNorm._ExtractThinkingBlocksDomNodes(nodes)
+            if (HtmlNorm._thinkingBlocks.Length != thinkCount)
+                changedAny := true
+
+            if (HtmlNorm._PromoteInlineCodeSpansDomNodes(nodes))
+                changedAny := true
+        }
+
+        if needUser {
+            changed := false
+            nodes := HtmlNorm._ExtractUserMessagesInlineContainerDomNodes(nodes, &changed)
+            nodes := HtmlNorm._ExtractUserMessagesFullNodeDomNodes(nodes, &changed)
+            if changed
+                changedAny := true
+        }
+
+        if needLate {
+            if (HtmlNorm._NormalizeFootnoteAndSpanDomNodes(&nodes))
+                changedAny := true
+            nodes := HtmlNorm._WrapBareTopLevelLiDomNodes(nodes, &wrapped)
+            if wrapped
+                changedAny := true
+        }
+
+        if needCode {
+            nodes := HtmlNorm._NormalizeCodeElementsDomNodes(nodes, false)
+            changedAny := true
+        }
+
+        Loop 10 {
+            changed := false
+            nodes := HtmlNorm._UnwrapNestedContainersDomNodes(nodes, &changed)
+            if !changed
+                break
+            changedAny := true
+        }
+
+        HtmlNorm._domNodes := nodes
+        return changedAny ? HtmlNorm._SerializeDomNodes(nodes) : html
     }
 
     ; ─────────────────────────────────────────────────────────────────────────
