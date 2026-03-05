@@ -72,6 +72,18 @@ class PasteMd {
   static _shellListItemPlaceholder := "¤LI_SHELL¤"
 
   /**
+   * Captures the current call stack for diagnostics.
+   * @param {string} label - Optional tag included in the thrown probe error
+   * @returns {string} Stack text
+   */
+  static _CaptureStack(label := "stack probe") {
+    try
+      throw Error(label)
+    catch as e
+      return e.Stack
+  }
+
+  /**
    * Overrides ordered-list prompt provider for deterministic testing.
    * @param {Func} promptFn - Callable receiving (defaultStart, expected, plain, htmlFrag)
    * @returns {Func} Previous prompt provider
@@ -714,8 +726,10 @@ class PasteMd {
         PasteMd.gPasteMenu.Uncheck("Pin current &log")
       }
       PasteMd._RotateLogFiles()
+      dbgOpenStack := PasteMd._CaptureStack("PasteMd.PasteMarkdown debug-log open")
       dbgF := FileOpen(PasteMd.DEBUG_PASTE_MD_LOG, "w", "UTF-8")
       dbgF.Write("PasteAsMd debug — " FormatTime(, "yyyy-MM-dd HH:mm:ss") "`n`n")
+      PasteMd._DbgSection(dbgF, "0. debug stack (log-open caller)", dbgOpenStack)
     }
 
     clipSaved := ClipboardAll()
@@ -791,6 +805,7 @@ class PasteMd {
       if (dbg) {
         try {
           dbgF.Write("!!! EXCEPTION: " e.File ":" e.Line " — " e.Message "`n")
+          dbgF.Write("!!! EXCEPTION STACK:`n" e.Stack "`n")
           dbgF.Close()
         }
       }
