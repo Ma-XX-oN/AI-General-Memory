@@ -54,9 +54,10 @@ directly/indirectly by the users.
 | [`AUTHORS.md`](AUTHORS.md) | Maintainer and contributor attribution list |
 | [`social-preview.svg`](social-preview.svg) | Repository social preview artwork by collaborative effort between Claude Code and Codex |
 | [`ahk.md`](ahk.md) | AutoHotkey v2 patterns and pitfalls (Git Bash, strings, concat) — referenced from CLAUDE.md |
-| [`build_issues.md`](build_issues.md) | Cross-project build and linker mismatch triage playbook |
+| [`build_issues.md`](build_issues.md) | Build and linker mismatch triage playbook |
 | [`regex-patterns.md`](regex-patterns.md) | Reusable regex patterns referenced from CLAUDE.md / CODEX.md |
 | [`testing.md`](testing.md) | Testing guidelines and discipline referenced from CLAUDE.md |
+| [`workflow.md`](workflow.md) | TTD/testing/command-workflow guidance for Codex to reduce approval friction |
 | [`scripts/normalize-eol.ps1`](scripts/normalize-eol.ps1) | Utility to normalize file EOL style (`CRLF` or `LF`) |
 | [`scripts/show-eol.ps1`](scripts/show-eol.ps1) | Utility to report file EOL style (`CRLF`, `LF`, `CR`, `Mixed`, `None`) |
 | [`scripts/show-eol.pl`](scripts/show-eol.pl) | Perl utility to report file EOL style (`CRLF`, `LF`, `CR`, `Mixed`, `None`) |
