@@ -63,6 +63,7 @@
 - For any edit under `~/.codex/`, run a hard preflight before changing files: read `~/.codex/README.md`, verify target-file tracking with `git -C ~/.codex ls-files -- <path>` and `.gitignore`, check EOL style, and do not edit until all checks pass.
 - For OpenSCAD JS documentation, require JSDoc on public symbols and use `@slot`/`@deref` plus full `@type` docs for slot-based constants/typedefs.
 - For GitHub markdown docs, avoid raw `<svg>` tags and sanitize punctuation-heavy anchors when generating intra-doc links.
+- For GitHub markdown diagrams that must align, prefer plain ASCII (`+`, `-`, `|`) over Unicode box-drawing characters because GitHub monospace rendering can drift.
 - For non-trivial diagrams where layout precision matters, prefer an ASCII-first draft and then convert to SVG; avoid relying on Mermaid auto-layout for final authoritative diagrams.
 - When editing diagrams, preserve graph semantics and local associations (connectivity, arrow targets, neighboring relationships) while moving elements; do not optimize a single element in isolation.
 - For SVG diagram styling, use class/token-based semantics and redundant encodings (color plus line-style/weight) so meaning remains clear under color-vision deficiencies and grayscale.
