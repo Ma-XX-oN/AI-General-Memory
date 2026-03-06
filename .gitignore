@@ -27,6 +27,8 @@
 !scripts/HtmlNorm.ahk
 !scripts/HtmlParser.ahk
 !scripts/HtmlDom.ahk
+!scripts/CopyClip.ahk
+!scripts/TT_Simple.ahk
 !scripts/ahk-test
 !scripts/ahk-test/**
 scripts/ahk-test/*.actual.md

@@ -61,7 +61,7 @@ directly/indirectly by the users.
 | [`scripts/show-eol.ps1`](scripts/show-eol.ps1) | Utility to report file EOL style (`CRLF`, `LF`, `CR`, `Mixed`, `None`) |
 | [`scripts/show-eol.pl`](scripts/show-eol.pl) | Perl utility to report file EOL style (`CRLF`, `LF`, `CR`, `Mixed`, `None`) |
 | [`scripts/normalize-eol.pl`](scripts/normalize-eol.pl) | Perl utility to normalize file EOL style (`CRLF` or `LF`) |
-| [`scripts/PasteAsMd.ahk`](scripts/PasteAsMd.ahk) | <h2>User helper script for user-to-AI communication via markdown-safe paste.</h2><ul><li>Requires [AutoHotkey](https://www.autohotkey.com/).</li><li>Maps `Ctrl-Alt-Shift-v` to a menu to paste as Markdown or quoted Markdown.</li><li>*not an AI runtime tool*</li></ul> |
+| [`scripts/PasteAsMd.ahk`](scripts/PasteAsMd.ahk) | <h2>User helper script for user-to-AI communication via markdown-safe paste.</h2><ul><li>Requires [AutoHotkey](https://www.autohotkey.com/) and [pandoc](https://pandoc.org/).</li><li>Maps `Ctrl-Alt-Shift-v` to a menu to paste as Markdown or quoted Markdown.</li><li>*not an AI runtime tool*</li></ul> |
 | [`scripts/ClipHelper.ahk`](scripts/ClipHelper.ahk) | Clipboard/CF_HTML utility used by `PasteAsMd.ahk`.<ul><li>*not an AI runtime tool*</li></ul> |
 | [`.gitignore`](.gitignore) | Deny-all with explicit exceptions for knowledge files |
 
