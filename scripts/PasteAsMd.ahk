@@ -1324,7 +1324,22 @@ class PasteMd {
     if !IsObject(promptFn)
       promptFn := PasteMd._defaultOrderedListPromptFn
 
-    rawResponse := promptFn.Call(defaultStart, expected, plain, htmlFrag)
+    busyWasActive := (PasteMd._busyStartTick != 0)
+    busyLabel := PasteMd._busyLabel
+    if (busyWasActive) {
+      if PasteMd._busyTimerFn
+        SetTimer(PasteMd._busyTimerFn, 0)
+      ToolTip()
+    }
+    try {
+      rawResponse := promptFn.Call(defaultStart, expected, plain, htmlFrag)
+    } finally {
+      if (busyWasActive && PasteMd._busyStartTick != 0) {
+        if PasteMd._busyTimerFn
+          SetTimer(PasteMd._busyTimerFn, PasteMd.BUSY_SPIN_INTERVAL_MS)
+        PasteMd._BusyUpdate(busyLabel != "" ? busyLabel : "Working")
+      }
+    }
     parsed := PasteMd.ParseOrderedListPromptResponse(rawResponse)
     if (parsed["status"] = "cancel")
       return Map("aborted", true, "value", expected)
@@ -1397,28 +1412,32 @@ class PasteMd {
   static _PromptOrderedListStartDialog(defaultStart, expected := 0, plain := "", htmlFrag := "") {
     isDark := PasteMd._IsDarkModeEnabled()
     state := { status: "cancel", value: 0 }
+    msgW := 360
+    btnW := 90
+    btnGap := 8
+    btnRowX := 14 + msgW - (btnW * 2 + btnGap)
 
-    gui := Gui("+AlwaysOnTop +OwnDialogs", "Paste as md: list start")
-    gui.MarginX := 14
-    gui.MarginY := 12
+    dlg := Gui("+AlwaysOnTop +OwnDialogs", "Paste as md: list start")
+    dlg.MarginX := 14
+    dlg.MarginY := 12
     if (isDark)
-      gui.BackColor := "202020"
+      dlg.BackColor := "202020"
 
-    gui.SetFont("s9", "Segoe UI")
+    dlg.SetFont("s9", "Segoe UI")
     if (isDark)
-      gui.SetFont("cE6E6E6")
+      dlg.SetFont("cE6E6E6")
 
-    gui.AddText("xm w460"
+    dlg.AddText("xm w" msgW
       , "Original ordered-list index is missing from clipboard context."
       . "`nEnter starting number (>= 1), or Cancel to abort paste.")
-    edit := gui.AddEdit("xm w140", "" defaultStart)
+    edit := dlg.AddEdit("xm w140", "" defaultStart)
 
-    errOpts := "xm w460 Hidden "
+    errOpts := "xm w" msgW " Hidden "
     errOpts .= isDark ? "cFF8A8A" : "cCC0000"
-    err := gui.AddText(errOpts, "Enter a whole number greater than or equal to 1.")
+    err := dlg.AddText(errOpts, "Enter a whole number greater than or equal to 1.")
 
-    okBtn := gui.AddButton("xm w90 Default", "OK")
-    cancelBtn := gui.AddButton("x+8 w90", "Cancel")
+    okBtn := dlg.AddButton("x" btnRowX " y+12 w" btnW " Default", "OK")
+    cancelBtn := dlg.AddButton("x+8 w" btnW, "Cancel")
 
     if (isDark) {
       edit.Opt("Background2B2B2B cF0F0F0")
@@ -1426,19 +1445,21 @@ class PasteMd {
       cancelBtn.Opt("Background3A3A3A cF0F0F0")
     }
 
-    okHandler := ObjBindMethod(PasteMd, "_PromptOrderedListSubmit", gui, edit, err, state)
-    cancelHandler := ObjBindMethod(PasteMd, "_PromptOrderedListCancel", gui, state)
+    okHandler := ObjBindMethod(PasteMd, "_PromptOrderedListSubmit", dlg, edit, err, state)
+    cancelHandler := ObjBindMethod(PasteMd, "_PromptOrderedListCancel", dlg, state)
     okBtn.OnEvent("Click", okHandler)
     cancelBtn.OnEvent("Click", cancelHandler)
-    gui.OnEvent("Close", cancelHandler)
-    gui.OnEvent("Escape", cancelHandler)
+    dlg.OnEvent("Close", cancelHandler)
+    dlg.OnEvent("Escape", cancelHandler)
 
-    gui.Show("AutoSize")
-    PasteMd._TrySetDarkTitleBar(gui.Hwnd, isDark)
+    ; Show hidden first so dark-title styling can be applied before first visible paint.
+    dlg.Show("Hide AutoSize")
+    PasteMd._TrySetDarkTitleBar(dlg.Hwnd, isDark)
+    dlg.Show()
     edit.Focus()
-    edit.Select()
+    SendMessage(0x00B1, 0, -1, edit, "ahk_id " dlg.Hwnd)
 
-    WinWaitClose("ahk_id " gui.Hwnd)
+    WinWaitClose("ahk_id " dlg.Hwnd)
     return (state.status = "ok") ? state.value : "CANCEL"
   }
 
@@ -1451,7 +1472,7 @@ class PasteMd {
       err.Visible := true
       err.Redraw()
       edit.Focus()
-      edit.Select()
+      SendMessage(0x00B1, 0, -1, edit, "ahk_id " gui.Hwnd)
       return
     }
 
