@@ -2,7 +2,7 @@
 
 ## Working Rules
 
-- If the user says to "remember" something, store project-specific rules in the project's `CODEX.md`. Store cross-project rules in `~/.codex/CODEX.md`, generalized when possible.
+- If the user says to "remember" something, store project-specific rules in the project's `CODEX.md`. Store cross-project rules in `~/.codex/CODEX.md` as global defaults that apply to all projects unless overridden locally.
 - For Conventional Commit messages with detail lines, format details as bullet points with no blank lines between bullets.
 - When composing git commit bodies with bullet detail lines, generate contiguous bullet lines with no blank separator lines (for example avoid multiple `-m` paragraphs that insert empty lines).
 - In PowerShell, never place Markdown backticks inside git commit -m strings; use plain text, single-quoted -m values, or git commit -F with a here-string to avoid escape-related character loss.
@@ -32,6 +32,8 @@
 - For simple checks, use only `rg` or already-approved command prefixes; avoid ad-hoc command strings that trigger approval prompts.
 - For any command execution, prefer already-approved command prefixes; if a required action is not covered, request scoped escalation first instead of running an ad-hoc variant.
 - Before running build/test/tool commands, perform an execution-rule preflight: identify applicable project/global `CODEX.md` command prerequisites and include them directly in the command line/environment.
+- For refactor or new development, agree expected behavior and the test plan before coding; if expectations change, re-agree before updating tests/fixtures.
+- IMPORTANT! For global default TTD/testing/approval-friction workflow details (applies to all projects unless overridden locally), follow `~/.codex/workflow.md`.
 - For CMake builds/tests in workspace repos, check `.vscode/settings.json` and `CMakePresets.json`/`CMakeUserPresets.json` first and mirror those settings; use manual command lines only when those sources are absent or the user explicitly overrides them.
 - For CMake workflows, never run configure and build concurrently; run them sequentially (`cmake -S/-B` then `cmake --build`) to avoid regenerate/build race conditions.
 - For build/linker mismatch triage, follow `~/.codex/build_issues.md` before ad-hoc fixes.
@@ -74,6 +76,7 @@
 
 - [Build issue triage guide](build_issues.md)
 - [Testing guidelines](testing.md)
+- [Workflow guidance (TTD/tests/approval friction)](workflow.md)
 - [Codex home README (memory file maintenance conventions)](README.md)
 
 ## Design Lessons
