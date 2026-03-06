@@ -140,6 +140,11 @@ class HtmlNorm {
         ;      its own line, content indented), instead of tight (number + content inline).
         html := RegExReplace(html, "is)(<li\b[^>]*\bid=`"user-content-fn-[^`"]*`"[^>]*>)\s*<p\b[^>]*>(.*?)</p>\s*(</li>)", "$1$2$3")
 
+        ; 11c. Tight-list normalization: unwrap solitary paragraph wrappers in list items.
+        ;      <li><p>text</p></li> → <li>text</li>
+        ;      This avoids loose-list markdown output (blank lines between items).
+        html := HtmlNorm._NormalizeTightListItems(html)
+
         ; 12. Strip residual <span> tags.
         html := RegExReplace(html, "i)</?span\b[^>]*>", "")
 
@@ -441,6 +446,32 @@ class HtmlNorm {
             html := SubStr(html, 1, mTask.Pos - 1) . replacement . SubStr(html, mTask.Pos + mTask.Len)
             pos := mTask.Pos + StrLen(replacement)
         }
+        return html
+    }
+
+    /**
+     * Unwraps solitary `<p>` wrappers inside list items.
+     * Only applies to simple `<li><p>...</p></li>` shapes.
+     * @param {string} html
+     * @returns {string}
+     */
+    static _NormalizeTightListItems(html) {
+        if !RegExMatch(html, "i)<li\b")
+            return html
+        if !RegExMatch(html, "i)<p\b")
+            return html
+        ; Case 1: list-item lead paragraph followed by nested list.
+        html := RegExReplace(
+            html,
+            "is)(<li\b[^>]*>)\s*<p\b[^>]*>((?:(?!</p>|<ul\b|<ol\b|<li\b).)++)</p>\s*((?:<ul\b|<ol\b))",
+            "$1$2$3"
+        )
+        ; Case 2: leaf list item with only a paragraph wrapper.
+        html := RegExReplace(
+            html,
+            "is)(<li\b[^>]*>)\s*<p\b[^>]*>((?:(?!</p>|<ul\b|<ol\b|<li\b).)++)</p>\s*(</li>)",
+            "$1$2$3"
+        )
         return html
     }
 

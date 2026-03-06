@@ -690,6 +690,8 @@ class PasteMd {
       }
 
       mdAfterPoster := md
+      if (asQuoted)
+        md := PasteMd.TrimTrailingQuoteSpacerLines(md)
       md := PasteMd.EnsureTrailingEolForList(md)
 
       ; Remove CR unconditionally (LF-only).
@@ -867,19 +869,35 @@ class PasteMd {
 
   /**
    * Normalizes plain text for markdown-safe paste.
-   * Removes CR, trims trailing whitespace, and removes edge blank lines.
+   * Removes CR and strips only truly empty edge lines.
+   * Preserves intra-line/trailing spaces from clipboard content.
    * @param {string} s - Text to normalize
    * @returns {string} Normalized text
    */
   static CleanPlainText(s) {
     s := StrReplace(s, "`r", "")
     lines := StrSplit(s, "`n")
+    if (lines.Length = 0)
+      return ""
+
+    start := 1
+    while (start <= lines.Length && lines[start] = "")
+      start += 1
+    if (start > lines.Length)
+      return ""
+
+    stop := lines.Length
+    while (stop >= start && lines[stop] = "")
+      stop -= 1
+
     out := ""
-    for i, line in lines {
-      line := RTrim(line, " `t")
-      out .= (i = 1 ? "" : "`n") line
+    firstOut := true
+    Loop (stop - start + 1) {
+      idx := start + A_Index - 1
+      out .= (firstOut ? "" : "`n") lines[idx]
+      firstOut := false
     }
-    return Trim(out, "`n")
+    return out
   }
 
   /**
@@ -906,7 +924,12 @@ class PasteMd {
         lang := RegExMatch(m[1], "i)language-(\w++)", &langM) ? langM[1] : ""
         inner := RegExReplace(m[2], "<[^>]++>", "")
         inner := PasteMd.DecodeBasicHtmlEntities(inner)
-        inner := Trim(inner, " `t`n")
+        inner := StrReplace(inner, "`r", "")
+        ; Keep content whitespace; trim only wrapper newlines introduced by HTML tags.
+        if (SubStr(inner, 1, 1) = "`n")
+          inner := SubStr(inner, 2)
+        if (inner != "" && SubStr(inner, 0) = "`n")
+          inner := SubStr(inner, 1, StrLen(inner) - 1)
         replacement := PasteMd.CODE_FENCE lang "`n" inner "`n" PasteMd.CODE_FENCE
         md := SubStr(md, 1, m.Pos - 1) replacement SubStr(md, m.Pos + m.Len)
         pos := m.Pos + StrLen(replacement)
@@ -1777,6 +1800,44 @@ class PasteMd {
       return md
 
     return tail "`n"
+  }
+
+  /**
+   * Removes quote-only blank spacer lines at the end of a quoted document.
+   * Preserves internal blank quote spacing.
+   * @param {string} md - Quoted markdown text
+   * @returns {string} Markdown with trailing quote spacer lines removed
+   */
+  static TrimTrailingQuoteSpacerLines(md) {
+    md := StrReplace(md, "`r", "")
+    if (md = "")
+      return md
+
+    hadTrailingBreak := RegExMatch(md, "\n$")
+    tail := RTrim(md, "`n")
+    if (tail = "")
+      return md
+
+    lines := StrSplit(tail, "`n")
+    while (lines.Length > 0) {
+      last := lines[lines.Length]
+      if !RegExMatch(last, "^[ \t]*+>[ \t]*+$")
+        break
+      lines.Pop()
+    }
+
+    if (lines.Length = 0)
+      return ""
+
+    out := ""
+    firstOut := true
+    Loop lines.Length {
+      out .= (firstOut ? "" : "`n") lines[A_Index]
+      firstOut := false
+    }
+    if (hadTrailingBreak)
+      out .= "`n"
+    return out
   }
 }
 
