@@ -1,10 +1,37 @@
-﻿;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; Paste as md
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+﻿/**
+ * ## Paste as md
+ * 
+ * By Adrian Hawryluk with help from Claude Code and Codex.
+ * 
+ * This allows pasting clipboard data that has been copied from an AI session
+ * as markdown text.  Claude, Claude Code, ChatGPT and Codex have been tested.
+ * This may work for other AI models or just regular HTML, though results may
+ * vary.
+ * 
+ * As some of the transforms can take some time, there is user feedback in the
+ * form of a tooltip showing the stage of processing and the time elapsed since
+ * the start of clipboard extraction.
+ * 
+ * There is also logging which can be used to debug aspects of the
+ * transformation, and they can be converted into test fixtures for future
+ * verification.
+ * 
+ * The HtmlNorm.ahk is there to help normalise the HTML from all sources prior
+ * to passing to [pandoc](https://pandoc.org/), an external executable that
+ * converts between document formats.  Basic pipeline is:
+ * 
+ * 1. Read HTML from clipboard (fallback is to take text from clipboard)
+ * 2. Normalise HTML.
+ * 3. Send to pandoc for most of the conversion.
+ * 4. Massage the output so that different inputs look more or less the same.
+ * 5. Paste.
+ */
+
 #Requires AutoHotkey v2.0
 #SingleInstance Force
 #Include ClipHelper.ahk
 #Include HtmlNorm.ahk
+#include TT_Simple.ahk
 
 class PasteMd {
   static __New() {
@@ -23,9 +50,6 @@ class PasteMd {
     PasteMd.gPasteMenu.Disable("Pinned &full names")
     if (PasteMd.BUSY_SPIN_INTERVAL_MS <= 0)
       throw Error("PasteMd.BUSY_SPIN_INTERVAL_MS must be > 0.")
-    ; if (PasteMd._busySpinner.Length == 0)
-    ;   throw Error("PasteMd._busySpinner must contain at least one element.")
-    PasteMd._busyTimerFn := ObjBindMethod(PasteMd, "_BusyUpdate")
     PasteMd._defaultOrderedListPromptFn := ObjBindMethod(PasteMd, "_PromptOrderedListStartDialog")
     PasteMd._orderedListPromptFn := PasteMd._defaultOrderedListPromptFn
     PasteMd._InitPinState()
@@ -65,8 +89,6 @@ class PasteMd {
   static _lastPinPath := ""
   static _busyStartTick := 0
   static _busyLabel := ""
-  static _busyTimerFn := 0
-  ; static _busySpinner := ["", ".", "..", "..."]
   static _defaultOrderedListPromptFn := 0
   static _orderedListPromptFn := 0
   static _shellListItemPlaceholder := "¤LI_SHELL¤"
@@ -277,14 +299,26 @@ class PasteMd {
     }
   }
 
+  static _BusyMsg(text) {
+    PasteMd._busyLabel := text
+    msg_fn() {
+      elapsed := A_TickCount - PasteMd._busyStartTick
+      sec := elapsed / 1000
+      min := sec / 60
+      sec := Mod(sec, 60)
+      return Format("{:02d}:{:02d} {}", min, sec, PasteMd._busyLabel)
+    }
+    return msg_fn
+  }
+
+  static _started := 0
   /**
    * Starts periodic busy tooltip updates for long-running paste operations.
    * @param {string} stage - Initial status label
    */
   static _BusyStart(stage := "Working") {
+    tt_simple.showAfter(PasteMd.BUSY_TT_SHOW_DELAY_MS)
     PasteMd._busyStartTick := A_TickCount
-    PasteMd._busyLabel := stage
-    SetTimer(PasteMd._busyTimerFn, PasteMd.BUSY_SPIN_INTERVAL_MS)
     PasteMd._BusyUpdate(stage)
   }
 
@@ -293,39 +327,14 @@ class PasteMd {
    * @param {string} stage - Optional updated status label
    */
   static _BusyUpdate(stage := "") {
-    if (PasteMd._busyStartTick = 0)
-      return
-
-    if (stage != "")
-      PasteMd._busyLabel := stage
-
-    elapsed := A_TickCount - PasteMd._busyStartTick
-    if (elapsed < PasteMd.BUSY_TT_SHOW_DELAY_MS) {
-      ToolTip()
-      return
-    }
-
-    ; spinnerCount := PasteMd._busySpinner.Length
-    ; spinInterval := PasteMd.BUSY_SPIN_INTERVAL_MS
-    ; spinnerIndex := Mod(Floor(elapsed / spinInterval), spinnerCount) + 1
-    ; spinner := PasteMd._busySpinner[spinnerIndex]
-
-    sec := elapsed / 1000
-    min := sec / 60
-    sec := Mod(sec, 60)
-    ToolTip(Format("{:02d}:{:02d} {}", min, sec, PasteMd._busyLabel))
+    tt_simple.on(PasteMd._BusyMsg(stage), , PasteMd.BUSY_SPIN_INTERVAL_MS)
   }
 
   /**
    * Stops periodic busy updates and clears tooltip state.
    */
   static _BusyEnd() {
-    if PasteMd._busyTimerFn
-      SetTimer(PasteMd._busyTimerFn, 0)
-    PasteMd._busyStartTick := 0
-    PasteMd._busyLabel := ""
-    Sleep 10 ; in case _BusyUpdate() was called and interrupted
-    ToolTip()
+    tt_simple.off()
   }
 
   /**
@@ -732,16 +741,14 @@ class PasteMd {
         PasteMd.gPasteMenu.Uncheck("Pin current &log")
       }
       PasteMd._RotateLogFiles()
-      dbgOpenStack := PasteMd._CaptureStack("PasteMd.PasteMarkdown debug-log open")
       dbgF := FileOpen(PasteMd.DEBUG_PASTE_MD_LOG, "w", "UTF-8")
       dbgF.Write("PasteAsMd debug — " FormatTime(, "yyyy-MM-dd HH:mm:ss") "`n`n")
-      PasteMd._DbgSection(dbgF, "0. debug stack (log-open caller)", dbgOpenStack)
     }
 
     clipSaved := ClipboardAll()
     plain := StrReplace(A_Clipboard, "`r", "")
     try {
-      PasteMd._BusyUpdate()
+      PasteMd._BusyUpdate("Getting content")
       cfHtml := ClipboardWaiter.GetHtml()
       PasteMd._BusyUpdate("Converting content")
       converted := PasteMd._ConvertFromCaptured(
@@ -1347,22 +1354,8 @@ class PasteMd {
     if !IsObject(promptFn)
       promptFn := PasteMd._defaultOrderedListPromptFn
 
-    busyWasActive := (PasteMd._busyStartTick != 0)
-    busyLabel := PasteMd._busyLabel
-    if (busyWasActive) {
-      if PasteMd._busyTimerFn
-        SetTimer(PasteMd._busyTimerFn, 0)
-      ToolTip()
-    }
-    try {
-      rawResponse := promptFn.Call(defaultStart, expected, plain, htmlFrag)
-    } finally {
-      if (busyWasActive && PasteMd._busyStartTick != 0) {
-        if PasteMd._busyTimerFn
-          SetTimer(PasteMd._busyTimerFn, PasteMd.BUSY_SPIN_INTERVAL_MS)
-        PasteMd._BusyUpdate(busyLabel != "" ? busyLabel : "Working")
-      }
-    }
+    rawResponse := promptFn(defaultStart, expected, plain, htmlFrag)
+
     parsed := PasteMd.ParseOrderedListPromptResponse(rawResponse)
     if (parsed["status"] = "cancel")
       return Map("aborted", true, "value", expected)
