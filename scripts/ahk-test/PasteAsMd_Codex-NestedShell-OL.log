@@ -1,4 +1,9 @@
 PasteAsMd debug — 2026-03-04 14:37:17
+case:quoted, asQuoted:1
+case:unquoted, asQuoted:0
+
+=== 0. source (len=5) ===
+codex
 
 === 1. plain (A_Clipboard minus CR) (len=56) ===
 OL-04 - Delta Cobalt¶

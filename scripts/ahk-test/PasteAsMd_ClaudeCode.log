@@ -1,5 +1,8 @@
 ﻿﻿PasteAsMd debug — 2026-03-02 01:49:56
 
+=== 0. source (len=10) ===
+claudecode
+
 === 1. plain (A_Clipboard minus CR) (len=597) ===
 Heading One¶
 Heading Two¶

@@ -1,4 +1,6 @@
-﻿> I’m patching `test-paste-md-fixtures.ahk` now so its with-user label assertions match the new `## Name` format.
+## Codex
+
+> I’m patching `test-paste-md-fixtures.ahk` now so its with-user label assertions match the new `## Name` format.
 >
 > Edited file
 >

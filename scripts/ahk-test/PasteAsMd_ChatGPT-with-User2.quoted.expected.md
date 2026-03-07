@@ -1,4 +1,4 @@
-﻿## User
+## User
 
 > Lorem ipsum dolor sit amet.
 

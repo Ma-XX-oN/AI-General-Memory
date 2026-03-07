@@ -1,5 +1,8 @@
 ﻿﻿PasteAsMd debug — 2026-03-02 01:53:38
 
+=== 0. source (len=9) ===
+claudeweb
+
 === 1. plain (A_Clipboard minus CR) (len=750) ===
 Markdown Test Document¶
 Section 1¶

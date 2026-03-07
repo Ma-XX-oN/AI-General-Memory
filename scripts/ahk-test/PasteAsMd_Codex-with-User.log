@@ -1,5 +1,8 @@
 ﻿﻿PasteAsMd debug — 2026-03-02 01:51:17
 
+=== 0. source (len=5) ===
+codex
+
 === 1. plain (A_Clipboard minus CR) (len=1505) ===
 Output a markdown test document demonstrating each of the following. No explanations — just the document.¶
 ¶
