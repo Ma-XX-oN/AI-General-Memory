@@ -207,8 +207,9 @@ See [ahk.md](ahk.md) for full notes. Critical reminders:
      If it fails, use `/tmp/claude-commit-msg.txt` as a fixed fallback path.
   2. Write the commit message to `/tmp/claude-commit-msg-<SESSION_PID>.txt`
      using the Write tool (no approval needed).
-  3. Commit with the stable command: `git commit -F /tmp/claude-commit-msg-<SESSION_PID>.txt`
-     (approve-once eligible with prefix `git commit -F /tmp/claude-commit-msg-`).
+     Note: the Write tool maps `/tmp` → `C:\tmp`; git requires the Windows form.
+  3. Commit with the stable command: `git commit -F C:/tmp/claude-commit-msg-<SESSION_PID>.txt`
+     (approve-once eligible with prefix `git commit -F C:/tmp/claude-commit-msg-`).
 
 ## Useful Patterns
 

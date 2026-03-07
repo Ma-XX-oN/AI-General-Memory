@@ -43,11 +43,12 @@ file so the `git commit -F` command string is stable and approve-once eligible.
    If PowerShell is unavailable the script exits 1 with an error message —
    fall back to a fixed path (`/tmp/claude-commit-msg.txt`) in that case.
 4. **Write the commit message** using the Write tool (no approval needed):
-   - Path: `/tmp/claude-commit-msg-<SESSION_PID>.txt`
-5. **Stable commit command** (approve-once eligible with prefix `git commit -F /tmp/claude-commit-msg-`):
+   - Write tool path: `/tmp/claude-commit-msg-<SESSION_PID>.txt`
+   - The Write tool maps `/tmp` → `C:\tmp`; git requires the Windows form.
+5. **Stable commit command** (approve-once eligible with prefix `git commit -F C:/tmp/claude-commit-msg-`):
 
    ```bash
-   git commit -F /tmp/claude-commit-msg-<SESSION_PID>.txt
+   git commit -F C:/tmp/claude-commit-msg-<SESSION_PID>.txt
    ```
 
 6. Do not store transient commit message files in repos.
