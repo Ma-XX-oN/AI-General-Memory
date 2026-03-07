@@ -138,6 +138,13 @@ fact that caused the change.
 For any question about current file contents, do a fresh read of the target
 file in the same turn before answering; do not answer from cached context alone.
 
+### Keep each command as its own tool call
+
+Never chain commands with `&&`, `;`, or `|` unless the whole pipeline was
+already approved as a unit.  Chaining changes the command string into a new
+unapproved shape even if each individual part was previously approved,
+forcing the user to re-approve what should have been a prompt-free operation.
+
 ### Order transforms carefully
 
 Do independent transforms first; do dependent or lossy transforms last.
