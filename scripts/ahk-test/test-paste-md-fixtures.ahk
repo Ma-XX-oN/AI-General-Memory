@@ -19,26 +19,25 @@ passed := 0
 failed := 0
 
 /**
- * Fixture registry: one source fixture log per entry.
- * Each descriptor defines expected source detection and with-user assertions.
+ * Fixture registry: one fixture source log per entry.
  */
 fixtures := [
-  { file: "PasteAsMd_ClaudeCode.log",               source: "claudecode", withUser: false, assistantLabel: "Claude Code" },
-  { file: "PasteAsMd_ClaudeCode-with-User.log",     source: "claudecode", withUser: true,  assistantLabel: "Claude Code" },
-  { file: "PasteAsMd_ClaudeWeb.log",                source: "claudeweb",  withUser: false, assistantLabel: "Claude Web" },
-  { file: "PasteAsMd_ClaudeWeb-with-User.log",      source: "claudeweb",  withUser: true,  assistantLabel: "Claude Web" },
-  { file: "PasteAsMd_Codex.log",                    source: "codex",      withUser: false, assistantLabel: "Codex" },
-  { file: "PasteAsMd_Codex-with-User.log",          source: "codex",      withUser: true,  assistantLabel: "Codex" },
-  { file: "PasteAsMd_Codex-EditedFile.log",         source: "codex",      withUser: false, assistantLabel: "Codex" },
-  { file: "PasteAsMd_Codex-OrderedList-Parent.log", source: "unknown",    withUser: false, assistantLabel: "Codex" },
-  { file: "PasteAsMd_Codex-OrderedList-Nested.log", source: "unknown",    withUser: false, assistantLabel: "Codex" },
-  { file: "PasteAsMd_Codex-OrderedList-Prompt.log", source: "codex",      withUser: false, assistantLabel: "Codex" },
-  { file: "PasteAsMd_Codex-NestedShell-UL.log",     source: "codex",      withUser: false, assistantLabel: "Codex" },
-  { file: "PasteAsMd_Codex-NestedShell-OL.log",     source: "codex",      withUser: false, assistantLabel: "Codex" },
-  { file: "PasteAsMd_KaTeX-DuplicateMath.log",      source: "unknown",    withUser: false, assistantLabel: "Codex" },
-  { file: "PasteAsMd_ChatGPT.log",                  source: "chatgpt",    withUser: false, assistantLabel: "ChatGPT" },
-  { file: "PasteAsMd_ChatGPT-with-User.log",        source: "chatgpt",    withUser: true,  assistantLabel: "ChatGPT" },
-  { file: "PasteAsMd_ChatGPT-with-User2.log",       source: "chatgpt",    withUser: true,  assistantLabel: "ChatGPT" },
+  "PasteAsMd_ClaudeCode.log",
+  "PasteAsMd_ClaudeCode-with-User.log",
+  "PasteAsMd_ClaudeWeb.log",
+  "PasteAsMd_ClaudeWeb-with-User.log",
+  "PasteAsMd_Codex.log",
+  "PasteAsMd_Codex-with-User.log",
+  "PasteAsMd_Codex-EditedFile.log",
+  "PasteAsMd_Codex-OrderedList-Parent.log",
+  "PasteAsMd_Codex-OrderedList-Nested.log",
+  "PasteAsMd_Codex-OrderedList-Prompt.log",
+  "PasteAsMd_Codex-NestedShell-UL.log",
+  "PasteAsMd_Codex-NestedShell-OL.log",
+  "PasteAsMd_KaTeX-DuplicateMath.log",
+  "PasteAsMd_ChatGPT.log",
+  "PasteAsMd_ChatGPT-with-User.log",
+  "PasteAsMd_ChatGPT-with-User2.log",
 ]
 
 opts := ParseHarnessOptions(A_Args, fixtures.Length)
@@ -67,15 +66,16 @@ actualSuffix := ".actual.md"
  * These provide seam inputs for _ConvertFromCaptured.
  */
 required := [
+  "0. source",
   "1. plain (A_Clipboard minus CR)",
   "2. cfHtml (raw full payload)",
 ]
 
 Log("── PasteAsMd fixture regressions ─────────────────────────────")
 for fx in fixtures {
-  path := A_ScriptDir "\" fx.file
+  path := A_ScriptDir "\" fx
   Log("")
-  Log("Fixture: " fx.file)
+  Log("Fixture: " fx)
 
   Chk("fixture exists", FileExist(path) != "", path)
   if !FileExist(path)
@@ -102,6 +102,7 @@ for fx in fixtures {
   /**
    * Seam inputs decoded from captured debug sections.
    */
+  expectedSource := Trim(SectionToText(sections["0. source"]), " `t`r`n")
   plain := SectionToText(sections["1. plain (A_Clipboard minus CR)"])
   cfHtml := SectionToText(sections["2. cfHtml (raw full payload)"])
   for sc in scenarios {
@@ -127,13 +128,12 @@ for fx in fixtures {
         }
       }
 
-      /**
-       * Fixture conversion uses quoted mode for parity with expected outputs.
-       */
-      converted := PasteMd._ConvertFromCaptured(plain, cfHtml, true, fx.withUser, false, sc["hasPrompt"])
+      ; Match runtime UI behavior: speaker labels are tied to quoted mode only.
+      showPoster := sc["asQuoted"]
+      converted := PasteMd._ConvertFromCaptured(plain, cfHtml, sc["asQuoted"], showPoster, false, sc["hasPrompt"])
       if (emitFixtureOutputLogs)
-        _WriteFixtureOutputLog(outputLogPath, plain, cfHtml, converted, true)
-      ChkEqNorm("source", converted["source"], fx.source)
+        _WriteFixtureOutputLog(outputLogPath, plain, cfHtml, converted, sc["asQuoted"])
+      ChkEqNorm("source", converted["source"], expectedSource)
       aborted := converted.Has("aborted") ? converted["aborted"] : false
 
       if (sc["expectAbort"]) {
@@ -168,10 +168,6 @@ for fx in fixtures {
       Chk("no placeholder: ¤CHK¤", !InStr(finalMd, "¤CHK¤"))
       Chk("no placeholder: ¤UNCHK¤", !InStr(finalMd, "¤UNCHK¤"))
 
-      if fx.withUser {
-        Chk("with-user has User label", InStr(finalMd, "## User"))
-        Chk("with-user has assistant label", InStr(finalMd, "## " fx.assistantLabel))
-      }
     } finally {
       if (prevPromptFn != "" && HasMethod(PasteMd, "SetOrderedListPromptProvider"))
         PasteMd.SetOrderedListPromptProvider(prevPromptFn)
@@ -239,7 +235,7 @@ ParseHarnessOptions(args, fixtureCount) {
 ListFixtures(fixtures) {
   Log("Fixture list")
   for fx in fixtures {
-    Log("  " A_Index ". " fx.file " (source=" fx.source ", withUser=" (fx.withUser ? "1" : "0") ")")
+    Log("  " A_Index ". " fx)
   }
 }
 
@@ -284,7 +280,8 @@ ParseFixtureScenarios(logText) {
       "case", "",
       "hasPrompt", false,
       "prompt", "",
-      "expectAbort", false
+      "expectAbort", false,
+      "asQuoted", true
     ))
     return scenarios
   }
@@ -305,7 +302,7 @@ ParseFixtureScenarios(logText) {
 
 /**
  * Parses one metadata scenario line.
- * Accepted keys: case, prompt, expectAbort.
+ * Accepted keys: case, prompt, expectAbort, asQuoted.
  * @param {string} line - One metadata line.
  * @param {string} err - Output parse/validation error text.
  * @returns {Map|integer} Scenario map, or 0 on parse error.
@@ -330,7 +327,8 @@ ParseFixtureScenarioLine(line, &err := "") {
   allowed := Map(
     "case", true,
     "prompt", true,
-    "expectabort", true
+    "expectabort", true,
+    "asquoted", true
   )
   for key, _ in pairs {
     if !allowed.Has(key) {
@@ -348,7 +346,8 @@ ParseFixtureScenarioLine(line, &err := "") {
     "case", pairs["case"],
     "hasPrompt", false,
     "prompt", "",
-    "expectAbort", false
+    "expectAbort", false,
+    "asQuoted", true
   )
 
   if pairs.Has("prompt") {
@@ -370,6 +369,15 @@ ParseFixtureScenarioLine(line, &err := "") {
       return 0
     }
     scenario["expectAbort"] := (val = "1")
+  }
+
+  if pairs.Has("asquoted") {
+    val := Trim(pairs["asquoted"], " `t")
+    if !RegExMatch(val, "^[01]$") {
+      err := "asQuoted must be 0 or 1"
+      return 0
+    }
+    scenario["asQuoted"] := (val = "1")
   }
 
   return scenario
@@ -627,6 +635,7 @@ _WriteFixtureOutputLog(path, plain, cfHtml, converted, asQuoted := true) {
   f := FileOpen(path, "w", "UTF-8")
   try {
     f.Write("PasteAsMd debug — " FormatTime(, "yyyy-MM-dd HH:mm:ss") "`n`n")
+    PasteMd._DbgSection(f, "0. source", converted["source"])
     PasteMd._DbgSection(f, "1. plain (A_Clipboard minus CR)", plain)
     PasteMd._DbgSection(f, "2. cfHtml (raw full payload)", cfHtml)
     PasteMd._DbgSection(f, "3. htmlFrag (CF_HTML fragment)", converted["htmlFrag"])

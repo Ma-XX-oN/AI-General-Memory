@@ -1,4 +1,9 @@
 ﻿﻿PasteAsMd debug — 2026-03-03 13:01:18
+case:quoted, asQuoted:1
+case:unquoted, asQuoted:0
+
+=== 0. source (len=5) ===
+codex
 
 === 1. plain (A_Clipboard minus CR) (len=579) ===
 I’m patching test-paste-md-fixtures.ahk now so its with-user label assertions match the new ## Name format.¶
@@ -447,5 +452,4 @@ Ran & "C:/Users/adria/.codex/scripts/show-eol.ps1" -Path "C:/Users/adria/.claud
 >       }¶
 >¶
 > Ran & "C:/Users/adria/.codex/scripts/show-eol.ps1" -Path "C:/Users/adria/.claude/scripts/PasteAsMd.ahk"¶
-
 

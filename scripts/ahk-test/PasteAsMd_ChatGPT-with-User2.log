@@ -1,4 +1,9 @@
 PasteAsMd debug — Timestamp Lost
+case:quoted, asQuoted:1
+case:unquoted, asQuoted:0
+
+=== 0. source (len=7) ===
+chatgpt
 
 === 1. plain (A_Clipboard minus CR) (len=343) ===
 Lorem ipsum dolor sit amet.¶
@@ -73,4 +78,3 @@ SourceURL:https://chatgpt.com/c/test-fixture⏎¶⏎
 ¶
 ¶
 </html>
-

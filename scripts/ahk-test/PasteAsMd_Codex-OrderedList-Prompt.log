@@ -1,6 +1,10 @@
 PasteAsMd debug — 2026-03-04 14:36:07
 case:prompt3, prompt:3
+case:prompt3_unquoted, prompt:3, asQuoted:0
 case:cancel, prompt:CANCEL, expectAbort:1
+
+=== 0. source (len=5) ===
+codex
 
 === 1. plain (A_Clipboard minus CR) (len=43) ===
 OL-03 - Charlie Nickel¶

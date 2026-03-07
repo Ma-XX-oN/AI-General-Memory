@@ -14,6 +14,7 @@ to `PasteMd.DEBUG_PASTE_MD_LOG` (default: `A_ScriptDir\PasteAsMd_debug.log`).
 
 The logger uses `PasteMd._DbgSection(...)` and writes pipeline stages such as:
 
+- `0. source`
 - `1. plain (A_Clipboard minus CR)`
 - `2. cfHtml (raw full payload)`
 - `3. htmlFrag (CF_HTML fragment)`
@@ -32,6 +33,7 @@ The logger uses `PasteMd._DbgSection(...)` and writes pipeline stages such as:
 1. Capture a real run with debug enabled.
 2. Copy/rename the log into `ahk-test/` as `PasteAsMd_<NAME>.log`.
 3. Keep at minimum sections:
+   - `0. source`
    - `1. plain (A_Clipboard minus CR)`
    - `2. cfHtml (raw full payload)`
 4. Add expected output file(s):
@@ -40,6 +42,14 @@ The logger uses `PasteMd._DbgSection(...)` and writes pipeline stages such as:
 
 The fixture harness decodes those sections and calls
 `PasteMd._ConvertFromCaptured(...)` directly.
+
+The `0. source` payload should be one of:
+
+- `claudecode`
+- `claudeweb`
+- `codex`
+- `chatgpt`
+- `unknown`
 
 ## 3) Metadata scenarios (in fixture `.log` header)
 

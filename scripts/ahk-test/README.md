@@ -53,6 +53,7 @@ Clean generated test logs:
 lorem-ipsum stand-ins where content is private).  Each log has two sections
 decoded by the fixture runner:
 
+- `0. source` — expected source detection (`claudecode`, `claudeweb`, `codex`, `chatgpt`, or `unknown`)
 - `1. plain (A_Clipboard minus CR)` — raw plain-text clipboard content
 - `2. cfHtml (raw full payload)` — full CF\_HTML clipboard format
 
@@ -75,12 +76,12 @@ match both filename forms.
 1. Pin a runtime debug log from the menu.
 2. Copy it into `ahk-test/` and rename it to `PasteAsMd_<NAME>.log`.
 3. Ensure it includes at least these sections:
+   - `0. source`
    - `1. plain (A_Clipboard minus CR)`
    - `2. cfHtml (raw full payload)`
 4. Add expected markdown:
    - default: `PasteAsMd_<NAME>.expected.md`
    - scenario case: `PasteAsMd_<NAME>.<CASE>.expected.md`
-5. (Optional) Add scenario metadata lines in the log header (after title line, before first `===`).
 
 ## Fixture Harness CLI
 
@@ -131,6 +132,7 @@ Comma-separated `key:value` pairs, for example:
 
 ```text
 case:renumber3,prompt:3
+case:renumber3_plain,prompt:3,asQuoted:0
 case:cancel,prompt:CANCEL,expectAbort:1
 ```
 
@@ -139,6 +141,7 @@ Supported keys:
 - `case` (required on each metadata line; if you want the default unsuffixed scenario, omit metadata lines entirely)
 - `prompt` (optional): `CANCEL` or integer `> = 1`
 - `expectAbort` (optional): `0` or `1` (default `0`)
+- `asQuoted` (optional): `0` or `1` (default `1`)
 
 Unknown keys fail metadata parsing.
 

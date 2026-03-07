@@ -1,5 +1,8 @@
 ﻿PasteAsMd debug — 2026-03-04 01:43:21
 
+=== 0. source (len=7) ===
+unknown
+
 === 1. plain (A_Clipboard minus CR) (len=122) ===
 For each integer M = 0, 1, 2, ... compute:¶
 ¶
