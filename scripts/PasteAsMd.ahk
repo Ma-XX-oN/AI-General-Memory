@@ -327,7 +327,8 @@ class PasteMd {
    * @param {string} stage - Optional updated status label
    */
   static _BusyUpdate(stage := "") {
-    tt_simple.on(PasteMd._BusyMsg(stage), , PasteMd.BUSY_SPIN_INTERVAL_MS)
+    if PasteMd._busyStartTick > 0
+      tt_simple.on(PasteMd._BusyMsg(stage), , PasteMd.BUSY_SPIN_INTERVAL_MS)
   }
 
   /**

@@ -1,0 +1,345 @@
+﻿PasteAsMd debug — 2026-03-06 22:26:14
+
+=== 1. plain (A_Clipboard minus CR) (len=655) ===
+Where it appears¶
+¶
+For a thin flat plate of thickness t_s, the plate bending stiffness is:¶
+¶
+𝐷¶
+𝑝¶
+𝑙¶
+𝑎¶
+𝑡¶
+𝑒¶
+=¶
+𝐸¶
+ ¶
+𝑡¶
+𝑠¶
+3¶
+12¶
+(¶
+1¶
+−¶
+𝜈¶
+2¶
+)¶
+D¶
+plate¶
+	​¶
+¶
+=¶
+12(1−ν¶
+2¶
+)¶
+Et¶
+s¶
+3¶
+	​¶
+¶
+	​¶
+¶
+¶
+The classical elastic buckling stress under in-plane compression has the form:¶
+¶
+𝜎¶
+𝑐¶
+𝑟¶
+=¶
+𝑘¶
+𝑐¶
+⋅¶
+𝜋¶
+2¶
+ ¶
+𝐷¶
+𝑝¶
+𝑙¶
+𝑎¶
+𝑡¶
+𝑒¶
+𝑏¶
+2¶
+ ¶
+𝑡¶
+𝑠¶
+σ¤LF⏎
+LF¤	​¶
+¶
+=k¶
+c¶
+	​¶
+¶
+⋅¶
+b¶
+2¶
+t¶
+s¶
+	​¶
+¶
+π¶
+2¶
+D¶
+plate¶
+	​¶
+¶
+	​¶
+¶
+¶
+Equivalently (substitute ¶
+𝐷¶
+𝑝¶
+𝑙¶
+𝑎¶
+𝑡¶
+𝑒¶
+D¶
+plate¶
+	​¶
+¶
+):¶
+¶
+𝜎¶
+𝑐¶
+𝑟¶
+=¶
+𝑘¶
+𝑐¶
+⋅¶
+𝜋¶
+2¶
+𝐸¶
+12¶
+(¶
+1¶
+−¶
+𝜈¶
+2¶
+)¶
+(¶
+𝑡¶
+𝑠¶
+𝑏¶
+)¶
+2¶
+σ¤LF⏎
+LF¤	​¶
+¶
+=k¶
+c¶
+	​¶
+¶
+⋅¶
+12(1−ν¶
+2¶
+)¶
+π¶
+2¶
+E¶
+	​¶
+¶
+(¶
+b¶
+t¶
+s¶
+	​¶
+¶
+	​¶
+¶
+)¶
+2¶
+¶
+b here is your characteristic bay width (rib-to-rib span), which you’re modelling as b(M) = l_max / 2^M.
+
+=== 2. cfHtml (raw full payload) (len=14223) ===
+Version:0.9⏎¶
+StartHTML:0000000105⏎¶
+EndHTML:0000014223⏎¶
+StartFragment:0000000141⏎¶
+EndFragment:0000014187⏎¶
+<html>⏎¶
+<body>⏎¶
+<!--StartFragment--><h3 data-section-id="r35fyq" data-start="1053" data-end="1073">Where it appears</h3>¶
+<p data-start="1075" data-end="1148">For a thin flat plate of thickness <code data-start="1110" data-end="1115">t_s</code>, the plate bending stiffness is:</p>¶
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><msub><mi>D</mi><mrow><mi>p</mi><mi>l</mi><mi>a</mi><mi>t</mi><mi>e</mi></mrow></msub><mo>=</mo><mfrac><mrow><mi>E</mi><mtext>â€‰</mtext><msubsup><mi>t</mi><mi>s</mi><mn>3</mn></msubsup></mrow><mrow><mn>12</mn><mo stretchy="false">(</mo><mn>1</mn><mo>âˆ’</mo><msup><mi>Î½</mi><mn>2</mn></msup><mo stretchy="false">)</mo></mrow></mfrac></mrow><annotation encoding="application/x-tex">D_{plate} = \frac{E\,t_s^3}{12(1-\nu^2)}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut"></span><span class="mord"><span class="mord mathnormal">D</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">pl</span><span class="mord mathnormal mtight">a</span><span class="mord mathnormal mtight">t</span><span class="mord mathnormal mtight">e</span></span></span></span></span><span class="vlist-s">â€‹</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span></span><span class="mspace"></span><span class="mrel">=</span><span class="mspace"></span></span><span class="base"><span class="strut"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="mord"><span class="mord">12</span><span class="mopen">(</span><span class="mord">1</span><span class="mspace"></span><span class="mbin">âˆ’</span><span class="mspace"></span><span class="mord"><span class="mord mathnormal">Î½</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span><span class="mclose">)</span></span></span><span><span class="pstrut"></span><span class="frac-line"></span></span><span><span class="pstrut"></span><span class="mord"><span class="mord mathnormal">E</span><span class="mspace"></span><span class="mord"><span class="mord mathnormal">t</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">s</span></span></span><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">3</span></span></span></span><span class="vlist-s">â€‹</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span></span></span></span></span><span class="vlist-s">â€‹</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span></span></span></span></span>¶
+<p data-start="1198" data-end="1276">The classical elastic buckling stress under in-plane compression has the form:</p>¶
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><msub><mi>Ïƒ</mi><mrow><mi>c</mi><mi>r</mi></mrow></msub><mo>=</mo><msub><mi>k</mi><mi>c</mi></msub><mo>â‹…</mo><mfrac><mrow><msup><mi>Ï€</mi><mn>2</mn></msup><mtext>â€‰</mtext><msub><mi>D</mi><mrow><mi>p</mi><mi>l</mi><mi>a</mi><mi>t</mi><mi>e</mi></mrow></msub></mrow><mrow><msup><mi>b</mi><mn>2</mn></msup><mtext>â€‰</mtext><msub><mi>t</mi><mi>s</mi></msub></mrow></mfrac></mrow><annotation encoding="application/x-tex">\sigma_{cr} = k_c \cdot \frac{\pi^2\,D_{plate}}{b^2\,t_s}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut"></span><span class="mord"><span class="mord mathnormal">Ïƒ</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">cr</span></span></span></span></span><span class="vlist-s">â€‹</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span></span><span class="mspace"></span><span class="mrel">=</span><span class="mspace"></span></span><span class="base"><span class="strut"></span><span class="mord"><span class="mord mathnormal">k</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">c</span></span></span></span><span class="vlist-s">â€‹</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span></span><span class="mspace"></span><span class="mbin">â‹…</span><span class="mspace"></span></span><span class="base"><span class="strut"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="mord"><span class="mord"><span class="mord mathnormal">b</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span><span class="mspace"></span><span class="mord"><span class="mord mathnormal">t</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">s</span></span></span></span><span class="vlist-s">â€‹</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span></span></span></span><span><span class="pstrut"></span><span class="frac-line"></span></span><span><span class="pstrut"></span><span class="mord"><span class="mord"><span class="mord mathnormal">Ï€</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span><span class="mspace"></span><span class="mord"><span class="mord mathnormal">D</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">pl</span><span class="mord mathnormal mtight">a</span><span class="mord mathnormal mtight">t</span><span class="mord mathnormal mtight">e</span></span></span></span></span><span class="vlist-s">â€‹</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span></span></span></span></span><span class="vlist-s">â€‹</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span></span></span></span></span>¶
+<p data-start="1343" data-end="1383">Equivalently (substitute <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>D</mi><mrow><mi>p</mi><mi>l</mi><mi>a</mi><mi>t</mi><mi>e</mi></mrow></msub></mrow><annotation encoding="application/x-tex">D_{plate}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut"></span><span class="mord"><span class="mord mathnormal">D</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">pl</span><span class="mord mathnormal mtight">a</span><span class="mord mathnormal mtight">t</span><span class="mord mathnormal mtight">e</span></span></span></span></span><span class="vlist-s">â€‹</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span></span></span></span></span>):</p>¶
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><msub><mi>Ïƒ</mi><mrow><mi>c</mi><mi>r</mi></mrow></msub><mo>=</mo><msub><mi>k</mi><mi>c</mi></msub><mo>â‹…</mo><mfrac><mrow><msup><mi>Ï€</mi><mn>2</mn></msup><mi>E</mi></mrow><mrow><mn>12</mn><mo stretchy="false">(</mo><mn>1</mn><mo>âˆ’</mo><msup><mi>Î½</mi><mn>2</mn></msup><mo stretchy="false">)</mo></mrow></mfrac><msup><mrow><mo fence="true">(</mo><mfrac><msub><mi>t</mi><mi>s</mi></msub><mi>b</mi></mfrac><mo fence="true">)</mo></mrow><mn>2</mn></msup></mrow><annotation encoding="application/x-tex">\sigma_{cr} = k_c \cdot \frac{\pi^2 E}{12(1-\nu^2)}\left(\frac{t_s}{b}\right)^2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut"></span><span class="mord"><span class="mord mathnormal">Ïƒ</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">cr</span></span></span></span></span><span class="vlist-s">â€‹</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span></span><span class="mspace"></span><span class="mrel">=</span><span class="mspace"></span></span><span class="base"><span class="strut"></span><span class="mord"><span class="mord mathnormal">k</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">c</span></span></span></span><span class="vlist-s">â€‹</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span></span><span class="mspace"></span><span class="mbin">â‹…</span><span class="mspace"></span></span><span class="base"><span class="strut"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="mord"><span class="mord">12</span><span class="mopen">(</span><span class="mord">1</span><span class="mspace"></span><span class="mbin">âˆ’</span><span class="mspace"></span><span class="mord"><span class="mord mathnormal">Î½</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span><span class="mclose">)</span></span></span><span><span class="pstrut"></span><span class="frac-line"></span></span><span><span class="pstrut"></span><span class="mord"><span class="mord"><span class="mord mathnormal">Ï€</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span><span class="mord mathnormal">E</span></span></span></span><span class="vlist-s">â€‹</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mspace"></span><span class="minner"><span class="minner"><span class="mopen delimcenter"><span class="delimsizing size3">(</span></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="mord"><span class="mord mathnormal">b</span></span></span><span><span class="pstrut"></span><span class="frac-line"></span></span><span><span class="pstrut"></span><span class="mord"><span class="mord"><span class="mord mathnormal">t</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">s</span></span></span></span><span class="vlist-s">â€‹</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span></span></span></span></span><span class="vlist-s">â€‹</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mclose delimcenter"><span class="delimsizing size3">)</span></span></span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span></span></span></span></span>¶
+<ul data-start="1472" data-end="1582">¶
+<li data-section-id="19blihh" data-start="1472" data-end="1582">¶
+<p data-start="1474" data-end="1582"><code data-start="1474" data-end="1477">b</code> here is your characteristic bay width (rib-to-rib span), which youâ€™re modelling as <code data-start="1561" data-end="1581">b(M) = l_max / 2^M</code>.</p></li></ul><!--EndFragment-->⏎¶
+</body>⏎¶
+</html>
+
+=== 3. htmlFrag (CF_HTML fragment) (len=13982) ===
+<h3 data-section-id="r35fyq" data-start="1053" data-end="1073">Where it appears</h3>¶
+<p data-start="1075" data-end="1148">For a thin flat plate of thickness <code data-start="1110" data-end="1115">t_s</code>, the plate bending stiffness is:</p>¶
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><msub><mi>D</mi><mrow><mi>p</mi><mi>l</mi><mi>a</mi><mi>t</mi><mi>e</mi></mrow></msub><mo>=</mo><mfrac><mrow><mi>E</mi><mtext> </mtext><msubsup><mi>t</mi><mi>s</mi><mn>3</mn></msubsup></mrow><mrow><mn>12</mn><mo stretchy="false">(</mo><mn>1</mn><mo>−</mo><msup><mi>ν</mi><mn>2</mn></msup><mo stretchy="false">)</mo></mrow></mfrac></mrow><annotation encoding="application/x-tex">D_{plate} = \frac{E\,t_s^3}{12(1-\nu^2)}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut"></span><span class="mord"><span class="mord mathnormal">D</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">pl</span><span class="mord mathnormal mtight">a</span><span class="mord mathnormal mtight">t</span><span class="mord mathnormal mtight">e</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span></span><span class="mspace"></span><span class="mrel">=</span><span class="mspace"></span></span><span class="base"><span class="strut"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="mord"><span class="mord">12</span><span class="mopen">(</span><span class="mord">1</span><span class="mspace"></span><span class="mbin">−</span><span class="mspace"></span><span class="mord"><span class="mord mathnormal">ν</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span><span class="mclose">)</span></span></span><span><span class="pstrut"></span><span class="frac-line"></span></span><span><span class="pstrut"></span><span class="mord"><span class="mord mathnormal">E</span><span class="mspace"></span><span class="mord"><span class="mord mathnormal">t</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">s</span></span></span><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">3</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span></span></span></span></span>¶
+<p data-start="1198" data-end="1276">The classical elastic buckling stress under in-plane compression has the form:</p>¶
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><msub><mi>σ</mi><mrow><mi>c</mi><mi>r</mi></mrow></msub><mo>=</mo><msub><mi>k</mi><mi>c</mi></msub><mo>⋅</mo><mfrac><mrow><msup><mi>π</mi><mn>2</mn></msup><mtext> </mtext><msub><mi>D</mi><mrow><mi>p</mi><mi>l</mi><mi>a</mi><mi>t</mi><mi>e</mi></mrow></msub></mrow><mrow><msup><mi>b</mi><mn>2</mn></msup><mtext> </mtext><msub><mi>t</mi><mi>s</mi></msub></mrow></mfrac></mrow><annotation encoding="application/x-tex">\sigma_{cr} = k_c \cdot \frac{\pi^2\,D_{plate}}{b^2\,t_s}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut"></span><span class="mord"><span class="mord mathnormal">σ</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">cr</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span></span><span class="mspace"></span><span class="mrel">=</span><span class="mspace"></span></span><span class="base"><span class="strut"></span><span class="mord"><span class="mord mathnormal">k</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">c</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span></span><span class="mspace"></span><span class="mbin">⋅</span><span class="mspace"></span></span><span class="base"><span class="strut"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="mord"><span class="mord"><span class="mord mathnormal">b</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span><span class="mspace"></span><span class="mord"><span class="mord mathnormal">t</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">s</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span></span></span></span><span><span class="pstrut"></span><span class="frac-line"></span></span><span><span class="pstrut"></span><span class="mord"><span class="mord"><span class="mord mathnormal">π</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span><span class="mspace"></span><span class="mord"><span class="mord mathnormal">D</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">pl</span><span class="mord mathnormal mtight">a</span><span class="mord mathnormal mtight">t</span><span class="mord mathnormal mtight">e</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span></span></span></span></span>¶
+<p data-start="1343" data-end="1383">Equivalently (substitute <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>D</mi><mrow><mi>p</mi><mi>l</mi><mi>a</mi><mi>t</mi><mi>e</mi></mrow></msub></mrow><annotation encoding="application/x-tex">D_{plate}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut"></span><span class="mord"><span class="mord mathnormal">D</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">pl</span><span class="mord mathnormal mtight">a</span><span class="mord mathnormal mtight">t</span><span class="mord mathnormal mtight">e</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span></span></span></span></span>):</p>¶
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><msub><mi>σ</mi><mrow><mi>c</mi><mi>r</mi></mrow></msub><mo>=</mo><msub><mi>k</mi><mi>c</mi></msub><mo>⋅</mo><mfrac><mrow><msup><mi>π</mi><mn>2</mn></msup><mi>E</mi></mrow><mrow><mn>12</mn><mo stretchy="false">(</mo><mn>1</mn><mo>−</mo><msup><mi>ν</mi><mn>2</mn></msup><mo stretchy="false">)</mo></mrow></mfrac><msup><mrow><mo fence="true">(</mo><mfrac><msub><mi>t</mi><mi>s</mi></msub><mi>b</mi></mfrac><mo fence="true">)</mo></mrow><mn>2</mn></msup></mrow><annotation encoding="application/x-tex">\sigma_{cr} = k_c \cdot \frac{\pi^2 E}{12(1-\nu^2)}\left(\frac{t_s}{b}\right)^2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut"></span><span class="mord"><span class="mord mathnormal">σ</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">cr</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span></span><span class="mspace"></span><span class="mrel">=</span><span class="mspace"></span></span><span class="base"><span class="strut"></span><span class="mord"><span class="mord mathnormal">k</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">c</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span></span><span class="mspace"></span><span class="mbin">⋅</span><span class="mspace"></span></span><span class="base"><span class="strut"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="mord"><span class="mord">12</span><span class="mopen">(</span><span class="mord">1</span><span class="mspace"></span><span class="mbin">−</span><span class="mspace"></span><span class="mord"><span class="mord mathnormal">ν</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span><span class="mclose">)</span></span></span><span><span class="pstrut"></span><span class="frac-line"></span></span><span><span class="pstrut"></span><span class="mord"><span class="mord"><span class="mord mathnormal">π</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span><span class="mord mathnormal">E</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mspace"></span><span class="minner"><span class="minner"><span class="mopen delimcenter"><span class="delimsizing size3">(</span></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="mord"><span class="mord mathnormal">b</span></span></span><span><span class="pstrut"></span><span class="frac-line"></span></span><span><span class="pstrut"></span><span class="mord"><span class="mord"><span class="mord mathnormal">t</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">s</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mclose delimcenter"><span class="delimsizing size3">)</span></span></span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist"><span><span class="pstrut"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span></span></span></span></span>¶
+<ul data-start="1472" data-end="1582">¶
+<li data-section-id="19blihh" data-start="1472" data-end="1582">¶
+<p data-start="1474" data-end="1582"><code data-start="1474" data-end="1477">b</code> here is your characteristic bay width (rib-to-rib span), which you’re modelling as <code data-start="1561" data-end="1581">b(M) = l_max / 2^M</code>.</p></li></ul>
+
+=== 2b. cfHtml offsets ===
+StartHTML: 105
+EndHTML: 14223
+StartFragment: 141
+EndFragment: 14187
+
+=== 3. htmlPrep (after _PreprocessHtml) (len=2881) ===
+<h3 data-section-id="r35fyq" data-start="1053" data-end="1073">Where it appears</h3>¶
+<p data-start="1075" data-end="1148">For a thin flat plate of thickness <code data-start="1110" data-end="1115">t_s</code>, the plate bending stiffness is:</p>¶
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><msub><mi>D</mi><mrow><mi>p</mi><mi>l</mi><mi>a</mi><mi>t</mi><mi>e</mi></mrow></msub><mo>=</mo><mfrac><mrow><mi>E</mi><mtext> </mtext><msubsup><mi>t</mi><mi>s</mi><mn>3</mn></msubsup></mrow><mrow><mn>12</mn><mo stretchy="false">(</mo><mn>1</mn><mo>−</mo><msup><mi>ν</mi><mn>2</mn></msup><mo stretchy="false">)</mo></mrow></mfrac></mrow><annotation encoding="application/x-tex">D_{plate} = \frac{E\,t_s^3}{12(1-\nu^2)}</annotation></semantics></math>Dplate​=12(1−ν2)Ets3​​¶
+<p data-start="1198" data-end="1276">The classical elastic buckling stress under in-plane compression has the form:</p>¶
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><msub><mi>σ</mi><mrow><mi>c</mi><mi>r</mi></mrow></msub><mo>=</mo><msub><mi>k</mi><mi>c</mi></msub><mo>⋅</mo><mfrac><mrow><msup><mi>π</mi><mn>2</mn></msup><mtext> </mtext><msub><mi>D</mi><mrow><mi>p</mi><mi>l</mi><mi>a</mi><mi>t</mi><mi>e</mi></mrow></msub></mrow><mrow><msup><mi>b</mi><mn>2</mn></msup><mtext> </mtext><msub><mi>t</mi><mi>s</mi></msub></mrow></mfrac></mrow><annotation encoding="application/x-tex">\sigma_{cr} = k_c \cdot \frac{\pi^2\,D_{plate}}{b^2\,t_s}</annotation></semantics></math>σcr​=kc​⋅b2ts​π2Dplate​​¶
+<p data-start="1343" data-end="1383">Equivalently (substitute <math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>D</mi><mrow><mi>p</mi><mi>l</mi><mi>a</mi><mi>t</mi><mi>e</mi></mrow></msub></mrow><annotation encoding="application/x-tex">D_{plate}</annotation></semantics></math>Dplate​):</p>¶
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><msub><mi>σ</mi><mrow><mi>c</mi><mi>r</mi></mrow></msub><mo>=</mo><msub><mi>k</mi><mi>c</mi></msub><mo>⋅</mo><mfrac><mrow><msup><mi>π</mi><mn>2</mn></msup><mi>E</mi></mrow><mrow><mn>12</mn><mo stretchy="false">(</mo><mn>1</mn><mo>−</mo><msup><mi>ν</mi><mn>2</mn></msup><mo stretchy="false">)</mo></mrow></mfrac><msup><mrow><mo fence="true">(</mo><mfrac><msub><mi>t</mi><mi>s</mi></msub><mi>b</mi></mfrac><mo fence="true">)</mo></mrow><mn>2</mn></msup></mrow><annotation encoding="application/x-tex">\sigma_{cr} = k_c \cdot \frac{\pi^2 E}{12(1-\nu^2)}\left(\frac{t_s}{b}\right)^2</annotation></semantics></math>σcr​=kc​⋅12(1−ν2)π2E​(bts​​)2¶
+<ul data-start="1472" data-end="1582">¶
+<li data-section-id="19blihh" data-start="1472" data-end="1582"><code data-start="1474" data-end="1477">b</code> here is your characteristic bay width (rib-to-rib span), which you’re modelling as <code data-start="1561" data-end="1581">b(M) = l_max / 2^M</code>.</li></ul>
+
+=== 4. mdRaw (pandoc output) (len=633) ===
+### Where it appears¶
+¶
+For a thin flat plate of thickness `t_s`, the plate bending stiffness is:¶
+¶
+```math¶
+D_{plate} = \frac{E\,t_s^3}{12(1-\nu^2)}¶
+```¶
+Dplate​=12(1−ν2)Ets3​​¶
+¶
+The classical elastic buckling stress under in-plane compression has the form:¶
+¶
+```math¶
+\sigma_{cr} = k_c \cdot \frac{\pi^2\,D_{plate}}{b^2\,t_s}¶
+```¶
+σcr​=kc​⋅b2ts​π2Dplate​​¶
+¶
+Equivalently (substitute $`D_{plate}`$Dplate​):¶
+¶
+```math¶
+\sigma_{cr} = k_c \cdot \frac{\pi^2 E}{12(1-\nu^2)}\left(\frac{t_s}{b}\right)^2¶
+```¶
+σcr​=kc​⋅12(1−ν2)π2E​(bts​​)2¶
+¶
+- `b` here is your characteristic bay width (rib-to-rib span), which you’re modelling as `b(M) = l_max / 2^M`.¶
+
+
+=== 5. md (after CleanMarkdown) (len=634) ===
+### Where it appears¶
+¶
+For a thin flat plate of thickness `t_s`, the plate bending stiffness is:¶
+¶
+```math¶
+D_{plate} = \frac{E\,t_s^3}{12(1-\nu^2)}¶
+```¶
+Dplate​=12(1−ν2)Ets3​​¶
+¶
+The classical elastic buckling stress under in-plane compression has the form:¶
+¶
+```math¶
+\sigma_{cr} = k_c \cdot \frac{\pi^2\,D_{plate}}{b^2\,t_s}¶
+```¶
+σcr​=kc​⋅b2ts​π2Dplate​​¶
+¶
+Equivalently (substitute $`D_{plate}`$Dplate​):¶
+¶
+```math¶
+\sigma_{cr} = k_c \cdot \frac{\pi^2 E}{12(1-\nu^2)}\left(\frac{t_s}{b}\right)^2¶
+```¶
+σcr​=kc​⋅12(1−ν2)π2E​(bts​​)2¶
+¶
+- `b` here is your characteristic bay width (rib-to-rib span), which you’re modelling as `b(M) = l_max / 2^M`.¶
+¶
+
+
+=== 5c. expected list start (ordered-list fix) (len=1) ===
+0
+
+=== 5d. md (after RestoreOrderedListStart) (len=634) ===
+### Where it appears¶
+¶
+For a thin flat plate of thickness `t_s`, the plate bending stiffness is:¶
+¶
+```math¶
+D_{plate} = \frac{E\,t_s^3}{12(1-\nu^2)}¶
+```¶
+Dplate​=12(1−ν2)Ets3​​¶
+¶
+The classical elastic buckling stress under in-plane compression has the form:¶
+¶
+```math¶
+\sigma_{cr} = k_c \cdot \frac{\pi^2\,D_{plate}}{b^2\,t_s}¶
+```¶
+σcr​=kc​⋅b2ts​π2Dplate​​¶
+¶
+Equivalently (substitute $`D_{plate}`$Dplate​):¶
+¶
+```math¶
+\sigma_{cr} = k_c \cdot \frac{\pi^2 E}{12(1-\nu^2)}\left(\frac{t_s}{b}\right)^2¶
+```¶
+σcr​=kc​⋅12(1−ν2)π2E​(bts​​)2¶
+¶
+- `b` here is your characteristic bay width (rib-to-rib span), which you’re modelling as `b(M) = l_max / 2^M`.¶
+¶
+
+
+=== 5e. md (after SHOW_POSTER replacement) (len=678) ===
+> ### Where it appears¶
+>¶
+> For a thin flat plate of thickness `t_s`, the plate bending stiffness is:¶
+>¶
+> ```math¶
+> D_{plate} = \frac{E\,t_s^3}{12(1-\nu^2)}¶
+> ```¶
+> Dplate​=12(1−ν2)Ets3​​¶
+>¶
+> The classical elastic buckling stress under in-plane compression has the form:¶
+>¶
+> ```math¶
+> \sigma_{cr} = k_c \cdot \frac{\pi^2\,D_{plate}}{b^2\,t_s}¶
+> ```¶
+> σcr​=kc​⋅b2ts​π2Dplate​​¶
+>¶
+> Equivalently (substitute $`D_{plate}`$Dplate​):¶
+>¶
+> ```math¶
+> \sigma_{cr} = k_c \cdot \frac{\pi^2 E}{12(1-\nu^2)}\left(\frac{t_s}{b}\right)^2¶
+> ```¶
+> σcr​=kc​⋅12(1−ν2)π2E​(bts​​)2¶
+>¶
+> - `b` here is your characteristic bay width (rib-to-rib span), which you’re modelling as `b(M) = l_max / 2^M`.¶
+>¶
+>¶
+
+
+=== 6. FINAL md (pasted) (len=674) ===
+> ### Where it appears¶
+>¶
+> For a thin flat plate of thickness `t_s`, the plate bending stiffness is:¶
+>¶
+> ```math¶
+> D_{plate} = \frac{E\,t_s^3}{12(1-\nu^2)}¶
+> ```¶
+> Dplate​=12(1−ν2)Ets3​​¶
+>¶
+> The classical elastic buckling stress under in-plane compression has the form:¶
+>¶
+> ```math¶
+> \sigma_{cr} = k_c \cdot \frac{\pi^2\,D_{plate}}{b^2\,t_s}¶
+> ```¶
+> σcr​=kc​⋅b2ts​π2Dplate​​¶
+>¶
+> Equivalently (substitute $`D_{plate}`$Dplate​):¶
+>¶
+> ```math¶
+> \sigma_{cr} = k_c \cdot \frac{\pi^2 E}{12(1-\nu^2)}\left(\frac{t_s}{b}\right)^2¶
+> ```¶
+> σcr​=kc​⋅12(1−ν2)π2E​(bts​​)2¶
+>¶
+> - `b` here is your characteristic bay width (rib-to-rib span), which you’re modelling as `b(M) = l_max / 2^M`.¶
+
+

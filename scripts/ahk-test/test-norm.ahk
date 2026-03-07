@@ -176,6 +176,23 @@ htmlFnWeb := '<a href="https://claude.ai/chat/xyz#user-content-fn-2">2</a>'
 normFnWeb  := RegExReplace(htmlFnWeb, "i)href=`"[^`"]*#(user-content-[^`"]*)`"", "href=`"#$1`"")
 Chk("claude.ai href stripped",         normFnWeb = '<a href="#user-content-fn-2">2</a>')
 
+; ── 8b: KaTeX wrapper collapse ────────────────────────────────────────────────
+Log("── 8b: KaTeX wrapper collapse ───────────────────────")
+
+katexHtml := '<p>Inline <span class="katex"><span class="katex-mathml">'
+    . '<math><semantics><mi>x</mi><annotation encoding="application/x-tex">x</annotation></semantics></math>'
+    . '</span><span class="katex-html" aria-hidden="true"><span class="base"><span class="mord">VISIBLE_INLINE</span></span></span></span> end</p>'
+    . '<span class="katex-display"><span class="katex"><span class="katex-mathml">'
+    . '<math display="block"><semantics><mi>y</mi><annotation encoding="application/x-tex">y</annotation></semantics></math>'
+    . '</span><span class="katex-html" aria-hidden="true"><span class="base"><span class="mord">VISIBLE_BLOCK</span></span></span></span></span>'
+normKatex := HtmlNorm.Normalize(katexHtml, "unknown", false, false)
+Chk("katex inline math preserved",
+    InStr(normKatex, '<math><semantics><mi>x</mi><annotation encoding="application/x-tex">x</annotation></semantics></math>'))
+Chk("katex display math preserved",
+    InStr(normKatex, '<math display="block"><semantics><mi>y</mi><annotation encoding="application/x-tex">y</annotation></semantics></math>'))
+Chk("katex inline visual branch removed", !InStr(normKatex, "VISIBLE_INLINE"))
+Chk("katex display visual branch removed", !InStr(normKatex, "VISIBLE_BLOCK"))
+
 ; ── 9: Full Normalize — Claude Code minimal ───────────────────────────────────
 Log("── 9: Full Normalize — claudecode minimal ───────────")
 

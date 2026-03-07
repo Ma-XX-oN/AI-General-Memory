@@ -35,6 +35,7 @@ fixtures := [
   { file: "PasteAsMd_Codex-OrderedList-Prompt.log", source: "codex",      withUser: false, assistantLabel: "Codex" },
   { file: "PasteAsMd_Codex-NestedShell-UL.log",     source: "codex",      withUser: false, assistantLabel: "Codex" },
   { file: "PasteAsMd_Codex-NestedShell-OL.log",     source: "codex",      withUser: false, assistantLabel: "Codex" },
+  { file: "PasteAsMd_KaTeX-DuplicateMath.log",      source: "unknown",    withUser: false, assistantLabel: "Codex" },
   { file: "PasteAsMd_ChatGPT.log",                  source: "chatgpt",    withUser: false, assistantLabel: "ChatGPT" },
   { file: "PasteAsMd_ChatGPT-with-User.log",        source: "chatgpt",    withUser: true,  assistantLabel: "ChatGPT" },
   { file: "PasteAsMd_ChatGPT-with-User2.log",       source: "chatgpt",    withUser: true,  assistantLabel: "ChatGPT" },

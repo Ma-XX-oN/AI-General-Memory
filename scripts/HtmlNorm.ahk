@@ -77,16 +77,17 @@ class HtmlNorm {
      *   3.  Diff-block normalization (diffs-container → pre/code language-diff)
      *   4.  Button stripping
      *   5.  ChatGPT code block extraction (pre.overflow-visible! → pre/code)
-     *   6.  Task-list checkbox normalization (canonical <input type="checkbox">)
-     *   7.  Thinking block extraction (→ ¤THINKING_N¤)
-     *   8.  Inline-code span promotion (inline-markdown/font-mono → <code>)
-     *   9.  User message extraction (→ ¤USERMSG_N¤)
-     *   10. Claude Web language-label div removal
-     *   11. Footnote URL stripping (long URLs → #fragment)
-     *   12. Residual span tag removal
-     *   13. Bare <li> list wrapping in <ol>
-     *   14. <code> element normalization (line-break conversion, pre-wrapping)
-     *   15. Nested container unwrapping
+     *   6.  KaTeX wrapper collapse (keep MathML, drop visual HTML fallback)
+     *   7.  Task-list checkbox normalization (canonical <input type="checkbox">)
+     *   8.  Thinking block extraction (→ ¤THINKING_N¤)
+     *   9.  Inline-code span promotion (inline-markdown/font-mono → <code>)
+     *   10. User message extraction (→ ¤USERMSG_N¤)
+     *   11. Claude Web language-label div removal
+     *   12. Footnote URL stripping (long URLs → #fragment)
+     *   13. Residual span tag removal
+     *   14. Bare <li> list wrapping in <ol>
+     *   15. <code> element normalization (line-break conversion, pre-wrapping)
+     *   16. Nested container unwrapping
      *
      * @param {string} htmlFrag  - HTML fragment from the CF_HTML clipboard
      * @param {string} source    - Source identifier from DetectSource()
@@ -116,48 +117,51 @@ class HtmlNorm {
         if (source = "chatgpt")
             html := HtmlNorm._NormalizeChatGptCodeBlocks(html)
 
-        ; 6. Normalize task-list checkboxes.
+        ; 6. Keep only semantic MathML from KaTeX wrappers.
+        html := HtmlNorm._NormalizeKatexMath(html)
+
+        ; 7. Normalize task-list checkboxes.
         html := HtmlNorm._NormalizeTaskListItems(html)
 
-        ; 7. Extract thinking blocks.
+        ; 8. Extract thinking blocks.
         html := HtmlNorm._ExtractThinkingBlocks(html)
 
-        ; 8. Promote inline-code spans.
+        ; 9. Promote inline-code spans.
         html := RegExReplace(html, "is)<span\b[^>]*\bclass=`"[^`"]*\b(?:inline-markdown|font-mono)\b[^`"]*`"[^>]*>(.*?)</span>", "<code>$1</code>")
 
-        ; 9. Extract whitespace-sensitive user message text.
+        ; 10. Extract whitespace-sensitive user message text.
         html := HtmlNorm._ExtractUserMessages(html)
 
-        ; 10. Strip Claude Web language-label divs (font-small p-3.5 pb-0).
+        ; 11. Strip Claude Web language-label divs (font-small p-3.5 pb-0).
         html := RegExReplace(html, "is)<div\b[^>]*\bclass=`"[^`"]*\bfont-small\b[^`"]*\bp-3[^`"]*`"[^>]*>.*?</div>", "")
 
-        ; 11. Strip long footnote hrefs, keeping only the #fragment.
+        ; 12. Strip long footnote hrefs, keeping only the #fragment.
         html := RegExReplace(html, "i)href=`"[^`"]*#(user-content-[^`"]*)`"", "href=`"#$1`"")
 
-        ; 11b. Strip <p> wrapper inside footnote definition <li> elements.
+        ; 12b. Strip <p> wrapper inside footnote definition <li> elements.
         ;      <li id="user-content-fn-N"><p>text</p></li> → <li id="...">text</li>
         ;      Without this, pandoc renders footnote lists in loose format (number on
         ;      its own line, content indented), instead of tight (number + content inline).
         html := RegExReplace(html, "is)(<li\b[^>]*\bid=`"user-content-fn-[^`"]*`"[^>]*>)\s*<p\b[^>]*>(.*?)</p>\s*(</li>)", "$1$2$3")
 
-        ; 11c. Tight-list normalization: unwrap solitary paragraph wrappers in list items.
+        ; 12c. Tight-list normalization: unwrap solitary paragraph wrappers in list items.
         ;      <li><p>text</p></li> → <li>text</li>
         ;      This avoids loose-list markdown output (blank lines between items).
         html := HtmlNorm._NormalizeTightListItems(html)
 
-        ; 12. Strip residual <span> tags.
+        ; 13. Strip residual <span> tags.
         html := RegExReplace(html, "i)</?span\b[^>]*>", "")
 
-        ; 13. Wrap bare top-level <li> siblings in <ol>.
+        ; 14. Wrap bare top-level <li> siblings in <ol>.
         htmlNoTrailingBr := RegExReplace(html, "is)(?:<br\b[^>]*>\s*)+$", "")
         trimmed := Trim(htmlNoTrailingBr, " `t`r`n")
         if (trimmed != "" && RegExMatch(trimmed, "is)^(?:<li\b[^>]*>.*?</li>\s*)+$"))
             html := "<ol>" . trimmed . "</ol>"
 
-        ; 14. Normalize <code> elements.
+        ; 15. Normalize <code> elements.
         html := HtmlNorm._NormalizeCodeElements(html)
 
-        ; 15. Unwrap nested containers that obscure code blocks.
+        ; 16. Unwrap nested containers that obscure code blocks.
         html := HtmlNorm._UnwrapNestedContainers(html)
 
         return html
@@ -383,6 +387,89 @@ class HtmlNorm {
             pos := m.Pos + StrLen(replacement)
         }
         return html
+    }
+
+    /**
+     * Collapses KaTeX wrapper spans to semantic MathML only.
+     *
+     * KaTeX emits sibling branches inside `<span class="katex">`:
+     * - `<span class="katex-mathml">...</span>` semantic source
+     * - `<span class="katex-html" ...>...</span>` visual layout fallback
+     *
+     * The generic residual-span stripper removes the wrapper tags but leaves the
+     * visual branch text behind, which duplicates math as flattened garbage.
+     *
+     * @param {string} html
+     * @returns {string}
+     */
+    static _NormalizeKatexMath(html) {
+        pos := 1
+        patKatex := "is)<span\b[^>]*\bclass\s*=\s*['`"][^'`"]*(?<![-\w])katex(?![-\w])[^'`"]*['`"][^>]*>"
+        while RegExMatch(html, patKatex, &mKatex, pos) {
+            if (mKatex.Pos != pos && mKatex.Pos < pos)
+                break
+            katexEnd := HtmlNorm._FindMatchingElementEnd(html, mKatex.Pos, "span")
+            if !katexEnd {
+                pos := mKatex.Pos + mKatex.Len
+                continue
+            }
+            katexBlock := SubStr(html, mKatex.Pos, katexEnd - mKatex.Pos + 1)
+            collapsed := HtmlNorm._CollapseKatexSpanBlock(katexBlock)
+            if (collapsed = katexBlock) {
+                pos := katexEnd + 1
+                continue
+            }
+            html := SubStr(html, 1, mKatex.Pos - 1) . collapsed . SubStr(html, katexEnd + 1)
+            pos := mKatex.Pos + StrLen(collapsed)
+        }
+        return html
+    }
+
+    /**
+     * Returns semantic MathML from a `<span class="katex">...</span>` block when
+     * its only substantive children are `katex-mathml` and `katex-html`.
+     * @param {string} katexBlock
+     * @returns {string}
+     */
+    static _CollapseKatexSpanBlock(katexBlock) {
+        if !RegExMatch(katexBlock, "is)^<span\b[^>]*>", &mOpen)
+            return katexBlock
+
+        closeLen := StrLen("</span>")
+        innerLen := StrLen(katexBlock) - mOpen.Len - closeLen
+        if (innerLen < 0)
+            return katexBlock
+        inner := SubStr(katexBlock, mOpen.Len + 1, innerLen)
+
+        pos := HtmlNorm._SkipHtmlWhitespace(inner, 1)
+        if !RegExMatch(inner, "is)<span\b[^>]*\bclass\s*=\s*['`"][^'`"]*(?<![-\w])katex-mathml(?![-\w])[^'`"]*['`"][^>]*>", &mMath, pos)
+            return katexBlock
+        if (mMath.Pos != pos)
+            return katexBlock
+        mathEnd := HtmlNorm._FindMatchingElementEnd(inner, pos, "span")
+        if !mathEnd
+            return katexBlock
+        mathBlock := SubStr(inner, pos, mathEnd - pos + 1)
+        if !RegExMatch(mathBlock, "is)^<span\b[^>]*>", &mMathOpen)
+            return katexBlock
+        mathInnerLen := StrLen(mathBlock) - mMathOpen.Len - closeLen
+        if (mathInnerLen < 0)
+            return katexBlock
+        mathInner := SubStr(mathBlock, mMathOpen.Len + 1, mathInnerLen)
+
+        pos := HtmlNorm._SkipHtmlWhitespace(inner, mathEnd + 1)
+        if !RegExMatch(inner, "is)<span\b[^>]*\bclass\s*=\s*['`"][^'`"]*(?<![-\w])katex-html(?![-\w])[^'`"]*['`"][^>]*>", &mHtml, pos)
+            return katexBlock
+        if (mHtml.Pos != pos)
+            return katexBlock
+        htmlEnd := HtmlNorm._FindMatchingElementEnd(inner, pos, "span")
+        if !htmlEnd
+            return katexBlock
+
+        pos := HtmlNorm._SkipHtmlWhitespace(inner, htmlEnd + 1)
+        if (pos <= StrLen(inner))
+            return katexBlock
+        return mathInner
     }
 
     /**
@@ -645,6 +732,54 @@ class HtmlNorm {
             html := RegExReplace(html, "is)<div\b[^>]*>\s*<div\b[^>]*>\s*(<code\b[^>]*>.*?</code>)\s*</div>\s*</div>", "$1")
         }
         return html
+    }
+
+    /**
+     * Finds the inclusive end offset of an HTML element, accounting for nested
+     * elements of the same tag name.
+     * @param {string} html
+     * @param {integer} openPos
+     * @param {string} tagName
+     * @returns {integer}
+     */
+    static _FindMatchingElementEnd(html, openPos, tagName) {
+        openPat := "is)<" . tagName . "\b[^>]*>"
+        if !RegExMatch(html, openPat, &mOpen, openPos)
+            return 0
+        if (mOpen.Pos != openPos)
+            return 0
+
+        tagPat := "is)</?" . tagName . "\b[^>]*>"
+        depth := 1
+        pos := openPos + mOpen.Len
+        while RegExMatch(html, tagPat, &mTag, pos) {
+            token := mTag[0]
+            if (SubStr(token, 2, 1) = "/") {
+                depth -= 1
+                if (depth = 0)
+                    return mTag.Pos + mTag.Len - 1
+            } else if !RegExMatch(token, "/\s*>$") {
+                depth += 1
+            }
+            pos := mTag.Pos + mTag.Len
+        }
+        return 0
+    }
+
+    /**
+     * Skips ASCII HTML whitespace from the given 1-based position.
+     * @param {string} s
+     * @param {integer} pos
+     * @returns {integer}
+     */
+    static _SkipHtmlWhitespace(s, pos) {
+        while (pos <= StrLen(s)) {
+            ch := SubStr(s, pos, 1)
+            if (ch != " " && ch != "`t" && ch != "`r" && ch != "`n")
+                break
+            pos += 1
+        }
+        return pos
     }
 
     ; ─────────────────────────────────────────────────────────────────────────
