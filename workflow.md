@@ -59,7 +59,7 @@ file so the `git commit -F` command string is stable and approve-once eligible.
 
 ## Commit Workflow (PowerShell)
 
-Rules 4–6 exist specifically to produce a **stable commit command string** that
+Rules 5–7 exist specifically to produce a **stable commit command string** that
 never changes between commits.  A fixed command string can be pre-approved once
 by the user and reused without triggering a new approval prompt each time.
 Embedding the message inline (e.g. `-m "..."` or a heredoc) makes every commit
@@ -68,8 +68,12 @@ command unique, defeating pre-approval.
 1. Use Conventional Commit format for every commit.
 2. Keep commit body bullet lines contiguous (no blank separators between bullets).
 3. Avoid Markdown backticks in `git commit -m` strings in PowerShell.
-4. Use a process-scoped commit message file in `%TEMP%` by parent PID:
-   - `%TEMP%\codex-commit-msg-<PARENT_PID>.txt`
-5. Use a stable commit command shape:
-   - `git commit -F (Join-Path $env:TEMP ("codex-commit-msg-" + (Get-CimInstance Win32_Process -Filter "ProcessId=$PID").ParentProcessId + ".txt"))`
-6. Do not store transient commit message files in repos.
+4. Resolve the stable session PID once at the start of a commit sequence:
+   - `$sessionPid = & "$env:CODEX_HOME/scripts/session-pid.ps1"`
+   - If this fails, use a fixed fallback filename for this commit sequence:
+     `$commitMsgPath = Join-Path $env:TEMP "codex-commit-msg.txt"`
+5. Use a session-scoped commit message file in `%TEMP%`:
+   - Primary path: `$commitMsgPath = Join-Path $env:TEMP ("codex-commit-msg-" + $sessionPid + ".txt")`
+6. Use a stable commit command shape:
+   - `git commit -F $commitMsgPath`
+7. Do not store transient commit message files in repos.
