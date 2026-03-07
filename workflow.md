@@ -26,7 +26,39 @@ progress. These defaults apply to all projects unless a project-specific
 3. Run dependent operations sequentially and verify each step.
 4. For long-running commands, capture output once to a log and inspect the log.
 
+## Commit Workflow (Bash / Claude Code)
+
+Same motivation as the PowerShell section below: write the message via a
+file so the `git commit -F` command string is stable and approve-once eligible.
+
+1. Use Conventional Commit format for every commit.
+2. Keep commit body bullet lines contiguous (no blank separators between bullets).
+3. **Resolve the session PID once** at the start of any commit sequence
+   (must be **sourced**, not executed — executing breaks the process chain):
+
+   ```bash
+   . ~/.claude/scripts/session-pid.sh
+   ```
+
+   If PowerShell is unavailable the script exits 1 with an error message —
+   fall back to a fixed path (`/tmp/claude-commit-msg.txt`) in that case.
+4. **Write the commit message** using the Write tool (no approval needed):
+   - Path: `/tmp/claude-commit-msg-<SESSION_PID>.txt`
+5. **Stable commit command** (approve-once eligible with prefix `git commit -F /tmp/claude-commit-msg-`):
+
+   ```bash
+   git commit -F /tmp/claude-commit-msg-<SESSION_PID>.txt
+   ```
+
+6. Do not store transient commit message files in repos.
+
 ## Commit Workflow (PowerShell)
+
+Rules 4–6 exist specifically to produce a **stable commit command string** that
+never changes between commits.  A fixed command string can be pre-approved once
+by the user and reused without triggering a new approval prompt each time.
+Embedding the message inline (e.g. `-m "..."` or a heredoc) makes every commit
+command unique, defeating pre-approval.
 
 1. Use Conventional Commit format for every commit.
 2. Keep commit body bullet lines contiguous (no blank separators between bullets).

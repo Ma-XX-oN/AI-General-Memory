@@ -78,6 +78,7 @@
 - [Build issue triage guide](build_issues.md)
 - [Testing guidelines](testing.md)
 - [Workflow guidance (TTD/tests/approval friction)](workflow.md)
+- [Session PID script (PowerShell)](scripts/session-pid.ps1)
 - [Codex home README (memory file maintenance conventions)](README.md)
 
 ## Design Lessons
