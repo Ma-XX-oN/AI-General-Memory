@@ -6,6 +6,7 @@
 - For Conventional Commit messages with detail lines, format details as bullet points with no blank lines between bullets.
 - When composing git commit bodies with bullet detail lines, generate contiguous bullet lines with no blank separator lines (for example avoid multiple `-m` paragraphs that insert empty lines).
 - In PowerShell, never place Markdown backticks inside git commit -m strings; use plain text, single-quoted -m values, or git commit -F with a here-string to avoid escape-related character loss.
+- In PowerShell, never pass `$variables` intended for an inner `pwsh -Command` through an outer double-quoted command string; use a temp message file or a single-quoted inner command, and verify the resulting commit subject with `git log -1 --pretty=%s` after commit/amend.
 - Always use Conventional Commit format for every git commit message.
 - For each user question/task: capture `START` before the first action; the first successful `START` capture is immutable for that turn (never overwrite it on retries), capture `END` immediately before sending the final response, and report `ELAPSED` as real wall-clock turn time.
 - When a user asks a direct question, answer it before making any code or documentation modifications.
