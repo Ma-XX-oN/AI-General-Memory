@@ -4,10 +4,11 @@
  * By Adrian Hawryluk
  * 
  * This is used to let the user know that the clipboard has been filled with
- * something when pressing Ctrl-C or Ctrl-Insert, in case of missing key press
- * or just a long delay while the clipboard is filled.  This waits for 4 seconds
- * before giving up, at which time, it restores the clipboard to what it was
- * before the copy was initiated and informs the user that it timed out.
+ * something when pressing Ctrl-C, Ctrl-Insert, Ctrl-PrtSc, or Alt-PrtScr, in
+ * case of missing key press or just a long delay while the clipboard is filled.
+ * This waits for 4 seconds before giving up, at which time, it restores the
+ * clipboard to what it was before the copy was initiated and informs the user
+ * that it timed out.
  * 
  * Since it was going to say something was copied, I figured that it would be
  * nice to know what types of clipboard formats were available for pasting.
@@ -18,6 +19,7 @@
 
 $^c::           CopyToClipboard
 $^Insert::      CopyToClipboard
+$^PrintScreen:: CopyToClipboard
 $!PrintScreen:: CopyToClipboard
 
 /**
