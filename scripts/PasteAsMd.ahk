@@ -422,17 +422,7 @@ class PasteMd {
    */
   static _DbgSection(f, label, s) {
     f.Write("=== " label " (len=" StrLen(s) ") ===`n")
-    ; Show EOL characters visibly without emitting raw CR in the log payload.
-    tokCRLF := "¤CRLF¤"
-    tokCR := "¤CR¤"
-    tokLF := "¤LF¤"
-    vis := StrReplace(s, "`r`n", tokCRLF)
-    vis := StrReplace(vis, "`r", tokCR)
-    vis := StrReplace(vis, "`n", tokLF)
-    vis := StrReplace(vis, tokCRLF, "⏎¶`n") ; CRLF
-    vis := StrReplace(vis, tokCR, "⏎`n")    ; lone CR
-    vis := StrReplace(vis, tokLF, "¶`n")    ; lone LF
-    f.Write(vis)
+    f.Write(s)
     f.Write("`n`n")
   }
 
@@ -550,7 +540,6 @@ class PasteMd {
    */
   static _ConvertFromCaptured(plain, cfHtml, asQuoted, showPoster, showImg, promptOrderedList := false) {
     PasteMd._BusyUpdate("Inspecting clipboard data")
-    plain := StrReplace(plain, "`r", "")
     source := DetectSource(cfHtml)
     PasteMd._BusyUpdate("Reading HTML fragment")
     htmlFrag := (cfHtml = "")
@@ -640,7 +629,6 @@ class PasteMd {
           if (hadTrailingBreak && md != "")
             md .= "`n"
           mdAfterClean := md
-          md := StrReplace(md, "`r", "")
         }
 
         ; Never paste empty.  If conversion failed/empty, use plain text.
@@ -707,9 +695,6 @@ class PasteMd {
       if (asQuoted)
         md := PasteMd.TrimTrailingQuoteSpacerLines(md)
       md := PasteMd.EnsureTrailingEolForList(md)
-
-      ; Remove CR unconditionally (LF-only).
-      md := StrReplace(md, "`r", "")
 
       return Map(
         "source", source,
@@ -887,7 +872,6 @@ class PasteMd {
    * @returns {string} Normalized text
    */
   static CleanPlainText(s) {
-    s := StrReplace(s, "`r", "")
     lines := StrSplit(s, "`n")
     if (lines.Length = 0)
       return ""
@@ -949,7 +933,6 @@ class PasteMd {
    * @returns {string} Cleaned markdown
    */
   static CleanMarkdown(md) {
-    md := StrReplace(md, "`r", "")
     hadTrailingBreak := RegExMatch(md, "\n$")
 
     ; Strip <span> tags (presentational wrappers that cause backtick accumulation).
@@ -966,7 +949,6 @@ class PasteMd {
         lang := RegExMatch(m[1], "i)language-(\w++)", &langM) ? langM[1] : ""
         inner := RegExReplace(m[2], "<[^>]++>", "")
         inner := PasteMd.DecodeBasicHtmlEntities(inner)
-        inner := StrReplace(inner, "`r", "")
         ; Keep content whitespace; trim only wrapper newlines introduced by HTML tags.
         if (SubStr(inner, 1, 1) = "`n")
           inner := SubStr(inner, 2)
@@ -1059,7 +1041,6 @@ class PasteMd {
 
     while RegExMatch(line, "<code\b[^>]*+>((?&inside_htag))</code>" PasteMd.RE_HTML_LIB, &m) {
       inner := PasteMd.DecodeBasicHtmlEntities(m[1])
-      inner := StrReplace(inner, "`r", "")
       inner := StrReplace(inner, "`n", " ")
       replacement := (inner = "") ? "" : ("``" inner "``")
       line := SubStr(line, 1, m.Pos - 1) replacement SubStr(line, m.Pos + m.Len)
@@ -1236,8 +1217,8 @@ class PasteMd {
     if (expected > 1)
       return htmlPrep
 
-    fragTrim := LTrim(htmlFrag, " `t`r`n")
-    prepTrim := LTrim(htmlPrep, " `t`r`n")
+    fragTrim := htmlFrag
+    prepTrim := htmlPrep
 
     ; Only handle bare top-level <li> fragments; explicit list containers keep intent.
     if !RegExMatch(fragTrim, "is)^<li\b")
@@ -1413,8 +1394,8 @@ class PasteMd {
     if (htmlPrep = "" || htmlFrag = "")
       return false
 
-    prepTrim := LTrim(htmlPrep, " `t`r`n")
-    fragTrim := LTrim(htmlFrag, " `t`r`n")
+    prepTrim := htmlPrep
+    fragTrim := htmlFrag
 
     ; Explicit unordered fragments are never prompted.
     if RegExMatch(prepTrim, "is)^<ul\b")
@@ -1661,7 +1642,7 @@ class PasteMd {
       if RegExMatch(htmlAll, "is)<!--[ \t\r\n]*+StartFragment[ \t\r\n]*+-->", &mStartFragment) {
         before := SubStr(htmlAll, 1, mStartFragment.Pos - 1)
       } else {
-        fragLookup := Trim(htmlFrag, " `t`r`n")
+        fragLookup := htmlFrag
         if (fragLookup = "")
           return 0
         fragPos := InStr(htmlAll, fragLookup)
@@ -1731,13 +1712,11 @@ class PasteMd {
       return -1
 
     pos += StrLen(key)
-    eol := InStr(cfHtml, "`r`n", , pos)
-    if (!eol)
-      eol := InStr(cfHtml, "`n", , pos)
+    eol := InStr(cfHtml, "`n", , pos)
     if (!eol)
       return -1
 
-    numStr := Trim(SubStr(cfHtml, pos, eol - pos))
+    numStr := Trim(SubStr(cfHtml, pos, eol - pos), "`r")
     if (numStr = "")
       return -1
 
@@ -1752,7 +1731,6 @@ class PasteMd {
    */
   static QuoteMarkdown(md) {
     ; Prefix each line.  Blank lines become ">" (no trailing space).
-    md := StrReplace(md, "`r", "")
     hadTrailingBreak := RegExMatch(md, "\n$")
     lines := StrSplit(md, "`n")
     if (lines.Length = 0)
@@ -1782,7 +1760,6 @@ class PasteMd {
    * @returns {string} Markdown with unquoted blank lines around poster headings
    */
   static UnquoteBlankLinesAroundPosterHeadings(md) {
-    md := StrReplace(md, "`r", "")
     if (md = "")
       return md
 
@@ -1814,7 +1791,6 @@ class PasteMd {
    * @returns {string} Markdown with guaranteed trailing LF for list output
    */
   static EnsureTrailingEolForList(md) {
-    md := StrReplace(md, "`r", "")
     if (md = "")
       return md
 
@@ -1837,7 +1813,6 @@ class PasteMd {
    * @returns {string} Markdown with trailing quote spacer lines removed
    */
   static TrimTrailingQuoteSpacerLines(md) {
-    md := StrReplace(md, "`r", "")
     if (md = "")
       return md
 
