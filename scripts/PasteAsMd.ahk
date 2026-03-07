@@ -635,6 +635,10 @@ class PasteMd {
           md := PasteMd.RestoreThinkingBlocks(md)
           md := PasteMd.RestoreUserMsgBlocks(md)
           md := PasteMd.RemoveListShellPlaceholders(md)
+          hadTrailingBreak := RegExMatch(md, "\n$")
+          md := PasteMd.TrimTrailingBlankPadding(md)
+          if (hadTrailingBreak && md != "")
+            md .= "`n"
           mdAfterClean := md
           md := StrReplace(md, "`r", "")
         }
@@ -906,6 +910,26 @@ class PasteMd {
       firstOut := false
     }
     return out
+  }
+
+  static TrimTrailingBlankPadding(md) {
+    if (md = "")
+      return md
+
+    end_i := StrLen(md)
+    while (end_i > 0) {
+      while (end_i > 0 && SubStr(md, end_i, 1) == "`n")
+        end_i -= 1
+
+      eol_i := end_i
+
+      while (end_i > 0 && InStr(" `t", SubStr(md, end_i, 1)))
+        end_i -= 1
+
+      if end_i > 0 && SubStr(md, end_i, 1) != "`n"
+        return SubStr(md, 1, eol_i)
+    }
+    return ""
   }
 
   /**
