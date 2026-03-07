@@ -21,6 +21,7 @@
 - Do independent transformations first; do dependent or lossy transformations last.
 - Do not run dependent operations in parallel (for example `git add` -> `git commit` -> `git push`); run them sequentially and verify each step before starting the next to avoid order/race errors.
 - Preserve semantic meaning before simplifying representation.
+- In docs, specs, and checklists, restatement may emphasize an invariant but must not later weaken it (for example by calling a requirement optional); remove redundant wording that adds doubt without adding information.
 - Encode invariants in code (for example, matching open/close tags with backreferences) rather than relying on assumptions.
 - Be exact with language/tool syntax and escaping rules.
 - Back implementation claims with verifiable outputs (counts/diff/line references), not assertions alone.
