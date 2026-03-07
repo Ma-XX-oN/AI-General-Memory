@@ -126,6 +126,18 @@ Before responding, check for unjustified hedging and remove it.  Back claims
 with verifiable evidence (counts, diffs, line references) rather than
 assertions alone.
 
+In debugging explanations, state the single minimal root cause first (one
+sentence), then show the exact line-level behavior causing it, before any
+secondary context.
+
+In technical recommendations, explicitly separate confirmed facts from
+preferences/inference, and include the strongest counterargument before the
+final recommendation.  If a recommendation changes, state the concrete new
+fact that caused the change.
+
+For any question about current file contents, do a fresh read of the target
+file in the same turn before answering; do not answer from cached context alone.
+
 ### Order transforms carefully
 
 Do independent transforms first; do dependent or lossy transforms last.
@@ -142,6 +154,13 @@ Preserve semantic meaning before simplifying representation.
 - Make defaults declarative in spec definitions instead of scattering them
   in function bodies.
 - Verify incrementally with build/tests during refactors to preserve behavior.
+- Prefer explicit canonical outputs (fixed slots + variadic tail) over
+  ad-hoc branching.
+- Preserve diagnostics while simplifying APIs: keep provenance internally,
+  keep the caller API simple.
+- Extend capability only for real use-cases; keep scope narrow.
+- Treat documentation and examples as part of correctness, not optional polish.
+- Never run build and tests concurrently; complete build first, then run tests.
 
 ### GitHub markdown rendering
 
@@ -154,6 +173,17 @@ Preserve semantic meaning before simplifying representation.
   at inconsistent widths, causing alignment drift in ASCII art diagrams.  Use
   plain ASCII (`+`, `-`, `|`) for diagrams intended to render correctly on
   GitHub; reserve box-drawing characters for local/IDE viewing only.
+- In Markdown, write `> =` (with space) instead of `>=` to prevent
+  auto-conversion to `≥`.
+
+### Diagrams
+
+- For precision diagrams, prefer an ASCII-first draft then convert to SVG;
+  avoid relying on Mermaid auto-layout for final authoritative diagrams.
+- When editing diagrams, preserve connectivity and neighboring relationships —
+  don't optimize a single element in isolation.
+- For SVG styling, use redundant encodings (color + line-style/weight) so
+  meaning is clear under color-vision deficiencies and grayscale.
 
 ## AutoHotkey v2
 
@@ -164,11 +194,29 @@ See [ahk.md](ahk.md) for full notes. Critical reminders:
 - Git Bash converts `/Switch` args to paths — use `#ErrorStdOut` directive in script, not command-line flag
 - Use `Chr(96)` to build backtick strings in tests (avoids the backtick-quote trap in string literals)
 
+## Git commits
+
+- Always use Conventional Commit format for every commit.
+- Body bullet detail lines must be contiguous — no blank lines between bullets.
+- PowerShell: never put Markdown backticks in `git commit -m` strings; use
+  single-quoted `-m` or `git commit -F` with a temp file to avoid
+  escape-related character loss.
+- Use a stable `git commit -F` command so it can be pre-approved once per
+  session.  Workflow:
+  1. Source (not execute) `. ~/.claude/scripts/session-pid.sh` once to get the session PID.
+     If it fails, use `/tmp/claude-commit-msg.txt` as a fixed fallback path.
+  2. Write the commit message to `/tmp/claude-commit-msg-<SESSION_PID>.txt`
+     using the Write tool (no approval needed).
+  3. Commit with the stable command: `git commit -F /tmp/claude-commit-msg-<SESSION_PID>.txt`
+     (approve-once eligible with prefix `git commit -F /tmp/claude-commit-msg-`).
+
 ## Useful Patterns
 
 - [Generalized bracketed-text regex](regex-patterns.md#generalized-bracketed-text-matching)
 - [AHK PCRE callout debugger](regex-patterns.md#ahk-pcre-callout-debugger)
 - [Testing guidelines](testing.md)
+- [Workflow guidance (TTD/tests/commit workflow)](workflow.md)
+- [Build issue triage playbook](build_issues.md)
 
 ## Time tracking (every prompt)
 
@@ -176,4 +224,12 @@ For **every** prompt — questions, coding tasks, research, all of them:
 
 1. At the very start of your response, get the current time and output it.
 2. At the very end of your response, get the current time and output it.
-3. Output the elapsed time (minutes and seconds) between start and end.
+3. Output the elapsed time in a fenced code block with exactly these lines:
+
+   ```text
+   START=<time>
+   END=<time>
+   ELAPSED=<m:ss>
+   ```
+
+   Format `ELAPSED` as `m:ss` (minutes, colon, zero-padded seconds), e.g. `1:07`.

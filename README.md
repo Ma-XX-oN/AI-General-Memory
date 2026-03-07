@@ -58,6 +58,8 @@ directly/indirectly by the users.
 | [`regex-patterns.md`](regex-patterns.md) | Reusable regex patterns referenced from CLAUDE.md / CODEX.md |
 | [`testing.md`](testing.md) | Testing guidelines and discipline referenced from CLAUDE.md |
 | [`workflow.md`](workflow.md) | TTD/testing/command-workflow guidance for Codex to reduce approval friction |
+| [`scripts/session-pid.sh`](scripts/session-pid.sh) | Print the stable AI agent session PID (bash entry point — must be sourced) |
+| [`scripts/session-pid.ps1`](scripts/session-pid.ps1) | Print the stable AI agent session PID (PowerShell implementation, called by session-pid.sh and usable directly from Codex) |
 | [`scripts/normalize-eol.ps1`](scripts/normalize-eol.ps1) | Utility to normalize file EOL style (`CRLF` or `LF`) |
 | [`scripts/show-eol.ps1`](scripts/show-eol.ps1) | Utility to report file EOL style (`CRLF`, `LF`, `CR`, `Mixed`, `None`) |
 | [`scripts/show-eol.pl`](scripts/show-eol.pl) | Perl utility to report file EOL style (`CRLF`, `LF`, `CR`, `Mixed`, `None`) |

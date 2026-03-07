@@ -24,6 +24,8 @@
 !scripts/show-eol.pl
 !scripts/normalize-eol.pl
 !scripts/PasteAsMd.ahk
+!scripts/session-pid.sh
+!scripts/session-pid.ps1
 !scripts/ClipHelper.ahk
 !scripts/HtmlNorm.ahk
 !scripts/HtmlParser.ahk
