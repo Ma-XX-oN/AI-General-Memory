@@ -23,8 +23,12 @@ progress. These defaults apply to all projects unless a project-specific
    approval prompts and speed up workflow.
 2. Keep command shapes stable across runs (same ordering/quoting/flags unless
    required) and avoid ad-hoc variants that trigger new approvals.
-3. Run dependent operations sequentially and verify each step.
-4. For long-running commands, capture output once to a log and inspect the log.
+3. **Issue each command as its own tool call — never chain commands with `&&`,
+   `;`, or `|` unless the whole pipeline was already approved as a unit.**
+   Chaining changes the command string, making it a new unapproved shape even
+   if each individual part was previously approved.
+4. Run dependent operations sequentially and verify each step.
+5. For long-running commands, capture output once to a log and inspect the log.
 
 ## Commit Workflow (Bash / Claude Code)
 
