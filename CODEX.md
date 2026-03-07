@@ -2,7 +2,12 @@
 
 ## Working Rules
 
+### Memory Placement
+
 - If the user says to "remember" something, store project-specific rules in the project's `CODEX.md`. Store cross-project rules in `~/.codex/CODEX.md` as global defaults that apply to all projects unless overridden locally.
+
+### Commit Messages And Timing
+
 - For Conventional Commit messages with detail lines, format details as bullet points with no blank lines between bullets.
 - When composing git commit bodies with bullet detail lines, generate contiguous bullet lines with no blank separator lines (for example avoid multiple `-m` paragraphs that insert empty lines).
 - In PowerShell, never place Markdown backticks inside git commit -m strings; use plain text, single-quoted -m values, or git commit -F with a here-string to avoid escape-related character loss.
@@ -14,6 +19,9 @@
 - Compute elapsed from those two timestamps in the response text only; do not run extra timing/calculation commands.
 - Report timing in a fenced code block with exactly these lines: `START=...`, `END=...`, `ELAPSED=...`.
 - Format `ELAPSED` as `m:ss.fff` (minutes, colon, zero-padded seconds with milliseconds), for example `ELAPSED=1:07.532`.
+
+### File Integrity And EOL
+
 - Preserve each file's existing line endings (CRLF/LF) when editing; do not change line endings unless explicitly requested.
 - Before editing any file, check its line-ending status; if mixed, notify before editing and abort; if non-mixed, keep all edits consistent with the original style.
 - For any non-mixed file, after editing, every line must still use that original line ending style; if that cannot be guaranteed, normalize to the original style and report.
@@ -22,12 +30,19 @@
 - Do independent transformations first; do dependent or lossy transformations last.
 - Do not run dependent operations in parallel (for example `git add` -> `git commit` -> `git push`); run them sequentially and verify each step before starting the next to avoid order/race errors.
 - Preserve semantic meaning before simplifying representation.
+
+### Semantics, Scope, And Explanations
+
 - In docs, specs, and checklists, restatement may emphasize an invariant but must not later weaken it (for example by calling a requirement optional); remove redundant wording that adds doubt without adding information.
+- In commit messages, status notes, and TODOs, write for the future reader's decision-making: record current state, actionable next steps, or real risk; do not explain how the assistant created the situation unless that history materially changes action or meaning.
 - Encode invariants in code (for example, matching open/close tags with backreferences) rather than relying on assumptions.
 - Be exact with language/tool syntax and escaping rules.
 - Back implementation claims with verifiable outputs (counts/diff/line references), not assertions alone.
 - Do not change code unless the user explicitly asks for code changes.
 - In debugging/explanations, state the single minimal root cause first (one sentence), then show the exact line-level behavior causing it before any secondary context.
+
+### Commands And Preflight
+
 - For file and text reads, always use `rg`
 - Do not use custom script workflows when an approved command set can do the job.
 - Never use custom file-read utilities when `rg` can be used.
@@ -35,17 +50,26 @@
 - For any command execution, prefer already-approved command prefixes; if a required action is not covered, request scoped escalation first instead of running an ad-hoc variant.
 - Issue each command as its own tool call; do not chain with `&&`, `;`, or `|` unless that exact pipeline was already approved as one command shape.
 - Before running build/test/tool commands, perform an execution-rule preflight: identify applicable project/global `CODEX.md` command prerequisites and include them directly in the command line/environment.
+
+### Testing And Build Workflow
+
 - For refactor or new development, agree expected behavior and the test plan before coding; if expectations change, re-agree before updating tests/fixtures.
 - IMPORTANT! For global default TTD/testing/approval-friction workflow details (applies to all projects unless overridden locally), follow `~/.codex/workflow.md`.
 - For CMake builds/tests in workspace repos, check `.vscode/settings.json` and `CMakePresets.json`/`CMakeUserPresets.json` first and mirror those settings; use manual command lines only when those sources are absent or the user explicitly overrides them.
 - For CMake workflows, never run configure and build concurrently; run them sequentially (`cmake -S/-B` then `cmake --build`) to avoid regenerate/build race conditions.
 - For build/linker mismatch triage, follow `~/.codex/build_issues.md` before ad-hoc fixes.
+
+### Editing And Read Conventions
+
 - For file edits, use approved editing tools and keep one consistent editing method per session/task unless explicitly asked to change.
 - For file edits, use patch-style edits only; do not use whole-file rewrite commands.
 - For EOL detection, use `rg` and keep one consistent `rg` method unless explicitly asked to change.
 - For file-context reads, prefer anchor-based `rg -n "<anchor>" <file> -A/-B/-C` output over manual line-number enumeration filters because it is easier for users to read and for the assistant to write.
 - If no stable anchor exists, use a two-pass `rg` workflow: first pass collects candidate line numbers (`rg -n`), second pass targets the selected line and prints context with `-A/-B/-C` (including piped `rg` forms) before falling back to manual line-number filters.
 - Universal rule: for repeated tasks, use one approved method consistently and do not switch variations unless explicitly requested.
+
+### Response Quality
+
 - Use definitive language when facts are certain; if uncertain, state uncertainty explicitly.
 - For timing output in chat responses, always use a fenced code block (not inline/backtick list items) to prevent webview auto-link artifacts.
 - Before sending any response, run a definitiveness pass to remove unjustified hedging and use direct language for confirmed facts.
@@ -53,6 +77,9 @@
 - In technical answers, explicitly separate confirmed facts from preferences/inference, and include the strongest counterargument before the final recommendation.
 - If a recommendation changes, state the concrete new fact that caused the change.
 - In Markdown text, when you DO NOT intend the literal sequence `>=`, write it with whitespace as `> =` to prevent auto-conversion to `≥`.
+
+### Troubleshooting And Guardrails
+
 - For any question about current file contents, perform a fresh read of the target file in the same turn before answering; do not answer from cached context alone.
 - When asked to re-review ("anything else?", "check again"), do a fresh pass instead of assuming prior checks were exhaustive.
 - When fixing one item in a repeated pattern/group, check sibling occurrences and update them together unless the user explicitly limits scope.
@@ -64,6 +91,9 @@
 - For long-running commands (builds/tests), capture output to a log once, then inspect the log instead of rerunning only to view different sections.
 - When maintaining files under `~/.codex/`, read `~/.codex/README.md` first and keep related index/reference entries consistent.
 - For any edit under `~/.codex/`, run a hard preflight before changing files: read `~/.codex/README.md`, verify target-file tracking with `git -C ~/.codex ls-files -- <path>` and `.gitignore`, check EOL style, and do not edit until all checks pass.
+
+### Documentation And Diagrams
+
 - For OpenSCAD JS documentation, require JSDoc on public symbols and use `@slot`/`@deref` plus full `@type` docs for slot-based constants/typedefs.
 - For GitHub markdown docs, avoid raw `<svg>` tags and sanitize punctuation-heavy anchors when generating intra-doc links.
 - For GitHub markdown diagrams that must align, prefer plain ASCII (`+`, `-`, `|`) over Unicode box-drawing characters because GitHub monospace rendering can drift.
