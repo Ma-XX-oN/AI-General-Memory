@@ -636,7 +636,7 @@ class PasteMd {
           md := PasteMd.RestoreUserMsgBlocks(md)
           md := PasteMd.RemoveListShellPlaceholders(md)
           hadTrailingBreak := RegExMatch(md, "\n$")
-          md := PasteMd.TrimTrailingBlankPadding(md)
+          md := PasteMd.TrimBlankPadding(md)
           if (hadTrailingBreak && md != "")
             md .= "`n"
           mdAfterClean := md
@@ -912,7 +912,17 @@ class PasteMd {
     return out
   }
 
-  static TrimTrailingBlankPadding(md) {
+  /**
+   * Trims blank lines before and after the markdown
+   * 
+   * @param {string} md
+   *  Markdown to be trimmed.
+   * 
+   * @returns {string}
+   *   Trimmed markdown.
+   */
+  static TrimBlankPadding(md) {
+    md := LTrim(md, "`n`t ")
     if (md = "")
       return md
 
