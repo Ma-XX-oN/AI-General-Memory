@@ -1,4 +1,4 @@
-# Workflow Guidance for Codex
+# Workflow Guidance
 
 This file captures global default workflow rules for test-driven delivery and
 for reducing repeated command-approval prompts which will slow or halt your
