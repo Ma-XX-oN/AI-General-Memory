@@ -75,7 +75,6 @@ class PasteMd {
   static SHOW_IMG := false
   ; Toggle: wrap pasted output in blockquote syntax.
   static QUOTE := true
-  static CODE_FENCE := "``````"
 
   ; Temporary storage for thinking blocks extracted during preprocessing.
   static _thinkingBlocks := []
@@ -941,41 +940,37 @@ class PasteMd {
     ; Convert <br> tags to newlines so line breaks are preserved.
     md := RegExReplace(md, "i)<br\b[^>]*+>", "`n")
 
-    ; Convert block-level <code> elements (multi-line) to fenced code blocks.
-    pos := 1
-    while RegExMatch(md, "s)<code\b([^>]*+)>(.*?)</code>", &m, pos) {
-      if InStr(m[2], "`n") {
-        ; Extract language identifier from class="language-xxx" if present.
-        lang := RegExMatch(m[1], "i)language-(\w++)", &langM) ? langM[1] : ""
-        inner := RegExReplace(m[2], "<[^>]++>", "")
-        inner := PasteMd.DecodeBasicHtmlEntities(inner)
-        ; Keep content whitespace; trim only wrapper newlines introduced by HTML tags.
-        if (SubStr(inner, 1, 1) = "`n")
-          inner := SubStr(inner, 2)
-        if (inner != "" && SubStr(inner, 0) = "`n")
-          inner := SubStr(inner, 1, StrLen(inner) - 1)
-        replacement := PasteMd.CODE_FENCE lang "`n" inner "`n" PasteMd.CODE_FENCE
-        md := SubStr(md, 1, m.Pos - 1) replacement SubStr(md, m.Pos + m.Len)
-        pos := m.Pos + StrLen(replacement)
-      } else {
-        pos := m.Pos + m.Len
-      }
-    }
-
     lines := StrSplit(md, "`n")
 
     out := ""
     inFence := false
+    fenceLen := 0
 
     for i, line in lines {
       t := LTrim(line, " `t")
 
-      ; Fence detection without regex (avoids backtick-escape problems).
-      if (SubStr(t, 1, StrLen(PasteMd.CODE_FENCE)) = PasteMd.CODE_FENCE) {
-        inFence := !inFence
-        outLine := line
-        out .= (out = "" ? "" : "`n") outLine
-        continue
+      ; Fence detection: track the opening backtick count so that inner
+      ; 3-backtick sequences inside a 4-backtick outer fence (which pandoc
+      ; generates when content itself contains 3-backtick sequences) do not
+      ; flip parity and cause </div> stripping to be skipped.
+      if RegExMatch(t, "^(``{3,})", &fenceM) {
+        thisFenceLen := StrLen(fenceM[1])
+        if (!inFence) {
+          inFence := true
+          fenceLen := thisFenceLen
+          out .= (out = "" ? "" : "`n") line
+          continue
+        } else if (thisFenceLen >= fenceLen && RegExMatch(t, "^``{3,}\s*$")) {
+          ; Closing fence: GFM requires >= backticks as the opener AND no
+          ; language specifier (closing fences are only backticks + whitespace).
+          ; A line like "```text" is an opener, never a closer.
+          inFence := false
+          fenceLen := 0
+          out .= (out = "" ? "" : "`n") line
+          continue
+        }
+        ; Not a valid closing fence (shorter than opener, or has a language
+        ; specifier): treat as content inside the outer fence.
       }
 
       if (inFence) {
@@ -1039,65 +1034,18 @@ class PasteMd {
   static SimplifyMarkdownInlineHtml(line) {
     line := PasteMd.DecodeBasicHtmlEntities(line)
 
-    while RegExMatch(line, "<code\b[^>]*+>((?&inside_htag))</code>" PasteMd.RE_HTML_LIB, &m) {
-      inner := PasteMd.DecodeBasicHtmlEntities(m[1])
-      inner := StrReplace(inner, "`n", " ")
-      replacement := (inner = "") ? "" : ("``" inner "``")
-      line := SubStr(line, 1, m.Pos - 1) replacement SubStr(line, m.Pos + m.Len)
-    }
-
-    ; Convert semantic emphasis tags before fallback stripping.
-    while RegExMatch(line, "<(strong|b)\b[^>]*+>((?&inside_htag))</\1>" PasteMd.RE_HTML_LIB, &m) {
-      replacement := (m[2] = "") ? "" : ("**" m[2] "**")
-      line := SubStr(line, 1, m.Pos - 1) replacement SubStr(line, m.Pos + m.Len)
-    }
-    while RegExMatch(line, "<(em|i)\b[^>]*+>((?&inside_htag))</\1>" PasteMd.RE_HTML_LIB, &m) {
-      replacement := (m[2] = "") ? "" : ("*" m[2] "*")
-      line := SubStr(line, 1, m.Pos - 1) replacement SubStr(line, m.Pos + m.Len)
-    }
-
     ; Convert HTML links to markdown links for readable output.
     while RegExMatch(line, "<a\b[^>]*\bhref\s*+=\s*+(['`"])(.*?)\1[^>]*+>((?&inside_htag))</a>" PasteMd.RE_HTML_LIB, &m) {
       href := PasteMd.DecodeBasicHtmlEntities(m[2])
       text := PasteMd.DecodeBasicHtmlEntities(m[3])
 
-      ; Convert semantic emphasis inside link text before stripping residual tags.
-      while RegExMatch(text, "<(strong|b)\b[^>]*+>((?&inside_htag))</\1>" PasteMd.RE_HTML_LIB, &inner) {
-        replacement := (inner[2] = "") ? "" : ("**" inner[2] "**")
-        text := SubStr(text, 1, inner.Pos - 1) replacement SubStr(text, inner.Pos + inner.Len)
-      }
-      while RegExMatch(text, "<(em|i)\b[^>]*+>((?&inside_htag))</\1>" PasteMd.RE_HTML_LIB, &inner) {
-        replacement := (inner[2] = "") ? "" : ("*" inner[2] "*")
-        text := SubStr(text, 1, inner.Pos - 1) replacement SubStr(text, inner.Pos + inner.Len)
-      }
-
-      ; Remove any unknown tags that are not escaped
-      text := RegExReplace(text, "((?&inside_htag))<[^>]++>" PasteMd.RE_HTML_LIB, "$1")
-      if (text = "") {
-        text := href
-      }
       replacement := "[" text "](" href ")"
       line := SubStr(line, 1, m.Pos - 1) replacement SubStr(line, m.Pos + m.Len)
-    }
-
-    ; Protect backtick code spans from tag stripping.
-    _codeSpans := []
-    pos := 1
-    while RegExMatch(line, "(?&codespan)" PasteMd.RE_HTML_LIB, &m, pos) {
-      _codeSpans.Push(m[0])
-      placeholder := "¤CSPAN_" _codeSpans.Length "¤"
-      line := SubStr(line, 1, m.Pos - 1) placeholder SubStr(line, m.Pos + m.Len)
-      pos := m.Pos + StrLen(placeholder)
     }
 
     ; Remove any unknown tags that are not escaped
     line := RegExReplace(line, "\G((?&inside_htag))(?<!\\)<(?:[^>'`"]++|(?&quoted_string))*+>" PasteMd.RE_HTML_LIB, "$1")
     line := RegExReplace(line, "((?:[^\\]|\\[^<>])++)\\([<>])" PasteMd.RE_HTML_LIB, "$1$2")
-
-    ; Restore backtick code spans.
-    for i, span in _codeSpans {
-      line := StrReplace(line, "¤CSPAN_" i "¤", span)
-    }
 
     return line
   }
