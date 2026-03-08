@@ -4,9 +4,7 @@
 ; Replaces PreprocessHtmlCodeBlocks in PasteAsMd.ahk with a more accurate
 ; normalizer that handles Codex, Claude Code, Claude Web, and ChatGPT web.
 ;
-; No dependencies — does not require HtmlParser.ahk.
-;
-; FUCKING CLAUDE!!!!  YOU THINK WE DID THAT WORK FOR SHITS AND GIGGLES?!?!?
+; No dependencies — does not require HtmlParser.ahk or MSHTML as it's oo slow.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 /**
@@ -150,12 +148,12 @@ class HtmlNorm {
         html := HtmlNorm._NormalizeTightListItems(html)
 
         ; 13. Strip residual <span> tags.
-        html := RegExReplace(html, "i)</?span\b[^>]*>", "")
+        html := RegExReplace(html, "i)</?+span\b[^>]*+>", "")
 
         ; 14. Wrap bare top-level <li> siblings in <ol>.
-        htmlNoTrailingBr := RegExReplace(html, "is)(?:<br\b[^>]*>\s*)+$", "")
+        htmlNoTrailingBr := RegExReplace(html, "is)(?:<br\b[^>]*+>\s*+)++$", "")
         trimmed := Trim(htmlNoTrailingBr, " `t`r`n")
-        if (trimmed != "" && RegExMatch(trimmed, "is)^(?:<li\b[^>]*>.*?</li>\s*)+$"))
+        if (trimmed != "" && RegExMatch(trimmed, "is)^(?:<li\b[^>]*+>.*?</li>\s*)+$"))
             html := "<ol>" . trimmed . "</ol>"
 
         ; 15. Normalize <code> elements.
