@@ -3,21 +3,48 @@
  * 
  * By Adrian Hawryluk
  * 
- * This is used to let the user know that the clipboard has been filled with
- * something when pressing Ctrl-C, Ctrl-Insert, Ctrl-PrtSc, or Alt-PrtScr, in
- * case of missing key press or just a long delay while the clipboard is filled.
- * This waits for 4 seconds before giving up, at which time, it restores the
- * clipboard to what it was before the copy was initiated and informs the user
- * that it timed out.
- * 
- * Since it was going to say something was copied, I figured that it would be
- * nice to know what types of clipboard formats were available for pasting.
+ *  This is used to inform the user that the clipboard has been filled with
+ *  something after pressing standard copy key sequences like Ctrl-c, Ctrl-x,
+ *  Ctrl-Insert, Ctrl-PrtSc, or Alt-PrtScr, as well as some specific ones for
+ *  specific applications.
+ *
+ *  The reason for this utility is that there are times when the clipboard
+ *  doesn't have the contents that was expected because either the user
+ *  accidentally didn't press the right keys or sometimes it takes some time for
+ *  the copy command to be registered by the application and then be filled but
+ *  the user is too fast.
+ *
+ *  This clears the clipboard, sends the same command that was pressed to the
+ *  active window, waits for 4 seconds for the clipboard to fill, and if it
+ *  hasn't, it gives up and restores the clipboard contents back.  If it has
+ *  something, it reports what types are now available in the clipboard.
+ *
+ *  Types people are mainly interested in are TEXT, HTML and graphic objects
  */
 
 #Requires AutoHotkey v2.0
 #include TT_Simple.ahk
 
+WinActiveRegEx(title) {
+  prevMode := SetTitleMatchMode("regex")
+  result := WinActive(title)
+  SetTitleMatchMode(prevMode)
+  return result
+}
+
+#HotIf WinActiveRegex("ahk_exe i)gimp.*\.exe")
+; Copy all layers
+$^+c::          CopyToClipboard
+#HotIf WinActiveRegex("ahk_exe i)explorer.exe")
+; Copy file name
+$^+c::          CopyToClipboard
+#HotIf WinActiveRegex("ahk_exe i)code.exe")
+; Copy file name
+$!+c::          CopyToClipboard
+#HotIf
+
 $^c::           CopyToClipboard
+$^x::           CopyToClipboard
 $^Insert::      CopyToClipboard
 $^PrintScreen:: CopyToClipboard
 $!PrintScreen:: CopyToClipboard
