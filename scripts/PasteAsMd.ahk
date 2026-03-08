@@ -1039,7 +1039,12 @@ class PasteMd {
       href := PasteMd.DecodeBasicHtmlEntities(m[2])
       text := PasteMd.DecodeBasicHtmlEntities(m[3])
 
-      replacement := "[" text "](" href ")"
+      if InStr(href, "vscode-webview://") {
+        ; this is a stale link so get rid of it.
+        replacement := "**" text "**"
+      } else {
+        replacement := "[" text "](" href ")"
+      }
       line := SubStr(line, 1, m.Pos - 1) replacement SubStr(line, m.Pos + m.Len)
     }
 
