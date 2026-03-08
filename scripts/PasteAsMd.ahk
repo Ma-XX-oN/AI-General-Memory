@@ -1034,12 +1034,14 @@ class PasteMd {
   static SimplifyMarkdownInlineHtml(line) {
     line := PasteMd.DecodeBasicHtmlEntities(line)
 
+    static vscode := "vscode-webview://"
+
     ; Convert HTML links to markdown links for readable output.
     while RegExMatch(line, "<a\b[^>]*\bhref\s*+=\s*+(['`"])(.*?)\1[^>]*+>((?&inside_htag))</a>" PasteMd.RE_HTML_LIB, &m) {
       href := PasteMd.DecodeBasicHtmlEntities(m[2])
       text := PasteMd.DecodeBasicHtmlEntities(m[3])
 
-      if InStr(href, "vscode-webview://") {
+      if SubStr(href, 1, StrLen(vscode)) == vscode {
         ; this is a stale link so get rid of it.
         replacement := "**" text "**"
       } else {
