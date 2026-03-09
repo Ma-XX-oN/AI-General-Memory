@@ -543,7 +543,7 @@ class PasteMd {
     PasteMd._BusyUpdate("Reading HTML fragment")
     htmlFrag := (cfHtml = "")
       ? ""
-      : ClipboardWaiter.SelectHtmlSection(cfHtml, ClipboardWaiter.HTML_SECTION_FRAGMENT)
+      : PasteMd.ToLfEols(ClipboardWaiter.SelectHtmlSection(cfHtml, ClipboardWaiter.HTML_SECTION_FRAGMENT))
 
     htmlPrep := ""
     mdRaw := ""
@@ -735,7 +735,7 @@ class PasteMd {
     }
 
     clipSaved := ClipboardAll()
-    plain := StrReplace(A_Clipboard, "`r", "")
+    plain := PasteMd.ToLfEols(A_Clipboard)
     try {
       PasteMd._BusyUpdate("Getting content")
       cfHtml := ClipboardWaiter.GetHtml()
@@ -1581,6 +1581,10 @@ class PasteMd {
     return 0
   }
 
+  static ToLfEols(text) {
+    return StrReplace(text, "`r", "")
+  }
+
   /**
    * Infers ordered-list index at StartFragment from full CF_HTML context.
    * Tracks nested list containers and counts immediate preceding <li> siblings.
@@ -1601,7 +1605,7 @@ class PasteMd {
       ; when marker text or fragment string matching is unreliable.
       before := SubStr(cfHtml, startHtmlOff + 1, startFragOff - startHtmlOff)
     } else {
-      htmlAll := ClipboardWaiter.SelectHtmlSection(cfHtml, ClipboardWaiter.HTML_SECTION_HTML)
+      htmlAll := PasteMd.ToLfEols(ClipboardWaiter.SelectHtmlSection(cfHtml, ClipboardWaiter.HTML_SECTION_HTML))
       if (htmlAll = "")
         return 0
 
