@@ -210,7 +210,7 @@ class ClipboardWaiter {
   }
 
   /**
-   * Get CF_HTML from clipboard as CP0-decoded text.
+   * Get CF_HTML from clipboard as UTF-8 text.
    * @param {Integer} timeoutMs
    * @param {Integer} pollMs
    * @returns {String} CF_HTML text or "".
@@ -222,9 +222,9 @@ class ClipboardWaiter {
     if (!buf)
       return ""
 
-    ; CF_HTML is conventionally byte-oriented.  This decodes using ANSI/ACP.
-    ; If you need raw bytes, call GetBuffer() and parse the Buffer yourself.
-    return StrGet(buf.Ptr, buf.Size, "CP0")
+    ; CF_HTML byte offsets are defined against the UTF-8 payload.
+    byteLen := this._TrimTrailingNulBytes(buf.Ptr, buf.Size)
+    return this._Utf8BytesToString(buf.Ptr, byteLen)
   }
 
   /**
@@ -256,14 +256,46 @@ class ClipboardWaiter {
     if (start < 0 || finish < 0 || finish <= start)
       return ""
 
-    ; Offsets are byte-based. Re-encode to bytes for accurate slicing.
-    byteCount := StrPut(cfHtml, "CP0") - 1
+    return this.SliceUtf8ByteRange(cfHtml, start, finish)
+  }
+
+  /**
+   * Slice a UTF-8 byte range from a Unicode string.
+   * @param {String} text UTF-8 decoded text.
+   * @param {Integer} start 0-based inclusive UTF-8 byte offset.
+   * @param {Integer} finish 0-based exclusive UTF-8 byte offset.
+   * @returns {String} Selected text or "".
+   */
+  static SliceUtf8ByteRange(text, start, finish) {
+    text := String(text)
+    if (start < 0 || finish < 0 || finish <= start)
+      return ""
+
+    encoded := this._StringToUtf8Buffer(text)
+    byteCount := encoded.byteLen
     if (finish > byteCount)
       return ""
 
-    buf := Buffer(byteCount + 1, 0)
-    StrPut(cfHtml, buf, "CP0")
-    return this._Utf8BytesToString(buf.Ptr + start, finish - start)
+    return this._Utf8BytesToString(encoded.buf.Ptr + start, finish - start)
+  }
+
+  /**
+   * Return the UTF-8 byte length of a Unicode string.
+   * @param {String} text
+   * @returns {Integer}
+   */
+  static Utf8ByteLen(text) {
+    return this._StringToUtf8Buffer(text).byteLen
+  }
+
+  /**
+   * Return the ANSI/ACP byte length of a Unicode string.
+   * Used only for legacy fixture compatibility detection.
+   * @param {String} text
+   * @returns {Integer}
+   */
+  static AnsiByteLen(text) {
+    return this._StringToCodePageBuffer(text, 0).byteLen
   }
 
   /**
@@ -346,5 +378,69 @@ class ClipboardWaiter {
       return ""
 
     return StrGet(wbuf.Ptr, wlen, "UTF-16")
+  }
+
+  /**
+   * Encode a UTF-16 AHK string into a UTF-8 byte buffer without relying on
+   * StrPut's overloaded buffer forms.
+   * @param {String} text
+   * @returns {Object} { buf, byteLen }
+   */
+  static _StringToUtf8Buffer(text) {
+    return this._StringToCodePageBuffer(text, 65001)
+  }
+
+  /**
+   * Encode a UTF-16 AHK string into a byte buffer using a specific code page.
+   * @param {String} text
+   * @param {Integer} codePage
+   * @returns {Object} { buf, byteLen }
+   */
+  static _StringToCodePageBuffer(text, codePage) {
+    text := String(text)
+    charLen := StrLen(text)
+    if (charLen <= 0)
+      return { buf: Buffer(1, 0), byteLen: 0 }
+
+    byteLen := DllCall("Kernel32\WideCharToMultiByte"
+      , "UInt", codePage
+      , "UInt", 0
+      , "Ptr", StrPtr(text)
+      , "Int", charLen
+      , "Ptr", 0
+      , "Int", 0
+      , "Ptr", 0
+      , "Ptr", 0
+      , "Int")
+    if (byteLen <= 0)
+      return { buf: Buffer(1, 0), byteLen: 0 }
+
+    buf := Buffer(byteLen + 1, 0)
+    out := DllCall("Kernel32\WideCharToMultiByte"
+      , "UInt", codePage
+      , "UInt", 0
+      , "Ptr", StrPtr(text)
+      , "Int", charLen
+      , "Ptr", buf.Ptr
+      , "Int", byteLen
+      , "Ptr", 0
+      , "Ptr", 0
+      , "Int")
+    if (out != byteLen)
+      return { buf: Buffer(1, 0), byteLen: 0 }
+
+    return { buf: buf, byteLen: byteLen }
+  }
+
+  /**
+   * Trim any terminating NUL bytes from clipboard data copied into a Buffer.
+   * @param {Ptr} ptr
+   * @param {Integer} byteLen
+   * @returns {Integer}
+   */
+  static _TrimTrailingNulBytes(ptr, byteLen) {
+    while (byteLen > 0 && NumGet(ptr + byteLen - 1, "UChar") = 0)
+      byteLen -= 1
+    return byteLen
   }
 }

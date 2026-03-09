@@ -105,7 +105,7 @@ for fx in fixtures {
    */
   expectedSource := Trim(SectionToText(sections["0. source"]), " `t`r`n")
   plain := SectionToText(sections["1. plain (A_Clipboard minus CR)"])
-  cfHtml := SectionToText(sections["2. cfHtml (raw full payload)"])
+  cfHtml := SectionToCfHtmlText(sections["2. cfHtml (raw full payload)"])
   for sc in scenarios {
     caseId := sc["case"]
     /**
@@ -432,6 +432,46 @@ SectionToText(section) {
   if (StrLen(s) > section.len)
     s := SubStr(s, 1, section.len)
   return s
+}
+
+/**
+ * Decodes a CF_HTML section and repairs legacy logs captured from the old
+ * CP0-decoded clipboard path. Real CF_HTML headers declare byte offsets against
+ * the UTF-8 payload, so EndHTML must equal the UTF-8 byte length of the text.
+ * Old logs instead match the CP0 byte length because they were logged after
+ * decoding UTF-8 bytes as ANSI.
+ * @param {Map} section - Section object containing raw and len.
+ * @returns {string} Canonical UTF-8 decoded CF_HTML text.
+ */
+SectionToCfHtmlText(section) {
+  cfHtml := SectionToText(section)
+  endHtml := PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndHTML:")
+  if (endHtml <= 0)
+    return cfHtml
+
+  if (ClipboardWaiter.Utf8ByteLen(cfHtml) = endHtml)
+    return cfHtml
+
+  if (ClipboardWaiter.AnsiByteLen(cfHtml) != endHtml)
+    return cfHtml
+
+  return LegacyCp0CfHtmlToUtf8(cfHtml)
+}
+
+/**
+ * Reconstructs canonical UTF-8 text from a legacy CF_HTML string that was
+ * originally decoded from UTF-8 bytes using CP0 and then written to disk.
+ * @param {string} cfHtml - Legacy mojibake CF_HTML text.
+ * @returns {string} UTF-8 decoded CF_HTML text, or original text on failure.
+ */
+LegacyCp0CfHtmlToUtf8(cfHtml) {
+  encoded := ClipboardWaiter._StringToCodePageBuffer(cfHtml, 0)
+  byteLen := encoded.byteLen
+  if (byteLen <= 0)
+    return cfHtml
+
+  repaired := ClipboardWaiter._Utf8BytesToString(encoded.buf.Ptr, byteLen)
+  return (repaired = "") ? cfHtml : repaired
 }
 
 /**

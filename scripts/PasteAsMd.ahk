@@ -349,7 +349,9 @@ class PasteMd {
     if (startFragOff <= 0 || startHtmlOff < 0 || startFragOff <= startHtmlOff)
       return ""
 
-    before := SubStr(cfHtml, startHtmlOff + 1, startFragOff - startHtmlOff)
+    before := ClipboardWaiter.SliceUtf8ByteRange(cfHtml, startHtmlOff, startFragOff)
+    if (before = "")
+      return ""
 
     ; Find the LAST (closest) message-type marker before the fragment start.
     lastAssist := 0
@@ -1618,7 +1620,7 @@ class PasteMd {
     if (startFragOff > 0 && startHtmlOff >= 0 && startFragOff > startHtmlOff) {
       ; Prefer raw-offset slicing: this preserves exact upstream context even
       ; when marker text or fragment string matching is unreliable.
-      before := SubStr(cfHtml, startHtmlOff + 1, startFragOff - startHtmlOff)
+      before := ClipboardWaiter.SliceUtf8ByteRange(cfHtml, startHtmlOff, startFragOff)
     } else {
       htmlAll := PasteMd.ToLfEols(ClipboardWaiter.SelectHtmlSection(cfHtml, ClipboardWaiter.HTML_SECTION_HTML))
       if (htmlAll = "")

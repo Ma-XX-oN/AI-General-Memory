@@ -50,7 +50,7 @@ Clean generated test logs:
 ## Fixture files
 
 `PasteAsMd_*.log` files contain debug captures from real clipboard pastes (or
-lorem-ipsum stand-ins where content is private).  Each log has two sections
+lorem-ipsum stand-ins where content is private).  Each log has three sections
 decoded by the fixture runner:
 
 - `0. source` — expected source detection (`claudecode`, `claudeweb`, `codex`, `chatgpt`, or `unknown`)
@@ -82,6 +82,11 @@ match both filename forms.
 4. Add expected markdown:
    - default: `PasteAsMd_<NAME>.expected.md`
    - scenario case: `PasteAsMd_<NAME>.<CASE>.expected.md`
+
+Legacy fixture note:
+
+- Runtime `CF_HTML` now uses the numeric `StartHTML` / `EndHTML` / `StartFragment` / `EndFragment` headers as UTF-8 byte offsets, matching the clipboard spec.
+- The fixture harness does not rewrite those headers. It repairs older fixture logs that were captured through the previous CP0-decoded path by checking whether `EndHTML` matches the payload's UTF-8 byte length. If it only matches the CP0 byte length, the harness reconstructs canonical UTF-8 text first and then applies the stored offsets.
 
 ## Fixture Harness CLI
 
@@ -201,6 +206,33 @@ From stage 6. FINAL md (pasted)
 ```md
 > Right now the document looks like it is trying to cover:
 ```
+
+### TBD fix(cliphelper): apply CF_HTML offsets as UTF-8 byte positions
+
+Affected runtime/files:
+
+- `ClipHelper.ahk`
+- `test-paste-md-fixtures.ahk`
+
+The old `SelectHtmlSection` path treated `CF_HTML` as ANSI (`CP0`) on the way
+into the byte buffer and UTF-8 on the way out. That happened to work for
+ASCII-only payloads, but it breaks as soon as the clipboard HTML contains
+non-ASCII text because the stored offsets are defined in UTF-8 bytes.
+
+The runtime fix keeps the existing numeric headers and applies them correctly:
+
+- `ClipboardWaiter.GetHtml()` now decodes the clipboard payload as UTF-8 text.
+- `ClipboardWaiter.SelectHtmlSection()` re-encodes that text as UTF-8 and slices
+  the requested byte range directly from the stored offsets.
+- `PasteMd` consumers that inspect the pre-fragment context now use the same
+  UTF-8 byte-range slicing helper instead of character-based substring logic.
+
+The fixture harness adds compatibility logic for older checked-in logs only:
+
+- if `EndHTML` already matches the decoded payload's UTF-8 byte length, the
+  fixture is treated as canonical and the stored offsets are used as-is
+- if `EndHTML` matches only the payload's `CP0` byte length, the harness repairs
+  that legacy mojibake back to UTF-8 first, then applies the same offsets
 
 ### 694e5e3 fix(paste-md): add edited-file fixture and monaco diff normalization
 
