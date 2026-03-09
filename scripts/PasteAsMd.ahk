@@ -573,6 +573,7 @@ class PasteMd {
         PasteMd._BusyUpdate("Preprocessing HTML")
         htmlPrep := PasteMd._PreprocessHtml(htmlFrag, cfHtml, showPoster)
         htmlPrep := PasteMd.NormalizeIncidentalListIntentHtml(htmlPrep, htmlFrag, plain, expectedListStart)
+        htmlPrep := PasteMd.StripTrailingEmptyListItems(htmlPrep)
 
         if (promptOrderedList) {
           promptResult := PasteMd.MaybePromptOrderedListStart(htmlPrep, plain, htmlFrag, expectedListStart)
@@ -1208,15 +1209,29 @@ class PasteMd {
 
     prepTrim := RegExReplace(prepTrim, "is)^<ol\b[^>]*+>", "<ul>", , 1)
     prepTrim := RegExReplace(prepTrim, "is)</ol>[ \t\r\n]*+$", "</ul>", , 1)
+    return prepTrim
+  }
 
-    ; Drop trailing empty list items produced by selection range clipping.
-    ; These become stray "-" bullets after pandoc if kept.
-    prepTrim := RegExReplace(
-      prepTrim,
-      "is)(?:<li\b[^>]*+>[ \t\r\n]*+(?:<p\b[^>]*+>[ \t\r\n]*+</p>[ \t\r\n]*+)?+</li>[ \t\r\n]*+)++(</ul>[ \t\r\n]*+)$",
+  /**
+   * Strips trailing empty list items from the end of any list container in
+   * preprocessed HTML.  This is a reusable cleanup step for cursor-artifact
+   * empty bullets regardless of the fragment's starting shape.
+   *
+   * An empty list item is one that contains only optional whitespace and an
+   * optional empty <p></p>.
+   *
+   * @param {string} html - Preprocessed HTML
+   * @returns {string} HTML with trailing empty list items removed
+   */
+  static StripTrailingEmptyListItems(html) {
+    if (html = "")
+      return html
+    ; Not using RE_HTML_LIB since this has no complex recursive structure.
+    return RegExReplace(
+      html,
+      "is)(?:<li\b[^>]*+>[ \t\r\n]*+(?:<p\b[^>]*+>[ \t\r\n]*+</p>[ \t\r\n]*+)?+</li>[ \t\r\n]*+)++(</(?:ul|ol)>[ \t\r\n]*+)$",
       "$1"
     )
-    return prepTrim
   }
 
   /**

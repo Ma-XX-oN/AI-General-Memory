@@ -38,6 +38,7 @@ fixtures := [
   "PasteAsMd_ChatGPT.log",
   "PasteAsMd_ChatGPT-with-User.log",
   "PasteAsMd_ChatGPT-with-User2.log",
+  "PasteAsMd_ChatGPT-TrailingEmptyBullet.log",
 ]
 
 opts := ParseHarnessOptions(A_Args, fixtures.Length)

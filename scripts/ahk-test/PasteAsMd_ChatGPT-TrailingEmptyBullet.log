@@ -1,0 +1,22 @@
+PasteAsMd debug — 2026-03-09 13:20:33
+
+=== 0. source (len=7) ===
+unknown
+
+=== 1. plain (A_Clipboard minus CR) (len=56) ===
+Right now the document looks like it is trying to cover:
+
+=== 2. cfHtml (raw full payload) (len=421) ===
+Version:0.9
+StartHTML:0000000100
+EndHTML:0000000421
+StartFragment:0000000134
+EndFragment:0000000387
+<html>
+<body>
+<!--StartFragment--><p data-start="1938" data-end="1994">Right now the document looks like it is trying to cover:</p>
+<ul data-start="1995" data-end="2108">
+<li data-section-id="1xs0cpe" data-start="1995" data-end="2021">
+<p data-start="1997" data-end="2021"></p></li></ul><!--EndFragment-->
+</body>
+</html>

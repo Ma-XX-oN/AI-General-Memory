@@ -165,6 +165,43 @@ Lists what commits relate to what `PasteAsMd_*.expected.md` entries.  This will
 allow being able to track if a fix was good, or could have been done better for
 possible future cleanup passes.
 
+### TBD fix(paste-md): strip trailing empty list items for non-bare-li fragments
+
+PasteAsMd_ChatGPT-TrailingEmptyBullet.expected.md
+
+When the source app includes a trailing empty `<li>` after a `<p>` (a cursor
+artifact from copy), the empty bullet was pasted because
+`NormalizeIncidentalListIntentHtml` only stripped it for bare-`<li>` fragments.
+Added `StripTrailingEmptyListItems` and called it unconditionally so the
+stripping applies regardless of fragment shape.
+
+From stage 2. cfHtml (raw full payload) (Simplified)
+
+```html
+<html><body>
+<!--StartFragment-->
+<p>Right now the document looks like it is trying to cover:</p>
+<ul><li><p></p></li></ul>
+<!--EndFragment-->
+</body></html>
+```
+
+From stage 4. mdRaw (pandoc output)
+
+```md
+Right now the document looks like it is trying to cover:
+
+-
+```
+
+**Fix applied here.**
+
+From stage 6. FINAL md (pasted)
+
+```md
+> Right now the document looks like it is trying to cover:
+```
+
 ### 694e5e3 fix(paste-md): add edited-file fixture and monaco diff normalization
 
 PasteAsMd_Codex-EditedFile.expected.md
