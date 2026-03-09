@@ -752,6 +752,7 @@ class PasteMd {
       PasteMd._BusyUpdate("Preparing paste")
 
       if (dbg) {
+        PasteMd._DbgSection(dbgF, "0. source", converted["source"])
         PasteMd._DbgSection(dbgF, "1. plain (A_Clipboard minus CR)", plain)
         PasteMd._DbgSection(dbgF, "2. cfHtml (raw full payload)", cfHtml)
         PasteMd._DbgSection(dbgF, "3. htmlFrag (CF_HTML fragment)", converted["htmlFrag"])
