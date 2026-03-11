@@ -263,6 +263,24 @@ Chk("list nested child paragraph unwrapped", InStr(scopedListNorm, "<li>Child it
 Chk("list footnote href stripped to fragment", InStr(scopedListNorm, 'href="#user-content-fn-2"'))
 Chk("list footnote body paragraph removed", InStr(scopedListNorm, '<li id="user-content-fn-2">Footnote body</li>'))
 
+; ── 8f: Region-scoped code normalization and unwrap ───────────────────────────
+Log("── 8f: Region-scoped code normalization and unwrap ─")
+
+scopedCodeHtml := '<div><div><pre class="code-block__code extra"><code class="language-python">'
+    . '<div>print(1)</div><div>print(2)</div>'
+    . '</code></pre></div></div><p>Tail</p>'
+regionsCode := HtmlNorm._DiscoverRegions(scopedCodeHtml, "claudeweb")
+scopedCodeNorm := HtmlNorm._ApplyRegionScopedTransforms(scopedCodeHtml, "claudeweb")
+
+Chk("code regions split into code + prose blocks", regionsCode.Length = 2)
+Chk("code region flags code normalization", regionsCode[1]["hasCodeWork"])
+Chk("code region flags container unwrap", regionsCode[1]["hasCodeContainers"])
+Chk("code block normalized and unwrapped",
+    InStr(scopedCodeNorm, '<pre><code class="language-python">print(1)`nprint(2)</code></pre>'))
+Chk("code wrapper classes removed", !InStr(scopedCodeNorm, "code-block__code"))
+Chk("code nested div wrappers removed", !InStr(scopedCodeNorm, "<div><div><pre"))
+Chk("code trailing prose preserved", InStr(scopedCodeNorm, "<p>Tail</p>"))
+
 ; ── 9: Full Normalize — Claude Code minimal ───────────────────────────────────
 Log("── 9: Full Normalize — claudecode minimal ───────────")
 

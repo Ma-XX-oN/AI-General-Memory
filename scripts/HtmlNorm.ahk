@@ -131,12 +131,6 @@ class HtmlNorm {
         if (trimmed != "" && RegExMatch(trimmed, "is)^(?:<li\b[^>]*+>.*?</li>\s*)+$"))
             html := "<ol>" . trimmed . "</ol>"
 
-        ; 9. Normalize <code> elements.
-        html := HtmlNorm._NormalizeCodeElements(html)
-
-        ; 10. Unwrap nested containers that obscure code blocks.
-        html := HtmlNorm._UnwrapNestedContainers(html)
-
         return html
     }
 
@@ -178,6 +172,10 @@ class HtmlNorm {
                 regionHtml := HtmlNorm._NormalizeFootnoteListItems(regionHtml)
             if region["hasTightList"]
                 regionHtml := HtmlNorm._NormalizeTightListItems(regionHtml)
+            if region["hasCodeWork"]
+                regionHtml := HtmlNorm._NormalizeCodeElements(regionHtml)
+            if region["hasCodeContainers"]
+                regionHtml := HtmlNorm._UnwrapNestedContainers(regionHtml)
             out .= regionHtml
         }
         return out
@@ -264,7 +262,9 @@ class HtmlNorm {
                 "hasClaudeWebLabel", false,
                 "hasFootnoteHref", false,
                 "hasFootnoteList", false,
-                "hasTightList", false
+                "hasTightList", false,
+                "hasCodeWork", false,
+                "hasCodeContainers", false
             )
         }
 
@@ -284,7 +284,9 @@ class HtmlNorm {
             "hasClaudeWebLabel", HtmlNorm._HasClaudeWebLanguageLabelWork(regionHtml),
             "hasFootnoteHref", HtmlNorm._HasFootnoteHrefWork(regionHtml),
             "hasFootnoteList", HtmlNorm._HasFootnoteListWork(regionHtml),
-            "hasTightList", HtmlNorm._HasTightListWork(regionHtml)
+            "hasTightList", HtmlNorm._HasTightListWork(regionHtml),
+            "hasCodeWork", HtmlNorm._HasCodeWork(regionHtml),
+            "hasCodeContainers", HtmlNorm._HasCodeContainerWork(regionHtml)
         )
     }
 
@@ -308,6 +310,10 @@ class HtmlNorm {
         if HtmlNorm._HasFootnoteListWork(html)
             return true
         if HtmlNorm._HasTightListWork(html)
+            return true
+        if HtmlNorm._HasCodeWork(html)
+            return true
+        if HtmlNorm._HasCodeContainerWork(html)
             return true
         return false
     }
@@ -338,6 +344,18 @@ class HtmlNorm {
 
     static _HasTightListWork(html) {
         return (InStr(html, "<li") && InStr(html, "<p"))
+    }
+
+    static _HasCodeWork(html) {
+        return (InStr(html, "<code") || InStr(html, "<pre"))
+    }
+
+    static _HasCodeContainerWork(html) {
+        if (InStr(html, "<pre") && InStr(html, "<code"))
+            return true
+        if RegExMatch(html, "i)<div\b")
+            return true
+        return false
     }
 
     static _IsVoidHtmlTag(tagName) {
