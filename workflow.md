@@ -68,12 +68,8 @@ command unique, defeating pre-approval.
 1. Use Conventional Commit format for every commit.
 2. Keep commit body bullet lines contiguous (no blank separators between bullets).
 3. Avoid Markdown backticks in `git commit -m` strings in PowerShell.
-4. Resolve the stable session PID once at the start of a commit sequence:
-   - `$sessionPid = & "$env:CODEX_HOME/scripts/session-pid.ps1"`
-   - If this fails, use a fixed fallback filename for this commit sequence:
-     `$commitMsgPath = Join-Path $env:TEMP "codex-commit-msg.txt"`
-5. Use a session-scoped commit message file in `%TEMP%`:
-   - Primary path: `$commitMsgPath = Join-Path $env:TEMP ("codex-commit-msg-" + $sessionPid + ".txt")`
-6. Use a stable commit command shape:
+4. Use a session-scoped commit message file in `%TEMP%`:
+   - Primary path: `$commitMsgPath = Join-Path $env:TEMP ("codex-commit-msg-" + $env:CODEX_THREAD_ID + ".txt")`
+5. Use a stable commit command shape:
    - `git commit -F $commitMsgPath`
-7. Do not store transient commit message files in repos.
+6. Do not store transient commit message files in repos.
