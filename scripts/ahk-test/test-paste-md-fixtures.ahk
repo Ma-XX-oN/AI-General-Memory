@@ -67,9 +67,9 @@ actualSuffix := ".actual.md"
  * These provide seam inputs for _ConvertFromCaptured.
  */
 required := [
-  "0. source",
-  "1. plain (A_Clipboard minus CR)",
-  "2. cfHtml (raw full payload)",
+  PasteMd.LOG_SECTION_SOURCE,
+  PasteMd.LOG_SECTION_PLAIN,
+  PasteMd.LOG_SECTION_CFHTML,
 ]
 
 Log("── PasteAsMd fixture regressions ─────────────────────────────")
@@ -88,7 +88,13 @@ for fx in fixtures {
   if (scenarios.Length = 0)
     continue
 
-  sections := ParseDbgSections(logText)
+  try {
+    sections := ParseDbgSections(logText)
+    Chk("debug sections parsed", true)
+  } catch as e {
+    Chk("debug sections parsed", false, e.Message)
+    continue
+  }
 
   missing := false
   for label in required {
@@ -103,9 +109,9 @@ for fx in fixtures {
   /**
    * Seam inputs decoded from captured debug sections.
    */
-  expectedSource := Trim(SectionToText(sections["0. source"]), " `t`r`n")
-  plain := SectionToText(sections["1. plain (A_Clipboard minus CR)"])
-  cfHtml := SectionToCfHtmlText(sections["2. cfHtml (raw full payload)"])
+  expectedSource := Trim(SectionToText(sections[PasteMd.LOG_SECTION_SOURCE]), " `t`r`n")
+  plain := SectionToText(sections[PasteMd.LOG_SECTION_PLAIN])
+  cfHtml := SectionToText(sections[PasteMd.LOG_SECTION_CFHTML])
   for sc in scenarios {
     caseId := sc["case"]
     /**
@@ -391,136 +397,57 @@ ParseFixtureScenarioLine(line, &err := "") {
  */
 ParseDbgSections(logText) {
   sections := Map()
-  pat := "ms)^=== ([^\r\n]+?) \(len=(\d+)\) ===\R"
-  pos := 1
-  while RegExMatch(logText, pat, &m, pos) {
+  firstHeaderPos := RegExMatch(logText, "m)^=== ", &mFirstHeader)
+  if (!firstHeaderPos)
+    return sections
+
+  pos := firstHeaderPos
+  pat := "s)^=== ([^\r\n]+?) \(len=(\d+)\) ===\r\n"
+  sepLen := StrLen(PasteMd.LOG_SECTION_SEPARATOR)
+  while (pos <= StrLen(logText)) {
+    if !RegExMatch(SubStr(logText, pos), pat, &m) {
+      throw Error("section header must start at character " pos " and use canonical CRLF framing")
+    }
+
     label := m[1]
     sectionLen := Integer(m[2])
-    contentStart := m.Pos + m.Len
-    if RegExMatch(logText, "m)^=== ", &mNextAny, contentStart) {
-      content := SubStr(logText, contentStart, mNextAny.Pos - contentStart)
-      pos := mNextAny.Pos
-    } else {
-      content := SubStr(logText, contentStart)
-      pos := StrLen(logText) + 1
+    contentStart := pos + m.Len
+    contentEnd := contentStart + sectionLen - 1
+    if (contentEnd > StrLen(logText)) {
+      throw Error("section '" label "' len=" sectionLen " exceeds remaining file length")
     }
-    sections[label] := { raw: TrimDbgSectionContent(content), len: sectionLen }
+
+    content := SubStr(logText, contentStart, sectionLen)
+    sections[label] := { raw: content, len: sectionLen }
+
+    pos := contentStart + sectionLen
+    if (pos > StrLen(logText))
+      break
+
+    if (SubStr(logText, pos, sepLen) != PasteMd.LOG_SECTION_SEPARATOR) {
+      throw Error("section '" label "' must be followed by exactly one canonical CRLF separator block or EOF")
+    }
+
+    pos += sepLen
+    if (pos > StrLen(logText))
+      break
+    if (SubStr(logText, pos, 4) != "=== ") {
+      throw Error("unexpected text after section '" label "'; expected next header at character " pos)
+    }
   }
   return sections
 }
 
 /**
- * Removes trailing spacing added between logged sections.
- * @param {string} s - Raw section payload substring.
- * @returns {string} Trimmed payload.
- */
-TrimDbgSectionContent(s) {
-  if (SubStr(s, -3) = "`r`n`r`n")
-    return SubStr(s, 1, StrLen(s) - 4)
-  if (SubStr(s, -1) = "`n`n")
-    return SubStr(s, 1, StrLen(s) - 2)
-  return s
-}
-
-/**
- * Decodes one parsed debug section and enforces declared length.
+ * Returns one parsed debug section and validates the declared length.
  * @param {Map} section - Section object containing raw and len.
- * @returns {string} Decoded section text.
+ * @returns {string} Section text.
  */
 SectionToText(section) {
-  s := DecodeDbgExact(section.raw)
-  if (StrLen(s) > section.len)
-    s := SubStr(s, 1, section.len)
-  return s
-}
-
-/**
- * Decodes a CF_HTML section and repairs legacy logs captured from the old
- * CP0-decoded clipboard path. Real CF_HTML headers declare byte offsets against
- * the UTF-8 payload, so EndHTML must equal the UTF-8 byte length of the text.
- * Old logs instead match the CP0 byte length because they were logged after
- * decoding UTF-8 bytes as ANSI.
- * @param {Map} section - Section object containing raw and len.
- * @returns {string} Canonical UTF-8 decoded CF_HTML text.
- */
-SectionToCfHtmlText(section) {
-  cfHtml := SectionToText(section)
-  endHtml := PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndHTML:")
-  if (endHtml <= 0)
-    return cfHtml
-
-  if (ClipboardWaiter.Utf8ByteLen(cfHtml) = endHtml)
-    return cfHtml
-
-  if (ClipboardWaiter.AnsiByteLen(cfHtml) != endHtml)
-    return cfHtml
-
-  return LegacyCp0CfHtmlToUtf8(cfHtml)
-}
-
-/**
- * Reconstructs canonical UTF-8 text from a legacy CF_HTML string that was
- * originally decoded from UTF-8 bytes using CP0 and then written to disk.
- * @param {string} cfHtml - Legacy mojibake CF_HTML text.
- * @returns {string} UTF-8 decoded CF_HTML text, or original text on failure.
- */
-LegacyCp0CfHtmlToUtf8(cfHtml) {
-  encoded := ClipboardWaiter._StringToCodePageBuffer(cfHtml, 0)
-  byteLen := encoded.byteLen
-  if (byteLen <= 0)
-    return cfHtml
-
-  repaired := ClipboardWaiter._Utf8BytesToString(encoded.buf.Ptr, byteLen)
-  return (repaired = "") ? cfHtml : repaired
-}
-
-/**
- * Reverses PasteMd._DbgSection visible EOL markers back to text EOLs.
- * Supports current LF-only logs and legacy markers normalized to LF.
- * @param {string} s - Marker-encoded section text.
- * @returns {string} Decoded text with original EOL semantics.
- */
-DecodeDbgExact(s) {
-  ; Reverse _DbgSection marker stream for:
-  ; - current LF-only logger output
-  ; - legacy output normalized to LF
-  tokLegacyCRLF := "⏎¶⏎`n¶`n¶`n"
-  tokLegacyCR := "⏎`n¶`n"
-  tokCRLF := "⏎¶`n"
-  tokCR := "⏎`n"
-  tokLF := "¶`n"
-  out := ""
-  pos := 1
-  while (pos <= StrLen(s)) {
-    if (SubStr(s, pos, StrLen(tokLegacyCRLF)) = tokLegacyCRLF) {
-      out .= "`r`n"
-      pos += StrLen(tokLegacyCRLF)
-      continue
-    }
-    if (SubStr(s, pos, StrLen(tokLegacyCR)) = tokLegacyCR) {
-      out .= "`r"
-      pos += StrLen(tokLegacyCR)
-      continue
-    }
-    if (SubStr(s, pos, StrLen(tokCRLF)) = tokCRLF) {
-      out .= "`r`n"
-      pos += StrLen(tokCRLF)
-      continue
-    }
-    if (SubStr(s, pos, StrLen(tokCR)) = tokCR) {
-      out .= "`r"
-      pos += StrLen(tokCR)
-      continue
-    }
-    if (SubStr(s, pos, StrLen(tokLF)) = tokLF) {
-      out .= "`n"
-      pos += StrLen(tokLF)
-      continue
-    }
-    out .= SubStr(s, pos, 1)
-    pos += 1
+  if (StrLen(section.raw) != section.len) {
+    throw Error("section length mismatch: declared len=" section.len " actual len=" StrLen(section.raw))
   }
-  return out
+  return section.raw
 }
 
 /**
@@ -675,16 +602,12 @@ _WriteUtf8(path, text) {
 _WriteFixtureOutputLog(path, plain, cfHtml, converted, asQuoted := true) {
   f := FileOpen(path, "w", "UTF-8")
   try {
-    f.Write("PasteAsMd debug — " FormatTime(, "yyyy-MM-dd HH:mm:ss") "`n`n")
-    PasteMd._DbgSection(f, "0. source", converted["source"])
-    PasteMd._DbgSection(f, "1. plain (A_Clipboard minus CR)", plain)
-    PasteMd._DbgSection(f, "2. cfHtml (raw full payload)", cfHtml)
-    PasteMd._DbgSection(f, "3. htmlFrag (CF_HTML fragment)", converted["htmlFrag"])
-    f.Write("=== 2b. cfHtml offsets ===`n")
-    f.Write("StartHTML: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartHTML:") "`n")
-    f.Write("EndHTML: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndHTML:") "`n")
-    f.Write("StartFragment: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartFragment:") "`n")
-    f.Write("EndFragment: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndFragment:") "`n`n")
+    f.Write("PasteAsMd debug — " FormatTime(, "yyyy-MM-dd HH:mm:ss") PasteMd.LOG_SECTION_SEPARATOR)
+    PasteMd._DbgSection(f, PasteMd.LOG_SECTION_SOURCE, converted["source"])
+    PasteMd._DbgSection(f, PasteMd.LOG_SECTION_PLAIN, plain)
+    PasteMd._DbgSection(f, PasteMd.LOG_SECTION_CFHTML, cfHtml, true)
+    PasteMd._DbgSection(f, PasteMd.LOG_SECTION_HTML_FRAG, converted["htmlFragRaw"], true)
+    PasteMd._WriteCfHtmlOffsetsSection(f, cfHtml)
 
     if (converted["htmlFrag"] = "") {
       PasteMd._DbgSection(f, "3. md (CleanPlainText – no HTML path)", converted["mdAfterClean"])

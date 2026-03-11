@@ -67,6 +67,13 @@ class PasteMd {
   static DEBUG_PASTE_MD := true
   static DEBUG_PASTE_MD_LOG := A_ScriptDir "\PasteAsMd_debug.log"
   static PROMPT_ORDERED_LIST_START_ON_AMBIGUOUS := true
+  static LOG_CRLF := "`r`n"
+  static LOG_SECTION_SEPARATOR := "`r`n`r`n"
+  static LOG_SECTION_SOURCE := "0. source"
+  static LOG_SECTION_PLAIN := "1. plain (canonical text capture)"
+  static LOG_SECTION_CFHTML := "2. cfHtml (raw full payload)"
+  static LOG_SECTION_HTML_FRAG := "3. htmlFrag (CF_HTML fragment, raw)"
+  static LOG_SECTION_CFHTML_OFFSETS := "2b. cfHtml offsets"
 
   ; Number of rotated past-run logs to keep alongside the current one.
   static LOG_HISTORY_COUNT := 4
@@ -416,15 +423,32 @@ class PasteMd {
 
   /**
    * Writes a labelled debug section to the log file.
-   * Replaces CR/LF with visible markers so EOL issues are obvious.
+   * Uses canonical CRLF framing and canonicalizes non-raw text payloads.
    * @param {object} f - FileOpen handle (already open for writing)
    * @param {string} label - Section heading
-   * @param {string} s - Raw string to dump
+   * @param {string} s - String to dump
+   * @param {boolean} preserveEols - If true, payload EOLs are preserved exactly
    */
-  static _DbgSection(f, label, s) {
-    f.Write("=== " label " (len=" StrLen(s) ") ===`n")
+  static _DbgSection(f, label, s, preserveEols := false) {
+    if (!preserveEols)
+      s := PasteMd.ToCrLfEols(s)
+    f.Write("=== " label " (len=" StrLen(s) ") ===" PasteMd.LOG_CRLF)
     f.Write(s)
-    f.Write("`n`n")
+    f.Write(PasteMd.LOG_SECTION_SEPARATOR)
+  }
+
+  /**
+   * Writes the decoded CF_HTML offsets block using canonical CRLF framing.
+   * @param {object} f - FileOpen handle
+   * @param {string} cfHtml - Full CF_HTML payload
+   */
+  static _WriteCfHtmlOffsetsSection(f, cfHtml) {
+    f.Write("=== " PasteMd.LOG_SECTION_CFHTML_OFFSETS " ===" PasteMd.LOG_CRLF)
+    f.Write("StartHTML: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartHTML:") PasteMd.LOG_CRLF)
+    f.Write("EndHTML: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndHTML:") PasteMd.LOG_CRLF)
+    f.Write("StartFragment: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartFragment:") PasteMd.LOG_CRLF)
+    f.Write("EndFragment: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndFragment:") PasteMd.LOG_CRLF)
+    f.Write(PasteMd.LOG_SECTION_SEPARATOR)
   }
 
   /**
@@ -531,7 +555,7 @@ class PasteMd {
   /**
    * Converts already-captured plain/cfHtml inputs through the markdown pipeline.
    * No clipboard writes or paste side effects.
-   * @param {string} plain - Plain clipboard text (typically A_Clipboard with CR stripped)
+   * @param {string} plainCapture - Plain clipboard text serialized into canonical log form
    * @param {string} cfHtml - Full CF_HTML payload
    * @param {boolean} asQuoted - If true, prefixes every line with blockquote syntax (>)
    * @param {boolean} showPoster - If true, resolves/replaces poster placeholders
@@ -539,13 +563,15 @@ class PasteMd {
    * @param {boolean} promptOrderedList - If true, may prompt for ordered-list start when ambiguous
    * @returns {Map} Stage outputs for test/debug use
    */
-  static _ConvertFromCaptured(plain, cfHtml, asQuoted, showPoster, showImg, promptOrderedList := false) {
+  static _ConvertFromCaptured(plainCapture, cfHtml, asQuoted, showPoster, showImg, promptOrderedList := false) {
     PasteMd._BusyUpdate("Inspecting clipboard data")
     source := DetectSource(cfHtml)
+    plain := PasteMd.ToLfEols(plainCapture)
     PasteMd._BusyUpdate("Reading HTML fragment")
-    htmlFrag := (cfHtml = "")
+    htmlFragRaw := (cfHtml = "")
       ? ""
-      : PasteMd.ToLfEols(ClipboardWaiter.SelectHtmlSection(cfHtml, ClipboardWaiter.HTML_SECTION_FRAGMENT))
+      : ClipboardWaiter.SelectHtmlSection(cfHtml, ClipboardWaiter.HTML_SECTION_FRAGMENT)
+    htmlFrag := PasteMd.ToLfEols(htmlFragRaw)
 
     htmlPrep := ""
     mdRaw := ""
@@ -571,7 +597,7 @@ class PasteMd {
         mdAfterClean := md
         mdAfterOrderedList := md
       } else {
-        expectedListStart := PasteMd.GetExpectedOrderedListStart(htmlFrag, cfHtml, plain)
+        expectedListStart := PasteMd.GetExpectedOrderedListStart(htmlFragRaw, cfHtml, plain)
         PasteMd._BusyUpdate("Preprocessing HTML")
         htmlPrep := PasteMd._PreprocessHtml(htmlFrag, cfHtml, showPoster)
         htmlPrep := PasteMd.NormalizeIncidentalListIntentHtml(htmlPrep, htmlFrag, plain, expectedListStart)
@@ -583,6 +609,7 @@ class PasteMd {
             aborted := true
             return Map(
               "source", source,
+              "htmlFragRaw", htmlFragRaw,
               "htmlFrag", htmlFrag,
               "htmlPrep", htmlPrep,
               "mdRaw", mdRaw,
@@ -700,6 +727,7 @@ class PasteMd {
 
       return Map(
         "source", source,
+        "htmlFragRaw", htmlFragRaw,
         "htmlFrag", htmlFrag,
         "htmlPrep", htmlPrep,
         "mdRaw", mdRaw,
@@ -734,17 +762,17 @@ class PasteMd {
       }
       PasteMd._RotateLogFiles()
       dbgF := FileOpen(PasteMd.DEBUG_PASTE_MD_LOG, "w", "UTF-8")
-      dbgF.Write("PasteAsMd debug — " FormatTime(, "yyyy-MM-dd HH:mm:ss") "`n`n")
+      dbgF.Write("PasteAsMd debug — " FormatTime(, "yyyy-MM-dd HH:mm:ss") PasteMd.LOG_SECTION_SEPARATOR)
     }
 
     clipSaved := ClipboardAll()
-    plain := PasteMd.ToLfEols(A_Clipboard)
+    plainCapture := PasteMd.ToCrLfEols(A_Clipboard)
     try {
       PasteMd._BusyUpdate("Getting content")
       cfHtml := ClipboardWaiter.GetHtml()
       PasteMd._BusyUpdate("Converting content")
       converted := PasteMd._ConvertFromCaptured(
-        plain,
+        plainCapture,
         cfHtml,
         asQuoted,
         asQuoted,
@@ -755,15 +783,11 @@ class PasteMd {
       PasteMd._BusyUpdate("Preparing paste")
 
       if (dbg) {
-        PasteMd._DbgSection(dbgF, "0. source", converted["source"])
-        PasteMd._DbgSection(dbgF, "1. plain (A_Clipboard minus CR)", plain)
-        PasteMd._DbgSection(dbgF, "2. cfHtml (raw full payload)", cfHtml)
-        PasteMd._DbgSection(dbgF, "3. htmlFrag (CF_HTML fragment)", converted["htmlFrag"])
-        dbgF.Write("=== 2b. cfHtml offsets ===`n")
-        dbgF.Write("StartHTML: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartHTML:") "`n")
-        dbgF.Write("EndHTML: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndHTML:") "`n")
-        dbgF.Write("StartFragment: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartFragment:") "`n")
-        dbgF.Write("EndFragment: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndFragment:") "`n`n")
+        PasteMd._DbgSection(dbgF, PasteMd.LOG_SECTION_SOURCE, converted["source"])
+        PasteMd._DbgSection(dbgF, PasteMd.LOG_SECTION_PLAIN, plainCapture)
+        PasteMd._DbgSection(dbgF, PasteMd.LOG_SECTION_CFHTML, cfHtml, true)
+        PasteMd._DbgSection(dbgF, PasteMd.LOG_SECTION_HTML_FRAG, converted["htmlFragRaw"], true)
+        PasteMd._WriteCfHtmlOffsetsSection(dbgF, cfHtml)
 
         if (converted["htmlFrag"] = "") {
           PasteMd._DbgSection(dbgF, "3. md (CleanPlainText – no HTML path)", converted["mdAfterClean"])
@@ -810,8 +834,8 @@ class PasteMd {
     } catch as e {
       if (dbg) {
         try {
-          dbgF.Write("!!! EXCEPTION: " e.File ":" e.Line " — " e.Message "`n")
-          dbgF.Write("!!! EXCEPTION STACK:`n" e.Stack "`n")
+          dbgF.Write("!!! EXCEPTION: " e.File ":" e.Line " — " e.Message PasteMd.LOG_CRLF)
+          dbgF.Write("!!! EXCEPTION STACK:" PasteMd.LOG_CRLF PasteMd.ToCrLfEols(e.Stack) PasteMd.LOG_CRLF)
           dbgF.Close()
         }
       }
@@ -1174,7 +1198,7 @@ class PasteMd {
    * <li> fragments when ordered intent is not inferred from clipboard context.
    *
    * @param {string} htmlPrep - Preprocessed HTML sent to pandoc
-   * @param {string} htmlFrag - StartFragment HTML
+   * @param {string} htmlFrag - Raw StartFragment HTML
    * @param {string} plain - Plain clipboard text
    * @param {number} expected - Inferred ordered-list start from context
    * @returns {string} HTML with corrected outer list intent
@@ -1708,6 +1732,18 @@ class PasteMd {
       return -1
 
     return numStr + 0
+  }
+
+  /**
+   * Converts line endings to canonical CRLF form for log serialization.
+   * @param {string} text
+   * @returns {string}
+   */
+  static ToCrLfEols(text) {
+    text := String(text)
+    text := StrReplace(text, "`r`n", "`n")
+    text := StrReplace(text, "`r", "`n")
+    return StrReplace(text, "`n", PasteMd.LOG_CRLF)
   }
 
   /**

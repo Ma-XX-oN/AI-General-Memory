@@ -289,16 +289,6 @@ class ClipboardWaiter {
   }
 
   /**
-   * Return the ANSI/ACP byte length of a Unicode string.
-   * Used only for legacy fixture compatibility detection.
-   * @param {String} text
-   * @returns {Integer}
-   */
-  static AnsiByteLen(text) {
-    return this._StringToCodePageBuffer(text, 0).byteLen
-  }
-
-  /**
    * Resolve a section enum to CF_HTML offset header keys.
    * @param {Integer} sectionEnum One of ClipboardWaiter.HTML_SECTION_* constants.
    * @returns {Object} { startKey, endKey }

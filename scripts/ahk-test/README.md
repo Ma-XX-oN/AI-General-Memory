@@ -51,11 +51,12 @@ Clean generated test logs:
 
 `PasteAsMd_*.log` files contain debug captures from real clipboard pastes (or
 lorem-ipsum stand-ins where content is private).  Each log has three sections
-decoded by the fixture runner:
+decoded by the fixture runner. Canonical fixture logs are stored as UTF-8 with
+BOM and use CRLF throughout:
 
 - `0. source` — expected source detection (`claudecode`, `claudeweb`, `codex`, `chatgpt`, or `unknown`)
-- `1. plain (A_Clipboard minus CR)` — raw plain-text clipboard content
-- `2. cfHtml (raw full payload)` — full CF\_HTML clipboard format
+- `1. plain (canonical text capture)` — lossless plain-text clipboard content serialized into canonical UTF-8 log text with CRLF
+- `2. cfHtml (raw full payload)` — exact CF\_HTML clipboard payload; its stored offsets remain UTF-8 byte positions and are offset-sensitive
 
 `PasteAsMd_*.expected.md` files are the expected markdown output for each fixture.
 `PasteAsMd_*.actual.md` files are generated at test time and excluded from git.
@@ -77,16 +78,18 @@ match both filename forms.
 2. Copy it into `ahk-test/` and rename it to `PasteAsMd_<NAME>.log`.
 3. Ensure it includes at least these sections:
    - `0. source`
-   - `1. plain (A_Clipboard minus CR)`
+   - `1. plain (canonical text capture)`
    - `2. cfHtml (raw full payload)`
 4. Add expected markdown:
    - default: `PasteAsMd_<NAME>.expected.md`
    - scenario case: `PasteAsMd_<NAME>.<CASE>.expected.md`
+5. If you want a replay log, copy the canonical source log to `PasteAsMd_<NAME>.fixture.log`; sections after `2` are optional and ignored by the harness.
 
-Legacy fixture note:
+Canonical fixture note:
 
-- Runtime `CF_HTML` now uses the numeric `StartHTML` / `EndHTML` / `StartFragment` / `EndFragment` headers as UTF-8 byte offsets, matching the clipboard spec.
-- The fixture harness does not rewrite those headers. It repairs older fixture logs that were captured through the previous CP0-decoded path by checking whether `EndHTML` matches the payload's UTF-8 byte length. If it only matches the CP0 byte length, the harness reconstructs canonical UTF-8 text first and then applies the stored offsets.
+- The harness expects canonical `PasteAsMd` logs only: UTF-8 with BOM, CRLF section framing, no visible EOL markers.
+- Section `1` is a canonical text capture, not a raw UTF-16 byte dump.
+- Section `2` is preserved exactly as CF\_HTML text; its `StartHTML` / `EndHTML` / `StartFragment` / `EndFragment` headers remain UTF-8 byte offsets and must already match the stored payload.
 
 ## Fixture Harness CLI
 
@@ -207,17 +210,16 @@ From stage 6. FINAL md (pasted)
 > Right now the document looks like it is trying to cover:
 ```
 
-### TBD fix(cliphelper): apply CF_HTML offsets as UTF-8 byte positions
+### TBD fix(cliphelper): keep CF_HTML offsets as UTF-8 byte positions
 
 Affected runtime/files:
 
 - `ClipHelper.ahk`
 - `test-paste-md-fixtures.ahk`
 
-The old `SelectHtmlSection` path treated `CF_HTML` as ANSI (`CP0`) on the way
-into the byte buffer and UTF-8 on the way out. That happened to work for
-ASCII-only payloads, but it breaks as soon as the clipboard HTML contains
-non-ASCII text because the stored offsets are defined in UTF-8 bytes.
+`CF_HTML` offsets are defined in UTF-8 bytes, so the runtime and fixtures must
+preserve that payload model exactly. Character-count slicing is not sufficient
+once the clipboard HTML contains non-ASCII text.
 
 The runtime fix keeps the existing numeric headers and applies them correctly:
 
@@ -227,12 +229,11 @@ The runtime fix keeps the existing numeric headers and applies them correctly:
 - `PasteMd` consumers that inspect the pre-fragment context now use the same
   UTF-8 byte-range slicing helper instead of character-based substring logic.
 
-The fixture harness adds compatibility logic for older checked-in logs only:
+The fixture harness now validates canonical logs directly:
 
-- if `EndHTML` already matches the decoded payload's UTF-8 byte length, the
-  fixture is treated as canonical and the stored offsets are used as-is
-- if `EndHTML` matches only the payload's `CP0` byte length, the harness repairs
-  that legacy mojibake back to UTF-8 first, then applies the same offsets
+- section payload length must match the declared `len=...`
+- each section boundary must be followed by the one canonical CRLF separator block or EOF
+- the stored CF\_HTML offsets are used as-is against the canonical payload
 
 ### 694e5e3 fix(paste-md): add edited-file fixture and monaco diff normalization
 
