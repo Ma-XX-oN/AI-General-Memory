@@ -224,6 +224,23 @@ Chk("scoped visual wrappers removed",
     !InStr(scopedNorm, "VISIBLE_INLINE") && !InStr(scopedNorm, "overflow-visible") && !InStr(scopedNorm, "<details"))
 Chk("scoped untouched intro preserved", InStr(scopedNorm, "<p>Intro</p>"))
 
+; ── 8d: Region-scoped inline code + user messages ─────────────────────────────
+Log("── 8d: Region-scoped inline code + user messages ─")
+
+scopedTextHtml := '<p>Say <span class="inline-markdown">hi</span></p>'
+    . '<div class="whitespace-pre-wrap">Hello<br>World</div>'
+regionsText := HtmlNorm._DiscoverRegions(scopedTextHtml, "chatgpt")
+HtmlNorm._userMsgBlocks := []
+scopedTextNorm := HtmlNorm._ApplyRegionScopedTransforms(scopedTextHtml, "chatgpt")
+
+Chk("text regions split into inline + user blocks", regionsText.Length = 2)
+Chk("text region flags inline code block", regionsText[1]["hasInlineCode"])
+Chk("text region flags user message block", regionsText[2]["hasUserMsg"])
+Chk("text inline code promoted", InStr(scopedTextNorm, "<code>hi</code>"))
+Chk("text user message placeholder inserted", InStr(scopedTextNorm, "<p>¤USERMSG_1¤</p>"))
+Chk("text user message stored with newline",
+    HtmlNorm._userMsgBlocks.Length = 1 && HtmlNorm._userMsgBlocks[1] = "Hello`nWorld")
+
 ; ── 9: Full Normalize — Claude Code minimal ───────────────────────────────────
 Log("── 9: Full Normalize — claudecode minimal ───────────")
 
