@@ -127,8 +127,8 @@ class HtmlNorm {
     }
 
     /**
-     * Applies the current region-scoped transforms to top-level spans in the
-     * original HTML and rejoins only the transformed replacements.
+     * Applies the current region-scoped transforms by collecting only changed
+     * replacement spans and rejoining them against the untouched original HTML.
      * @param {string} html
      * @param {string} source
      * @returns {string}
@@ -141,47 +141,85 @@ class HtmlNorm {
         if (regions.Length = 0)
             return html
 
+        replacements := []
+        for _, region in regions {
+            replacement := HtmlNorm._BuildRegionReplacement(html, region)
+            if (replacement != "")
+                replacements.Push(Map(
+                    "start", region["start"],
+                    "end", region["end"],
+                    "text", replacement
+                ))
+        }
+
+        if (replacements.Length = 0)
+            return html
+
         out := ""
         cursor := 1
-        for _, region in regions {
-            startPos := region["start"]
-            endPos := region["end"]
+        for _, replacement in replacements {
+            startPos := replacement["start"]
+            endPos := replacement["end"]
             if (startPos > cursor)
                 out .= SubStr(html, cursor, startPos - cursor)
-
-            regionHtml := SubStr(html, startPos, endPos - startPos + 1)
-            if region["hasChatGptCode"]
-                regionHtml := HtmlNorm._NormalizeChatGptCodeBlocks(regionHtml)
-            if region["hasKatex"]
-                regionHtml := HtmlNorm._NormalizeKatexMath(regionHtml)
-            if region["hasTaskList"]
-                regionHtml := HtmlNorm._NormalizeTaskListItems(regionHtml)
-            if region["hasThinking"]
-                regionHtml := HtmlNorm._ExtractThinkingBlocks(regionHtml)
-            if region["hasInlineCode"]
-                regionHtml := HtmlNorm._PromoteInlineCodeSpans(regionHtml)
-            if region["hasUserMsg"]
-                regionHtml := HtmlNorm._ExtractUserMessages(regionHtml)
-            if region["hasClaudeWebLabel"]
-                regionHtml := HtmlNorm._StripClaudeWebLanguageLabels(regionHtml)
-            if region["hasFootnoteHref"]
-                regionHtml := HtmlNorm._StripFootnoteHrefFragments(regionHtml)
-            if region["hasFootnoteList"]
-                regionHtml := HtmlNorm._NormalizeFootnoteListItems(regionHtml)
-            if region["hasTightList"]
-                regionHtml := HtmlNorm._NormalizeTightListItems(regionHtml)
-            if region["hasCodeWork"]
-                regionHtml := HtmlNorm._NormalizeCodeElements(regionHtml)
-            if region["hasCodeContainers"]
-                regionHtml := HtmlNorm._UnwrapNestedContainers(regionHtml)
-            if region["hasResidualSpan"]
-                regionHtml := HtmlNorm._StripResidualSpans(regionHtml)
-            out .= regionHtml
+            out .= replacement["text"]
             cursor := endPos + 1
         }
         if (cursor <= StrLen(html))
             out .= SubStr(html, cursor)
         return out
+    }
+
+    static _BuildRegionReplacement(html, region) {
+        if !HtmlNorm._RegionHasWork(region)
+            return ""
+
+        startPos := region["start"]
+        endPos := region["end"]
+        replacement := SubStr(html, startPos, endPos - startPos + 1)
+        if region["hasChatGptCode"]
+            replacement := HtmlNorm._NormalizeChatGptCodeBlocks(replacement)
+        if region["hasKatex"]
+            replacement := HtmlNorm._NormalizeKatexMath(replacement)
+        if region["hasTaskList"]
+            replacement := HtmlNorm._NormalizeTaskListItems(replacement)
+        if region["hasThinking"]
+            replacement := HtmlNorm._ExtractThinkingBlocks(replacement)
+        if region["hasInlineCode"]
+            replacement := HtmlNorm._PromoteInlineCodeSpans(replacement)
+        if region["hasUserMsg"]
+            replacement := HtmlNorm._ExtractUserMessages(replacement)
+        if region["hasClaudeWebLabel"]
+            replacement := HtmlNorm._StripClaudeWebLanguageLabels(replacement)
+        if region["hasFootnoteHref"]
+            replacement := HtmlNorm._StripFootnoteHrefFragments(replacement)
+        if region["hasFootnoteList"]
+            replacement := HtmlNorm._NormalizeFootnoteListItems(replacement)
+        if region["hasTightList"]
+            replacement := HtmlNorm._NormalizeTightListItems(replacement)
+        if region["hasCodeWork"]
+            replacement := HtmlNorm._NormalizeCodeElements(replacement)
+        if region["hasCodeContainers"]
+            replacement := HtmlNorm._UnwrapNestedContainers(replacement)
+        if region["hasResidualSpan"]
+            replacement := HtmlNorm._StripResidualSpans(replacement)
+        return replacement
+    }
+
+    static _RegionHasWork(region) {
+        return region["hasChatGptCode"]
+            || region["hasKatex"]
+            || region["hasTaskList"]
+            || region["hasThinking"]
+            || region["hasInlineCode"]
+            || region["hasUserMsg"]
+            || region["hasClaudeWebLabel"]
+            || region["hasFootnoteHref"]
+            || region["hasFootnoteList"]
+            || region["hasTightList"]
+            || region["hasCodeWork"]
+            || region["hasCodeContainers"]
+            || region["hasResidualSpan"]
     }
 
     static _PromoteInlineCodeSpans(html) {
