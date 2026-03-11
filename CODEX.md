@@ -5,6 +5,7 @@
 ### Memory Placement
 
 - If the user says to "remember" something, store project-specific rules in the project's `CODEX.md`. Store cross-project rules in `~/.codex/CODEX.md` as global defaults that apply to all projects unless overridden locally.
+- If the user says to store something in "your memory", store it only in Codex global memory (`~/.codex/CODEX.md`, or the configured `$CODEX_HOME/CODEX.md`). Do not store it in project-local memory, `.claude`, or any other tool's memory file.
 
 ### Commit Messages And Timing
 
@@ -78,6 +79,7 @@
 - In technical answers, explicitly separate confirmed facts from preferences/inference, and include the strongest counterargument before the final recommendation.
 - If a recommendation changes, state the concrete new fact that caused the change.
 - In Markdown text, when you DO NOT intend the literal sequence `>=`, write it with whitespace as `> =` to prevent auto-conversion to `≥`.
+- For clickable local file references in chat responses on Windows, use Markdown links with a leading slash before the drive path, for example `[label](/c:/absolute/path/to/file.ext#L12)`.
 
 ### Troubleshooting And Guardrails
 
