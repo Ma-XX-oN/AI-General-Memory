@@ -345,53 +345,6 @@ class PasteMd {
   }
 
   /**
-   * Determines the poster of the message containing the clipboard selection
-   * by scanning the CF_HTML context before StartFragment.
-   * @param {string} cfHtml - Full CF_HTML payload
-   * @returns {string} "AI", "User", or empty string when not detected
-   */
-  static _ExtractPosterFromContext(cfHtml) {
-    startFragOff := PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartFragment:")
-    startHtmlOff := PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartHTML:")
-    if (startFragOff <= 0 || startHtmlOff < 0 || startFragOff <= startHtmlOff)
-      return ""
-
-    before := ClipboardWaiter.SliceUtf8ByteRange(cfHtml, startHtmlOff, startFragOff)
-    if (before = "")
-      return ""
-
-    ; Find the LAST (closest) message-type marker before the fragment start.
-    lastAssist := 0
-    lastUser   := 0
-    pos := 1
-    while RegExMatch(before, "i)data-testid=`"assistant-message`"", &m, pos) {
-      lastAssist := m.Pos
-      pos := m.Pos + 1
-    }
-    ; Codex assistant messages: group + min-w-0 + flex-col classes.
-    pos := 1
-    while RegExMatch(before, "i)\bclass=`"[^`"]*+\bgroup\b[^`"]*+\bmin-w-0\b[^`"]*+\bflex-col\b[^`"]*+`"", &m, pos) {
-      lastAssist := m.Pos
-      pos := m.Pos + 1
-    }
-    pos := 1
-    while RegExMatch(before, "i)userMessageContainer_", &m, pos) {
-      lastUser := m.Pos
-      pos := m.Pos + 1
-    }
-    ; Codex user messages: right-aligned blocks include flex-col + items-end.
-    pos := 1
-    while RegExMatch(before, "i)\bclass=`"[^`"]*+\bflex-col\b[^`"]*+\bitems-end\b[^`"]*+`"", &m, pos) {
-      lastUser := m.Pos
-      pos := m.Pos + 1
-    }
-
-    if (lastAssist = 0 && lastUser = 0)
-      return ""
-    return (lastAssist > lastUser) ? "AI" : "User"
-  }
-
-  /**
    * Resolves assistant label from CF_HTML source context.
    * @param {string} cfHtml - Full CF_HTML payload
    * @returns {string} Source-specific label, or "AI" fallback
@@ -444,10 +397,7 @@ class PasteMd {
    */
   static _WriteCfHtmlOffsetsSection(f, cfHtml) {
     f.Write("=== " PasteMd.LOG_SECTION_CFHTML_OFFSETS " ===" PasteMd.LOG_CRLF)
-    f.Write("StartHTML: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartHTML:") PasteMd.LOG_CRLF)
-    f.Write("EndHTML: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndHTML:") PasteMd.LOG_CRLF)
-    f.Write("StartFragment: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "StartFragment:") PasteMd.LOG_CRLF)
-    f.Write("EndFragment: " PasteMd.ParseCfHtmlOffsetRaw(cfHtml, "EndFragment:") PasteMd.LOG_CRLF)
+    f.Write(ClipboardWaiter.FormatCfHtmlOffsets(cfHtml) PasteMd.LOG_CRLF)
     f.Write(PasteMd.LOG_SECTION_SEPARATOR)
   }
 
@@ -709,7 +659,7 @@ class PasteMd {
         ; If no placeholders were found the fragment had no message container
         ; divs (partial selection). Fall back to the pre-fragment cfHtml context.
         if (posters.Length = 0 && cfHtml != "") {
-          poster := PasteMd._ExtractPosterFromContext(cfHtml)
+          poster := ClipboardWaiter.ExtractPosterFromContext(cfHtml)
           if (poster = "AI")
             poster := assistantLabel
           if (poster != "")
@@ -1607,7 +1557,7 @@ class PasteMd {
       return Integer(mValue[1])
     }
 
-    n := this.GetListStartFromHtmlContext(cfHtml, htmlFrag)
+    n := ClipboardWaiter.GetListStartFromHtmlContext(cfHtml, htmlFrag)
     if (n > 0)
       return n
 
@@ -1624,114 +1574,6 @@ class PasteMd {
 
   static ToLfEols(text) {
     return StrReplace(text, "`r", "")
-  }
-
-  /**
-   * Infers ordered-list index at StartFragment from full CF_HTML context.
-   * Tracks nested list containers and counts immediate preceding <li> siblings.
-   * @param {string} cfHtml - Full CF_HTML payload
-   * @param {string} htmlFrag - StartFragment HTML
-   * @returns {number} Inferred index, or 0 when not inside an ordered list
-   */
-  static GetListStartFromHtmlContext(cfHtml, htmlFrag := "") {
-    if (cfHtml = "")
-      return 0
-
-    before := ""
-    startFragOff := this.ParseCfHtmlOffsetRaw(cfHtml, "StartFragment:")
-    startHtmlOff := this.ParseCfHtmlOffsetRaw(cfHtml, "StartHTML:")
-
-    if (startFragOff > 0 && startHtmlOff >= 0 && startFragOff > startHtmlOff) {
-      ; Prefer raw-offset slicing: this preserves exact upstream context even
-      ; when marker text or fragment string matching is unreliable.
-      before := ClipboardWaiter.SliceUtf8ByteRange(cfHtml, startHtmlOff, startFragOff)
-    } else {
-      htmlAll := PasteMd.ToLfEols(ClipboardWaiter.SelectHtmlSection(cfHtml, ClipboardWaiter.HTML_SECTION_HTML))
-      if (htmlAll = "")
-        return 0
-
-      if RegExMatch(htmlAll, "is)<!--[ \t\r\n]*+StartFragment[ \t\r\n]*+-->", &mStartFragment) {
-        before := SubStr(htmlAll, 1, mStartFragment.Pos - 1)
-      } else {
-        fragLookup := htmlFrag
-        if (fragLookup = "")
-          return 0
-        fragPos := InStr(htmlAll, fragLookup)
-        if (fragPos = 0)
-          return 0
-        before := SubStr(htmlAll, 1, fragPos - 1)
-      }
-    }
-
-    listStack := []
-    pos := 1
-
-    while RegExMatch(before, "is)<(/?)(ol|ul|li)\b([^>]*+)>", &mTag, pos) {
-      isClose := (mTag[1] = "/")
-      tagName := StrLower(mTag[2])
-      attrs := mTag[3]
-
-      if (!isClose) {
-        if (tagName = "ol" || tagName = "ul") {
-          ctx := { tag: tagName, start: 1, childLi: 0 }
-          if (tagName = "ol" && RegExMatch(attrs, "i)\bstart\s*+=\s*+['`"]?(\d++)", &mStart)) {
-            ctx.start := Integer(mStart[1])
-          }
-          listStack.Push(ctx)
-        } else if (tagName = "li") {
-          if (listStack.Length > 0) {
-            listStack[listStack.Length].childLi += 1
-          }
-        }
-      } else {
-        if (tagName = "ol" || tagName = "ul") {
-          idx := listStack.Length
-          while (idx > 0 && listStack[idx].tag != tagName) {
-            idx -= 1
-          }
-          if (idx > 0) {
-            removeCount := listStack.Length - idx + 1
-            Loop removeCount {
-              listStack.Pop()
-            }
-          }
-        }
-      }
-
-      pos := mTag.Pos + mTag.Len
-    }
-
-    idx := listStack.Length
-    while (idx > 0 && listStack[idx].tag != "ol") {
-      idx -= 1
-    }
-    if (idx = 0)
-      return 0
-
-    return listStack[idx].start + listStack[idx].childLi
-  }
-
-  /**
-   * Parses numeric CF_HTML header offsets from raw CF_HTML text.
-   * @param {string} cfHtml - Raw CF_HTML payload string
-   * @param {string} key - Header key, e.g. StartFragment:
-   * @returns {number} Parsed offset, or -1 when missing/invalid
-   */
-  static ParseCfHtmlOffsetRaw(cfHtml, key) {
-    pos := InStr(cfHtml, key)
-    if (!pos)
-      return -1
-
-    pos += StrLen(key)
-    eol := InStr(cfHtml, "`n", , pos)
-    if (!eol)
-      return -1
-
-    numStr := Trim(SubStr(cfHtml, pos, eol - pos), "`r")
-    if (numStr = "")
-      return -1
-
-    return numStr + 0
   }
 
   /**

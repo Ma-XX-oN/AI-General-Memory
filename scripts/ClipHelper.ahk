@@ -289,6 +289,158 @@ class ClipboardWaiter {
   }
 
   /**
+   * Formats common CF_HTML offsets for debug logging.
+   * @param {String} cfHtml
+   * @returns {String}
+   */
+  static FormatCfHtmlOffsets(cfHtml) {
+    cfHtml := String(cfHtml)
+    return "StartHTML: " this._ParseCfHtmlOffset(cfHtml, "StartHTML:") "`r`n"
+      . "EndHTML: " this._ParseCfHtmlOffset(cfHtml, "EndHTML:") "`r`n"
+      . "StartFragment: " this._ParseCfHtmlOffset(cfHtml, "StartFragment:") "`r`n"
+      . "EndFragment: " this._ParseCfHtmlOffset(cfHtml, "EndFragment:")
+  }
+
+  /**
+   * Returns the CF_HTML context before StartFragment.
+   * Prefers raw UTF-8 byte-offset slicing and falls back to HTML text search.
+   * @param {String} cfHtml
+   * @param {String} htmlFrag Optional fragment text for fallback lookup.
+   * @returns {String} HTML context before StartFragment, or "".
+   */
+  static GetHtmlContextBeforeFragment(cfHtml, htmlFrag := "") {
+    cfHtml := String(cfHtml)
+    if (cfHtml = "")
+      return ""
+
+    startFragment := this._ParseCfHtmlOffset(cfHtml, "StartFragment:")
+    startHtml := this._ParseCfHtmlOffset(cfHtml, "StartHTML:")
+    if (startFragment > 0 && startHtml >= 0 && startFragment > startHtml) {
+      return this.SliceUtf8ByteRange(cfHtml, startHtml, startFragment)
+    }
+
+    htmlAll := this.SelectHtmlSection(cfHtml, this.HTML_SECTION_HTML)
+    if (htmlAll = "")
+      return ""
+
+    if RegExMatch(htmlAll, "is)<!--[ \t\r\n]*+StartFragment[ \t\r\n]*+-->", &mStartFragment) {
+      return SubStr(htmlAll, 1, mStartFragment.Pos - 1)
+    }
+
+    fragLookup := String(htmlFrag)
+    if (fragLookup = "")
+      return ""
+
+    fragPos := InStr(htmlAll, fragLookup)
+    if (fragPos = 0)
+      return ""
+
+    return SubStr(htmlAll, 1, fragPos - 1)
+  }
+
+  /**
+   * Infers ordered-list index at StartFragment from full CF_HTML context.
+   * Tracks nested list containers and counts immediate preceding <li> siblings.
+   * @param {string} cfHtml - Full CF_HTML payload
+   * @param {string} htmlFrag - StartFragment HTML
+   * @returns {number} Inferred index, or 0 when not inside an ordered list
+   */
+  static GetListStartFromHtmlContext(cfHtml, htmlFrag := "") {
+    before := this.GetHtmlContextBeforeFragment(cfHtml, htmlFrag)
+    if (before = "")
+      return 0
+
+    listStack := []
+    pos := 1
+
+    while RegExMatch(before, "is)<(/?)(ol|ul|li)\b([^>]*+)>", &mTag, pos) {
+      isClose := (mTag[1] = "/")
+      tagName := StrLower(mTag[2])
+      attrs := mTag[3]
+
+      if (!isClose) {
+        if (tagName = "ol" || tagName = "ul") {
+          ctx := { tag: tagName, start: 1, childLi: 0 }
+          if (tagName = "ol" && RegExMatch(attrs, "i)\bstart\s*+=\s*+['`"]?(\d++)", &mStart)) {
+            ctx.start := Integer(mStart[1])
+          }
+          listStack.Push(ctx)
+        } else if (tagName = "li") {
+          if (listStack.Length > 0) {
+            listStack[listStack.Length].childLi += 1
+          }
+        }
+      } else {
+        if (tagName = "ol" || tagName = "ul") {
+          idx := listStack.Length
+          while (idx > 0 && listStack[idx].tag != tagName) {
+            idx -= 1
+          }
+          if (idx > 0) {
+            removeCount := listStack.Length - idx + 1
+            Loop removeCount {
+              listStack.Pop()
+            }
+          }
+        }
+      }
+
+      pos := mTag.Pos + mTag.Len
+    }
+
+    idx := listStack.Length
+    while (idx > 0 && listStack[idx].tag != "ol") {
+      idx -= 1
+    }
+    if (idx = 0)
+      return 0
+
+    return listStack[idx].start + listStack[idx].childLi
+  }
+
+  /**
+   * Determines the poster of the message containing the clipboard selection
+   * by scanning the CF_HTML context before StartFragment.
+   * @param {string} cfHtml - Full CF_HTML payload
+   * @returns {string} "AI", "User", or empty string when not detected
+   */
+  static ExtractPosterFromContext(cfHtml) {
+    before := this.GetHtmlContextBeforeFragment(cfHtml)
+    if (before = "")
+      return ""
+
+    ; Find the LAST (closest) message-type marker before the fragment start.
+    lastAssist := 0
+    lastUser   := 0
+    pos := 1
+    while RegExMatch(before, "i)data-testid=`"assistant-message`"", &m, pos) {
+      lastAssist := m.Pos
+      pos := m.Pos + 1
+    }
+    ; Codex assistant messages: group + min-w-0 + flex-col classes.
+    pos := 1
+    while RegExMatch(before, "i)\bclass=`"[^`"]*+\bgroup\b[^`"]*+\bmin-w-0\b[^`"]*+\bflex-col\b[^`"]*+`"", &m, pos) {
+      lastAssist := m.Pos
+      pos := m.Pos + 1
+    }
+    pos := 1
+    while RegExMatch(before, "i)userMessageContainer_", &m, pos) {
+      lastUser := m.Pos
+      pos := m.Pos + 1
+    }
+    ; Codex user messages: right-aligned blocks include flex-col + items-end.
+    pos := 1
+    while RegExMatch(before, "i)\bclass=`"[^`"]*+\bflex-col\b[^`"]*+\bitems-end\b[^`"]*+`"", &m, pos) {
+      lastUser := m.Pos
+      pos := m.Pos + 1
+    }
+
+    if (lastAssist = 0 && lastUser = 0)
+      return ""
+    return (lastAssist > lastUser) ? "AI" : "User"
+  }
+
+  /**
    * Resolve a section enum to CF_HTML offset header keys.
    * @param {Integer} sectionEnum One of ClipboardWaiter.HTML_SECTION_* constants.
    * @returns {Object} { startKey, endKey }
