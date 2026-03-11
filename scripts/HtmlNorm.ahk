@@ -574,7 +574,6 @@ class HtmlNorm {
                 lineHtml := mLine[2]
                 lineText := RegExReplace(lineHtml, "<[^>]++>", "")
                 lineText := HtmlNorm._DecodeBasicHtmlEntities(lineText)
-                lineText := StrReplace(lineText, "`r", "")
                 lineText := Trim(lineText, "`n")
                 prefix := " "
                 if InStr(lineType, "deletion")
@@ -638,7 +637,6 @@ class HtmlNorm {
             inner := RegExReplace(inner, "i)<br\b[^>]*>", "`n")
             ; Strip all HTML tags — leaves only the plain code text plus structural whitespace.
             codeText := RegExReplace(inner, "<[^>]++>", "")
-            codeText := StrReplace(codeText, "`r", "")
             codeText := Trim(codeText, " `t`n")
             if (codeText = "") {
                 pos := m.Pos + m.Len
@@ -880,7 +878,6 @@ class HtmlNorm {
             rawContent := RegExReplace(rawContent, "i)</?span\b[^>]*>", "")
             rawContent := RegExReplace(rawContent, "<[^>]++>", "")
             rawContent := HtmlNorm._DecodeBasicHtmlEntities(rawContent)
-            rawContent := StrReplace(rawContent, "`r", "")
             rawContent := Trim(rawContent, "`n")
             HtmlNorm._userMsgBlocks.Push(rawContent)
             placeholder := "<p>¤USERMSG_" . HtmlNorm._userMsgBlocks.Length . "¤</p>"
@@ -892,7 +889,6 @@ class HtmlNorm {
         pos := 1
         while RegExMatch(html, "is)(<div\b[^>]*\bcontent_xGDvVg\b[^>]*>)\s*<span>(.*?)</span>", &m, pos) {
             rawText := HtmlNorm._DecodeBasicHtmlEntities(m[2])
-            rawText := StrReplace(rawText, "`r", "")
             HtmlNorm._userMsgBlocks.Push(rawText)
             placeholder := "<p>¤USERMSG_" . HtmlNorm._userMsgBlocks.Length . "¤</p>"
             newStr := m[1] . placeholder
@@ -908,7 +904,6 @@ class HtmlNorm {
             rawContent := RegExReplace(rawContent, "i)<br\b[^>]*>", "`n")
             rawContent := RegExReplace(rawContent, "<[^>]++>", "")
             rawContent := HtmlNorm._DecodeBasicHtmlEntities(rawContent)
-            rawContent := StrReplace(rawContent, "`r", "")
             rawContent := Trim(rawContent, "`n")
             HtmlNorm._userMsgBlocks.Push(rawContent)
             placeholder := "<p>¤USERMSG_" . HtmlNorm._userMsgBlocks.Length . "¤</p>"
@@ -925,7 +920,6 @@ class HtmlNorm {
             rawContent := RegExReplace(rawContent, "i)<br\b[^>]*>", "`n")
             rawContent := RegExReplace(rawContent, "<[^>]++>", "")
             rawContent := HtmlNorm._DecodeBasicHtmlEntities(rawContent)
-            rawContent := StrReplace(rawContent, "`r", "")
             rawContent := Trim(rawContent, "`n")
             HtmlNorm._userMsgBlocks.Push(rawContent)
             placeholder := "<p>¤USERMSG_" . HtmlNorm._userMsgBlocks.Length . "¤</p>"
@@ -952,7 +946,6 @@ class HtmlNorm {
             content := RegExReplace(content, "i)<br\b[^>]*>", "`n")
             content := RegExReplace(content, "i)</div>\s*<div\b[^>]*>", "`n")
             content := RegExReplace(content, "<[^>]++>", "")
-            content := StrReplace(content, "`r", "")
             if InStr(content, "`n") {
                 content := HtmlNorm._DecodeBasicHtmlEntities(content)
                 ; Extract language identifier; discard pure-CSS classes.
