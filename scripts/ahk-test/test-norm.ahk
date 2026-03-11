@@ -281,6 +281,17 @@ Chk("code wrapper classes removed", !InStr(scopedCodeNorm, "code-block__code"))
 Chk("code nested div wrappers removed", !InStr(scopedCodeNorm, "<div><div><pre"))
 Chk("code trailing prose preserved", InStr(scopedCodeNorm, "<p>Tail</p>"))
 
+; ── 8g: Region-scoped residual span cleanup ───────────────────────────────────
+Log("── 8g: Region-scoped residual span cleanup ───────────")
+
+scopedSpanHtml := '<p><span class="plain">Alpha</span> <span>Beta</span></p>'
+regionsSpan := HtmlNorm._DiscoverRegions(scopedSpanHtml, "unknown")
+scopedSpanNorm := HtmlNorm._ApplyRegionScopedTransforms(scopedSpanHtml, "unknown")
+
+Chk("span cleanup stays one top-level block", regionsSpan.Length = 1)
+Chk("span cleanup flags residual spans", regionsSpan[1]["hasResidualSpan"])
+Chk("span cleanup removes wrapper tags", scopedSpanNorm = "<p>Alpha Beta</p>")
+
 ; ── 9: Full Normalize — Claude Code minimal ───────────────────────────────────
 Log("── 9: Full Normalize — claudecode minimal ───────────")
 

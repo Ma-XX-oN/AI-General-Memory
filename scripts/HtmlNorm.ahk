@@ -117,15 +117,7 @@ class HtmlNorm {
         ; 5. Run the current region-scoped transform subset on discovered top-level blocks.
         html := HtmlNorm._ApplyRegionScopedTransforms(html, source)
 
-        ; 6. Tight-list normalization: unwrap solitary paragraph wrappers in list items.
-        ;      <li><p>text</p></li> → <li>text</li>
-        ;      This avoids loose-list markdown output (blank lines between items).
-        html := HtmlNorm._NormalizeTightListItems(html)
-
-        ; 7. Strip residual <span> tags.
-        html := RegExReplace(html, "i)</?+span\b[^>]*+>", "")
-
-        ; 8. Wrap bare top-level <li> siblings in <ol>.
+        ; 6. Wrap bare top-level <li> siblings in <ol>.
         htmlNoTrailingBr := RegExReplace(html, "is)(?:<br\b[^>]*+>\s*+)++$", "")
         trimmed := Trim(htmlNoTrailingBr, " `t`r`n")
         if (trimmed != "" && RegExMatch(trimmed, "is)^(?:<li\b[^>]*+>.*?</li>\s*)+$"))
@@ -176,6 +168,8 @@ class HtmlNorm {
                 regionHtml := HtmlNorm._NormalizeCodeElements(regionHtml)
             if region["hasCodeContainers"]
                 regionHtml := HtmlNorm._UnwrapNestedContainers(regionHtml)
+            if region["hasResidualSpan"]
+                regionHtml := HtmlNorm._StripResidualSpans(regionHtml)
             out .= regionHtml
         }
         return out
@@ -207,6 +201,10 @@ class HtmlNorm {
             "is)(<li\b[^>]*\bid=`"user-content-fn-[^`"]*`"[^>]*>)\s*<p\b[^>]*>(.*?)</p>\s*(</li>)",
             "$1$2$3"
         )
+    }
+
+    static _StripResidualSpans(html) {
+        return RegExReplace(html, "i)</?+span\b[^>]*+>", "")
     }
 
     /**
@@ -264,7 +262,8 @@ class HtmlNorm {
                 "hasFootnoteList", false,
                 "hasTightList", false,
                 "hasCodeWork", false,
-                "hasCodeContainers", false
+                "hasCodeContainers", false,
+                "hasResidualSpan", false
             )
         }
 
@@ -286,7 +285,8 @@ class HtmlNorm {
             "hasFootnoteList", HtmlNorm._HasFootnoteListWork(regionHtml),
             "hasTightList", HtmlNorm._HasTightListWork(regionHtml),
             "hasCodeWork", HtmlNorm._HasCodeWork(regionHtml),
-            "hasCodeContainers", HtmlNorm._HasCodeContainerWork(regionHtml)
+            "hasCodeContainers", HtmlNorm._HasCodeContainerWork(regionHtml),
+            "hasResidualSpan", HtmlNorm._HasResidualSpanWork(regionHtml)
         )
     }
 
@@ -314,6 +314,8 @@ class HtmlNorm {
         if HtmlNorm._HasCodeWork(html)
             return true
         if HtmlNorm._HasCodeContainerWork(html)
+            return true
+        if HtmlNorm._HasResidualSpanWork(html)
             return true
         return false
     }
@@ -356,6 +358,10 @@ class HtmlNorm {
         if RegExMatch(html, "i)<div\b")
             return true
         return false
+    }
+
+    static _HasResidualSpanWork(html) {
+        return InStr(html, "<span")
     }
 
     static _IsVoidHtmlTag(tagName) {
