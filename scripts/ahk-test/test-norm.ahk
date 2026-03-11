@@ -206,8 +206,12 @@ scopedHtml := '<p>Intro</p>'
 regions := HtmlNorm._DiscoverRegions(scopedHtml, "chatgpt")
 HtmlNorm._thinkingBlocks := []
 scopedNorm := HtmlNorm._ApplyRegionScopedTransforms(scopedHtml, "chatgpt")
+scopedRejoined := ""
+for _, region in regions
+    scopedRejoined .= SubStr(scopedHtml, region["start"], region["end"] - region["start"] + 1)
 
 Chk("scoped regions split into top-level blocks", regions.Length = 5)
+Chk("scoped regions rejoin to original html", scopedRejoined = scopedHtml)
 Chk("scoped regions flag chatgpt code block", regions[2]["hasChatGptCode"])
 Chk("scoped regions flag task list block", regions[3]["hasTaskList"])
 Chk("scoped regions flag thinking block", regions[4]["hasThinking"])

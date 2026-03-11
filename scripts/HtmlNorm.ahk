@@ -127,8 +127,8 @@ class HtmlNorm {
     }
 
     /**
-     * Applies the initial high-signal transforms only to discovered top-level regions.
-     * This prototypes region-aware normalization without moving the whole pipeline.
+     * Applies the current region-scoped transforms to top-level spans in the
+     * original HTML and rejoins only the transformed replacements.
      * @param {string} html
      * @param {string} source
      * @returns {string}
@@ -142,8 +142,14 @@ class HtmlNorm {
             return html
 
         out := ""
+        cursor := 1
         for _, region in regions {
-            regionHtml := region["html"]
+            startPos := region["start"]
+            endPos := region["end"]
+            if (startPos > cursor)
+                out .= SubStr(html, cursor, startPos - cursor)
+
+            regionHtml := SubStr(html, startPos, endPos - startPos + 1)
             if region["hasChatGptCode"]
                 regionHtml := HtmlNorm._NormalizeChatGptCodeBlocks(regionHtml)
             if region["hasKatex"]
@@ -171,7 +177,10 @@ class HtmlNorm {
             if region["hasResidualSpan"]
                 regionHtml := HtmlNorm._StripResidualSpans(regionHtml)
             out .= regionHtml
+            cursor := endPos + 1
         }
+        if (cursor <= StrLen(html))
+            out .= SubStr(html, cursor)
         return out
     }
 
@@ -208,7 +217,8 @@ class HtmlNorm {
     }
 
     /**
-     * Splits HTML into top-level regions and annotates the first scoped-transform features.
+     * Discovers top-level HTML spans and annotates the scoped-transform features
+     * for each span without storing detached working copies.
      * @param {string} html
      * @param {string} source
      * @returns {Array}
@@ -221,12 +231,12 @@ class HtmlNorm {
 
         while (pos <= len) {
             if !RegExMatch(html, tagPat, &mTag, pos) {
-                regions.Push(HtmlNorm._BuildRegion(SubStr(html, pos), source, true))
+                regions.Push(HtmlNorm._BuildRegion(html, pos, len, source, true))
                 break
             }
 
             if (mTag.Pos > pos)
-                regions.Push(HtmlNorm._BuildRegion(SubStr(html, pos, mTag.Pos - pos), source, true))
+                regions.Push(HtmlNorm._BuildRegion(html, pos, mTag.Pos - 1, source, true))
 
             tagName := StrLower(mTag[1])
             if (HtmlNorm._IsVoidHtmlTag(tagName) || RegExMatch(mTag[0], "/\s*>$")) {
@@ -234,22 +244,23 @@ class HtmlNorm {
             } else {
                 endPos := HtmlNorm._FindMatchingElementEnd(html, mTag.Pos, tagName)
                 if !endPos {
-                    regions.Push(HtmlNorm._BuildRegion(SubStr(html, mTag.Pos), source))
+                    regions.Push(HtmlNorm._BuildRegion(html, mTag.Pos, len, source))
                     break
                 }
             }
 
-            regions.Push(HtmlNorm._BuildRegion(SubStr(html, mTag.Pos, endPos - mTag.Pos + 1), source))
+            regions.Push(HtmlNorm._BuildRegion(html, mTag.Pos, endPos, source))
             pos := endPos + 1
         }
 
         return regions
     }
 
-    static _BuildRegion(regionHtml, source, isText := false) {
+    static _BuildRegion(html, startPos, endPos, source, isText := false) {
         if (isText) {
             return Map(
-                "html", regionHtml,
+                "start", startPos,
+                "end", endPos,
                 "kind", "text",
                 "hasChatGptCode", false,
                 "hasKatex", false,
@@ -267,12 +278,14 @@ class HtmlNorm {
             )
         }
 
+        regionHtml := SubStr(html, startPos, endPos - startPos + 1)
         kind := ""
         if RegExMatch(regionHtml, "is)^<([a-z][a-z0-9:-]*)\b", &mOpen)
             kind := StrLower(mOpen[1])
 
         return Map(
-            "html", regionHtml,
+            "start", startPos,
+            "end", endPos,
             "kind", kind,
             "hasChatGptCode", (source = "chatgpt" && InStr(regionHtml, "overflow-visible")),
             "hasKatex", InStr(regionHtml, "katex"),
