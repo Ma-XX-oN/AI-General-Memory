@@ -1,0 +1,37 @@
+﻿﻿PasteAsMd debug — 2026-03-10 15:41:12
+
+=== 0. source (len=7) ===
+unknown
+
+=== 1. plain (canonical text capture) (len=99) ===
+Copied to fresh paths in the sandbox.
+
+Resume (.docx)
+
+Resume preview (.pdf)
+
+Verified sizes:
+
+=== 2. cfHtml (raw full payload) (len=1284) ===
+Version:0.9
+StartHTML:0000000105
+EndHTML:0000001284
+StartFragment:0000000141
+EndFragment:0000001246
+<html>
+<body>
+<!--StartFragment--><p data-start="0" data-end="37">Copied to fresh paths in the sandbox.</p>
+<ul data-start="39" data-end="204">
+<li data-section-id="1cg7t1y" data-start="39" data-end="118">
+<p data-start="41" data-end="118"><span class="" data-state="closed"><button class="behavior-btn hover:entity-accent focus-visible:focus-ring entity-underline inline cursor-pointer appearance-none border-0 bg-transparent p-0 text-start align-baseline text-inherit" type="button">Resume (.docx)</button></span></p>
+</li>
+<li data-section-id="1x5pmvw" data-start="119" data-end="204">
+<p data-start="121" data-end="204"><span class="" data-state="closed"><button class="behavior-btn hover:entity-accent focus-visible:focus-ring entity-underline inline cursor-pointer appearance-none border-0 bg-transparent p-0 text-start align-baseline text-inherit" type="button">Resume preview (.pdf)</button></span></p>
+</li>
+</ul>
+<p data-start="206" data-end="221">Verified sizes:</p>
+<ul data-start="222" data-end="266">
+<li data-section-id="1t4eqn7" data-start="222" data-end="244">
+<p data-start="224" data-end="244"></p></li></ul><!--EndFragment-->
+</body>
+</html>

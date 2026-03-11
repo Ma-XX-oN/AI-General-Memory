@@ -108,7 +108,10 @@ class HtmlNorm {
         ; 3. Convert tool diff containers into canonical language-diff code blocks.
         html := HtmlNorm._NormalizeSimpleDiffBlocks(html)
 
-        ; 4. Strip UI buttons.
+        ; 4. Preserve semantic inline entity buttons, then strip UI buttons.
+        html := RegExReplace(html
+            , "is)<button\b(?=[^>]*\bbehavior-btn\b)(?=[^>]*\bentity-underline\b)[^>]*>(.*?)</button>"
+            , "<u>$1</u>")
         html := RegExReplace(html, "is)<button\b[^>]*>.*?</button>", "")
 
         ; 5. ChatGPT: normalize CodeMirror code blocks before any span stripping.
