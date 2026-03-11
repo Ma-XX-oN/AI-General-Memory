@@ -46,6 +46,7 @@
 - For file and text reads, always use `rg`
 - Do not use custom script workflows when an approved command set can do the job.
 - Never use custom file-read utilities when `rg` can be used.
+- When a loaded memory/reference file points to another file (for example `~/.codex/...` or a relative Markdown link), resolve that path to an absolute path immediately using the referenced file's own base directory/home alias; do not reinterpret it relative to the current working directory.
 - For simple checks, use only `rg` or already-approved command prefixes; avoid ad-hoc command strings that trigger approval prompts.
 - For any command execution, prefer already-approved command prefixes; if a required action is not covered, request scoped escalation first instead of running an ad-hoc variant.
 - Issue each command as its own tool call; do not chain with `&&`, `;`, or `|` unless that exact pipeline was already approved as one command shape.
@@ -81,6 +82,7 @@
 ### Troubleshooting And Guardrails
 
 - For any question about current file contents, perform a fresh read of the target file in the same turn before answering; do not answer from cached context alone.
+- If a required memory/reference file cannot be resolved or opened, stop and tell the user explicitly; do not silently ignore the missing reference or answer as if it had been loaded.
 - When asked to re-review ("anything else?", "check again"), do a fresh pass instead of assuming prior checks were exhaustive.
 - When fixing one item in a repeated pattern/group, check sibling occurrences and update them together unless the user explicitly limits scope.
 - Prefer public APIs when fixing external library usage; avoid bypassing behavior by calling private/internal APIs directly unless you are working inside that library.
