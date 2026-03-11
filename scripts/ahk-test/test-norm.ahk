@@ -241,6 +241,28 @@ Chk("text user message placeholder inserted", InStr(scopedTextNorm, "<p>¤USERMS
 Chk("text user message stored with newline",
     HtmlNorm._userMsgBlocks.Length = 1 && HtmlNorm._userMsgBlocks[1] = "Hello`nWorld")
 
+; ── 8e: Region-scoped label, footnote, and tight-list cleanup ─────────────────
+Log("── 8e: Region-scoped label, footnote, and tight-list ─")
+
+scopedListHtml := '<div class="font-small p-3.5 pb-0">Python</div>'
+    . '<ul><li><p>Leaf item</p></li><li><p>Parent item</p><ul><li><p>Child item</p></li></ul></li></ul>'
+    . '<p><a href="https://claude.ai/chat/xyz#user-content-fn-2">note</a></p>'
+    . '<ol><li id="user-content-fn-2"><p>Footnote body</p></li></ol>'
+regionsList := HtmlNorm._DiscoverRegions(scopedListHtml, "claudeweb")
+scopedListNorm := HtmlNorm._ApplyRegionScopedTransforms(scopedListHtml, "claudeweb")
+
+Chk("list regions split into four top-level blocks", regionsList.Length = 4)
+Chk("list region flags language label block", regionsList[1]["hasClaudeWebLabel"])
+Chk("list region flags tight-list block", regionsList[2]["hasTightList"])
+Chk("list region flags footnote href block", regionsList[3]["hasFootnoteHref"])
+Chk("list region flags footnote list block", regionsList[4]["hasFootnoteList"])
+Chk("list language label removed", !InStr(scopedListNorm, "font-small p-3.5 pb-0") && !InStr(scopedListNorm, ">Python<"))
+Chk("list leaf paragraph unwrapped", InStr(scopedListNorm, "<li>Leaf item</li>"))
+Chk("list nested parent paragraph unwrapped", InStr(scopedListNorm, "<li>Parent item<ul>"))
+Chk("list nested child paragraph unwrapped", InStr(scopedListNorm, "<li>Child item</li>"))
+Chk("list footnote href stripped to fragment", InStr(scopedListNorm, 'href="#user-content-fn-2"'))
+Chk("list footnote body paragraph removed", InStr(scopedListNorm, '<li id="user-content-fn-2">Footnote body</li>'))
+
 ; ── 9: Full Normalize — Claude Code minimal ───────────────────────────────────
 Log("── 9: Full Normalize — claudecode minimal ───────────")
 

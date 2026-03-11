@@ -117,36 +117,24 @@ class HtmlNorm {
         ; 5. Run the current region-scoped transform subset on discovered top-level blocks.
         html := HtmlNorm._ApplyRegionScopedTransforms(html, source)
 
-        ; 6. Strip Claude Web language-label divs (font-small p-3.5 pb-0).
-        html := RegExReplace(html, "is)<div\b[^>]*\bclass=`"[^`"]*\bfont-small\b[^`"]*\bp-3[^`"]*`"[^>]*>.*?</div>", "")
-
-        ; 7. Strip long footnote hrefs, keeping only the #fragment.
-        html := RegExReplace(html, "i)href=`"[^`"]*#(user-content-[^`"]*)`"", "href=`"#$1`"")
-
-        ; 7b. Strip <p> wrapper inside footnote definition <li> elements.
-        ;      <li id="user-content-fn-N"><p>text</p></li> → <li id="...">text</li>
-        ;      Without this, pandoc renders footnote lists in loose format (number on
-        ;      its own line, content indented), instead of tight (number + content inline).
-        html := RegExReplace(html, "is)(<li\b[^>]*\bid=`"user-content-fn-[^`"]*`"[^>]*>)\s*<p\b[^>]*>(.*?)</p>\s*(</li>)", "$1$2$3")
-
-        ; 7c. Tight-list normalization: unwrap solitary paragraph wrappers in list items.
+        ; 6. Tight-list normalization: unwrap solitary paragraph wrappers in list items.
         ;      <li><p>text</p></li> → <li>text</li>
         ;      This avoids loose-list markdown output (blank lines between items).
         html := HtmlNorm._NormalizeTightListItems(html)
 
-        ; 8. Strip residual <span> tags.
+        ; 7. Strip residual <span> tags.
         html := RegExReplace(html, "i)</?+span\b[^>]*+>", "")
 
-        ; 9. Wrap bare top-level <li> siblings in <ol>.
+        ; 8. Wrap bare top-level <li> siblings in <ol>.
         htmlNoTrailingBr := RegExReplace(html, "is)(?:<br\b[^>]*+>\s*+)++$", "")
         trimmed := Trim(htmlNoTrailingBr, " `t`r`n")
         if (trimmed != "" && RegExMatch(trimmed, "is)^(?:<li\b[^>]*+>.*?</li>\s*)+$"))
             html := "<ol>" . trimmed . "</ol>"
 
-        ; 10. Normalize <code> elements.
+        ; 9. Normalize <code> elements.
         html := HtmlNorm._NormalizeCodeElements(html)
 
-        ; 11. Unwrap nested containers that obscure code blocks.
+        ; 10. Unwrap nested containers that obscure code blocks.
         html := HtmlNorm._UnwrapNestedContainers(html)
 
         return html
@@ -182,6 +170,14 @@ class HtmlNorm {
                 regionHtml := HtmlNorm._PromoteInlineCodeSpans(regionHtml)
             if region["hasUserMsg"]
                 regionHtml := HtmlNorm._ExtractUserMessages(regionHtml)
+            if region["hasClaudeWebLabel"]
+                regionHtml := HtmlNorm._StripClaudeWebLanguageLabels(regionHtml)
+            if region["hasFootnoteHref"]
+                regionHtml := HtmlNorm._StripFootnoteHrefFragments(regionHtml)
+            if region["hasFootnoteList"]
+                regionHtml := HtmlNorm._NormalizeFootnoteListItems(regionHtml)
+            if region["hasTightList"]
+                regionHtml := HtmlNorm._NormalizeTightListItems(regionHtml)
             out .= regionHtml
         }
         return out
@@ -192,6 +188,26 @@ class HtmlNorm {
             html,
             "is)<span\b[^>]*\bclass=`"[^`"]*\b(?:inline-markdown|font-mono)\b[^`"]*`"[^>]*>(.*?)</span>",
             "<code>$1</code>"
+        )
+    }
+
+    static _StripClaudeWebLanguageLabels(html) {
+        return RegExReplace(
+            html,
+            "is)<div\b[^>]*\bclass=`"[^`"]*\bfont-small\b[^`"]*\bp-3[^`"]*`"[^>]*>.*?</div>",
+            ""
+        )
+    }
+
+    static _StripFootnoteHrefFragments(html) {
+        return RegExReplace(html, "i)href=`"[^`"]*#(user-content-[^`"]*)`"", "href=`"#$1`"")
+    }
+
+    static _NormalizeFootnoteListItems(html) {
+        return RegExReplace(
+            html,
+            "is)(<li\b[^>]*\bid=`"user-content-fn-[^`"]*`"[^>]*>)\s*<p\b[^>]*>(.*?)</p>\s*(</li>)",
+            "$1$2$3"
         )
     }
 
@@ -244,7 +260,11 @@ class HtmlNorm {
                 "hasTaskList", false,
                 "hasThinking", false,
                 "hasInlineCode", false,
-                "hasUserMsg", false
+                "hasUserMsg", false,
+                "hasClaudeWebLabel", false,
+                "hasFootnoteHref", false,
+                "hasFootnoteList", false,
+                "hasTightList", false
             )
         }
 
@@ -260,7 +280,11 @@ class HtmlNorm {
             "hasTaskList", (InStr(regionHtml, "<li") && (InStr(regionHtml, "task-list-item") || InStr(regionHtml, "todoItem_"))),
             "hasThinking", (InStr(regionHtml, "<details") && InStr(regionHtml, "thinking")),
             "hasInlineCode", RegExMatch(regionHtml, "i)<span\b[^>]*\bclass\s*=\s*['`"][^'`"]*\b(?:inline-markdown|font-mono)\b"),
-            "hasUserMsg", HtmlNorm._HasUserMessageRegionWork(regionHtml)
+            "hasUserMsg", HtmlNorm._HasUserMessageRegionWork(regionHtml),
+            "hasClaudeWebLabel", HtmlNorm._HasClaudeWebLanguageLabelWork(regionHtml),
+            "hasFootnoteHref", HtmlNorm._HasFootnoteHrefWork(regionHtml),
+            "hasFootnoteList", HtmlNorm._HasFootnoteListWork(regionHtml),
+            "hasTightList", HtmlNorm._HasTightListWork(regionHtml)
         )
     }
 
@@ -277,6 +301,14 @@ class HtmlNorm {
             return true
         if HtmlNorm._HasUserMessageRegionWork(html)
             return true
+        if HtmlNorm._HasClaudeWebLanguageLabelWork(html)
+            return true
+        if HtmlNorm._HasFootnoteHrefWork(html)
+            return true
+        if HtmlNorm._HasFootnoteListWork(html)
+            return true
+        if HtmlNorm._HasTightListWork(html)
+            return true
         return false
     }
 
@@ -290,6 +322,22 @@ class HtmlNorm {
         if RegExMatch(html, "i)<div\b[^>]*\bclass\s*=\s*['`"]whitespace-pre-wrap['`"]")
             return true
         return false
+    }
+
+    static _HasClaudeWebLanguageLabelWork(html) {
+        return RegExMatch(html, "i)<div\b[^>]*\bclass\s*=\s*['`"][^'`"]*\bfont-small\b[^'`"]*\bp-3")
+    }
+
+    static _HasFootnoteHrefWork(html) {
+        return RegExMatch(html, "i)href=`"[^`"]*#user-content-[^`"]*`"")
+    }
+
+    static _HasFootnoteListWork(html) {
+        return RegExMatch(html, "i)<li\b[^>]*\bid=`"user-content-fn-[^`"]*`"[^>]*>\s*<p\b")
+    }
+
+    static _HasTightListWork(html) {
+        return (InStr(html, "<li") && InStr(html, "<p"))
     }
 
     static _IsVoidHtmlTag(tagName) {
