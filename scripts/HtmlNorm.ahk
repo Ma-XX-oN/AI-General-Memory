@@ -114,8 +114,8 @@ class HtmlNorm {
       , "<u>$1</u>")
     html := RegExReplace(html, "is)<button\b[^>]*>.*?</button>", "")
 
-    ; 5. Run the current region-scoped transform subset on discovered top-level blocks.
-    html := HtmlNorm._ApplyRegionScopedTransforms(html, source)
+    ; 5. Run the current segment-scoped transform subset on discovered top-level blocks.
+    html := HtmlNorm._ApplySegmentScopedTransforms(html, source)
 
     ; 6. Wrap bare top-level <li> siblings in <ol>.
     htmlNoTrailingBr := RegExReplace(html, "is)(?:<br\b[^>]*+>\s*+)++$", "")
@@ -127,100 +127,79 @@ class HtmlNorm {
   }
 
   /**
-   * Applies the current region-scoped transforms by collecting only changed
-   * replacement spans and rejoining them against the untouched original HTML.
+   * Applies the current segment-scoped transforms by rewriting ordered segment
+   * payloads and joining them back in sequence.
    * @param {string} html
    * @param {string} source
    * @returns {string}
    */
-  static _ApplyRegionScopedTransforms(html, source) {
-    if !HtmlNorm._HasRegionScopedWork(html, source)
+  static _ApplySegmentScopedTransforms(html, source) {
+    if !HtmlNorm._HasSegmentScopedWork(html, source)
       return html
 
-    regions := HtmlNorm._DiscoverRegions(html, source)
-    if (regions.Length = 0)
-      return html
-
-    replacements := []
-    for _, region in regions {
-      if !HtmlNorm._RegionHasWork(region)
-        continue
-      replacement := HtmlNorm._BuildRegionReplacement(html, region)
-      replacements.Push(Map(
-        "start", region["start"],
-        "end", region["end"],
-        "text", replacement
-      ))
-    }
-
-    if (replacements.Length = 0)
+    segments := HtmlNorm._DiscoverSegments(html, source)
+    if (segments.Length = 0)
       return html
 
     out := ""
-    cursor := 1
-    for _, replacement in replacements {
-      startPos := replacement["start"]
-      endPos := replacement["end"]
-      if (startPos > cursor)
-        out .= SubStr(html, cursor, startPos - cursor)
-      out .= replacement["text"]
-      cursor := endPos + 1
+    changed := false
+    for _, segment in segments {
+      replacement := HtmlNorm._TransformSegment(segment)
+      if (replacement != segment["html"])
+        changed := true
+      out .= replacement
     }
-    if (cursor <= StrLen(html))
-      out .= SubStr(html, cursor)
-    return out
+    return changed ? out : html
   }
 
-  static _BuildRegionReplacement(html, region) {
-    if !HtmlNorm._RegionHasWork(region)
-      return ""
+  static _TransformSegment(segment) {
+    replacement := segment["html"]
+    if !HtmlNorm._SegmentHasWork(segment)
+      return replacement
 
-    startPos := region["start"]
-    endPos := region["end"]
-    replacement := SubStr(html, startPos, endPos - startPos + 1)
-    if region["hasChatGptCode"]
+    if segment["hasChatGptCode"]
       replacement := HtmlNorm._NormalizeChatGptCodeBlocks(replacement)
-    if region["hasKatex"]
+    if segment["hasKatex"]
       replacement := HtmlNorm._NormalizeKatexMath(replacement)
-    if region["hasTaskList"]
+    if segment["hasTaskList"]
       replacement := HtmlNorm._NormalizeTaskListItems(replacement)
-    if region["hasThinking"]
+    if segment["hasThinking"]
       replacement := HtmlNorm._ExtractThinkingBlocks(replacement)
-    if region["hasInlineCode"]
+    if segment["hasInlineCode"]
       replacement := HtmlNorm._PromoteInlineCodeSpans(replacement)
-    if region["hasUserMsg"]
+    if segment["hasUserMsg"]
       replacement := HtmlNorm._ExtractUserMessages(replacement)
-    if region["hasClaudeWebLabel"]
+    if segment["hasClaudeWebLabel"]
       replacement := HtmlNorm._StripClaudeWebLanguageLabels(replacement)
-    if region["hasFootnoteHref"]
+    if segment["hasFootnoteHref"]
       replacement := HtmlNorm._StripFootnoteHrefFragments(replacement)
-    if region["hasFootnoteList"]
+    if segment["hasFootnoteList"]
       replacement := HtmlNorm._NormalizeFootnoteListItems(replacement)
-    if region["hasTightList"]
+    if segment["hasTightList"]
       replacement := HtmlNorm._NormalizeTightListItems(replacement)
-    if region["hasCodeWork"]
+    if segment["hasCodeWork"]
       replacement := HtmlNorm._NormalizeCodeElements(replacement)
-    if region["hasCodeContainers"]
+    if segment["hasCodeContainers"]
       replacement := HtmlNorm._UnwrapNestedContainers(replacement)
-    if region["hasResidualSpan"]
+    if segment["hasResidualSpan"]
       replacement := HtmlNorm._StripResidualSpans(replacement)
     return replacement
   }
 
-  static _RegionHasWork(region) {
-    return region["hasChatGptCode"]
-      || region["hasKatex"]
-      || region["hasTaskList"]
-      || region["hasThinking"]
-      || region["hasInlineCode"]
-      || region["hasUserMsg"]
-      || region["hasClaudeWebLabel"]
-      || region["hasFootnoteHref"]
-      || region["hasFootnoteList"]
-      || region["hasTightList"]
-      || region["hasCodeWork"]
-      || region["hasCodeContainers"]
-      || region["hasResidualSpan"]
+  static _SegmentHasWork(segment) {
+    return segment["hasChatGptCode"]
+      || segment["hasKatex"]
+      || segment["hasTaskList"]
+      || segment["hasThinking"]
+      || segment["hasInlineCode"]
+      || segment["hasUserMsg"]
+      || segment["hasClaudeWebLabel"]
+      || segment["hasFootnoteHref"]
+      || segment["hasFootnoteList"]
+      || segment["hasTightList"]
+      || segment["hasCodeWork"]
+      || segment["hasCodeContainers"]
+      || segment["hasResidualSpan"]
   }
 
   static _PromoteInlineCodeSpans(html) {
@@ -256,26 +235,26 @@ class HtmlNorm {
   }
 
   /**
-   * Discovers top-level HTML spans and annotates the scoped-transform features
-   * for each span without storing detached working copies.
+   * Discovers top-level HTML segments and annotates the scoped-transform
+   * features for each ordered payload.
    * @param {string} html
    * @param {string} source
    * @returns {Array}
    */
-  static _DiscoverRegions(html, source) {
-    regions := []
+  static _DiscoverSegments(html, source) {
+    segments := []
     pos := 1
     len := StrLen(html)
     tagPat := "is)<([a-z][a-z0-9:-]*)\b[^>]*>"
 
     while (pos <= len) {
       if !RegExMatch(html, tagPat, &mTag, pos) {
-        regions.Push(HtmlNorm._BuildRegion(html, pos, len, source, true))
+        segments.Push(HtmlNorm._BuildSegment(SubStr(html, pos, len - pos + 1), source, true))
         break
       }
 
       if (mTag.Pos > pos)
-        regions.Push(HtmlNorm._BuildRegion(html, pos, mTag.Pos - 1, source, true))
+        segments.Push(HtmlNorm._BuildSegment(SubStr(html, pos, mTag.Pos - pos), source, true))
 
       tagName := StrLower(mTag[1])
       if (HtmlNorm._IsVoidHtmlTag(tagName) || RegExMatch(mTag[0], "/\s*>$")) {
@@ -283,24 +262,23 @@ class HtmlNorm {
       } else {
         endPos := HtmlNorm._FindMatchingElementEnd(html, mTag.Pos, tagName)
         if !endPos {
-          regions.Push(HtmlNorm._BuildRegion(html, mTag.Pos, len, source))
+          segments.Push(HtmlNorm._BuildSegment(SubStr(html, mTag.Pos, len - mTag.Pos + 1), source))
           break
         }
       }
 
-      regions.Push(HtmlNorm._BuildRegion(html, mTag.Pos, endPos, source))
+      segments.Push(HtmlNorm._BuildSegment(SubStr(html, mTag.Pos, endPos - mTag.Pos + 1), source))
       pos := endPos + 1
     }
 
-    return regions
+    return segments
   }
 
-  static _BuildRegion(html, startPos, endPos, source, isText := false) {
+  static _BuildSegment(segmentHtml, source, isText := false) {
     if (isText) {
       return Map(
-        "start", startPos,
-        "end", endPos,
         "kind", "text",
+        "html", segmentHtml,
         "hasChatGptCode", false,
         "hasKatex", false,
         "hasTaskList", false,
@@ -317,32 +295,30 @@ class HtmlNorm {
       )
     }
 
-    regionHtml := SubStr(html, startPos, endPos - startPos + 1)
     kind := ""
-    if RegExMatch(regionHtml, "is)^<([a-z][a-z0-9:-]*)\b", &mOpen)
+    if RegExMatch(segmentHtml, "is)^<([a-z][a-z0-9:-]*)\b", &mOpen)
       kind := StrLower(mOpen[1])
 
     return Map(
-      "start", startPos,
-      "end", endPos,
       "kind", kind,
-      "hasChatGptCode", (source = "chatgpt" && InStr(regionHtml, "overflow-visible")),
-      "hasKatex", InStr(regionHtml, "katex"),
-      "hasTaskList", (InStr(regionHtml, "<li") && (InStr(regionHtml, "task-list-item") || InStr(regionHtml, "todoItem_"))),
-      "hasThinking", (InStr(regionHtml, "<details") && InStr(regionHtml, "thinking")),
-      "hasInlineCode", RegExMatch(regionHtml, "i)<span\b[^>]*\bclass\s*=\s*['`"][^'`"]*\b(?:inline-markdown|font-mono)\b"),
-      "hasUserMsg", HtmlNorm._HasUserMessageRegionWork(regionHtml),
-      "hasClaudeWebLabel", HtmlNorm._HasClaudeWebLanguageLabelWork(regionHtml),
-      "hasFootnoteHref", HtmlNorm._HasFootnoteHrefWork(regionHtml),
-      "hasFootnoteList", HtmlNorm._HasFootnoteListWork(regionHtml),
-      "hasTightList", HtmlNorm._HasTightListWork(regionHtml),
-      "hasCodeWork", HtmlNorm._HasCodeWork(regionHtml),
-      "hasCodeContainers", HtmlNorm._HasCodeContainerWork(regionHtml),
-      "hasResidualSpan", HtmlNorm._HasResidualSpanWork(regionHtml)
+      "html", segmentHtml,
+      "hasChatGptCode", (source = "chatgpt" && InStr(segmentHtml, "overflow-visible")),
+      "hasKatex", InStr(segmentHtml, "katex"),
+      "hasTaskList", (InStr(segmentHtml, "<li") && (InStr(segmentHtml, "task-list-item") || InStr(segmentHtml, "todoItem_"))),
+      "hasThinking", (InStr(segmentHtml, "<details") && InStr(segmentHtml, "thinking")),
+      "hasInlineCode", RegExMatch(segmentHtml, "i)<span\b[^>]*\bclass\s*=\s*['`"][^'`"]*\b(?:inline-markdown|font-mono)\b"),
+      "hasUserMsg", HtmlNorm._HasUserMessageRegionWork(segmentHtml),
+      "hasClaudeWebLabel", HtmlNorm._HasClaudeWebLanguageLabelWork(segmentHtml),
+      "hasFootnoteHref", HtmlNorm._HasFootnoteHrefWork(segmentHtml),
+      "hasFootnoteList", HtmlNorm._HasFootnoteListWork(segmentHtml),
+      "hasTightList", HtmlNorm._HasTightListWork(segmentHtml),
+      "hasCodeWork", HtmlNorm._HasCodeWork(segmentHtml),
+      "hasCodeContainers", HtmlNorm._HasCodeContainerWork(segmentHtml),
+      "hasResidualSpan", HtmlNorm._HasResidualSpanWork(segmentHtml)
     )
   }
 
-  static _HasRegionScopedWork(html, source) {
+  static _HasSegmentScopedWork(html, source) {
     if (source = "chatgpt" && InStr(html, "overflow-visible"))
       return true
     if (InStr(html, "katex"))

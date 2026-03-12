@@ -193,8 +193,8 @@ Chk("katex display math preserved",
 Chk("katex inline visual branch removed", !InStr(normKatex, "VISIBLE_INLINE"))
 Chk("katex display visual branch removed", !InStr(normKatex, "VISIBLE_BLOCK"))
 
-; ── 8c: Region-scoped mixed block normalization ───────────────────────────────
-Log("── 8c: Region-scoped mixed block normalization ──────")
+; ── 8c: Segment-scoped mixed block normalization ──────────────────────────────
+Log("── 8c: Segment-scoped mixed block normalization ─────")
 
 scopedHtml := '<p>Intro</p>'
   . '<pre class="overflow-visible! px-0!"><div class="cm-content"><span>print</span><span>(1)</span></div></pre>'
@@ -203,19 +203,20 @@ scopedHtml := '<p>Intro</p>'
   . '<p>Math <span class="katex"><span class="katex-mathml">'
   . '<math><semantics><mi>x</mi><annotation encoding="application/x-tex">x</annotation></semantics></math>'
   . '</span><span class="katex-html" aria-hidden="true"><span class="base"><span class="mord">VISIBLE_INLINE</span></span></span></span></p>'
-regions := HtmlNorm._DiscoverRegions(scopedHtml, "chatgpt")
+segments := HtmlNorm._DiscoverSegments(scopedHtml, "chatgpt")
 HtmlNorm._thinkingBlocks := []
-scopedNorm := HtmlNorm._ApplyRegionScopedTransforms(scopedHtml, "chatgpt")
+scopedNorm := HtmlNorm._ApplySegmentScopedTransforms(scopedHtml, "chatgpt")
 scopedRejoined := ""
-for _, region in regions
-  scopedRejoined .= SubStr(scopedHtml, region["start"], region["end"] - region["start"] + 1)
+for _, segment in segments
+  scopedRejoined .= segment["html"]
 
-Chk("scoped regions split into top-level blocks", regions.Length = 5)
-Chk("scoped regions rejoin to original html", scopedRejoined = scopedHtml)
-Chk("scoped regions flag chatgpt code block", regions[2]["hasChatGptCode"])
-Chk("scoped regions flag task list block", regions[3]["hasTaskList"])
-Chk("scoped regions flag thinking block", regions[4]["hasThinking"])
-Chk("scoped regions flag katex block", regions[5]["hasKatex"])
+Chk("scoped segments split into top-level blocks", segments.Length = 5)
+Chk("scoped segments rejoin to original html", scopedRejoined = scopedHtml)
+Chk("scoped segments do not expose offsets", !segments[1].Has("start") && !segments[1].Has("end"))
+Chk("scoped segments flag chatgpt code block", segments[2]["hasChatGptCode"])
+Chk("scoped segments flag task list block", segments[3]["hasTaskList"])
+Chk("scoped segments flag thinking block", segments[4]["hasThinking"])
+Chk("scoped segments flag katex block", segments[5]["hasKatex"])
 Chk("scoped code block canonicalized", InStr(scopedNorm, "<pre><code>") && InStr(scopedNorm, "print(1)"))
 Chk("scoped task list canonicalized",
   InStr(scopedNorm, '<li><input type="checkbox" disabled checked /> Done</li>'))
@@ -228,38 +229,38 @@ Chk("scoped visual wrappers removed",
   !InStr(scopedNorm, "VISIBLE_INLINE") && !InStr(scopedNorm, "overflow-visible") && !InStr(scopedNorm, "<details"))
 Chk("scoped untouched intro preserved", InStr(scopedNorm, "<p>Intro</p>"))
 
-; ── 8d: Region-scoped inline code + user messages ─────────────────────────────
-Log("── 8d: Region-scoped inline code + user messages ─")
+; ── 8d: Segment-scoped inline code + user messages ────────────────────────────
+Log("── 8d: Segment-scoped inline code + user messages ─")
 
 scopedTextHtml := '<p>Say <span class="inline-markdown">hi</span></p>'
   . '<div class="whitespace-pre-wrap">Hello<br>World</div>'
-regionsText := HtmlNorm._DiscoverRegions(scopedTextHtml, "chatgpt")
+segmentsText := HtmlNorm._DiscoverSegments(scopedTextHtml, "chatgpt")
 HtmlNorm._userMsgBlocks := []
-scopedTextNorm := HtmlNorm._ApplyRegionScopedTransforms(scopedTextHtml, "chatgpt")
+scopedTextNorm := HtmlNorm._ApplySegmentScopedTransforms(scopedTextHtml, "chatgpt")
 
-Chk("text regions split into inline + user blocks", regionsText.Length = 2)
-Chk("text region flags inline code block", regionsText[1]["hasInlineCode"])
-Chk("text region flags user message block", regionsText[2]["hasUserMsg"])
+Chk("text segments split into inline + user blocks", segmentsText.Length = 2)
+Chk("text segment flags inline code block", segmentsText[1]["hasInlineCode"])
+Chk("text segment flags user message block", segmentsText[2]["hasUserMsg"])
 Chk("text inline code promoted", InStr(scopedTextNorm, "<code>hi</code>"))
 Chk("text user message placeholder inserted", InStr(scopedTextNorm, "<p>¤USERMSG_1¤</p>"))
 Chk("text user message stored with newline",
   HtmlNorm._userMsgBlocks.Length = 1 && HtmlNorm._userMsgBlocks[1] = "Hello`nWorld")
 
-; ── 8e: Region-scoped label, footnote, and tight-list cleanup ─────────────────
-Log("── 8e: Region-scoped label, footnote, and tight-list ─")
+; ── 8e: Segment-scoped label, footnote, and tight-list cleanup ────────────────
+Log("── 8e: Segment-scoped label, footnote, and tight-list ─")
 
 scopedListHtml := '<div class="font-small p-3.5 pb-0">Python</div>'
   . '<ul><li><p>Leaf item</p></li><li><p>Parent item</p><ul><li><p>Child item</p></li></ul></li></ul>'
   . '<p><a href="https://claude.ai/chat/xyz#user-content-fn-2">note</a></p>'
   . '<ol><li id="user-content-fn-2"><p>Footnote body</p></li></ol>'
-regionsList := HtmlNorm._DiscoverRegions(scopedListHtml, "claudeweb")
-scopedListNorm := HtmlNorm._ApplyRegionScopedTransforms(scopedListHtml, "claudeweb")
+segmentsList := HtmlNorm._DiscoverSegments(scopedListHtml, "claudeweb")
+scopedListNorm := HtmlNorm._ApplySegmentScopedTransforms(scopedListHtml, "claudeweb")
 
-Chk("list regions split into four top-level blocks", regionsList.Length = 4)
-Chk("list region flags language label block", regionsList[1]["hasClaudeWebLabel"])
-Chk("list region flags tight-list block", regionsList[2]["hasTightList"])
-Chk("list region flags footnote href block", regionsList[3]["hasFootnoteHref"])
-Chk("list region flags footnote list block", regionsList[4]["hasFootnoteList"])
+Chk("list segments split into four top-level blocks", segmentsList.Length = 4)
+Chk("list segment flags language label block", segmentsList[1]["hasClaudeWebLabel"])
+Chk("list segment flags tight-list block", segmentsList[2]["hasTightList"])
+Chk("list segment flags footnote href block", segmentsList[3]["hasFootnoteHref"])
+Chk("list segment flags footnote list block", segmentsList[4]["hasFootnoteList"])
 Chk("list language label removed", !InStr(scopedListNorm, "font-small p-3.5 pb-0") && !InStr(scopedListNorm, ">Python<"))
 Chk("list leaf paragraph unwrapped", InStr(scopedListNorm, "<li>Leaf item</li>"))
 Chk("list nested parent paragraph unwrapped", InStr(scopedListNorm, "<li>Parent item<ul>"))
@@ -267,33 +268,33 @@ Chk("list nested child paragraph unwrapped", InStr(scopedListNorm, "<li>Child it
 Chk("list footnote href stripped to fragment", InStr(scopedListNorm, 'href="#user-content-fn-2"'))
 Chk("list footnote body paragraph removed", InStr(scopedListNorm, '<li id="user-content-fn-2">Footnote body</li>'))
 
-; ── 8f: Region-scoped code normalization and unwrap ───────────────────────────
-Log("── 8f: Region-scoped code normalization and unwrap ─")
+; ── 8f: Segment-scoped code normalization and unwrap ──────────────────────────
+Log("── 8f: Segment-scoped code normalization and unwrap ─")
 
 scopedCodeHtml := '<div><div><pre class="code-block__code extra"><code class="language-python">'
   . '<div>print(1)</div><div>print(2)</div>'
   . '</code></pre></div></div><p>Tail</p>'
-regionsCode := HtmlNorm._DiscoverRegions(scopedCodeHtml, "claudeweb")
-scopedCodeNorm := HtmlNorm._ApplyRegionScopedTransforms(scopedCodeHtml, "claudeweb")
+segmentsCode := HtmlNorm._DiscoverSegments(scopedCodeHtml, "claudeweb")
+scopedCodeNorm := HtmlNorm._ApplySegmentScopedTransforms(scopedCodeHtml, "claudeweb")
 
-Chk("code regions split into code + prose blocks", regionsCode.Length = 2)
-Chk("code region flags code normalization", regionsCode[1]["hasCodeWork"])
-Chk("code region flags container unwrap", regionsCode[1]["hasCodeContainers"])
+Chk("code segments split into code + prose blocks", segmentsCode.Length = 2)
+Chk("code segment flags code normalization", segmentsCode[1]["hasCodeWork"])
+Chk("code segment flags container unwrap", segmentsCode[1]["hasCodeContainers"])
 Chk("code block normalized and unwrapped",
   InStr(scopedCodeNorm, '<pre><code class="language-python">print(1)`nprint(2)</code></pre>'))
 Chk("code wrapper classes removed", !InStr(scopedCodeNorm, "code-block__code"))
 Chk("code nested div wrappers removed", !InStr(scopedCodeNorm, "<div><div><pre"))
 Chk("code trailing prose preserved", InStr(scopedCodeNorm, "<p>Tail</p>"))
 
-; ── 8g: Region-scoped residual span cleanup ───────────────────────────────────
-Log("── 8g: Region-scoped residual span cleanup ───────────")
+; ── 8g: Segment-scoped residual span cleanup ──────────────────────────────────
+Log("── 8g: Segment-scoped residual span cleanup ──────────")
 
 scopedSpanHtml := '<p><span class="plain">Alpha</span> <span>Beta</span></p>'
-regionsSpan := HtmlNorm._DiscoverRegions(scopedSpanHtml, "unknown")
-scopedSpanNorm := HtmlNorm._ApplyRegionScopedTransforms(scopedSpanHtml, "unknown")
+segmentsSpan := HtmlNorm._DiscoverSegments(scopedSpanHtml, "unknown")
+scopedSpanNorm := HtmlNorm._ApplySegmentScopedTransforms(scopedSpanHtml, "unknown")
 
-Chk("span cleanup stays one top-level block", regionsSpan.Length = 1)
-Chk("span cleanup flags residual spans", regionsSpan[1]["hasResidualSpan"])
+Chk("span cleanup stays one top-level block", segmentsSpan.Length = 1)
+Chk("span cleanup flags residual spans", segmentsSpan[1]["hasResidualSpan"])
 Chk("span cleanup removes wrapper tags", scopedSpanNorm = "<p>Alpha Beta</p>")
 
 ; ── 9: Full Normalize — Claude Code minimal ───────────────────────────────────
