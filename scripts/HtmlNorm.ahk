@@ -307,7 +307,7 @@ class HtmlNorm {
       "hasTaskList", (InStr(segmentHtml, "<li") && (InStr(segmentHtml, "task-list-item") || InStr(segmentHtml, "todoItem_"))),
       "hasThinking", (InStr(segmentHtml, "<details") && InStr(segmentHtml, "thinking")),
       "hasInlineCode", RegExMatch(segmentHtml, "i)<span\b[^>]*\bclass\s*=\s*['`"][^'`"]*\b(?:inline-markdown|font-mono)\b"),
-      "hasUserMsg", HtmlNorm._HasUserMessageRegionWork(segmentHtml),
+      "hasUserMsg", HtmlNorm._HasUserMessageWork(segmentHtml),
       "hasClaudeWebLabel", HtmlNorm._HasClaudeWebLanguageLabelWork(segmentHtml),
       "hasFootnoteHref", HtmlNorm._HasFootnoteHrefWork(segmentHtml),
       "hasFootnoteList", HtmlNorm._HasFootnoteListWork(segmentHtml),
@@ -329,7 +329,7 @@ class HtmlNorm {
       return true
     if RegExMatch(html, "i)<span\b[^>]*\bclass\s*=\s*['`"][^'`"]*\b(?:inline-markdown|font-mono)\b")
       return true
-    if HtmlNorm._HasUserMessageRegionWork(html)
+    if HtmlNorm._HasUserMessageWork(html)
       return true
     if HtmlNorm._HasClaudeWebLanguageLabelWork(html)
       return true
@@ -348,7 +348,7 @@ class HtmlNorm {
     return false
   }
 
-  static _HasUserMessageRegionWork(html) {
+  static _HasUserMessageWork(html) {
     if RegExMatch(html, "i)<div\b[^>]*\btext-size-chat\b[^>]*\bwhitespace-pre-wrap\b")
       return true
     if RegExMatch(html, "i)<div\b[^>]*\bcontent_xGDvVg\b")
