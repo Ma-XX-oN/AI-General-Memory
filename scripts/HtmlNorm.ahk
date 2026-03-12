@@ -159,7 +159,7 @@ class HtmlNorm {
 
     for _, spec in HtmlNorm._GetSegmentTransformSpecs() {
       if segment[spec["flag"]]
-        replacement := spec["apply"].Call(replacement)
+        replacement := HtmlNorm._ApplySegmentSpec(spec, replacement)
     }
     return replacement
   }
@@ -174,17 +174,63 @@ class HtmlNorm {
       Map("flag", "hasKatex", "detect", ObjBindMethod(HtmlNorm, "_HasKatexWork"), "apply", ObjBindMethod(HtmlNorm, "_NormalizeKatexMath")),
       Map("flag", "hasTaskList", "detect", ObjBindMethod(HtmlNorm, "_HasTaskListWork"), "apply", ObjBindMethod(HtmlNorm, "_NormalizeTaskListItems")),
       Map("flag", "hasThinking", "detect", ObjBindMethod(HtmlNorm, "_HasThinkingWork"), "apply", ObjBindMethod(HtmlNorm, "_ExtractThinkingBlocks")),
-      Map("flag", "hasInlineCode", "detect", ObjBindMethod(HtmlNorm, "_HasInlineCodeWork"), "apply", ObjBindMethod(HtmlNorm, "_PromoteInlineCodeSpans")),
+      HtmlNorm._RegexTransformSpec(
+        "hasInlineCode",
+        "i)<span\b[^>]*\bclass\s*=\s*['`"][^'`"]*\b(?:inline-markdown|font-mono)\b",
+        "is)<span\b[^>]*\bclass=`"[^`"]*\b(?:inline-markdown|font-mono)\b[^`"]*`"[^>]*>(.*?)</span>",
+        "<code>$1</code>"
+      ),
       Map("flag", "hasUserMsg", "detect", ObjBindMethod(HtmlNorm, "_HasUserMessageWork"), "apply", ObjBindMethod(HtmlNorm, "_ExtractUserMessages")),
-      Map("flag", "hasClaudeWebLabel", "detect", ObjBindMethod(HtmlNorm, "_HasClaudeWebLanguageLabelWork"), "apply", ObjBindMethod(HtmlNorm, "_StripClaudeWebLanguageLabels")),
-      Map("flag", "hasFootnoteHref", "detect", ObjBindMethod(HtmlNorm, "_HasFootnoteHrefWork"), "apply", ObjBindMethod(HtmlNorm, "_StripFootnoteHrefFragments")),
-      Map("flag", "hasFootnoteList", "detect", ObjBindMethod(HtmlNorm, "_HasFootnoteListWork"), "apply", ObjBindMethod(HtmlNorm, "_NormalizeFootnoteListItems")),
+      HtmlNorm._RegexTransformSpec(
+        "hasClaudeWebLabel",
+        "i)<div\b[^>]*\bclass\s*=\s*['`"][^'`"]*\bfont-small\b[^'`"]*\bp-3",
+        "is)<div\b[^>]*\bclass=`"[^`"]*\bfont-small\b[^`"]*\bp-3[^`"]*`"[^>]*>.*?</div>",
+        ""
+      ),
+      HtmlNorm._RegexTransformSpec(
+        "hasFootnoteHref",
+        "i)href=`"[^`"]*#user-content-[^`"]*`"",
+        "i)href=`"[^`"]*#(user-content-[^`"]*)`"",
+        "href=`"#$1`""
+      ),
+      HtmlNorm._RegexTransformSpec(
+        "hasFootnoteList",
+        "is)<li\b[^>]*\bid=`"user-content-fn-[^`"]*`"[^>]*>\s*<p\b",
+        "is)(<li\b[^>]*\bid=`"user-content-fn-[^`"]*`"[^>]*>)\s*<p\b[^>]*>(.*?)</p>\s*(</li>)",
+        "$1$2$3"
+      ),
       Map("flag", "hasTightList", "detect", ObjBindMethod(HtmlNorm, "_HasTightListWork"), "apply", ObjBindMethod(HtmlNorm, "_NormalizeTightListItems")),
       Map("flag", "hasCodeWork", "detect", ObjBindMethod(HtmlNorm, "_HasCodeWork"), "apply", ObjBindMethod(HtmlNorm, "_NormalizeCodeElements")),
       Map("flag", "hasCodeContainers", "detect", ObjBindMethod(HtmlNorm, "_HasCodeContainerWork"), "apply", ObjBindMethod(HtmlNorm, "_UnwrapNestedContainers")),
-      Map("flag", "hasResidualSpan", "detect", ObjBindMethod(HtmlNorm, "_HasResidualSpanWork"), "apply", ObjBindMethod(HtmlNorm, "_StripResidualSpans"))
+      HtmlNorm._RegexTransformSpec(
+        "hasResidualSpan",
+        "i)</?+span\b",
+        "i)</?+span\b[^>]*+>",
+        ""
+      )
     ]
     return specs
+  }
+
+  static _RegexTransformSpec(flag, detectPat, replacePat, replaceWith) {
+    return Map(
+      "flag", flag,
+      "detectPat", detectPat,
+      "replacePat", replacePat,
+      "replaceWith", replaceWith
+    )
+  }
+
+  static _SpecHasWork(spec, html, source := "") {
+    if spec.Has("detect")
+      return spec["detect"].Call(html, source)
+    return RegExMatch(html, spec["detectPat"])
+  }
+
+  static _ApplySegmentSpec(spec, html) {
+    if spec.Has("apply")
+      return spec["apply"].Call(html)
+    return RegExReplace(html, spec["replacePat"], spec["replaceWith"])
   }
 
   static _NewSegment(kind, startPos, segmentLen) {
@@ -201,38 +247,6 @@ class HtmlNorm {
 
   static _ReadSegmentText(html, segment) {
     return SubStr(html, segment["_start"], segment["_len"])
-  }
-
-  static _PromoteInlineCodeSpans(html) {
-    return RegExReplace(
-      html,
-      "is)<span\b[^>]*\bclass=`"[^`"]*\b(?:inline-markdown|font-mono)\b[^`"]*`"[^>]*>(.*?)</span>",
-      "<code>$1</code>"
-    )
-  }
-
-  static _StripClaudeWebLanguageLabels(html) {
-    return RegExReplace(
-      html,
-      "is)<div\b[^>]*\bclass=`"[^`"]*\bfont-small\b[^`"]*\bp-3[^`"]*`"[^>]*>.*?</div>",
-      ""
-    )
-  }
-
-  static _StripFootnoteHrefFragments(html) {
-    return RegExReplace(html, "i)href=`"[^`"]*#(user-content-[^`"]*)`"", "href=`"#$1`"")
-  }
-
-  static _NormalizeFootnoteListItems(html) {
-    return RegExReplace(
-      html,
-      "is)(<li\b[^>]*\bid=`"user-content-fn-[^`"]*`"[^>]*>)\s*<p\b[^>]*>(.*?)</p>\s*(</li>)",
-      "$1$2$3"
-    )
-  }
-
-  static _StripResidualSpans(html) {
-    return RegExReplace(html, "i)</?+span\b[^>]*+>", "")
   }
 
   /**
@@ -285,7 +299,7 @@ class HtmlNorm {
     segment := HtmlNorm._NewSegment(kind, startPos, segmentLen)
     segmentHtml := HtmlNorm._ReadSegmentText(html, segment)
     for _, spec in HtmlNorm._GetSegmentTransformSpecs() {
-      hasWork := spec["detect"].Call(segmentHtml, source)
+      hasWork := HtmlNorm._SpecHasWork(spec, segmentHtml, source)
       segment[spec["flag"]] := hasWork
       if hasWork
         segment["hasWork"] := true
@@ -295,7 +309,7 @@ class HtmlNorm {
 
   static _HasSegmentScopedWork(html, source) {
     for _, spec in HtmlNorm._GetSegmentTransformSpecs() {
-      if spec["detect"].Call(html, source)
+      if HtmlNorm._SpecHasWork(spec, html, source)
         return true
     }
     return false
@@ -317,10 +331,6 @@ class HtmlNorm {
     return (InStr(html, "<details") && InStr(html, "thinking"))
   }
 
-  static _HasInlineCodeWork(html, source := "") {
-    return RegExMatch(html, "i)<span\b[^>]*\bclass\s*=\s*['`"][^'`"]*\b(?:inline-markdown|font-mono)\b")
-  }
-
   static _HasUserMessageWork(html, source := "") {
     if RegExMatch(html, "i)<div\b[^>]*\btext-size-chat\b[^>]*\bwhitespace-pre-wrap\b")
       return true
@@ -331,18 +341,6 @@ class HtmlNorm {
     if RegExMatch(html, "i)<div\b[^>]*\bclass\s*=\s*['`"]whitespace-pre-wrap['`"]")
       return true
     return false
-  }
-
-  static _HasClaudeWebLanguageLabelWork(html, source := "") {
-    return RegExMatch(html, "i)<div\b[^>]*\bclass\s*=\s*['`"][^'`"]*\bfont-small\b[^'`"]*\bp-3")
-  }
-
-  static _HasFootnoteHrefWork(html, source := "") {
-    return RegExMatch(html, "i)href=`"[^`"]*#user-content-[^`"]*`"")
-  }
-
-  static _HasFootnoteListWork(html, source := "") {
-    return RegExMatch(html, "i)<li\b[^>]*\bid=`"user-content-fn-[^`"]*`"[^>]*>\s*<p\b")
   }
 
   static _HasTightListWork(html, source := "") {
@@ -366,10 +364,6 @@ class HtmlNorm {
       || RegExMatch(html, "is)^\s*<pre\b[^>]*\bcode-block__code\b[^>]*>\s*<code\b")
       || RegExMatch(html, "is)^\s*<div\b[^>]*>\s*<div\b[^>]*>\s*<pre><code\b")
       || RegExMatch(html, "is)^\s*<div\b[^>]*>\s*<div\b[^>]*>\s*<code\b")
-  }
-
-  static _HasResidualSpanWork(html, source := "") {
-    return InStr(html, "<span")
   }
 
   static _IsVoidHtmlTag(tagName) {
