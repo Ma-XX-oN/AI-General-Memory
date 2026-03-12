@@ -349,11 +349,18 @@ class HtmlNorm {
   }
 
   static _HasCodeContainerWork(html, source := "") {
-    if (InStr(html, "<pre") && InStr(html, "<code"))
-      return true
-    if RegExMatch(html, "i)<div\b")
-      return true
-    return false
+    if (source != "chatgpt") {
+      if (InStr(html, "<pre") && InStr(html, "<code"))
+        return true
+      if RegExMatch(html, "i)<div\b")
+        return true
+      return false
+    }
+
+    return RegExMatch(html, "is)^\s*<pre\b[^>]+>\s*<pre\b[^>]*><code\b")
+      || RegExMatch(html, "is)^\s*<pre\b[^>]*\bcode-block__code\b[^>]*>\s*<code\b")
+      || RegExMatch(html, "is)^\s*<div\b[^>]*>\s*<div\b[^>]*>\s*<pre><code\b")
+      || RegExMatch(html, "is)^\s*<div\b[^>]*>\s*<div\b[^>]*>\s*<code\b")
   }
 
   static _HasResidualSpanWork(html, source := "") {
