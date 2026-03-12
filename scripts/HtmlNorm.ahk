@@ -26,21 +26,21 @@
  * @returns {string} Source identifier string
  */
 DetectSource(cfHtml) {
-    if RegExMatch(cfHtml, "i)extensionId=([^&`r`n]+)", &m) {
-        extId := StrLower(m[1])
-        if InStr(extId, "openai.chatgpt")
-            return "codex"
-        if InStr(extId, "anthropic") || InStr(extId, "claude")
-            return "claudecode"   ; real Claude Web (browser) never has extensionId
-    }
-    ; Claude Web (browser): no extensionId in header; detect from HTML content.
-    if InStr(cfHtml, "font-claude-response") || InStr(cfHtml, "data-is-streaming") || InStr(cfHtml, "code-block__code")
-        return "claudeweb"
-    ; ChatGPT web: no extensionId.  Full-turn copies have data-turn-id on <article>;
-    ; sub-selection copies omit the article but keep CodeMirror overflow-visible! <pre>.
-    if InStr(cfHtml, "data-turn-id=") || InStr(cfHtml, "overflow-visible!")
-        return "chatgpt"
-    return "unknown"
+  if RegExMatch(cfHtml, "i)extensionId=([^&`r`n]+)", &m) {
+    extId := StrLower(m[1])
+    if InStr(extId, "openai.chatgpt")
+      return "codex"
+    if InStr(extId, "anthropic") || InStr(extId, "claude")
+      return "claudecode"   ; real Claude Web (browser) never has extensionId
+  }
+  ; Claude Web (browser): no extensionId in header; detect from HTML content.
+  if InStr(cfHtml, "font-claude-response") || InStr(cfHtml, "data-is-streaming") || InStr(cfHtml, "code-block__code")
+    return "claudeweb"
+  ; ChatGPT web: no extensionId.  Full-turn copies have data-turn-id on <article>;
+  ; sub-selection copies omit the article but keep CodeMirror overflow-visible! <pre>.
+  if InStr(cfHtml, "data-turn-id=") || InStr(cfHtml, "overflow-visible!")
+    return "chatgpt"
+  return "unknown"
 }
 
 /**
@@ -54,1023 +54,1016 @@ DetectSource(cfHtml) {
  * the caller before invoking `RestoreThinkingBlocks` / `RestoreUserMsgBlocks`.
  */
 class HtmlNorm {
-    /**
-     * Thinking block inner texts; index N corresponds to placeholder ¤THINKING_N¤.
-     * @type {Array}
-     */
-    static _thinkingBlocks := []
+  /**
+   * Thinking block inner texts; index N corresponds to placeholder ¤THINKING_N¤.
+   * @type {Array}
+   */
+  static _thinkingBlocks := []
 
-    /**
-     * User message raw text blocks; index N corresponds to placeholder ¤USERMSG_N¤.
-     * @type {Array}
-     */
-    static _userMsgBlocks := []
+  /**
+   * User message raw text blocks; index N corresponds to placeholder ¤USERMSG_N¤.
+   * @type {Array}
+   */
+  static _userMsgBlocks := []
 
-    /**
-     * Normalizes an HTML fragment for pandoc processing.
-     *
-     * Transforms are applied in order:
-     *   1.  Image/SVG handling: drop if no accessible text, else (img: text); leave when showImg
-     *   2.  Poster-label placeholder injection (when showPoster)
-     *   3.  Diff-block normalization (diffs-container → pre/code language-diff)
-     *   4.  Button stripping
-     *   5.  ChatGPT code block extraction (pre.overflow-visible! → pre/code)
-     *   6.  KaTeX wrapper collapse (keep MathML, drop visual HTML fallback)
-     *   7.  Task-list checkbox normalization (canonical <input type="checkbox">)
-     *   8.  Thinking block extraction (→ ¤THINKING_N¤)
-     *   9.  Inline-code span promotion (inline-markdown/font-mono → <code>)
-     *   10. User message extraction (→ ¤USERMSG_N¤)
-     *   11. Claude Web language-label div removal
-     *   12. Footnote URL stripping (long URLs → #fragment)
-     *   13. Residual span tag removal
-     *   14. Bare <li> list wrapping in <ol>
-     *   15. <code> element normalization (line-break conversion, pre-wrapping)
-     *   16. Nested container unwrapping
-     *
-     * @param {string} htmlFrag  - HTML fragment from the CF_HTML clipboard
-     * @param {string} source    - Source identifier from DetectSource()
-     * @param {boolean} showPoster - Inject ¤POSTER_AI¤/¤POSTER_User¤ markers
-     * @param {boolean} showImg    - Keep <img> tags for pandoc when true
-     * @returns {string} Canonical HTML ready for pandoc
-     */
-    static Normalize(htmlFrag, source, showPoster, showImg) {
-        HtmlNorm._thinkingBlocks := []
-        HtmlNorm._userMsgBlocks  := []
-        html := htmlFrag
+  /**
+   * Normalizes an HTML fragment for pandoc processing.
+   *
+   * Transforms are applied in order:
+   *   1.  Image/SVG handling: drop if no accessible text, else (img: text); leave when showImg
+   *   2.  Poster-label placeholder injection (when showPoster)
+   *   3.  Diff-block normalization (diffs-container → pre/code language-diff)
+   *   4.  Button stripping
+   *   5.  ChatGPT code block extraction (pre.overflow-visible! → pre/code)
+   *   6.  KaTeX wrapper collapse (keep MathML, drop visual HTML fallback)
+   *   7.  Task-list checkbox normalization (canonical <input type="checkbox">)
+   *   8.  Thinking block extraction (→ ¤THINKING_N¤)
+   *   9.  Inline-code span promotion (inline-markdown/font-mono → <code>)
+   *   10. User message extraction (→ ¤USERMSG_N¤)
+   *   11. Claude Web language-label div removal
+   *   12. Footnote URL stripping (long URLs → #fragment)
+   *   13. Residual span tag removal
+   *   14. Bare <li> list wrapping in <ol>
+   *   15. <code> element normalization (line-break conversion, pre-wrapping)
+   *   16. Nested container unwrapping
+   *
+   * @param {string} htmlFrag  - HTML fragment from the CF_HTML clipboard
+   * @param {string} source    - Source identifier from DetectSource()
+   * @param {boolean} showPoster - Inject ¤POSTER_AI¤/¤POSTER_User¤ markers
+   * @param {boolean} showImg    - Keep <img> tags for pandoc when true
+   * @returns {string} Canonical HTML ready for pandoc
+   */
+  static Normalize(htmlFrag, source, showPoster, showImg) {
+    HtmlNorm._thinkingBlocks := []
+    HtmlNorm._userMsgBlocks  := []
+    html := htmlFrag
 
-        ; 1. Handle <img> tags.
-        html := HtmlNorm._ProcessImgTags(html, showImg)
+    ; 1. Handle <img> tags.
+    html := HtmlNorm._ProcessImgTags(html, showImg)
 
-        ; 2. Inject poster-label placeholders.
-        if showPoster
-            html := HtmlNorm._InjectPosterPlaceholders(html, source)
+    ; 2. Inject poster-label placeholders.
+    if showPoster
+      html := HtmlNorm._InjectPosterPlaceholders(html, source)
 
-        ; 3. Convert tool diff containers into canonical language-diff code blocks.
-        html := HtmlNorm._NormalizeSimpleDiffBlocks(html)
+    ; 3. Convert tool diff containers into canonical language-diff code blocks.
+    html := HtmlNorm._NormalizeSimpleDiffBlocks(html)
 
-        ; 4. Preserve semantic inline entity buttons, then strip UI buttons.
-        html := RegExReplace(html
-            , "is)<button\b(?=[^>]*\bbehavior-btn\b)(?=[^>]*\bentity-underline\b)[^>]*>(.*?)</button>"
-            , "<u>$1</u>")
-        html := RegExReplace(html, "is)<button\b[^>]*>.*?</button>", "")
+    ; 4. Preserve semantic inline entity buttons, then strip UI buttons.
+    html := RegExReplace(html
+      , "is)<button\b(?=[^>]*\bbehavior-btn\b)(?=[^>]*\bentity-underline\b)[^>]*>(.*?)</button>"
+      , "<u>$1</u>")
+    html := RegExReplace(html, "is)<button\b[^>]*>.*?</button>", "")
 
-        ; 5. Run the current region-scoped transform subset on discovered top-level blocks.
-        html := HtmlNorm._ApplyRegionScopedTransforms(html, source)
+    ; 5. Run the current region-scoped transform subset on discovered top-level blocks.
+    html := HtmlNorm._ApplyRegionScopedTransforms(html, source)
 
-        ; 6. Wrap bare top-level <li> siblings in <ol>.
-        htmlNoTrailingBr := RegExReplace(html, "is)(?:<br\b[^>]*+>\s*+)++$", "")
-        trimmed := Trim(htmlNoTrailingBr, " `t`r`n")
-        if (trimmed != "" && RegExMatch(trimmed, "is)^(?:<li\b[^>]*+>.*?</li>\s*)+$"))
-            html := "<ol>" . trimmed . "</ol>"
+    ; 6. Wrap bare top-level <li> siblings in <ol>.
+    htmlNoTrailingBr := RegExReplace(html, "is)(?:<br\b[^>]*+>\s*+)++$", "")
+    trimmed := Trim(htmlNoTrailingBr, " `t`r`n")
+    if (trimmed != "" && RegExMatch(trimmed, "is)^(?:<li\b[^>]*+>.*?</li>\s*)+$"))
+      html := "<ol>" . trimmed . "</ol>"
 
-        return html
+    return html
+  }
+
+  /**
+   * Applies the current region-scoped transforms by collecting only changed
+   * replacement spans and rejoining them against the untouched original HTML.
+   * @param {string} html
+   * @param {string} source
+   * @returns {string}
+   */
+  static _ApplyRegionScopedTransforms(html, source) {
+    if !HtmlNorm._HasRegionScopedWork(html, source)
+      return html
+
+    regions := HtmlNorm._DiscoverRegions(html, source)
+    if (regions.Length = 0)
+      return html
+
+    replacements := []
+    for _, region in regions {
+      replacement := HtmlNorm._BuildRegionReplacement(html, region)
+      if (replacement != "")
+        replacements.Push(Map(
+          "start", region["start"],
+          "end", region["end"],
+          "text", replacement
+        ))
     }
 
-    /**
-     * Applies the current region-scoped transforms by collecting only changed
-     * replacement spans and rejoining them against the untouched original HTML.
-     * @param {string} html
-     * @param {string} source
-     * @returns {string}
-     */
-    static _ApplyRegionScopedTransforms(html, source) {
-        if !HtmlNorm._HasRegionScopedWork(html, source)
-            return html
+    if (replacements.Length = 0)
+      return html
 
-        regions := HtmlNorm._DiscoverRegions(html, source)
-        if (regions.Length = 0)
-            return html
+    out := ""
+    cursor := 1
+    for _, replacement in replacements {
+      startPos := replacement["start"]
+      endPos := replacement["end"]
+      if (startPos > cursor)
+        out .= SubStr(html, cursor, startPos - cursor)
+      out .= replacement["text"]
+      cursor := endPos + 1
+    }
+    if (cursor <= StrLen(html))
+      out .= SubStr(html, cursor)
+    return out
+  }
 
-        replacements := []
-        for _, region in regions {
-            replacement := HtmlNorm._BuildRegionReplacement(html, region)
-            if (replacement != "")
-                replacements.Push(Map(
-                    "start", region["start"],
-                    "end", region["end"],
-                    "text", replacement
-                ))
+  static _BuildRegionReplacement(html, region) {
+    if !HtmlNorm._RegionHasWork(region)
+      return ""
+
+    startPos := region["start"]
+    endPos := region["end"]
+    replacement := SubStr(html, startPos, endPos - startPos + 1)
+    if region["hasChatGptCode"]
+      replacement := HtmlNorm._NormalizeChatGptCodeBlocks(replacement)
+    if region["hasKatex"]
+      replacement := HtmlNorm._NormalizeKatexMath(replacement)
+    if region["hasTaskList"]
+      replacement := HtmlNorm._NormalizeTaskListItems(replacement)
+    if region["hasThinking"]
+      replacement := HtmlNorm._ExtractThinkingBlocks(replacement)
+    if region["hasInlineCode"]
+      replacement := HtmlNorm._PromoteInlineCodeSpans(replacement)
+    if region["hasUserMsg"]
+      replacement := HtmlNorm._ExtractUserMessages(replacement)
+    if region["hasClaudeWebLabel"]
+      replacement := HtmlNorm._StripClaudeWebLanguageLabels(replacement)
+    if region["hasFootnoteHref"]
+      replacement := HtmlNorm._StripFootnoteHrefFragments(replacement)
+    if region["hasFootnoteList"]
+      replacement := HtmlNorm._NormalizeFootnoteListItems(replacement)
+    if region["hasTightList"]
+      replacement := HtmlNorm._NormalizeTightListItems(replacement)
+    if region["hasCodeWork"]
+      replacement := HtmlNorm._NormalizeCodeElements(replacement)
+    if region["hasCodeContainers"]
+      replacement := HtmlNorm._UnwrapNestedContainers(replacement)
+    if region["hasResidualSpan"]
+      replacement := HtmlNorm._StripResidualSpans(replacement)
+    return replacement
+  }
+
+  static _RegionHasWork(region) {
+    return region["hasChatGptCode"]
+      || region["hasKatex"]
+      || region["hasTaskList"]
+      || region["hasThinking"]
+      || region["hasInlineCode"]
+      || region["hasUserMsg"]
+      || region["hasClaudeWebLabel"]
+      || region["hasFootnoteHref"]
+      || region["hasFootnoteList"]
+      || region["hasTightList"]
+      || region["hasCodeWork"]
+      || region["hasCodeContainers"]
+      || region["hasResidualSpan"]
+  }
+
+  static _PromoteInlineCodeSpans(html) {
+    return RegExReplace(
+      html,
+      "is)<span\b[^>]*\bclass=`"[^`"]*\b(?:inline-markdown|font-mono)\b[^`"]*`"[^>]*>(.*?)</span>",
+      "<code>$1</code>"
+    )
+  }
+
+  static _StripClaudeWebLanguageLabels(html) {
+    return RegExReplace(
+      html,
+      "is)<div\b[^>]*\bclass=`"[^`"]*\bfont-small\b[^`"]*\bp-3[^`"]*`"[^>]*>.*?</div>",
+      ""
+    )
+  }
+
+  static _StripFootnoteHrefFragments(html) {
+    return RegExReplace(html, "i)href=`"[^`"]*#(user-content-[^`"]*)`"", "href=`"#$1`"")
+  }
+
+  static _NormalizeFootnoteListItems(html) {
+    return RegExReplace(
+      html,
+      "is)(<li\b[^>]*\bid=`"user-content-fn-[^`"]*`"[^>]*>)\s*<p\b[^>]*>(.*?)</p>\s*(</li>)",
+      "$1$2$3"
+    )
+  }
+
+  static _StripResidualSpans(html) {
+    return RegExReplace(html, "i)</?+span\b[^>]*+>", "")
+  }
+
+  /**
+   * Discovers top-level HTML spans and annotates the scoped-transform features
+   * for each span without storing detached working copies.
+   * @param {string} html
+   * @param {string} source
+   * @returns {Array}
+   */
+  static _DiscoverRegions(html, source) {
+    regions := []
+    pos := 1
+    len := StrLen(html)
+    tagPat := "is)<([a-z][a-z0-9:-]*)\b[^>]*>"
+
+    while (pos <= len) {
+      if !RegExMatch(html, tagPat, &mTag, pos) {
+        regions.Push(HtmlNorm._BuildRegion(html, pos, len, source, true))
+        break
+      }
+
+      if (mTag.Pos > pos)
+        regions.Push(HtmlNorm._BuildRegion(html, pos, mTag.Pos - 1, source, true))
+
+      tagName := StrLower(mTag[1])
+      if (HtmlNorm._IsVoidHtmlTag(tagName) || RegExMatch(mTag[0], "/\s*>$")) {
+        endPos := mTag.Pos + mTag.Len - 1
+      } else {
+        endPos := HtmlNorm._FindMatchingElementEnd(html, mTag.Pos, tagName)
+        if !endPos {
+          regions.Push(HtmlNorm._BuildRegion(html, mTag.Pos, len, source))
+          break
         }
+      }
 
-        if (replacements.Length = 0)
-            return html
-
-        out := ""
-        cursor := 1
-        for _, replacement in replacements {
-            startPos := replacement["start"]
-            endPos := replacement["end"]
-            if (startPos > cursor)
-                out .= SubStr(html, cursor, startPos - cursor)
-            out .= replacement["text"]
-            cursor := endPos + 1
-        }
-        if (cursor <= StrLen(html))
-            out .= SubStr(html, cursor)
-        return out
+      regions.Push(HtmlNorm._BuildRegion(html, mTag.Pos, endPos, source))
+      pos := endPos + 1
     }
 
-    static _BuildRegionReplacement(html, region) {
-        if !HtmlNorm._RegionHasWork(region)
-            return ""
+    return regions
+  }
 
-        startPos := region["start"]
-        endPos := region["end"]
-        replacement := SubStr(html, startPos, endPos - startPos + 1)
-        if region["hasChatGptCode"]
-            replacement := HtmlNorm._NormalizeChatGptCodeBlocks(replacement)
-        if region["hasKatex"]
-            replacement := HtmlNorm._NormalizeKatexMath(replacement)
-        if region["hasTaskList"]
-            replacement := HtmlNorm._NormalizeTaskListItems(replacement)
-        if region["hasThinking"]
-            replacement := HtmlNorm._ExtractThinkingBlocks(replacement)
-        if region["hasInlineCode"]
-            replacement := HtmlNorm._PromoteInlineCodeSpans(replacement)
-        if region["hasUserMsg"]
-            replacement := HtmlNorm._ExtractUserMessages(replacement)
-        if region["hasClaudeWebLabel"]
-            replacement := HtmlNorm._StripClaudeWebLanguageLabels(replacement)
-        if region["hasFootnoteHref"]
-            replacement := HtmlNorm._StripFootnoteHrefFragments(replacement)
-        if region["hasFootnoteList"]
-            replacement := HtmlNorm._NormalizeFootnoteListItems(replacement)
-        if region["hasTightList"]
-            replacement := HtmlNorm._NormalizeTightListItems(replacement)
-        if region["hasCodeWork"]
-            replacement := HtmlNorm._NormalizeCodeElements(replacement)
-        if region["hasCodeContainers"]
-            replacement := HtmlNorm._UnwrapNestedContainers(replacement)
-        if region["hasResidualSpan"]
-            replacement := HtmlNorm._StripResidualSpans(replacement)
-        return replacement
+  static _BuildRegion(html, startPos, endPos, source, isText := false) {
+    if (isText) {
+      return Map(
+        "start", startPos,
+        "end", endPos,
+        "kind", "text",
+        "hasChatGptCode", false,
+        "hasKatex", false,
+        "hasTaskList", false,
+        "hasThinking", false,
+        "hasInlineCode", false,
+        "hasUserMsg", false,
+        "hasClaudeWebLabel", false,
+        "hasFootnoteHref", false,
+        "hasFootnoteList", false,
+        "hasTightList", false,
+        "hasCodeWork", false,
+        "hasCodeContainers", false,
+        "hasResidualSpan", false
+      )
     }
 
-    static _RegionHasWork(region) {
-        return region["hasChatGptCode"]
-            || region["hasKatex"]
-            || region["hasTaskList"]
-            || region["hasThinking"]
-            || region["hasInlineCode"]
-            || region["hasUserMsg"]
-            || region["hasClaudeWebLabel"]
-            || region["hasFootnoteHref"]
-            || region["hasFootnoteList"]
-            || region["hasTightList"]
-            || region["hasCodeWork"]
-            || region["hasCodeContainers"]
-            || region["hasResidualSpan"]
+    regionHtml := SubStr(html, startPos, endPos - startPos + 1)
+    kind := ""
+    if RegExMatch(regionHtml, "is)^<([a-z][a-z0-9:-]*)\b", &mOpen)
+      kind := StrLower(mOpen[1])
+
+    return Map(
+      "start", startPos,
+      "end", endPos,
+      "kind", kind,
+      "hasChatGptCode", (source = "chatgpt" && InStr(regionHtml, "overflow-visible")),
+      "hasKatex", InStr(regionHtml, "katex"),
+      "hasTaskList", (InStr(regionHtml, "<li") && (InStr(regionHtml, "task-list-item") || InStr(regionHtml, "todoItem_"))),
+      "hasThinking", (InStr(regionHtml, "<details") && InStr(regionHtml, "thinking")),
+      "hasInlineCode", RegExMatch(regionHtml, "i)<span\b[^>]*\bclass\s*=\s*['`"][^'`"]*\b(?:inline-markdown|font-mono)\b"),
+      "hasUserMsg", HtmlNorm._HasUserMessageRegionWork(regionHtml),
+      "hasClaudeWebLabel", HtmlNorm._HasClaudeWebLanguageLabelWork(regionHtml),
+      "hasFootnoteHref", HtmlNorm._HasFootnoteHrefWork(regionHtml),
+      "hasFootnoteList", HtmlNorm._HasFootnoteListWork(regionHtml),
+      "hasTightList", HtmlNorm._HasTightListWork(regionHtml),
+      "hasCodeWork", HtmlNorm._HasCodeWork(regionHtml),
+      "hasCodeContainers", HtmlNorm._HasCodeContainerWork(regionHtml),
+      "hasResidualSpan", HtmlNorm._HasResidualSpanWork(regionHtml)
+    )
+  }
+
+  static _HasRegionScopedWork(html, source) {
+    if (source = "chatgpt" && InStr(html, "overflow-visible"))
+      return true
+    if (InStr(html, "katex"))
+      return true
+    if (InStr(html, "<details") && InStr(html, "thinking"))
+      return true
+    if (InStr(html, "<li") && (InStr(html, "task-list-item") || InStr(html, "todoItem_")))
+      return true
+    if RegExMatch(html, "i)<span\b[^>]*\bclass\s*=\s*['`"][^'`"]*\b(?:inline-markdown|font-mono)\b")
+      return true
+    if HtmlNorm._HasUserMessageRegionWork(html)
+      return true
+    if HtmlNorm._HasClaudeWebLanguageLabelWork(html)
+      return true
+    if HtmlNorm._HasFootnoteHrefWork(html)
+      return true
+    if HtmlNorm._HasFootnoteListWork(html)
+      return true
+    if HtmlNorm._HasTightListWork(html)
+      return true
+    if HtmlNorm._HasCodeWork(html)
+      return true
+    if HtmlNorm._HasCodeContainerWork(html)
+      return true
+    if HtmlNorm._HasResidualSpanWork(html)
+      return true
+    return false
+  }
+
+  static _HasUserMessageRegionWork(html) {
+    if RegExMatch(html, "i)<div\b[^>]*\btext-size-chat\b[^>]*\bwhitespace-pre-wrap\b")
+      return true
+    if RegExMatch(html, "i)<div\b[^>]*\bcontent_xGDvVg\b")
+      return true
+    if RegExMatch(html, "i)<p\b[^>]*\bclass\s*=\s*['`"]whitespace-pre-wrap break-words['`"]")
+      return true
+    if RegExMatch(html, "i)<div\b[^>]*\bclass\s*=\s*['`"]whitespace-pre-wrap['`"]")
+      return true
+    return false
+  }
+
+  static _HasClaudeWebLanguageLabelWork(html) {
+    return RegExMatch(html, "i)<div\b[^>]*\bclass\s*=\s*['`"][^'`"]*\bfont-small\b[^'`"]*\bp-3")
+  }
+
+  static _HasFootnoteHrefWork(html) {
+    return RegExMatch(html, "i)href=`"[^`"]*#user-content-[^`"]*`"")
+  }
+
+  static _HasFootnoteListWork(html) {
+    return RegExMatch(html, "i)<li\b[^>]*\bid=`"user-content-fn-[^`"]*`"[^>]*>\s*<p\b")
+  }
+
+  static _HasTightListWork(html) {
+    return (InStr(html, "<li") && InStr(html, "<p"))
+  }
+
+  static _HasCodeWork(html) {
+    return (InStr(html, "<code") || InStr(html, "<pre"))
+  }
+
+  static _HasCodeContainerWork(html) {
+    if (InStr(html, "<pre") && InStr(html, "<code"))
+      return true
+    if RegExMatch(html, "i)<div\b")
+      return true
+    return false
+  }
+
+  static _HasResidualSpanWork(html) {
+    return InStr(html, "<span")
+  }
+
+  static _IsVoidHtmlTag(tagName) {
+    static voidTags := Map(
+      "area", true,
+      "base", true,
+      "br", true,
+      "col", true,
+      "embed", true,
+      "hr", true,
+      "img", true,
+      "input", true,
+      "link", true,
+      "meta", true,
+      "param", true,
+      "source", true,
+      "track", true,
+      "wbr", true
+    )
+    return voidTags.Has(tagName)
+  }
+
+  ; ─────────────────────────────────────────────────────────────────────────
+  ; Phase methods
+  ; ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Replaces `<img>` and `<svg>` elements according to the showImg flag.
+   *
+   * When showImg is false:
+   *   - No accessible text (alt / title / aria-label / SVG `<title>`): dropped.
+   *   - Has accessible text: replaced with `(img: <text>)`.
+   *
+   * When showImg is true, leaves elements in place for pandoc.
+   *
+   * @param {string} html
+   * @param {boolean} showImg
+   * @returns {string}
+   */
+  static _ProcessImgTags(html, showImg) {
+    if showImg
+      return html
+    ; <img> tags (self-closing).
+    pos := 1
+    while RegExMatch(html, "i)<img\b([^>]*?)>", &m, pos) {
+      attrs := m[1]
+      accessText := ""
+      if (RegExMatch(attrs, "i)\balt\s*=\s*['`"]([^'`"]*)[`"']", &mA) && mA[1] != "")
+        accessText := mA[1]
+      else if (RegExMatch(attrs, "i)\btitle\s*=\s*['`"]([^'`"]*)[`"']", &mT) && mT[1] != "")
+        accessText := mT[1]
+      else if (RegExMatch(attrs, "i)\baria-label\s*=\s*['`"]([^'`"]*)[`"']", &mL) && mL[1] != "")
+        accessText := mL[1]
+      replacement := (accessText = "") ? "" : "(img: " . accessText . ")"
+      html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
+      pos := m.Pos + StrLen(replacement)
     }
-
-    static _PromoteInlineCodeSpans(html) {
-        return RegExReplace(
-            html,
-            "is)<span\b[^>]*\bclass=`"[^`"]*\b(?:inline-markdown|font-mono)\b[^`"]*`"[^>]*>(.*?)</span>",
-            "<code>$1</code>"
-        )
+    ; <svg>…</svg> elements — same rule, checking aria-label, title attr, or <title> child.
+    pos := 1
+    while RegExMatch(html, "is)<svg\b([^>]*)>.*?</svg>", &m, pos) {
+      attrs := m[1]
+      full  := m[0]
+      accessText := ""
+      if (RegExMatch(attrs, "i)\baria-label\s*=\s*['`"]([^'`"]*)[`"']", &mL) && mL[1] != "")
+        accessText := mL[1]
+      else if (RegExMatch(attrs, "i)\btitle\s*=\s*['`"]([^'`"]*)[`"']", &mT) && mT[1] != "")
+        accessText := mT[1]
+      else if (RegExMatch(full, "i)<title\b[^>]*>(.*?)</title>", &mTc) && mTc[1] != "")
+        accessText := HtmlNorm._DecodeBasicHtmlEntities(mTc[1])
+      replacement := (accessText = "") ? "" : "(img: " . accessText . ")"
+      html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
+      pos := m.Pos + StrLen(replacement)
     }
+    return html
+  }
 
-    static _StripClaudeWebLanguageLabels(html) {
-        return RegExReplace(
-            html,
-            "is)<div\b[^>]*\bclass=`"[^`"]*\bfont-small\b[^`"]*\bp-3[^`"]*`"[^>]*>.*?</div>",
-            ""
-        )
+  /**
+   * Injects ¤POSTER_AI¤ / ¤POSTER_User¤ paragraph placeholders at the start
+   * of each detected message container.  Only the patterns for the detected
+   * source are applied; this prevents cross-source false positives (e.g. the
+   * Codex flex-col patterns matching inner divs inside ChatGPT articles).
+   * @param {string} html
+   * @param {string} source - Source identifier from DetectSource()
+   * @returns {string}
+   */
+  static _InjectPosterPlaceholders(html, source) {
+    if (source = "claudecode") {
+      ; AI turn
+      html := RegExReplace(html, "i)(<div\b[^>]*\bdata-testid=`"assistant-message`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
+      ; user turn (class has both message_* and userMessageContainer_*)
+      html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bmessage_\w+\s+[^`"]*\buserMessageContainer_[^>]*>)", "$1<p>¤POSTER_User¤</p>")
+    } else if (source = "codex") {
+      ; AI turn (group min-w-0 flex-col)
+      html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bgroup\b[^`"]*\bmin-w-0\b[^`"]*\bflex-col\b[^`"]*`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
+      ; user turn (flex-col items-end)
+      html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bflex-col\b[^`"]*\bitems-end\b[^`"]*`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
+    } else if (source = "claudeweb") {
+      ; AI turn (data-is-streaming or font-claude-response)
+      html := RegExReplace(html, "i)(<div\b[^>]*(?:\bdata-is-streaming\b|\bclass=`"[^`"]*\bfont-claude-response\b[^`"]*`")[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
+      ; user turn (data-testid="user-message")
+      html := RegExReplace(html, "i)(<div\b[^>]*\bdata-testid=`"user-message`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
+    } else if (source = "chatgpt") {
+      ; AI turn: prefer data-turn="assistant"; fall back to legacy data-turn-id="request-WEB:..." prefix.
+      ; Both patterns may match the same article in older captures — the duplicate dedup in
+      ; PasteMarkdown collapses consecutive same-type markers, so double injection is harmless.
+      html := RegExReplace(html, "i)(<article\b[^>]*\bdata-turn=`"assistant`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
+      html := RegExReplace(html, "i)(<article\b[^>]*\bdata-turn-id=`"request-WEB:[^`"]*`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
+      ; User turn: prefer data-turn="user"; fall back to legacy plain-UUID data-turn-id.
+      html := RegExReplace(html, "i)(<article\b[^>]*\bdata-turn=`"user`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
     }
+    return html
+  }
 
-    static _StripFootnoteHrefFragments(html) {
-        return RegExReplace(html, "i)href=`"[^`"]*#(user-content-[^`"]*)`"", "href=`"#$1`"")
+  /**
+   * Converts VS Code chat/tool diff widgets to canonical HTML diff code blocks.
+   *
+   * Input shape (Codex/Claude tool output):
+   * - <diffs-container ...>
+   *   - many <div data-line-type="...">...</div> rows with line text
+   *
+   * Output shape:
+   * - <pre><code class="language-diff">...</code></pre>
+   *
+   * Also preserves the edited filename when present in a nearby header button
+   * (for example "test-paste-md-fixtures.ahk") by inserting a short
+   * `<p><code>filename</code></p>` line before the diff block.
+   *
+   * Line-type mapping:
+   * - deletion rows => '-' prefix
+   * - addition rows => '+' prefix
+   * - context/other rows => ' ' prefix
+   *
+   * @param {string} html
+   * @returns {string}
+   */
+  static _NormalizeSimpleDiffBlocks(html) {
+    pos := 1
+    while RegExMatch(html, "is)<diffs-container\b[^>]*>(.*?)</diffs-container>", &mDiff, pos) {
+      inner := mDiff[1]
+      fileName := ""
+      ; The editable filename appears in a button before the diff block.
+      ; Some captures include very large inline style payloads between header
+      ; and diff body, so scan the full prefix and keep the last non-empty
+      ; button label.
+      before := SubStr(html, 1, mDiff.Pos - 1)
+      btnPos := 1
+      while RegExMatch(before, "is)<button\b[^>]*>(.*?)</button>", &mBtn, btnPos) {
+        btnText := RegExReplace(mBtn[1], "<[^>]++>", "")
+        btnText := HtmlNorm._DecodeBasicHtmlEntities(btnText)
+        btnText := Trim(btnText, " `t`r`n")
+        if (btnText != "")
+          fileName := btnText
+        btnPos := mBtn.Pos + mBtn.Len
+      }
+      linePos := 1
+      diffLines := []
+      while RegExMatch(inner, "is)<div\b[^>]*\bdata-line-type\s*=\s*['`"]([^'`"]+)['`"][^>]*>(.*?)</div>", &mLine, linePos) {
+        lineType := StrLower(mLine[1])
+        lineHtml := mLine[2]
+        lineText := RegExReplace(lineHtml, "<[^>]++>", "")
+        lineText := HtmlNorm._DecodeBasicHtmlEntities(lineText)
+        lineText := Trim(lineText, "`n")
+        prefix := " "
+        if InStr(lineType, "deletion")
+          prefix := "-"
+        else if InStr(lineType, "addition")
+          prefix := "+"
+        diffLines.Push(prefix . lineText)
+        linePos := mLine.Pos + mLine.Len
+      }
+
+      if (diffLines.Length = 0) {
+        pos := mDiff.Pos + mDiff.Len
+        continue
+      }
+
+      diffText := ""
+      for _, line in diffLines
+        diffText .= (diffText = "" ? "" : "`n") . line
+
+      ; Escape for safe embedding inside <code>.
+      diffText := StrReplace(diffText, "&", "&amp;")
+      diffText := StrReplace(diffText, "<", "&lt;")
+      diffText := StrReplace(diffText, ">", "&gt;")
+
+      header := ""
+      if (fileName != "") {
+        fileNameEsc := StrReplace(fileName, "&", "&amp;")
+        fileNameEsc := StrReplace(fileNameEsc, "<", "&lt;")
+        fileNameEsc := StrReplace(fileNameEsc, ">", "&gt;")
+        header := "<p><code>" . fileNameEsc . "</code></p>"
+      }
+
+      replacement := header . '<pre><code class="language-diff">' . diffText . '</code></pre>'
+      html := SubStr(html, 1, mDiff.Pos - 1) . replacement . SubStr(html, mDiff.Pos + mDiff.Len)
+      pos := mDiff.Pos + StrLen(replacement)
     }
+    return html
+  }
 
-    static _NormalizeFootnoteListItems(html) {
-        return RegExReplace(
-            html,
-            "is)(<li\b[^>]*\bid=`"user-content-fn-[^`"]*`"[^>]*>)\s*<p\b[^>]*>(.*?)</p>\s*(</li>)",
-            "$1$2$3"
-        )
+  /**
+   * Converts ChatGPT CodeMirror code blocks to canonical `<pre><code>` form.
+   *
+   * ChatGPT renders code blocks as `<pre class="overflow-visible! ...">` wrapping
+   * a deeply nested CodeMirror viewer.  Pandoc interprets the class on `<pre>`
+   * as a language tag, producing ` ```overflow-visible! ` fences.
+   *
+   * This method finds such `<pre>` blocks, strips all inner HTML tags, and
+   * re-emits the code as `<pre><code>entity-safe text</code></pre>`.
+   *
+   * Must be called before span-stripping so that the structural divs are
+   * still present (their stripping is idempotent here since they carry no text).
+   *
+   * @param {string} html
+   * @returns {string}
+   */
+  static _NormalizeChatGptCodeBlocks(html) {
+    pos := 1
+    while RegExMatch(html, "is)<pre\b[^>]*\boverflow-visible\b[^>]*>(.*?)</pre>", &m, pos) {
+      inner := m[1]
+      ; Convert <br> to newlines before stripping all other tags.
+      inner := RegExReplace(inner, "i)<br\b[^>]*>", "`n")
+      ; Strip all HTML tags — leaves only the plain code text plus structural whitespace.
+      codeText := RegExReplace(inner, "<[^>]++>", "")
+      codeText := Trim(codeText, " `t`n")
+      if (codeText = "") {
+        pos := m.Pos + m.Len
+        continue
+      }
+      ; Decode HTML entities so the raw code characters are correct.
+      codeText := HtmlNorm._DecodeBasicHtmlEntities(codeText)
+      ; Re-encode for safe embedding inside <code>…</code>.
+      codeText := StrReplace(codeText, "&", "&amp;")
+      codeText := StrReplace(codeText, "<", "&lt;")
+      codeText := StrReplace(codeText, ">", "&gt;")
+      replacement := "<pre><code>" . codeText . "</code></pre>"
+      html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
+      pos := m.Pos + StrLen(replacement)
     }
+    return html
+  }
 
-    static _StripResidualSpans(html) {
-        return RegExReplace(html, "i)</?+span\b[^>]*+>", "")
+  /**
+   * Collapses KaTeX wrapper spans to semantic MathML only.
+   *
+   * KaTeX emits sibling branches inside `<span class="katex">`:
+   * - `<span class="katex-mathml">...</span>` semantic source
+   * - `<span class="katex-html" ...>...</span>` visual layout fallback
+   *
+   * The generic residual-span stripper removes the wrapper tags but leaves the
+   * visual branch text behind, which duplicates math as flattened garbage.
+   *
+   * @param {string} html
+   * @returns {string}
+   */
+  static _NormalizeKatexMath(html) {
+    pos := 1
+    patKatex := "is)<span\b[^>]*\bclass\s*=\s*['`"][^'`"]*(?<![-\w])katex(?![-\w])[^'`"]*['`"][^>]*>"
+    while RegExMatch(html, patKatex, &mKatex, pos) {
+      if (mKatex.Pos != pos && mKatex.Pos < pos)
+        break
+      katexEnd := HtmlNorm._FindMatchingElementEnd(html, mKatex.Pos, "span")
+      if !katexEnd {
+        pos := mKatex.Pos + mKatex.Len
+        continue
+      }
+      katexBlock := SubStr(html, mKatex.Pos, katexEnd - mKatex.Pos + 1)
+      collapsed := HtmlNorm._CollapseKatexSpanBlock(katexBlock)
+      if (collapsed = katexBlock) {
+        pos := katexEnd + 1
+        continue
+      }
+      html := SubStr(html, 1, mKatex.Pos - 1) . collapsed . SubStr(html, katexEnd + 1)
+      pos := mKatex.Pos + StrLen(collapsed)
     }
+    return html
+  }
 
-    /**
-     * Discovers top-level HTML spans and annotates the scoped-transform features
-     * for each span without storing detached working copies.
-     * @param {string} html
-     * @param {string} source
-     * @returns {Array}
-     */
-    static _DiscoverRegions(html, source) {
-        regions := []
-        pos := 1
-        len := StrLen(html)
-        tagPat := "is)<([a-z][a-z0-9:-]*)\b[^>]*>"
+  /**
+   * Returns semantic MathML from a `<span class="katex">...</span>` block when
+   * its only substantive children are `katex-mathml` and `katex-html`.
+   * @param {string} katexBlock
+   * @returns {string}
+   */
+  static _CollapseKatexSpanBlock(katexBlock) {
+    if !RegExMatch(katexBlock, "is)^<span\b[^>]*>", &mOpen)
+      return katexBlock
 
-        while (pos <= len) {
-            if !RegExMatch(html, tagPat, &mTag, pos) {
-                regions.Push(HtmlNorm._BuildRegion(html, pos, len, source, true))
-                break
-            }
+    closeLen := StrLen("</span>")
+    innerLen := StrLen(katexBlock) - mOpen.Len - closeLen
+    if (innerLen < 0)
+      return katexBlock
+    inner := SubStr(katexBlock, mOpen.Len + 1, innerLen)
 
-            if (mTag.Pos > pos)
-                regions.Push(HtmlNorm._BuildRegion(html, pos, mTag.Pos - 1, source, true))
+    pos := HtmlNorm._SkipHtmlWhitespace(inner, 1)
+    if !RegExMatch(inner, "is)<span\b[^>]*\bclass\s*=\s*['`"][^'`"]*(?<![-\w])katex-mathml(?![-\w])[^'`"]*['`"][^>]*>", &mMath, pos)
+      return katexBlock
+    if (mMath.Pos != pos)
+      return katexBlock
+    mathEnd := HtmlNorm._FindMatchingElementEnd(inner, pos, "span")
+    if !mathEnd
+      return katexBlock
+    mathBlock := SubStr(inner, pos, mathEnd - pos + 1)
+    if !RegExMatch(mathBlock, "is)^<span\b[^>]*>", &mMathOpen)
+      return katexBlock
+    mathInnerLen := StrLen(mathBlock) - mMathOpen.Len - closeLen
+    if (mathInnerLen < 0)
+      return katexBlock
+    mathInner := SubStr(mathBlock, mMathOpen.Len + 1, mathInnerLen)
 
-            tagName := StrLower(mTag[1])
-            if (HtmlNorm._IsVoidHtmlTag(tagName) || RegExMatch(mTag[0], "/\s*>$")) {
-                endPos := mTag.Pos + mTag.Len - 1
-            } else {
-                endPos := HtmlNorm._FindMatchingElementEnd(html, mTag.Pos, tagName)
-                if !endPos {
-                    regions.Push(HtmlNorm._BuildRegion(html, mTag.Pos, len, source))
-                    break
-                }
-            }
+    pos := HtmlNorm._SkipHtmlWhitespace(inner, mathEnd + 1)
+    if !RegExMatch(inner, "is)<span\b[^>]*\bclass\s*=\s*['`"][^'`"]*(?<![-\w])katex-html(?![-\w])[^'`"]*['`"][^>]*>", &mHtml, pos)
+      return katexBlock
+    if (mHtml.Pos != pos)
+      return katexBlock
+    htmlEnd := HtmlNorm._FindMatchingElementEnd(inner, pos, "span")
+    if !htmlEnd
+      return katexBlock
 
-            regions.Push(HtmlNorm._BuildRegion(html, mTag.Pos, endPos, source))
-            pos := endPos + 1
-        }
+    pos := HtmlNorm._SkipHtmlWhitespace(inner, htmlEnd + 1)
+    if (pos <= StrLen(inner))
+      return katexBlock
+    return mathInner
+  }
 
-        return regions
+  /**
+   * Normalizes task-list `<li>` elements to a canonical checkbox-input form.
+   *
+   * Processes any `<li class="task-list-item">` that contains
+   * `<input type="checkbox">`, regardless of whether the input is a direct
+   * child or wrapped in a `<p>` tag (as ChatGPT does).
+   *
+   * Output form is:
+   *   <li><input type="checkbox" disabled [checked] /> text</li>
+   *
+   * This lets pandoc emit GFM task-list markers natively.
+   *
+   * @param {string} html
+   * @returns {string}
+   */
+  static _NormalizeTaskListItems(html) {
+    pos := 1
+    while RegExMatch(html, "is)<li\b([^>]*)>(.*?)</li>", &mTask, pos) {
+      liAttrs := mTask[1]
+      liInner := mTask[2]
+      ; Supported task-list containers:
+      ; - Standard markdown renderers: class contains task-list-item
+      ; - Claude Code todo tool rows: class contains todoItem_*
+      if (!RegExMatch(liAttrs, "i)\btask-list-item\b")
+        && !RegExMatch(liAttrs, "i)\btodoItem_")) {
+        pos := mTask.Pos + mTask.Len
+        continue
+      }
+      ; Find <input type="checkbox"> anywhere inside the item
+      ; (direct child OR inside a <p> wrapper, as ChatGPT does).
+      if !RegExMatch(liInner, "is)<input\b[^>]*\btype\s*=\s*['`"]checkbox['`"][^>]*>", &mInput) {
+        pos := mTask.Pos + mTask.Len
+        continue
+      }
+      checked := RegExMatch(liInner, "i)\bchecked\b")
+      if (!checked) {
+        if RegExMatch(liAttrs, "i)\bcompleted_")
+          checked := true
+        else if RegExMatch(liInner, "i)\btext-decoration\s*:\s*line-through\b")
+          checked := true
+      }
+      ; Capture text that follows the <input> tag.
+      text := SubStr(liInner, mInput.Pos + mInput.Len)
+      text := RegExReplace(text, "is)<span\b[^>]*>\s*</span>", "")
+      text := RegExReplace(text, "<[^>]++>", "")
+      text := HtmlNorm._DecodeBasicHtmlEntities(text)
+      text := Trim(text, " `t`r`n" . Chr(160))
+      ; Re-encode for HTML context.
+      text := StrReplace(text, "&", "&amp;")
+      text := StrReplace(text, "<", "&lt;")
+      text := StrReplace(text, ">", "&gt;")
+      inputTag := checked
+        ? '<input type="checkbox" disabled checked />'
+        : '<input type="checkbox" disabled />'
+      replacement := "<li>" . inputTag
+      if (text != "")
+        replacement .= " " . text
+      replacement .= "</li>"
+      html := SubStr(html, 1, mTask.Pos - 1) . replacement . SubStr(html, mTask.Pos + mTask.Len)
+      pos := mTask.Pos + StrLen(replacement)
     }
+    return html
+  }
 
-    static _BuildRegion(html, startPos, endPos, source, isText := false) {
-        if (isText) {
-            return Map(
-                "start", startPos,
-                "end", endPos,
-                "kind", "text",
-                "hasChatGptCode", false,
-                "hasKatex", false,
-                "hasTaskList", false,
-                "hasThinking", false,
-                "hasInlineCode", false,
-                "hasUserMsg", false,
-                "hasClaudeWebLabel", false,
-                "hasFootnoteHref", false,
-                "hasFootnoteList", false,
-                "hasTightList", false,
-                "hasCodeWork", false,
-                "hasCodeContainers", false,
-                "hasResidualSpan", false
-            )
-        }
+  /**
+   * Unwraps solitary `<p>` wrappers inside list items.
+   * Only applies to simple `<li><p>...</p></li>` shapes.
+   * @param {string} html
+   * @returns {string}
+   */
+  static _NormalizeTightListItems(html) {
+    if !RegExMatch(html, "i)<li\b")
+      return html
+    if !RegExMatch(html, "i)<p\b")
+      return html
+    ; Case 1: list-item lead paragraph followed by nested list.
+    html := RegExReplace(
+      html,
+      "is)(<li\b[^>]*>)\s*<p\b[^>]*>((?:(?!</p>|<ul\b|<ol\b|<li\b).)++)</p>\s*((?:<ul\b|<ol\b))",
+      "$1$2$3"
+    )
+    ; Case 2: leaf list item with only a paragraph wrapper.
+    html := RegExReplace(
+      html,
+      "is)(<li\b[^>]*>)\s*<p\b[^>]*>((?:(?!</p>|<ul\b|<ol\b|<li\b).)++)</p>\s*(</li>)",
+      "$1$2$3"
+    )
+    return html
+  }
 
-        regionHtml := SubStr(html, startPos, endPos - startPos + 1)
-        kind := ""
-        if RegExMatch(regionHtml, "is)^<([a-z][a-z0-9:-]*)\b", &mOpen)
-            kind := StrLower(mOpen[1])
-
-        return Map(
-            "start", startPos,
-            "end", endPos,
-            "kind", kind,
-            "hasChatGptCode", (source = "chatgpt" && InStr(regionHtml, "overflow-visible")),
-            "hasKatex", InStr(regionHtml, "katex"),
-            "hasTaskList", (InStr(regionHtml, "<li") && (InStr(regionHtml, "task-list-item") || InStr(regionHtml, "todoItem_"))),
-            "hasThinking", (InStr(regionHtml, "<details") && InStr(regionHtml, "thinking")),
-            "hasInlineCode", RegExMatch(regionHtml, "i)<span\b[^>]*\bclass\s*=\s*['`"][^'`"]*\b(?:inline-markdown|font-mono)\b"),
-            "hasUserMsg", HtmlNorm._HasUserMessageRegionWork(regionHtml),
-            "hasClaudeWebLabel", HtmlNorm._HasClaudeWebLanguageLabelWork(regionHtml),
-            "hasFootnoteHref", HtmlNorm._HasFootnoteHrefWork(regionHtml),
-            "hasFootnoteList", HtmlNorm._HasFootnoteListWork(regionHtml),
-            "hasTightList", HtmlNorm._HasTightListWork(regionHtml),
-            "hasCodeWork", HtmlNorm._HasCodeWork(regionHtml),
-            "hasCodeContainers", HtmlNorm._HasCodeContainerWork(regionHtml),
-            "hasResidualSpan", HtmlNorm._HasResidualSpanWork(regionHtml)
-        )
+  /**
+   * Extracts `<details class="thinking">` blocks into ¤THINKING_N¤ placeholders.
+   * The inner text (summary removed, tags stripped) is stored in `_thinkingBlocks`.
+   * `PasteMd.RestoreThinkingBlocks()` restores them after pandoc.
+   * @param {string} html
+   * @returns {string}
+   */
+  static _ExtractThinkingBlocks(html) {
+    pos := 1
+    while RegExMatch(html, "is)<details\b[^>]*\bclass=`"[^`"]*\bthinking\b[^`"]*`"[^>]*>(.*?)</details>", &m, pos) {
+      inner := m[1]
+      inner := RegExReplace(inner, "is)<summary\b[^>]*>.*?</summary>", "")
+      inner := RegExReplace(inner, "<[^>]++>", "")
+      inner := HtmlNorm._DecodeBasicHtmlEntities(inner)
+      inner := Trim(inner, " `t`n`r")
+      HtmlNorm._thinkingBlocks.Push(inner)
+      placeholder := "¤THINKING_" . HtmlNorm._thinkingBlocks.Length . "¤"
+      html := SubStr(html, 1, m.Pos - 1) . placeholder . SubStr(html, m.Pos + m.Len)
+      pos := m.Pos + StrLen(placeholder)
     }
+    return html
+  }
 
-    static _HasRegionScopedWork(html, source) {
-        if (source = "chatgpt" && InStr(html, "overflow-visible"))
-            return true
-        if (InStr(html, "katex"))
-            return true
-        if (InStr(html, "<details") && InStr(html, "thinking"))
-            return true
-        if (InStr(html, "<li") && (InStr(html, "task-list-item") || InStr(html, "todoItem_")))
-            return true
-        if RegExMatch(html, "i)<span\b[^>]*\bclass\s*=\s*['`"][^'`"]*\b(?:inline-markdown|font-mono)\b")
-            return true
-        if HtmlNorm._HasUserMessageRegionWork(html)
-            return true
-        if HtmlNorm._HasClaudeWebLanguageLabelWork(html)
-            return true
-        if HtmlNorm._HasFootnoteHrefWork(html)
-            return true
-        if HtmlNorm._HasFootnoteListWork(html)
-            return true
-        if HtmlNorm._HasTightListWork(html)
-            return true
-        if HtmlNorm._HasCodeWork(html)
-            return true
-        if HtmlNorm._HasCodeContainerWork(html)
-            return true
-        if HtmlNorm._HasResidualSpanWork(html)
-            return true
-        return false
+  /**
+   * Extracts whitespace-sensitive user message text into ¤USERMSG_N¤ placeholders.
+   *
+   * Four container types are handled (all source-specific enough to avoid false
+   * positives without explicit source gating):
+   *
+   * - Codex: `<div class="text-size-chat whitespace-pre-wrap">` with mixed
+   *   `<span>` and `<code class="font-mono">` children.
+   * - Claude Code: `<div class="content_xGDvVg">` with a single `<span>` child.
+   * - Claude Web: `<p class="whitespace-pre-wrap break-words">` — plain text with
+   *   embedded literal newlines; `<br>` tags possible.
+   * - ChatGPT: `<div class="whitespace-pre-wrap">` (exact sole class value) —
+   *   plain text with embedded literal newlines.
+   *
+   * `PasteMd.RestoreUserMsgBlocks()` restores the plain text after pandoc.
+   * @param {string} html
+   * @returns {string}
+   */
+  static _ExtractUserMessages(html) {
+    ; Codex user messages: <div class="text-size-chat whitespace-pre-wrap">
+    pos := 1
+    while RegExMatch(html, "is)(<div\b[^>]*\btext-size-chat\b[^>]*\bwhitespace-pre-wrap\b[^>]*>)(.*?)</div>", &m, pos) {
+      rawContent := m[2]
+      rawContent := RegExReplace(rawContent, "is)<code\b[^>]*\bfont-mono\b[^>]*>(.*?)</code>", "``$1``")
+      rawContent := RegExReplace(rawContent, "i)</?span\b[^>]*>", "")
+      rawContent := RegExReplace(rawContent, "<[^>]++>", "")
+      rawContent := HtmlNorm._DecodeBasicHtmlEntities(rawContent)
+      rawContent := Trim(rawContent, "`n")
+      HtmlNorm._userMsgBlocks.Push(rawContent)
+      placeholder := "<p>¤USERMSG_" . HtmlNorm._userMsgBlocks.Length . "¤</p>"
+      newStr := m[1] . placeholder . "</div>"
+      html := SubStr(html, 1, m.Pos - 1) . newStr . SubStr(html, m.Pos + m.Len)
+      pos := m.Pos + StrLen(newStr)
     }
-
-    static _HasUserMessageRegionWork(html) {
-        if RegExMatch(html, "i)<div\b[^>]*\btext-size-chat\b[^>]*\bwhitespace-pre-wrap\b")
-            return true
-        if RegExMatch(html, "i)<div\b[^>]*\bcontent_xGDvVg\b")
-            return true
-        if RegExMatch(html, "i)<p\b[^>]*\bclass\s*=\s*['`"]whitespace-pre-wrap break-words['`"]")
-            return true
-        if RegExMatch(html, "i)<div\b[^>]*\bclass\s*=\s*['`"]whitespace-pre-wrap['`"]")
-            return true
-        return false
+    ; Claude Code user messages: <div class="content_xGDvVg"><span>text</span>
+    pos := 1
+    while RegExMatch(html, "is)(<div\b[^>]*\bcontent_xGDvVg\b[^>]*>)\s*<span>(.*?)</span>", &m, pos) {
+      rawText := HtmlNorm._DecodeBasicHtmlEntities(m[2])
+      HtmlNorm._userMsgBlocks.Push(rawText)
+      placeholder := "<p>¤USERMSG_" . HtmlNorm._userMsgBlocks.Length . "¤</p>"
+      newStr := m[1] . placeholder
+      html := SubStr(html, 1, m.Pos - 1) . newStr . SubStr(html, m.Pos + m.Len)
+      pos := m.Pos + StrLen(newStr)
     }
-
-    static _HasClaudeWebLanguageLabelWork(html) {
-        return RegExMatch(html, "i)<div\b[^>]*\bclass\s*=\s*['`"][^'`"]*\bfont-small\b[^'`"]*\bp-3")
+    ; Claude Web user messages: <p class="whitespace-pre-wrap break-words">
+    ; Replace the entire <p>...</p> with the placeholder (not nested inside the
+    ; original <p>, which would produce invalid nested <p> elements).
+    pos := 1
+    while RegExMatch(html, "is)(<p\b[^>]*\bclass=`"whitespace-pre-wrap break-words`"[^>]*>)(.*?)</p>", &m, pos) {
+      rawContent := m[2]
+      rawContent := RegExReplace(rawContent, "i)<br\b[^>]*>", "`n")
+      rawContent := RegExReplace(rawContent, "<[^>]++>", "")
+      rawContent := HtmlNorm._DecodeBasicHtmlEntities(rawContent)
+      rawContent := Trim(rawContent, "`n")
+      HtmlNorm._userMsgBlocks.Push(rawContent)
+      placeholder := "<p>¤USERMSG_" . HtmlNorm._userMsgBlocks.Length . "¤</p>"
+      html := SubStr(html, 1, m.Pos - 1) . placeholder . SubStr(html, m.Pos + m.Len)
+      pos := m.Pos + StrLen(placeholder)
     }
-
-    static _HasFootnoteHrefWork(html) {
-        return RegExMatch(html, "i)href=`"[^`"]*#user-content-[^`"]*`"")
+    ; ChatGPT user messages: <div class="whitespace-pre-wrap"> (exact sole class).
+    ; Exact-value match avoids re-matching Codex's "text-size-chat whitespace-pre-wrap"
+    ; outer tag, which still carries the class after Codex extraction above.
+    ; Replace the entire <div>...</div> with the placeholder.
+    pos := 1
+    while RegExMatch(html, "is)(<div\b[^>]*\bclass=`"whitespace-pre-wrap`"[^>]*>)(.*?)</div>", &m, pos) {
+      rawContent := m[2]
+      rawContent := RegExReplace(rawContent, "i)<br\b[^>]*>", "`n")
+      rawContent := RegExReplace(rawContent, "<[^>]++>", "")
+      rawContent := HtmlNorm._DecodeBasicHtmlEntities(rawContent)
+      rawContent := Trim(rawContent, "`n")
+      HtmlNorm._userMsgBlocks.Push(rawContent)
+      placeholder := "<p>¤USERMSG_" . HtmlNorm._userMsgBlocks.Length . "¤</p>"
+      html := SubStr(html, 1, m.Pos - 1) . placeholder . SubStr(html, m.Pos + m.Len)
+      pos := m.Pos + StrLen(placeholder)
     }
+    return html
+  }
 
-    static _HasFootnoteListWork(html) {
-        return RegExMatch(html, "i)<li\b[^>]*\bid=`"user-content-fn-[^`"]*`"[^>]*>\s*<p\b")
+  /**
+   * Processes each `<code>` element: converts `<br>` and `</div><div>` sequences
+   * to newlines, strips inner tags, and wraps multi-line content in `<pre>` if
+   * not already inside one.  Preserves `class="language-xxx"` on the `<code>`
+   * element while discarding other CSS utility classes.
+   * @param {string} html
+   * @returns {string}
+   */
+  static _NormalizeCodeElements(html) {
+    pos := 1
+    while RegExMatch(html, "is)<code\b([^>]*)>(.*?)</code>", &m, pos) {
+      content := m[2]
+      attrs   := m[1]
+      ; Normalize line-break representations inside the code.
+      content := RegExReplace(content, "i)<br\b[^>]*>", "`n")
+      content := RegExReplace(content, "i)</div>\s*<div\b[^>]*>", "`n")
+      content := RegExReplace(content, "<[^>]++>", "")
+      if InStr(content, "`n") {
+        content := HtmlNorm._DecodeBasicHtmlEntities(content)
+        ; Extract language identifier; discard pure-CSS classes.
+        langAttr := ""
+        if RegExMatch(attrs, "i)language-(\w+)", &langM)
+          langAttr := ' class="language-' . langM[1] . '"'
+        ; Check whether this <code> is already the direct child of a <pre>.
+        beforeSnippet := SubStr(html, Max(1, m.Pos - 100), Min(100, m.Pos - 1))
+        if RegExMatch(beforeSnippet, "i)<pre\b[^>]*>\s*$")
+          replacement := "<code" . langAttr . ">" . content . "</code>"
+        else
+          replacement := "<pre><code" . langAttr . ">" . content . "</code></pre>"
+      } else {
+        ; Single-line: leave as inline <code>.
+        replacement := "<code" . attrs . ">" . content . "</code>"
+      }
+      html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
+      pos := m.Pos + StrLen(replacement)
     }
+    return html
+  }
 
-    static _HasTightListWork(html) {
-        return (InStr(html, "<li") && InStr(html, "<p"))
+  /**
+   * Unwraps redundant container elements that wrap canonical `<pre><code>` blocks.
+   * Repeats until no further simplification is possible.
+   * @param {string} html
+   * @returns {string}
+   */
+  static _UnwrapNestedContainers(html) {
+    prev := ""
+    while (html != prev) {
+      prev := html
+      ; Outer <pre class="..."> wrapping an inner <pre><code>.
+      html := RegExReplace(html, "is)<pre\b[^>]+>\s*(<pre\b[^>]*><code\b[^>]*>.*?</code></pre>)\s*</pre>", "$1")
+      ; Claude Web: <pre class="code-block__code ..."> directly wrapping <code>.
+      ; Strip the outer pre's class so pandoc uses the <code class="language-xxx">
+      ; for the language identifier, not the pre's CSS utility class.
+      html := RegExReplace(html, "is)<pre\b[^>]*\bcode-block__code\b[^>]*>\s*(<code\b[^>]*>.*?</code>)\s*</pre>", "<pre>$1</pre>")
+      ; Claude Web copy-button overlay: <div class="sticky ..."><div ...></div></div>
+      ; Strip it so the remaining structure is a simple two-div wrap around <pre><code>.
+      html := RegExReplace(html, "is)<div\b[^>]*\bsticky\b[^>]*>.*?</div>\s*</div>", "")
+      ; Two nested <div>s wrapping <pre><code>.
+      html := RegExReplace(html, "is)<div\b[^>]*>\s*<div\b[^>]*>\s*(<pre><code\b[^>]*>.*?</code></pre>)\s*</div>\s*</div>", "$1")
+      ; Two nested <div>s wrapping an inline <code>.
+      html := RegExReplace(html, "is)<div\b[^>]*>\s*<div\b[^>]*>\s*(<code\b[^>]*>.*?</code>)\s*</div>\s*</div>", "$1")
     }
+    return html
+  }
 
-    static _HasCodeWork(html) {
-        return (InStr(html, "<code") || InStr(html, "<pre"))
+  /**
+   * Finds the inclusive end offset of an HTML element, accounting for nested
+   * elements of the same tag name.
+   * @param {string} html
+   * @param {integer} openPos
+   * @param {string} tagName
+   * @returns {integer}
+   */
+  static _FindMatchingElementEnd(html, openPos, tagName) {
+    openPat := "is)<" . tagName . "\b[^>]*>"
+    if !RegExMatch(html, openPat, &mOpen, openPos)
+      return 0
+    if (mOpen.Pos != openPos)
+      return 0
+
+    tagPat := "is)</?" . tagName . "\b[^>]*>"
+    depth := 1
+    pos := openPos + mOpen.Len
+    while RegExMatch(html, tagPat, &mTag, pos) {
+      token := mTag[0]
+      if (SubStr(token, 2, 1) = "/") {
+        depth -= 1
+        if (depth = 0)
+          return mTag.Pos + mTag.Len - 1
+      } else if !RegExMatch(token, "/\s*>$") {
+        depth += 1
+      }
+      pos := mTag.Pos + mTag.Len
     }
+    return 0
+  }
 
-    static _HasCodeContainerWork(html) {
-        if (InStr(html, "<pre") && InStr(html, "<code"))
-            return true
-        if RegExMatch(html, "i)<div\b")
-            return true
-        return false
+  /**
+   * Skips ASCII HTML whitespace from the given 1-based position.
+   * @param {string} s
+   * @param {integer} pos
+   * @returns {integer}
+   */
+  static _SkipHtmlWhitespace(s, pos) {
+    while (pos <= StrLen(s)) {
+      ch := SubStr(s, pos, 1)
+      if (ch != " " && ch != "`t" && ch != "`r" && ch != "`n")
+        break
+      pos += 1
     }
+    return pos
+  }
 
-    static _HasResidualSpanWork(html) {
-        return InStr(html, "<span")
-    }
+  ; ─────────────────────────────────────────────────────────────────────────
+  ; Shared helpers
+  ; ─────────────────────────────────────────────────────────────────────────
 
-    static _IsVoidHtmlTag(tagName) {
-        static voidTags := Map(
-            "area", true,
-            "base", true,
-            "br", true,
-            "col", true,
-            "embed", true,
-            "hr", true,
-            "img", true,
-            "input", true,
-            "link", true,
-            "meta", true,
-            "param", true,
-            "source", true,
-            "track", true,
-            "wbr", true
-        )
-        return voidTags.Has(tagName)
-    }
-
-    ; ─────────────────────────────────────────────────────────────────────────
-    ; Phase methods
-    ; ─────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Replaces `<img>` and `<svg>` elements according to the showImg flag.
-     *
-     * When showImg is false:
-     *   - No accessible text (alt / title / aria-label / SVG `<title>`): dropped.
-     *   - Has accessible text: replaced with `(img: <text>)`.
-     *
-     * When showImg is true, leaves elements in place for pandoc.
-     *
-     * @param {string} html
-     * @param {boolean} showImg
-     * @returns {string}
-     */
-    static _ProcessImgTags(html, showImg) {
-        if showImg
-            return html
-        ; <img> tags (self-closing).
-        pos := 1
-        while RegExMatch(html, "i)<img\b([^>]*?)>", &m, pos) {
-            attrs := m[1]
-            accessText := ""
-            if (RegExMatch(attrs, "i)\balt\s*=\s*['`"]([^'`"]*)[`"']", &mA) && mA[1] != "")
-                accessText := mA[1]
-            else if (RegExMatch(attrs, "i)\btitle\s*=\s*['`"]([^'`"]*)[`"']", &mT) && mT[1] != "")
-                accessText := mT[1]
-            else if (RegExMatch(attrs, "i)\baria-label\s*=\s*['`"]([^'`"]*)[`"']", &mL) && mL[1] != "")
-                accessText := mL[1]
-            replacement := (accessText = "") ? "" : "(img: " . accessText . ")"
-            html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
-            pos := m.Pos + StrLen(replacement)
-        }
-        ; <svg>…</svg> elements — same rule, checking aria-label, title attr, or <title> child.
-        pos := 1
-        while RegExMatch(html, "is)<svg\b([^>]*)>.*?</svg>", &m, pos) {
-            attrs := m[1]
-            full  := m[0]
-            accessText := ""
-            if (RegExMatch(attrs, "i)\baria-label\s*=\s*['`"]([^'`"]*)[`"']", &mL) && mL[1] != "")
-                accessText := mL[1]
-            else if (RegExMatch(attrs, "i)\btitle\s*=\s*['`"]([^'`"]*)[`"']", &mT) && mT[1] != "")
-                accessText := mT[1]
-            else if (RegExMatch(full, "i)<title\b[^>]*>(.*?)</title>", &mTc) && mTc[1] != "")
-                accessText := HtmlNorm._DecodeBasicHtmlEntities(mTc[1])
-            replacement := (accessText = "") ? "" : "(img: " . accessText . ")"
-            html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
-            pos := m.Pos + StrLen(replacement)
-        }
-        return html
-    }
-
-    /**
-     * Injects ¤POSTER_AI¤ / ¤POSTER_User¤ paragraph placeholders at the start
-     * of each detected message container.  Only the patterns for the detected
-     * source are applied; this prevents cross-source false positives (e.g. the
-     * Codex flex-col patterns matching inner divs inside ChatGPT articles).
-     * @param {string} html
-     * @param {string} source - Source identifier from DetectSource()
-     * @returns {string}
-     */
-    static _InjectPosterPlaceholders(html, source) {
-        if (source = "claudecode") {
-            ; AI turn
-            html := RegExReplace(html, "i)(<div\b[^>]*\bdata-testid=`"assistant-message`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
-            ; user turn (class has both message_* and userMessageContainer_*)
-            html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bmessage_\w+\s+[^`"]*\buserMessageContainer_[^>]*>)", "$1<p>¤POSTER_User¤</p>")
-        } else if (source = "codex") {
-            ; AI turn (group min-w-0 flex-col)
-            html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bgroup\b[^`"]*\bmin-w-0\b[^`"]*\bflex-col\b[^`"]*`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
-            ; user turn (flex-col items-end)
-            html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bflex-col\b[^`"]*\bitems-end\b[^`"]*`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
-        } else if (source = "claudeweb") {
-            ; AI turn (data-is-streaming or font-claude-response)
-            html := RegExReplace(html, "i)(<div\b[^>]*(?:\bdata-is-streaming\b|\bclass=`"[^`"]*\bfont-claude-response\b[^`"]*`")[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
-            ; user turn (data-testid="user-message")
-            html := RegExReplace(html, "i)(<div\b[^>]*\bdata-testid=`"user-message`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
-        } else if (source = "chatgpt") {
-            ; AI turn: prefer data-turn="assistant"; fall back to legacy data-turn-id="request-WEB:..." prefix.
-            ; Both patterns may match the same article in older captures — the duplicate dedup in
-            ; PasteMarkdown collapses consecutive same-type markers, so double injection is harmless.
-            html := RegExReplace(html, "i)(<article\b[^>]*\bdata-turn=`"assistant`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
-            html := RegExReplace(html, "i)(<article\b[^>]*\bdata-turn-id=`"request-WEB:[^`"]*`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
-            ; User turn: prefer data-turn="user"; fall back to legacy plain-UUID data-turn-id.
-            html := RegExReplace(html, "i)(<article\b[^>]*\bdata-turn=`"user`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
-        }
-        return html
-    }
-
-    /**
-     * Converts VS Code chat/tool diff widgets to canonical HTML diff code blocks.
-     *
-     * Input shape (Codex/Claude tool output):
-     * - <diffs-container ...>
-     *   - many <div data-line-type="...">...</div> rows with line text
-     *
-     * Output shape:
-     * - <pre><code class="language-diff">...</code></pre>
-     *
-     * Also preserves the edited filename when present in a nearby header button
-     * (for example "test-paste-md-fixtures.ahk") by inserting a short
-     * `<p><code>filename</code></p>` line before the diff block.
-     *
-     * Line-type mapping:
-     * - deletion rows => '-' prefix
-     * - addition rows => '+' prefix
-     * - context/other rows => ' ' prefix
-     *
-     * @param {string} html
-     * @returns {string}
-     */
-    static _NormalizeSimpleDiffBlocks(html) {
-        pos := 1
-        while RegExMatch(html, "is)<diffs-container\b[^>]*>(.*?)</diffs-container>", &mDiff, pos) {
-            inner := mDiff[1]
-            fileName := ""
-            ; The editable filename appears in a button before the diff block.
-            ; Some captures include very large inline style payloads between header
-            ; and diff body, so scan the full prefix and keep the last non-empty
-            ; button label.
-            before := SubStr(html, 1, mDiff.Pos - 1)
-            btnPos := 1
-            while RegExMatch(before, "is)<button\b[^>]*>(.*?)</button>", &mBtn, btnPos) {
-                btnText := RegExReplace(mBtn[1], "<[^>]++>", "")
-                btnText := HtmlNorm._DecodeBasicHtmlEntities(btnText)
-                btnText := Trim(btnText, " `t`r`n")
-                if (btnText != "")
-                    fileName := btnText
-                btnPos := mBtn.Pos + mBtn.Len
-            }
-            linePos := 1
-            diffLines := []
-            while RegExMatch(inner, "is)<div\b[^>]*\bdata-line-type\s*=\s*['`"]([^'`"]+)['`"][^>]*>(.*?)</div>", &mLine, linePos) {
-                lineType := StrLower(mLine[1])
-                lineHtml := mLine[2]
-                lineText := RegExReplace(lineHtml, "<[^>]++>", "")
-                lineText := HtmlNorm._DecodeBasicHtmlEntities(lineText)
-                lineText := Trim(lineText, "`n")
-                prefix := " "
-                if InStr(lineType, "deletion")
-                    prefix := "-"
-                else if InStr(lineType, "addition")
-                    prefix := "+"
-                diffLines.Push(prefix . lineText)
-                linePos := mLine.Pos + mLine.Len
-            }
-
-            if (diffLines.Length = 0) {
-                pos := mDiff.Pos + mDiff.Len
-                continue
-            }
-
-            diffText := ""
-            for _, line in diffLines
-                diffText .= (diffText = "" ? "" : "`n") . line
-
-            ; Escape for safe embedding inside <code>.
-            diffText := StrReplace(diffText, "&", "&amp;")
-            diffText := StrReplace(diffText, "<", "&lt;")
-            diffText := StrReplace(diffText, ">", "&gt;")
-
-            header := ""
-            if (fileName != "") {
-                fileNameEsc := StrReplace(fileName, "&", "&amp;")
-                fileNameEsc := StrReplace(fileNameEsc, "<", "&lt;")
-                fileNameEsc := StrReplace(fileNameEsc, ">", "&gt;")
-                header := "<p><code>" . fileNameEsc . "</code></p>"
-            }
-
-            replacement := header . '<pre><code class="language-diff">' . diffText . '</code></pre>'
-            html := SubStr(html, 1, mDiff.Pos - 1) . replacement . SubStr(html, mDiff.Pos + mDiff.Len)
-            pos := mDiff.Pos + StrLen(replacement)
-        }
-        return html
-    }
-
-    /**
-     * Converts ChatGPT CodeMirror code blocks to canonical `<pre><code>` form.
-     *
-     * ChatGPT renders code blocks as `<pre class="overflow-visible! ...">` wrapping
-     * a deeply nested CodeMirror viewer.  Pandoc interprets the class on `<pre>`
-     * as a language tag, producing ` ```overflow-visible! ` fences.
-     *
-     * This method finds such `<pre>` blocks, strips all inner HTML tags, and
-     * re-emits the code as `<pre><code>entity-safe text</code></pre>`.
-     *
-     * Must be called before span-stripping so that the structural divs are
-     * still present (their stripping is idempotent here since they carry no text).
-     *
-     * @param {string} html
-     * @returns {string}
-     */
-    static _NormalizeChatGptCodeBlocks(html) {
-        pos := 1
-        while RegExMatch(html, "is)<pre\b[^>]*\boverflow-visible\b[^>]*>(.*?)</pre>", &m, pos) {
-            inner := m[1]
-            ; Convert <br> to newlines before stripping all other tags.
-            inner := RegExReplace(inner, "i)<br\b[^>]*>", "`n")
-            ; Strip all HTML tags — leaves only the plain code text plus structural whitespace.
-            codeText := RegExReplace(inner, "<[^>]++>", "")
-            codeText := Trim(codeText, " `t`n")
-            if (codeText = "") {
-                pos := m.Pos + m.Len
-                continue
-            }
-            ; Decode HTML entities so the raw code characters are correct.
-            codeText := HtmlNorm._DecodeBasicHtmlEntities(codeText)
-            ; Re-encode for safe embedding inside <code>…</code>.
-            codeText := StrReplace(codeText, "&", "&amp;")
-            codeText := StrReplace(codeText, "<", "&lt;")
-            codeText := StrReplace(codeText, ">", "&gt;")
-            replacement := "<pre><code>" . codeText . "</code></pre>"
-            html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
-            pos := m.Pos + StrLen(replacement)
-        }
-        return html
-    }
-
-    /**
-     * Collapses KaTeX wrapper spans to semantic MathML only.
-     *
-     * KaTeX emits sibling branches inside `<span class="katex">`:
-     * - `<span class="katex-mathml">...</span>` semantic source
-     * - `<span class="katex-html" ...>...</span>` visual layout fallback
-     *
-     * The generic residual-span stripper removes the wrapper tags but leaves the
-     * visual branch text behind, which duplicates math as flattened garbage.
-     *
-     * @param {string} html
-     * @returns {string}
-     */
-    static _NormalizeKatexMath(html) {
-        pos := 1
-        patKatex := "is)<span\b[^>]*\bclass\s*=\s*['`"][^'`"]*(?<![-\w])katex(?![-\w])[^'`"]*['`"][^>]*>"
-        while RegExMatch(html, patKatex, &mKatex, pos) {
-            if (mKatex.Pos != pos && mKatex.Pos < pos)
-                break
-            katexEnd := HtmlNorm._FindMatchingElementEnd(html, mKatex.Pos, "span")
-            if !katexEnd {
-                pos := mKatex.Pos + mKatex.Len
-                continue
-            }
-            katexBlock := SubStr(html, mKatex.Pos, katexEnd - mKatex.Pos + 1)
-            collapsed := HtmlNorm._CollapseKatexSpanBlock(katexBlock)
-            if (collapsed = katexBlock) {
-                pos := katexEnd + 1
-                continue
-            }
-            html := SubStr(html, 1, mKatex.Pos - 1) . collapsed . SubStr(html, katexEnd + 1)
-            pos := mKatex.Pos + StrLen(collapsed)
-        }
-        return html
-    }
-
-    /**
-     * Returns semantic MathML from a `<span class="katex">...</span>` block when
-     * its only substantive children are `katex-mathml` and `katex-html`.
-     * @param {string} katexBlock
-     * @returns {string}
-     */
-    static _CollapseKatexSpanBlock(katexBlock) {
-        if !RegExMatch(katexBlock, "is)^<span\b[^>]*>", &mOpen)
-            return katexBlock
-
-        closeLen := StrLen("</span>")
-        innerLen := StrLen(katexBlock) - mOpen.Len - closeLen
-        if (innerLen < 0)
-            return katexBlock
-        inner := SubStr(katexBlock, mOpen.Len + 1, innerLen)
-
-        pos := HtmlNorm._SkipHtmlWhitespace(inner, 1)
-        if !RegExMatch(inner, "is)<span\b[^>]*\bclass\s*=\s*['`"][^'`"]*(?<![-\w])katex-mathml(?![-\w])[^'`"]*['`"][^>]*>", &mMath, pos)
-            return katexBlock
-        if (mMath.Pos != pos)
-            return katexBlock
-        mathEnd := HtmlNorm._FindMatchingElementEnd(inner, pos, "span")
-        if !mathEnd
-            return katexBlock
-        mathBlock := SubStr(inner, pos, mathEnd - pos + 1)
-        if !RegExMatch(mathBlock, "is)^<span\b[^>]*>", &mMathOpen)
-            return katexBlock
-        mathInnerLen := StrLen(mathBlock) - mMathOpen.Len - closeLen
-        if (mathInnerLen < 0)
-            return katexBlock
-        mathInner := SubStr(mathBlock, mMathOpen.Len + 1, mathInnerLen)
-
-        pos := HtmlNorm._SkipHtmlWhitespace(inner, mathEnd + 1)
-        if !RegExMatch(inner, "is)<span\b[^>]*\bclass\s*=\s*['`"][^'`"]*(?<![-\w])katex-html(?![-\w])[^'`"]*['`"][^>]*>", &mHtml, pos)
-            return katexBlock
-        if (mHtml.Pos != pos)
-            return katexBlock
-        htmlEnd := HtmlNorm._FindMatchingElementEnd(inner, pos, "span")
-        if !htmlEnd
-            return katexBlock
-
-        pos := HtmlNorm._SkipHtmlWhitespace(inner, htmlEnd + 1)
-        if (pos <= StrLen(inner))
-            return katexBlock
-        return mathInner
-    }
-
-    /**
-     * Normalizes task-list `<li>` elements to a canonical checkbox-input form.
-     *
-     * Processes any `<li class="task-list-item">` that contains
-     * `<input type="checkbox">`, regardless of whether the input is a direct
-     * child or wrapped in a `<p>` tag (as ChatGPT does).
-     *
-     * Output form is:
-     *   <li><input type="checkbox" disabled [checked] /> text</li>
-     *
-     * This lets pandoc emit GFM task-list markers natively.
-     *
-     * @param {string} html
-     * @returns {string}
-     */
-    static _NormalizeTaskListItems(html) {
-        pos := 1
-        while RegExMatch(html, "is)<li\b([^>]*)>(.*?)</li>", &mTask, pos) {
-            liAttrs := mTask[1]
-            liInner := mTask[2]
-            ; Supported task-list containers:
-            ; - Standard markdown renderers: class contains task-list-item
-            ; - Claude Code todo tool rows: class contains todoItem_*
-            if (!RegExMatch(liAttrs, "i)\btask-list-item\b")
-                && !RegExMatch(liAttrs, "i)\btodoItem_")) {
-                pos := mTask.Pos + mTask.Len
-                continue
-            }
-            ; Find <input type="checkbox"> anywhere inside the item
-            ; (direct child OR inside a <p> wrapper, as ChatGPT does).
-            if !RegExMatch(liInner, "is)<input\b[^>]*\btype\s*=\s*['`"]checkbox['`"][^>]*>", &mInput) {
-                pos := mTask.Pos + mTask.Len
-                continue
-            }
-            checked := RegExMatch(liInner, "i)\bchecked\b")
-            if (!checked) {
-                if RegExMatch(liAttrs, "i)\bcompleted_")
-                    checked := true
-                else if RegExMatch(liInner, "i)\btext-decoration\s*:\s*line-through\b")
-                    checked := true
-            }
-            ; Capture text that follows the <input> tag.
-            text := SubStr(liInner, mInput.Pos + mInput.Len)
-            text := RegExReplace(text, "is)<span\b[^>]*>\s*</span>", "")
-            text := RegExReplace(text, "<[^>]++>", "")
-            text := HtmlNorm._DecodeBasicHtmlEntities(text)
-            text := Trim(text, " `t`r`n" . Chr(160))
-            ; Re-encode for HTML context.
-            text := StrReplace(text, "&", "&amp;")
-            text := StrReplace(text, "<", "&lt;")
-            text := StrReplace(text, ">", "&gt;")
-            inputTag := checked
-                ? '<input type="checkbox" disabled checked />'
-                : '<input type="checkbox" disabled />'
-            replacement := "<li>" . inputTag
-            if (text != "")
-                replacement .= " " . text
-            replacement .= "</li>"
-            html := SubStr(html, 1, mTask.Pos - 1) . replacement . SubStr(html, mTask.Pos + mTask.Len)
-            pos := mTask.Pos + StrLen(replacement)
-        }
-        return html
-    }
-
-    /**
-     * Unwraps solitary `<p>` wrappers inside list items.
-     * Only applies to simple `<li><p>...</p></li>` shapes.
-     * @param {string} html
-     * @returns {string}
-     */
-    static _NormalizeTightListItems(html) {
-        if !RegExMatch(html, "i)<li\b")
-            return html
-        if !RegExMatch(html, "i)<p\b")
-            return html
-        ; Case 1: list-item lead paragraph followed by nested list.
-        html := RegExReplace(
-            html,
-            "is)(<li\b[^>]*>)\s*<p\b[^>]*>((?:(?!</p>|<ul\b|<ol\b|<li\b).)++)</p>\s*((?:<ul\b|<ol\b))",
-            "$1$2$3"
-        )
-        ; Case 2: leaf list item with only a paragraph wrapper.
-        html := RegExReplace(
-            html,
-            "is)(<li\b[^>]*>)\s*<p\b[^>]*>((?:(?!</p>|<ul\b|<ol\b|<li\b).)++)</p>\s*(</li>)",
-            "$1$2$3"
-        )
-        return html
-    }
-
-    /**
-     * Extracts `<details class="thinking">` blocks into ¤THINKING_N¤ placeholders.
-     * The inner text (summary removed, tags stripped) is stored in `_thinkingBlocks`.
-     * `PasteMd.RestoreThinkingBlocks()` restores them after pandoc.
-     * @param {string} html
-     * @returns {string}
-     */
-    static _ExtractThinkingBlocks(html) {
-        pos := 1
-        while RegExMatch(html, "is)<details\b[^>]*\bclass=`"[^`"]*\bthinking\b[^`"]*`"[^>]*>(.*?)</details>", &m, pos) {
-            inner := m[1]
-            inner := RegExReplace(inner, "is)<summary\b[^>]*>.*?</summary>", "")
-            inner := RegExReplace(inner, "<[^>]++>", "")
-            inner := HtmlNorm._DecodeBasicHtmlEntities(inner)
-            inner := Trim(inner, " `t`n`r")
-            HtmlNorm._thinkingBlocks.Push(inner)
-            placeholder := "¤THINKING_" . HtmlNorm._thinkingBlocks.Length . "¤"
-            html := SubStr(html, 1, m.Pos - 1) . placeholder . SubStr(html, m.Pos + m.Len)
-            pos := m.Pos + StrLen(placeholder)
-        }
-        return html
-    }
-
-    /**
-     * Extracts whitespace-sensitive user message text into ¤USERMSG_N¤ placeholders.
-     *
-     * Four container types are handled (all source-specific enough to avoid false
-     * positives without explicit source gating):
-     *
-     * - Codex: `<div class="text-size-chat whitespace-pre-wrap">` with mixed
-     *   `<span>` and `<code class="font-mono">` children.
-     * - Claude Code: `<div class="content_xGDvVg">` with a single `<span>` child.
-     * - Claude Web: `<p class="whitespace-pre-wrap break-words">` — plain text with
-     *   embedded literal newlines; `<br>` tags possible.
-     * - ChatGPT: `<div class="whitespace-pre-wrap">` (exact sole class value) —
-     *   plain text with embedded literal newlines.
-     *
-     * `PasteMd.RestoreUserMsgBlocks()` restores the plain text after pandoc.
-     * @param {string} html
-     * @returns {string}
-     */
-    static _ExtractUserMessages(html) {
-        ; Codex user messages: <div class="text-size-chat whitespace-pre-wrap">
-        pos := 1
-        while RegExMatch(html, "is)(<div\b[^>]*\btext-size-chat\b[^>]*\bwhitespace-pre-wrap\b[^>]*>)(.*?)</div>", &m, pos) {
-            rawContent := m[2]
-            rawContent := RegExReplace(rawContent, "is)<code\b[^>]*\bfont-mono\b[^>]*>(.*?)</code>", "``$1``")
-            rawContent := RegExReplace(rawContent, "i)</?span\b[^>]*>", "")
-            rawContent := RegExReplace(rawContent, "<[^>]++>", "")
-            rawContent := HtmlNorm._DecodeBasicHtmlEntities(rawContent)
-            rawContent := Trim(rawContent, "`n")
-            HtmlNorm._userMsgBlocks.Push(rawContent)
-            placeholder := "<p>¤USERMSG_" . HtmlNorm._userMsgBlocks.Length . "¤</p>"
-            newStr := m[1] . placeholder . "</div>"
-            html := SubStr(html, 1, m.Pos - 1) . newStr . SubStr(html, m.Pos + m.Len)
-            pos := m.Pos + StrLen(newStr)
-        }
-        ; Claude Code user messages: <div class="content_xGDvVg"><span>text</span>
-        pos := 1
-        while RegExMatch(html, "is)(<div\b[^>]*\bcontent_xGDvVg\b[^>]*>)\s*<span>(.*?)</span>", &m, pos) {
-            rawText := HtmlNorm._DecodeBasicHtmlEntities(m[2])
-            HtmlNorm._userMsgBlocks.Push(rawText)
-            placeholder := "<p>¤USERMSG_" . HtmlNorm._userMsgBlocks.Length . "¤</p>"
-            newStr := m[1] . placeholder
-            html := SubStr(html, 1, m.Pos - 1) . newStr . SubStr(html, m.Pos + m.Len)
-            pos := m.Pos + StrLen(newStr)
-        }
-        ; Claude Web user messages: <p class="whitespace-pre-wrap break-words">
-        ; Replace the entire <p>...</p> with the placeholder (not nested inside the
-        ; original <p>, which would produce invalid nested <p> elements).
-        pos := 1
-        while RegExMatch(html, "is)(<p\b[^>]*\bclass=`"whitespace-pre-wrap break-words`"[^>]*>)(.*?)</p>", &m, pos) {
-            rawContent := m[2]
-            rawContent := RegExReplace(rawContent, "i)<br\b[^>]*>", "`n")
-            rawContent := RegExReplace(rawContent, "<[^>]++>", "")
-            rawContent := HtmlNorm._DecodeBasicHtmlEntities(rawContent)
-            rawContent := Trim(rawContent, "`n")
-            HtmlNorm._userMsgBlocks.Push(rawContent)
-            placeholder := "<p>¤USERMSG_" . HtmlNorm._userMsgBlocks.Length . "¤</p>"
-            html := SubStr(html, 1, m.Pos - 1) . placeholder . SubStr(html, m.Pos + m.Len)
-            pos := m.Pos + StrLen(placeholder)
-        }
-        ; ChatGPT user messages: <div class="whitespace-pre-wrap"> (exact sole class).
-        ; Exact-value match avoids re-matching Codex's "text-size-chat whitespace-pre-wrap"
-        ; outer tag, which still carries the class after Codex extraction above.
-        ; Replace the entire <div>...</div> with the placeholder.
-        pos := 1
-        while RegExMatch(html, "is)(<div\b[^>]*\bclass=`"whitespace-pre-wrap`"[^>]*>)(.*?)</div>", &m, pos) {
-            rawContent := m[2]
-            rawContent := RegExReplace(rawContent, "i)<br\b[^>]*>", "`n")
-            rawContent := RegExReplace(rawContent, "<[^>]++>", "")
-            rawContent := HtmlNorm._DecodeBasicHtmlEntities(rawContent)
-            rawContent := Trim(rawContent, "`n")
-            HtmlNorm._userMsgBlocks.Push(rawContent)
-            placeholder := "<p>¤USERMSG_" . HtmlNorm._userMsgBlocks.Length . "¤</p>"
-            html := SubStr(html, 1, m.Pos - 1) . placeholder . SubStr(html, m.Pos + m.Len)
-            pos := m.Pos + StrLen(placeholder)
-        }
-        return html
-    }
-
-    /**
-     * Processes each `<code>` element: converts `<br>` and `</div><div>` sequences
-     * to newlines, strips inner tags, and wraps multi-line content in `<pre>` if
-     * not already inside one.  Preserves `class="language-xxx"` on the `<code>`
-     * element while discarding other CSS utility classes.
-     * @param {string} html
-     * @returns {string}
-     */
-    static _NormalizeCodeElements(html) {
-        pos := 1
-        while RegExMatch(html, "is)<code\b([^>]*)>(.*?)</code>", &m, pos) {
-            content := m[2]
-            attrs   := m[1]
-            ; Normalize line-break representations inside the code.
-            content := RegExReplace(content, "i)<br\b[^>]*>", "`n")
-            content := RegExReplace(content, "i)</div>\s*<div\b[^>]*>", "`n")
-            content := RegExReplace(content, "<[^>]++>", "")
-            if InStr(content, "`n") {
-                content := HtmlNorm._DecodeBasicHtmlEntities(content)
-                ; Extract language identifier; discard pure-CSS classes.
-                langAttr := ""
-                if RegExMatch(attrs, "i)language-(\w+)", &langM)
-                    langAttr := ' class="language-' . langM[1] . '"'
-                ; Check whether this <code> is already the direct child of a <pre>.
-                beforeSnippet := SubStr(html, Max(1, m.Pos - 100), Min(100, m.Pos - 1))
-                if RegExMatch(beforeSnippet, "i)<pre\b[^>]*>\s*$")
-                    replacement := "<code" . langAttr . ">" . content . "</code>"
-                else
-                    replacement := "<pre><code" . langAttr . ">" . content . "</code></pre>"
-            } else {
-                ; Single-line: leave as inline <code>.
-                replacement := "<code" . attrs . ">" . content . "</code>"
-            }
-            html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
-            pos := m.Pos + StrLen(replacement)
-        }
-        return html
-    }
-
-    /**
-     * Unwraps redundant container elements that wrap canonical `<pre><code>` blocks.
-     * Repeats until no further simplification is possible.
-     * @param {string} html
-     * @returns {string}
-     */
-    static _UnwrapNestedContainers(html) {
-        prev := ""
-        while (html != prev) {
-            prev := html
-            ; Outer <pre class="..."> wrapping an inner <pre><code>.
-            html := RegExReplace(html, "is)<pre\b[^>]+>\s*(<pre\b[^>]*><code\b[^>]*>.*?</code></pre>)\s*</pre>", "$1")
-            ; Claude Web: <pre class="code-block__code ..."> directly wrapping <code>.
-            ; Strip the outer pre's class so pandoc uses the <code class="language-xxx">
-            ; for the language identifier, not the pre's CSS utility class.
-            html := RegExReplace(html, "is)<pre\b[^>]*\bcode-block__code\b[^>]*>\s*(<code\b[^>]*>.*?</code>)\s*</pre>", "<pre>$1</pre>")
-            ; Claude Web copy-button overlay: <div class="sticky ..."><div ...></div></div>
-            ; Strip it so the remaining structure is a simple two-div wrap around <pre><code>.
-            html := RegExReplace(html, "is)<div\b[^>]*\bsticky\b[^>]*>.*?</div>\s*</div>", "")
-            ; Two nested <div>s wrapping <pre><code>.
-            html := RegExReplace(html, "is)<div\b[^>]*>\s*<div\b[^>]*>\s*(<pre><code\b[^>]*>.*?</code></pre>)\s*</div>\s*</div>", "$1")
-            ; Two nested <div>s wrapping an inline <code>.
-            html := RegExReplace(html, "is)<div\b[^>]*>\s*<div\b[^>]*>\s*(<code\b[^>]*>.*?</code>)\s*</div>\s*</div>", "$1")
-        }
-        return html
-    }
-
-    static _HasChatGptCodeContainerShape(html) {
-        return RegExMatch(html, "is)^\s*<pre\b[^>]+>\s*<pre\b[^>]*><code\b")
-            || RegExMatch(html, "is)^\s*<pre\b[^>]*\bcode-block__code\b[^>]*>\s*<code\b")
-            || RegExMatch(html, "is)^\s*<div\b[^>]*>\s*<div\b[^>]*>\s*<pre><code\b")
-            || RegExMatch(html, "is)^\s*<div\b[^>]*>\s*<div\b[^>]*>\s*<code\b")
-    }
-
-    /**
-     * Finds the inclusive end offset of an HTML element, accounting for nested
-     * elements of the same tag name.
-     * @param {string} html
-     * @param {integer} openPos
-     * @param {string} tagName
-     * @returns {integer}
-     */
-    static _FindMatchingElementEnd(html, openPos, tagName) {
-        openPat := "is)<" . tagName . "\b[^>]*>"
-        if !RegExMatch(html, openPat, &mOpen, openPos)
-            return 0
-        if (mOpen.Pos != openPos)
-            return 0
-
-        tagPat := "is)</?" . tagName . "\b[^>]*>"
-        depth := 1
-        pos := openPos + mOpen.Len
-        while RegExMatch(html, tagPat, &mTag, pos) {
-            token := mTag[0]
-            if (SubStr(token, 2, 1) = "/") {
-                depth -= 1
-                if (depth = 0)
-                    return mTag.Pos + mTag.Len - 1
-            } else if !RegExMatch(token, "/\s*>$") {
-                depth += 1
-            }
-            pos := mTag.Pos + mTag.Len
-        }
-        return 0
-    }
-
-    /**
-     * Skips ASCII HTML whitespace from the given 1-based position.
-     * @param {string} s
-     * @param {integer} pos
-     * @returns {integer}
-     */
-    static _SkipHtmlWhitespace(s, pos) {
-        while (pos <= StrLen(s)) {
-            ch := SubStr(s, pos, 1)
-            if (ch != " " && ch != "`t" && ch != "`r" && ch != "`n")
-                break
-            pos += 1
-        }
-        return pos
-    }
-
-    ; ─────────────────────────────────────────────────────────────────────────
-    ; Shared helpers
-    ; ─────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Decodes the HTML entities most commonly found in clipboard fragments.
-     * Decodes &amp; last so that doubly-encoded entities (e.g. &amp;lt;) decode
-     * only one level per call, which is the correct HTML behaviour.
-     * @param {string} s
-     * @returns {string}
-     */
-    static _DecodeBasicHtmlEntities(s) {
-        s := StrReplace(s, "&nbsp;",  Chr(160))
-        s := StrReplace(s, "&#160;",  Chr(160))
-        s := StrReplace(s, "&quot;",  '"')
-        s := StrReplace(s, "&#34;",   '"')
-        s := StrReplace(s, "&apos;",  "'")
-        s := StrReplace(s, "&#39;",   "'")
-        s := StrReplace(s, "&lt;",    "<")
-        s := StrReplace(s, "&gt;",    ">")
-        s := StrReplace(s, "&amp;",   "&")
-        return s
-    }
+  /**
+   * Decodes the HTML entities most commonly found in clipboard fragments.
+   * Decodes &amp; last so that doubly-encoded entities (e.g. &amp;lt;) decode
+   * only one level per call, which is the correct HTML behaviour.
+   * @param {string} s
+   * @returns {string}
+   */
+  static _DecodeBasicHtmlEntities(s) {
+    s := StrReplace(s, "&nbsp;",  Chr(160))
+    s := StrReplace(s, "&#160;",  Chr(160))
+    s := StrReplace(s, "&quot;",  '"')
+    s := StrReplace(s, "&#34;",   '"')
+    s := StrReplace(s, "&apos;",  "'")
+    s := StrReplace(s, "&#39;",   "'")
+    s := StrReplace(s, "&lt;",    "<")
+    s := StrReplace(s, "&gt;",    ">")
+    s := StrReplace(s, "&amp;",   "&")
+    return s
+  }
 }

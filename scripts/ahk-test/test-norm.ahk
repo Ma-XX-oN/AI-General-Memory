@@ -20,25 +20,25 @@ cf_cx := "Version:0.9`r`nSourceURL:vscode-webview://x`r`nextensionId=openai.chat
 cf_gp := "Version:0.9`r`n<article data-turn-id=`"e7e18cd8-1234-..`">"
 
 Chk("claudecode has anthropic extensionId",
-    DetectSource(cf_cc) = "claudecode")
+  DetectSource(cf_cc) = "claudecode")
 Chk("claudeweb no extensionId, font-claude-response signal",
-    DetectSource(cf_cw) = "claudeweb")
+  DetectSource(cf_cw) = "claudeweb")
 Chk("codex extensionId openai.chatgpt",
-    DetectSource(cf_cx) = "codex")
+  DetectSource(cf_cx) = "codex")
 Chk("chatgpt has data-turn-id",
-    DetectSource(cf_gp) = "chatgpt")
+  DetectSource(cf_gp) = "chatgpt")
 Chk("unknown — no matching signals",
-    DetectSource("Version:0.9`r`nSourceURL:https://example.com/`r`n") = "unknown")
+  DetectSource("Version:0.9`r`nSourceURL:https://example.com/`r`n") = "unknown")
 
 ; ── 2: ChatGPT code block normalization ───────────────────────────────────────
 Log("── 2: ChatGPT code block normalization ──────────────")
 
 chatgptCode := '<pre class="overflow-visible! px-0!">'
-    . '<div class="relative"><div class="cm-editor">'
-    . '<div class="cm-content q9tKkq_readonly">'
-    . '<span class="tok-keyword">def</span> <span class="tok-name">greet</span>():'
-    . '`n    return "Hello"'
-    . '</div></div></div></pre>'
+  . '<div class="relative"><div class="cm-editor">'
+  . '<div class="cm-content q9tKkq_readonly">'
+  . '<span class="tok-keyword">def</span> <span class="tok-name">greet</span>():'
+  . '`n    return "Hello"'
+  . '</div></div></div></pre>'
 normCode := HtmlNorm._NormalizeChatGptCodeBlocks(chatgptCode)
 
 Chk("no overflow-visible! class leaked",    !InStr(normCode, "overflow-visible"))
@@ -51,8 +51,8 @@ Chk("closing /code/pre present",            InStr(normCode, "</code></pre>"))
 Log("── 3: ChatGPT code block entity encoding ────────────")
 
 chatgptCodeEntities := '<pre class="overflow-visible!">'
-    . '<span>x &lt; y &amp;&amp; z &gt; 0</span>'
-    . '</pre>'
+  . '<span>x &lt; y &amp;&amp; z &gt; 0</span>'
+  . '</pre>'
 normEntities := HtmlNorm._NormalizeChatGptCodeBlocks(chatgptCodeEntities)
 
 Chk("raw < encoded as &lt;",               InStr(normEntities, "&lt;"))
@@ -63,12 +63,12 @@ Chk("raw > encoded as &gt;",               InStr(normEntities, "&gt;"))
 Log("── 3b: Diff container normalization ─────────────────")
 
 diffHtml := '<div class="header"><button type="button">test-paste-md-fixtures.ahk</button></div>'
-    . '<diffs-container class="composer-diff-simple-line"><pre><code>'
-    . '<div data-line-type="context"><span data-column-content="">  if fx.withUser {</span></div>'
-    . '<div data-line-type="change-deletion"><span data-column-content="">    Chk("with-user has User label", InStr(finalMd, "**User:**"))</span></div>'
-    . '<div data-line-type="change-addition"><span data-column-content="">    Chk("with-user has User label", InStr(finalMd, "## User"))</span></div>'
-    . '<div data-line-type="context"><span data-column-content="">  }</span></div>'
-    . '</code></pre></diffs-container>'
+  . '<diffs-container class="composer-diff-simple-line"><pre><code>'
+  . '<div data-line-type="context"><span data-column-content="">  if fx.withUser {</span></div>'
+  . '<div data-line-type="change-deletion"><span data-column-content="">    Chk("with-user has User label", InStr(finalMd, "**User:**"))</span></div>'
+  . '<div data-line-type="change-addition"><span data-column-content="">    Chk("with-user has User label", InStr(finalMd, "## User"))</span></div>'
+  . '<div data-line-type="context"><span data-column-content="">  }</span></div>'
+  . '</code></pre></diffs-container>'
 normDiff := HtmlNorm._NormalizeSimpleDiffBlocks(diffHtml)
 
 Chk("diff container removed", !InStr(normDiff, "<diffs-container"))
@@ -85,7 +85,7 @@ liDirect := '<li class="task-list-item"><input type="checkbox" checked> Done ite
 normDirect := HtmlNorm._NormalizeTaskListItems(liDirect)
 
 Chk("checked keeps canonical input",
-    InStr(normDirect, '<input type="checkbox" disabled checked />'))
+  InStr(normDirect, '<input type="checkbox" disabled checked />'))
 Chk("text preserved",        InStr(normDirect, "Done item"))
 Chk("no placeholder (checked)", !InStr(normDirect, "¤CHK¤") && !InStr(normDirect, "¤UNCHK¤"))
 Chk("direct checked canonical li", normDirect = '<li><input type="checkbox" disabled checked /> Done item</li>')
@@ -94,7 +94,7 @@ liUnchecked := '<li class="task-list-item"><input type="checkbox"> Pending</li>'
 normUnchecked := HtmlNorm._NormalizeTaskListItems(liUnchecked)
 
 Chk("unchecked keeps canonical input",
-    InStr(normUnchecked, '<input type="checkbox" disabled />'))
+  InStr(normUnchecked, '<input type="checkbox" disabled />'))
 Chk("text Pending preserved", InStr(normUnchecked, "Pending"))
 Chk("no placeholder (unchecked)", !InStr(normUnchecked, "¤CHK¤") && !InStr(normUnchecked, "¤UNCHK¤"))
 Chk("direct unchecked canonical li", normUnchecked = '<li><input type="checkbox" disabled /> Pending</li>')
@@ -106,7 +106,7 @@ liPWrapped := '<li class="task-list-item"><p><input disabled="" type="checkbox" 
 normPWrapped := HtmlNorm._NormalizeTaskListItems(liPWrapped)
 
 Chk("p-wrapped checked canonical input",
-    InStr(normPWrapped, '<input type="checkbox" disabled checked />'))
+  InStr(normPWrapped, '<input type="checkbox" disabled checked />'))
 Chk("p-wrapped text Done preserved", InStr(normPWrapped, "Done"))
 Chk("no <p> remains",               !InStr(normPWrapped, "<p>"))
 Chk("no placeholder (p-wrapped checked)", !InStr(normPWrapped, "¤CHK¤") && !InStr(normPWrapped, "¤UNCHK¤"))
@@ -116,7 +116,7 @@ liPUnchecked := '<li class="task-list-item"><p><input disabled="" type="checkbox
 normPUnchecked := HtmlNorm._NormalizeTaskListItems(liPUnchecked)
 
 Chk("p-wrapped unchecked canonical input",
-    InStr(normPUnchecked, '<input type="checkbox" disabled />'))
+  InStr(normPUnchecked, '<input type="checkbox" disabled />'))
 Chk("p-wrapped text Not done preserved", InStr(normPUnchecked, "Not done"))
 Chk("no placeholder (p-wrapped unchecked)", !InStr(normPUnchecked, "¤CHK¤") && !InStr(normPUnchecked, "¤UNCHK¤"))
 Chk("p-wrapped unchecked canonical li", normPUnchecked = '<li><input type="checkbox" disabled /> Not done</li>')
@@ -132,30 +132,30 @@ Chk("plain li unchanged",   normPlain = liPlain)
 Log("── 6b: Task list — Claude Code todoItem/completed ─────────")
 
 liTodoCompleted := '<li class="todoItem_xheXVQ completed_xheXVQ">'
-    . '<input type="checkbox" class="checkbox_xheXVQ" disabled="">'
-    . '<div class="content_xheXVQ" style="text-decoration: line-through;">Fix DetectSource</div>'
-    . '</li>'
+  . '<input type="checkbox" class="checkbox_xheXVQ" disabled="">'
+  . '<div class="content_xheXVQ" style="text-decoration: line-through;">Fix DetectSource</div>'
+  . '</li>'
 normTodoCompleted := HtmlNorm._NormalizeTaskListItems(liTodoCompleted)
 Chk("todoItem completed infers checked",
-    normTodoCompleted = '<li><input type="checkbox" disabled checked /> Fix DetectSource</li>')
+  normTodoCompleted = '<li><input type="checkbox" disabled checked /> Fix DetectSource</li>')
 
 liTodoPending := '<li class="todoItem_xheXVQ">'
-    . '<input type="checkbox" class="checkbox_xheXVQ" disabled="">'
-    . '<div class="content_xheXVQ">Refactor _NormalizeTaskListItems</div>'
-    . '</li>'
+  . '<input type="checkbox" class="checkbox_xheXVQ" disabled="">'
+  . '<div class="content_xheXVQ">Refactor _NormalizeTaskListItems</div>'
+  . '</li>'
 normTodoPending := HtmlNorm._NormalizeTaskListItems(liTodoPending)
 Chk("todoItem pending stays unchecked",
-    normTodoPending = '<li><input type="checkbox" disabled /> Refactor _NormalizeTaskListItems</li>')
+  normTodoPending = '<li><input type="checkbox" disabled /> Refactor _NormalizeTaskListItems</li>')
 Chk("todoItem no placeholders",
-    !InStr(normTodoCompleted, "¤CHK¤") && !InStr(normTodoCompleted, "¤UNCHK¤")
-    && !InStr(normTodoPending, "¤CHK¤") && !InStr(normTodoPending, "¤UNCHK¤"))
+  !InStr(normTodoCompleted, "¤CHK¤") && !InStr(normTodoCompleted, "¤UNCHK¤")
+  && !InStr(normTodoPending, "¤CHK¤") && !InStr(normTodoPending, "¤UNCHK¤"))
 
 ; ── 7: Thinking block extraction ──────────────────────────────────────────────
 Log("── 7: Thinking block extraction ─────────────────────")
 
 htmlThink := '<p>Before</p>'
-    . '<details class="thinking"><summary>Thinking</summary><p>inner thought</p></details>'
-    . '<p>After</p>'
+  . '<details class="thinking"><summary>Thinking</summary><p>inner thought</p></details>'
+  . '<p>After</p>'
 result := HtmlNorm._ExtractThinkingBlocks(htmlThink)
 
 Chk("thinking placeholder inserted",    InStr(result, "¤THINKING_1¤"))
@@ -163,7 +163,7 @@ Chk("<details> removed from html",      !InStr(result, "<details"))
 Chk("before/after preserved",           InStr(result, "Before") && InStr(result, "After"))
 Chk("one block stored",                 HtmlNorm._thinkingBlocks.Length = 1)
 Chk("block text is inner thought",      HtmlNorm._thinkingBlocks.Length >= 1
-    && InStr(HtmlNorm._thinkingBlocks[1], "inner thought"))
+  && InStr(HtmlNorm._thinkingBlocks[1], "inner thought"))
 
 ; ── 8: Footnote URL stripping ─────────────────────────────────────────────────
 Log("── 8: Footnote URL stripping ────────────────────────")
@@ -180,16 +180,16 @@ Chk("claude.ai href stripped",         normFnWeb = '<a href="#user-content-fn-2"
 Log("── 8b: KaTeX wrapper collapse ───────────────────────")
 
 katexHtml := '<p>Inline <span class="katex"><span class="katex-mathml">'
-    . '<math><semantics><mi>x</mi><annotation encoding="application/x-tex">x</annotation></semantics></math>'
-    . '</span><span class="katex-html" aria-hidden="true"><span class="base"><span class="mord">VISIBLE_INLINE</span></span></span></span> end</p>'
-    . '<span class="katex-display"><span class="katex"><span class="katex-mathml">'
-    . '<math display="block"><semantics><mi>y</mi><annotation encoding="application/x-tex">y</annotation></semantics></math>'
-    . '</span><span class="katex-html" aria-hidden="true"><span class="base"><span class="mord">VISIBLE_BLOCK</span></span></span></span></span>'
+  . '<math><semantics><mi>x</mi><annotation encoding="application/x-tex">x</annotation></semantics></math>'
+  . '</span><span class="katex-html" aria-hidden="true"><span class="base"><span class="mord">VISIBLE_INLINE</span></span></span></span> end</p>'
+  . '<span class="katex-display"><span class="katex"><span class="katex-mathml">'
+  . '<math display="block"><semantics><mi>y</mi><annotation encoding="application/x-tex">y</annotation></semantics></math>'
+  . '</span><span class="katex-html" aria-hidden="true"><span class="base"><span class="mord">VISIBLE_BLOCK</span></span></span></span></span>'
 normKatex := HtmlNorm.Normalize(katexHtml, "unknown", false, false)
 Chk("katex inline math preserved",
-    InStr(normKatex, '<math><semantics><mi>x</mi><annotation encoding="application/x-tex">x</annotation></semantics></math>'))
+  InStr(normKatex, '<math><semantics><mi>x</mi><annotation encoding="application/x-tex">x</annotation></semantics></math>'))
 Chk("katex display math preserved",
-    InStr(normKatex, '<math display="block"><semantics><mi>y</mi><annotation encoding="application/x-tex">y</annotation></semantics></math>'))
+  InStr(normKatex, '<math display="block"><semantics><mi>y</mi><annotation encoding="application/x-tex">y</annotation></semantics></math>'))
 Chk("katex inline visual branch removed", !InStr(normKatex, "VISIBLE_INLINE"))
 Chk("katex display visual branch removed", !InStr(normKatex, "VISIBLE_BLOCK"))
 
@@ -197,18 +197,18 @@ Chk("katex display visual branch removed", !InStr(normKatex, "VISIBLE_BLOCK"))
 Log("── 8c: Region-scoped mixed block normalization ──────")
 
 scopedHtml := '<p>Intro</p>'
-    . '<pre class="overflow-visible! px-0!"><div class="cm-content"><span>print</span><span>(1)</span></div></pre>'
-    . '<ul><li class="task-list-item"><input type="checkbox" checked> Done</li></ul>'
-    . '<details class="thinking"><summary>Thinking</summary><p>inner thought</p></details>'
-    . '<p>Math <span class="katex"><span class="katex-mathml">'
-    . '<math><semantics><mi>x</mi><annotation encoding="application/x-tex">x</annotation></semantics></math>'
-    . '</span><span class="katex-html" aria-hidden="true"><span class="base"><span class="mord">VISIBLE_INLINE</span></span></span></span></p>'
+  . '<pre class="overflow-visible! px-0!"><div class="cm-content"><span>print</span><span>(1)</span></div></pre>'
+  . '<ul><li class="task-list-item"><input type="checkbox" checked> Done</li></ul>'
+  . '<details class="thinking"><summary>Thinking</summary><p>inner thought</p></details>'
+  . '<p>Math <span class="katex"><span class="katex-mathml">'
+  . '<math><semantics><mi>x</mi><annotation encoding="application/x-tex">x</annotation></semantics></math>'
+  . '</span><span class="katex-html" aria-hidden="true"><span class="base"><span class="mord">VISIBLE_INLINE</span></span></span></span></p>'
 regions := HtmlNorm._DiscoverRegions(scopedHtml, "chatgpt")
 HtmlNorm._thinkingBlocks := []
 scopedNorm := HtmlNorm._ApplyRegionScopedTransforms(scopedHtml, "chatgpt")
 scopedRejoined := ""
 for _, region in regions
-    scopedRejoined .= SubStr(scopedHtml, region["start"], region["end"] - region["start"] + 1)
+  scopedRejoined .= SubStr(scopedHtml, region["start"], region["end"] - region["start"] + 1)
 
 Chk("scoped regions split into top-level blocks", regions.Length = 5)
 Chk("scoped regions rejoin to original html", scopedRejoined = scopedHtml)
@@ -218,21 +218,21 @@ Chk("scoped regions flag thinking block", regions[4]["hasThinking"])
 Chk("scoped regions flag katex block", regions[5]["hasKatex"])
 Chk("scoped code block canonicalized", InStr(scopedNorm, "<pre><code>") && InStr(scopedNorm, "print(1)"))
 Chk("scoped task list canonicalized",
-    InStr(scopedNorm, '<li><input type="checkbox" disabled checked /> Done</li>'))
+  InStr(scopedNorm, '<li><input type="checkbox" disabled checked /> Done</li>'))
 Chk("scoped thinking placeholder inserted", InStr(scopedNorm, "¤THINKING_1¤"))
 Chk("scoped thinking block stored",
-    HtmlNorm._thinkingBlocks.Length = 1 && InStr(HtmlNorm._thinkingBlocks[1], "inner thought"))
+  HtmlNorm._thinkingBlocks.Length = 1 && InStr(HtmlNorm._thinkingBlocks[1], "inner thought"))
 Chk("scoped katex math preserved",
-    InStr(scopedNorm, '<math><semantics><mi>x</mi><annotation encoding="application/x-tex">x</annotation></semantics></math>'))
+  InStr(scopedNorm, '<math><semantics><mi>x</mi><annotation encoding="application/x-tex">x</annotation></semantics></math>'))
 Chk("scoped visual wrappers removed",
-    !InStr(scopedNorm, "VISIBLE_INLINE") && !InStr(scopedNorm, "overflow-visible") && !InStr(scopedNorm, "<details"))
+  !InStr(scopedNorm, "VISIBLE_INLINE") && !InStr(scopedNorm, "overflow-visible") && !InStr(scopedNorm, "<details"))
 Chk("scoped untouched intro preserved", InStr(scopedNorm, "<p>Intro</p>"))
 
 ; ── 8d: Region-scoped inline code + user messages ─────────────────────────────
 Log("── 8d: Region-scoped inline code + user messages ─")
 
 scopedTextHtml := '<p>Say <span class="inline-markdown">hi</span></p>'
-    . '<div class="whitespace-pre-wrap">Hello<br>World</div>'
+  . '<div class="whitespace-pre-wrap">Hello<br>World</div>'
 regionsText := HtmlNorm._DiscoverRegions(scopedTextHtml, "chatgpt")
 HtmlNorm._userMsgBlocks := []
 scopedTextNorm := HtmlNorm._ApplyRegionScopedTransforms(scopedTextHtml, "chatgpt")
@@ -243,15 +243,15 @@ Chk("text region flags user message block", regionsText[2]["hasUserMsg"])
 Chk("text inline code promoted", InStr(scopedTextNorm, "<code>hi</code>"))
 Chk("text user message placeholder inserted", InStr(scopedTextNorm, "<p>¤USERMSG_1¤</p>"))
 Chk("text user message stored with newline",
-    HtmlNorm._userMsgBlocks.Length = 1 && HtmlNorm._userMsgBlocks[1] = "Hello`nWorld")
+  HtmlNorm._userMsgBlocks.Length = 1 && HtmlNorm._userMsgBlocks[1] = "Hello`nWorld")
 
 ; ── 8e: Region-scoped label, footnote, and tight-list cleanup ─────────────────
 Log("── 8e: Region-scoped label, footnote, and tight-list ─")
 
 scopedListHtml := '<div class="font-small p-3.5 pb-0">Python</div>'
-    . '<ul><li><p>Leaf item</p></li><li><p>Parent item</p><ul><li><p>Child item</p></li></ul></li></ul>'
-    . '<p><a href="https://claude.ai/chat/xyz#user-content-fn-2">note</a></p>'
-    . '<ol><li id="user-content-fn-2"><p>Footnote body</p></li></ol>'
+  . '<ul><li><p>Leaf item</p></li><li><p>Parent item</p><ul><li><p>Child item</p></li></ul></li></ul>'
+  . '<p><a href="https://claude.ai/chat/xyz#user-content-fn-2">note</a></p>'
+  . '<ol><li id="user-content-fn-2"><p>Footnote body</p></li></ol>'
 regionsList := HtmlNorm._DiscoverRegions(scopedListHtml, "claudeweb")
 scopedListNorm := HtmlNorm._ApplyRegionScopedTransforms(scopedListHtml, "claudeweb")
 
@@ -271,8 +271,8 @@ Chk("list footnote body paragraph removed", InStr(scopedListNorm, '<li id="user-
 Log("── 8f: Region-scoped code normalization and unwrap ─")
 
 scopedCodeHtml := '<div><div><pre class="code-block__code extra"><code class="language-python">'
-    . '<div>print(1)</div><div>print(2)</div>'
-    . '</code></pre></div></div><p>Tail</p>'
+  . '<div>print(1)</div><div>print(2)</div>'
+  . '</code></pre></div></div><p>Tail</p>'
 regionsCode := HtmlNorm._DiscoverRegions(scopedCodeHtml, "claudeweb")
 scopedCodeNorm := HtmlNorm._ApplyRegionScopedTransforms(scopedCodeHtml, "claudeweb")
 
@@ -280,7 +280,7 @@ Chk("code regions split into code + prose blocks", regionsCode.Length = 2)
 Chk("code region flags code normalization", regionsCode[1]["hasCodeWork"])
 Chk("code region flags container unwrap", regionsCode[1]["hasCodeContainers"])
 Chk("code block normalized and unwrapped",
-    InStr(scopedCodeNorm, '<pre><code class="language-python">print(1)`nprint(2)</code></pre>'))
+  InStr(scopedCodeNorm, '<pre><code class="language-python">print(1)`nprint(2)</code></pre>'))
 Chk("code wrapper classes removed", !InStr(scopedCodeNorm, "code-block__code"))
 Chk("code nested div wrappers removed", !InStr(scopedCodeNorm, "<div><div><pre"))
 Chk("code trailing prose preserved", InStr(scopedCodeNorm, "<p>Tail</p>"))
@@ -309,12 +309,14 @@ Chk("print hello preserved",          InStr(normSimple, "print"))
 Log("── 10: Full Normalize — chatgpt code block ──────────")
 
 gptHtml := '<pre class="overflow-visible! px-0!"><div class="cm-content">'
-    . '<span>def</span> <span>foo</span>():`n    pass'
-    . '</div></pre>'
+  . '<span>def</span> <span>foo</span>():`n    pass'
+  . '</div></pre>'
 normGpt := HtmlNorm.Normalize(gptHtml, "chatgpt", false, false)
 Chk("no overflow-visible! class",     !InStr(normGpt, "overflow-visible"))
 Chk("canonical pre/code emitted",     InStr(normGpt, "<pre><code>") || InStr(normGpt, "<pre><code "))
 Chk("def foo preserved",              InStr(normGpt, "def") && InStr(normGpt, "foo"))
 
 ; ── summary ───────────────────────────────────────────────────────────────────
-TestFinish()
+Log("")
+Log("Results: " passed " passed, " failed " failed")
+ExitApp
