@@ -154,52 +154,48 @@ class HtmlNorm {
 
   static _TransformSegment(segment) {
     replacement := segment["html"]
-    if !HtmlNorm._SegmentHasWork(segment)
+    if !segment["hasWork"]
       return replacement
 
-    if segment["hasChatGptCode"]
-      replacement := HtmlNorm._NormalizeChatGptCodeBlocks(replacement)
-    if segment["hasKatex"]
-      replacement := HtmlNorm._NormalizeKatexMath(replacement)
-    if segment["hasTaskList"]
-      replacement := HtmlNorm._NormalizeTaskListItems(replacement)
-    if segment["hasThinking"]
-      replacement := HtmlNorm._ExtractThinkingBlocks(replacement)
-    if segment["hasInlineCode"]
-      replacement := HtmlNorm._PromoteInlineCodeSpans(replacement)
-    if segment["hasUserMsg"]
-      replacement := HtmlNorm._ExtractUserMessages(replacement)
-    if segment["hasClaudeWebLabel"]
-      replacement := HtmlNorm._StripClaudeWebLanguageLabels(replacement)
-    if segment["hasFootnoteHref"]
-      replacement := HtmlNorm._StripFootnoteHrefFragments(replacement)
-    if segment["hasFootnoteList"]
-      replacement := HtmlNorm._NormalizeFootnoteListItems(replacement)
-    if segment["hasTightList"]
-      replacement := HtmlNorm._NormalizeTightListItems(replacement)
-    if segment["hasCodeWork"]
-      replacement := HtmlNorm._NormalizeCodeElements(replacement)
-    if segment["hasCodeContainers"]
-      replacement := HtmlNorm._UnwrapNestedContainers(replacement)
-    if segment["hasResidualSpan"]
-      replacement := HtmlNorm._StripResidualSpans(replacement)
+    for _, spec in HtmlNorm._GetSegmentTransformSpecs() {
+      if segment[spec["flag"]]
+        replacement := spec["apply"].Call(replacement)
+    }
     return replacement
   }
 
-  static _SegmentHasWork(segment) {
-    return segment["hasChatGptCode"]
-      || segment["hasKatex"]
-      || segment["hasTaskList"]
-      || segment["hasThinking"]
-      || segment["hasInlineCode"]
-      || segment["hasUserMsg"]
-      || segment["hasClaudeWebLabel"]
-      || segment["hasFootnoteHref"]
-      || segment["hasFootnoteList"]
-      || segment["hasTightList"]
-      || segment["hasCodeWork"]
-      || segment["hasCodeContainers"]
-      || segment["hasResidualSpan"]
+  static _GetSegmentTransformSpecs() {
+    static specs := ""
+    if IsObject(specs)
+      return specs
+
+    specs := [
+      Map("flag", "hasChatGptCode", "detect", ObjBindMethod(HtmlNorm, "_HasChatGptCodeWork"), "apply", ObjBindMethod(HtmlNorm, "_NormalizeChatGptCodeBlocks")),
+      Map("flag", "hasKatex", "detect", ObjBindMethod(HtmlNorm, "_HasKatexWork"), "apply", ObjBindMethod(HtmlNorm, "_NormalizeKatexMath")),
+      Map("flag", "hasTaskList", "detect", ObjBindMethod(HtmlNorm, "_HasTaskListWork"), "apply", ObjBindMethod(HtmlNorm, "_NormalizeTaskListItems")),
+      Map("flag", "hasThinking", "detect", ObjBindMethod(HtmlNorm, "_HasThinkingWork"), "apply", ObjBindMethod(HtmlNorm, "_ExtractThinkingBlocks")),
+      Map("flag", "hasInlineCode", "detect", ObjBindMethod(HtmlNorm, "_HasInlineCodeWork"), "apply", ObjBindMethod(HtmlNorm, "_PromoteInlineCodeSpans")),
+      Map("flag", "hasUserMsg", "detect", ObjBindMethod(HtmlNorm, "_HasUserMessageWork"), "apply", ObjBindMethod(HtmlNorm, "_ExtractUserMessages")),
+      Map("flag", "hasClaudeWebLabel", "detect", ObjBindMethod(HtmlNorm, "_HasClaudeWebLanguageLabelWork"), "apply", ObjBindMethod(HtmlNorm, "_StripClaudeWebLanguageLabels")),
+      Map("flag", "hasFootnoteHref", "detect", ObjBindMethod(HtmlNorm, "_HasFootnoteHrefWork"), "apply", ObjBindMethod(HtmlNorm, "_StripFootnoteHrefFragments")),
+      Map("flag", "hasFootnoteList", "detect", ObjBindMethod(HtmlNorm, "_HasFootnoteListWork"), "apply", ObjBindMethod(HtmlNorm, "_NormalizeFootnoteListItems")),
+      Map("flag", "hasTightList", "detect", ObjBindMethod(HtmlNorm, "_HasTightListWork"), "apply", ObjBindMethod(HtmlNorm, "_NormalizeTightListItems")),
+      Map("flag", "hasCodeWork", "detect", ObjBindMethod(HtmlNorm, "_HasCodeWork"), "apply", ObjBindMethod(HtmlNorm, "_NormalizeCodeElements")),
+      Map("flag", "hasCodeContainers", "detect", ObjBindMethod(HtmlNorm, "_HasCodeContainerWork"), "apply", ObjBindMethod(HtmlNorm, "_UnwrapNestedContainers")),
+      Map("flag", "hasResidualSpan", "detect", ObjBindMethod(HtmlNorm, "_HasResidualSpanWork"), "apply", ObjBindMethod(HtmlNorm, "_StripResidualSpans"))
+    ]
+    return specs
+  }
+
+  static _NewSegment(kind, segmentHtml) {
+    segment := Map(
+      "kind", kind,
+      "html", segmentHtml,
+      "hasWork", false
+    )
+    for _, spec in HtmlNorm._GetSegmentTransformSpecs()
+      segment[spec["flag"]] := false
+    return segment
   }
 
   static _PromoteInlineCodeSpans(html) {
@@ -275,80 +271,52 @@ class HtmlNorm {
   }
 
   static _BuildSegment(segmentHtml, source, isText := false) {
-    if (isText) {
-      return Map(
-        "kind", "text",
-        "html", segmentHtml,
-        "hasChatGptCode", false,
-        "hasKatex", false,
-        "hasTaskList", false,
-        "hasThinking", false,
-        "hasInlineCode", false,
-        "hasUserMsg", false,
-        "hasClaudeWebLabel", false,
-        "hasFootnoteHref", false,
-        "hasFootnoteList", false,
-        "hasTightList", false,
-        "hasCodeWork", false,
-        "hasCodeContainers", false,
-        "hasResidualSpan", false
-      )
-    }
+    if isText
+      return HtmlNorm._NewSegment("text", segmentHtml)
 
     kind := ""
     if RegExMatch(segmentHtml, "is)^<([a-z][a-z0-9:-]*)\b", &mOpen)
       kind := StrLower(mOpen[1])
 
-    return Map(
-      "kind", kind,
-      "html", segmentHtml,
-      "hasChatGptCode", (source = "chatgpt" && InStr(segmentHtml, "overflow-visible")),
-      "hasKatex", InStr(segmentHtml, "katex"),
-      "hasTaskList", (InStr(segmentHtml, "<li") && (InStr(segmentHtml, "task-list-item") || InStr(segmentHtml, "todoItem_"))),
-      "hasThinking", (InStr(segmentHtml, "<details") && InStr(segmentHtml, "thinking")),
-      "hasInlineCode", RegExMatch(segmentHtml, "i)<span\b[^>]*\bclass\s*=\s*['`"][^'`"]*\b(?:inline-markdown|font-mono)\b"),
-      "hasUserMsg", HtmlNorm._HasUserMessageWork(segmentHtml),
-      "hasClaudeWebLabel", HtmlNorm._HasClaudeWebLanguageLabelWork(segmentHtml),
-      "hasFootnoteHref", HtmlNorm._HasFootnoteHrefWork(segmentHtml),
-      "hasFootnoteList", HtmlNorm._HasFootnoteListWork(segmentHtml),
-      "hasTightList", HtmlNorm._HasTightListWork(segmentHtml),
-      "hasCodeWork", HtmlNorm._HasCodeWork(segmentHtml),
-      "hasCodeContainers", HtmlNorm._HasCodeContainerWork(segmentHtml),
-      "hasResidualSpan", HtmlNorm._HasResidualSpanWork(segmentHtml)
-    )
+    segment := HtmlNorm._NewSegment(kind, segmentHtml)
+    for _, spec in HtmlNorm._GetSegmentTransformSpecs() {
+      hasWork := spec["detect"].Call(segmentHtml, source)
+      segment[spec["flag"]] := hasWork
+      if hasWork
+        segment["hasWork"] := true
+    }
+    return segment
   }
 
   static _HasSegmentScopedWork(html, source) {
-    if (source = "chatgpt" && InStr(html, "overflow-visible"))
-      return true
-    if (InStr(html, "katex"))
-      return true
-    if (InStr(html, "<details") && InStr(html, "thinking"))
-      return true
-    if (InStr(html, "<li") && (InStr(html, "task-list-item") || InStr(html, "todoItem_")))
-      return true
-    if RegExMatch(html, "i)<span\b[^>]*\bclass\s*=\s*['`"][^'`"]*\b(?:inline-markdown|font-mono)\b")
-      return true
-    if HtmlNorm._HasUserMessageWork(html)
-      return true
-    if HtmlNorm._HasClaudeWebLanguageLabelWork(html)
-      return true
-    if HtmlNorm._HasFootnoteHrefWork(html)
-      return true
-    if HtmlNorm._HasFootnoteListWork(html)
-      return true
-    if HtmlNorm._HasTightListWork(html)
-      return true
-    if HtmlNorm._HasCodeWork(html)
-      return true
-    if HtmlNorm._HasCodeContainerWork(html)
-      return true
-    if HtmlNorm._HasResidualSpanWork(html)
-      return true
+    for _, spec in HtmlNorm._GetSegmentTransformSpecs() {
+      if spec["detect"].Call(html, source)
+        return true
+    }
     return false
   }
 
-  static _HasUserMessageWork(html) {
+  static _HasChatGptCodeWork(html, source := "") {
+    return (source = "chatgpt" && InStr(html, "overflow-visible"))
+  }
+
+  static _HasKatexWork(html, source := "") {
+    return InStr(html, "katex")
+  }
+
+  static _HasTaskListWork(html, source := "") {
+    return (InStr(html, "<li") && (InStr(html, "task-list-item") || InStr(html, "todoItem_")))
+  }
+
+  static _HasThinkingWork(html, source := "") {
+    return (InStr(html, "<details") && InStr(html, "thinking"))
+  }
+
+  static _HasInlineCodeWork(html, source := "") {
+    return RegExMatch(html, "i)<span\b[^>]*\bclass\s*=\s*['`"][^'`"]*\b(?:inline-markdown|font-mono)\b")
+  }
+
+  static _HasUserMessageWork(html, source := "") {
     if RegExMatch(html, "i)<div\b[^>]*\btext-size-chat\b[^>]*\bwhitespace-pre-wrap\b")
       return true
     if RegExMatch(html, "i)<div\b[^>]*\bcontent_xGDvVg\b")
@@ -360,27 +328,27 @@ class HtmlNorm {
     return false
   }
 
-  static _HasClaudeWebLanguageLabelWork(html) {
+  static _HasClaudeWebLanguageLabelWork(html, source := "") {
     return RegExMatch(html, "i)<div\b[^>]*\bclass\s*=\s*['`"][^'`"]*\bfont-small\b[^'`"]*\bp-3")
   }
 
-  static _HasFootnoteHrefWork(html) {
+  static _HasFootnoteHrefWork(html, source := "") {
     return RegExMatch(html, "i)href=`"[^`"]*#user-content-[^`"]*`"")
   }
 
-  static _HasFootnoteListWork(html) {
+  static _HasFootnoteListWork(html, source := "") {
     return RegExMatch(html, "i)<li\b[^>]*\bid=`"user-content-fn-[^`"]*`"[^>]*>\s*<p\b")
   }
 
-  static _HasTightListWork(html) {
+  static _HasTightListWork(html, source := "") {
     return (InStr(html, "<li") && InStr(html, "<p"))
   }
 
-  static _HasCodeWork(html) {
+  static _HasCodeWork(html, source := "") {
     return (InStr(html, "<code") || InStr(html, "<pre"))
   }
 
-  static _HasCodeContainerWork(html) {
+  static _HasCodeContainerWork(html, source := "") {
     if (InStr(html, "<pre") && InStr(html, "<code"))
       return true
     if RegExMatch(html, "i)<div\b")
@@ -388,7 +356,7 @@ class HtmlNorm {
     return false
   }
 
-  static _HasResidualSpanWork(html) {
+  static _HasResidualSpanWork(html, source := "") {
     return InStr(html, "<span")
   }
 
