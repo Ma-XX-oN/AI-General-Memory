@@ -85,6 +85,8 @@
 
 - For any question about current file contents, perform a fresh read of the target file in the same turn before answering; do not answer from cached context alone.
 - If a required memory/reference file cannot be resolved or opened, stop and tell the user explicitly; do not silently ignore the missing reference or answer as if it had been loaded.
+- When a script or test resolves output paths relative to its own location or executable location (for example via `A_ScriptDir`), treat logs and generated artifacts as worktree-specific; inspect the matching worktree/script directory instead of assuming the current shell's repo path.
+- Do not misdiagnose worktree-relative or executable-relative output-path issues as sandbox problems; first verify the code's path-resolution rule and the fully resolved output path.
 - When asked to re-review ("anything else?", "check again"), do a fresh pass instead of assuming prior checks were exhaustive.
 - When fixing one item in a repeated pattern/group, check sibling occurrences and update them together unless the user explicitly limits scope.
 - Prefer public APIs when fixing external library usage; avoid bypassing behavior by calling private/internal APIs directly unless you are working inside that library.
