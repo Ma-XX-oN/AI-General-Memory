@@ -99,6 +99,13 @@ Canonical fixture note:
 - Section `1` is a canonical text capture, not a raw UTF-16 byte dump.
 - Section `2` is preserved exactly as CF\_HTML text; its `StartHTML` / `EndHTML` / `StartFragment` / `EndFragment` headers remain UTF-8 byte offsets and must already match the stored payload.
 
+Sanitized fixture note:
+
+- Private fixture sanitization preserves fixture structure, section lengths, and CF\_HTML offsets.
+- Sanitized section `1` plain text and sanitized section `2` CF\_HTML text are rewritten independently and are not guaranteed to remain semantically equivalent.
+- That mismatch is accepted for sanitized private fixtures because the goal is safe format-preserving regression data, not perfect plain-vs-HTML content parity.
+- If plain/HTML semantic equivalence for sanitized fixtures becomes important, file a ticket instead of assuming it is already enforced.
+
 ## Fixture Harness CLI
 
 `test-paste-md-fixtures.ahk` supports these switches:
