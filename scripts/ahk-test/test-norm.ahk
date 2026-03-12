@@ -193,6 +193,37 @@ Chk("katex display math preserved",
 Chk("katex inline visual branch removed", !InStr(normKatex, "VISIBLE_INLINE"))
 Chk("katex display visual branch removed", !InStr(normKatex, "VISIBLE_BLOCK"))
 
+; ── 8c: Region-scoped mixed block normalization ───────────────────────────────
+Log("── 8c: Region-scoped mixed block normalization ──────")
+
+scopedHtml := '<p>Intro</p>'
+    . '<pre class="overflow-visible! px-0!"><div class="cm-content"><span>print</span><span>(1)</span></div></pre>'
+    . '<ul><li class="task-list-item"><input type="checkbox" checked> Done</li></ul>'
+    . '<details class="thinking"><summary>Thinking</summary><p>inner thought</p></details>'
+    . '<p>Math <span class="katex"><span class="katex-mathml">'
+    . '<math><semantics><mi>x</mi><annotation encoding="application/x-tex">x</annotation></semantics></math>'
+    . '</span><span class="katex-html" aria-hidden="true"><span class="base"><span class="mord">VISIBLE_INLINE</span></span></span></span></p>'
+regions := HtmlNorm._DiscoverRegions(scopedHtml, "chatgpt")
+HtmlNorm._thinkingBlocks := []
+scopedNorm := HtmlNorm._ApplyRegionScopedTransforms(scopedHtml, "chatgpt")
+
+Chk("scoped regions split into top-level blocks", regions.Length = 5)
+Chk("scoped regions flag chatgpt code block", regions[2]["hasChatGptCode"])
+Chk("scoped regions flag task list block", regions[3]["hasTaskList"])
+Chk("scoped regions flag thinking block", regions[4]["hasThinking"])
+Chk("scoped regions flag katex block", regions[5]["hasKatex"])
+Chk("scoped code block canonicalized", InStr(scopedNorm, "<pre><code>") && InStr(scopedNorm, "print(1)"))
+Chk("scoped task list canonicalized",
+    InStr(scopedNorm, '<li><input type="checkbox" disabled checked /> Done</li>'))
+Chk("scoped thinking placeholder inserted", InStr(scopedNorm, "¤THINKING_1¤"))
+Chk("scoped thinking block stored",
+    HtmlNorm._thinkingBlocks.Length = 1 && InStr(HtmlNorm._thinkingBlocks[1], "inner thought"))
+Chk("scoped katex math preserved",
+    InStr(scopedNorm, '<math><semantics><mi>x</mi><annotation encoding="application/x-tex">x</annotation></semantics></math>'))
+Chk("scoped visual wrappers removed",
+    !InStr(scopedNorm, "VISIBLE_INLINE") && !InStr(scopedNorm, "overflow-visible") && !InStr(scopedNorm, "<details"))
+Chk("scoped untouched intro preserved", InStr(scopedNorm, "<p>Intro</p>"))
+
 ; ── 9: Full Normalize — Claude Code minimal ───────────────────────────────────
 Log("── 9: Full Normalize — claudecode minimal ───────────")
 

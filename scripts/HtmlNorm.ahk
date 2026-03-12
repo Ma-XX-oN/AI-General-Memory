@@ -114,59 +114,176 @@ class HtmlNorm {
             , "<u>$1</u>")
         html := RegExReplace(html, "is)<button\b[^>]*>.*?</button>", "")
 
-        ; 5. ChatGPT: normalize CodeMirror code blocks before any span stripping.
-        if (source = "chatgpt")
-            html := HtmlNorm._NormalizeChatGptCodeBlocks(html)
+        ; 5. Run the first region-scoped transform subset on discovered top-level blocks.
+        html := HtmlNorm._ApplyRegionScopedTransforms(html, source)
 
-        ; 6. Keep only semantic MathML from KaTeX wrappers.
-        html := HtmlNorm._NormalizeKatexMath(html)
-
-        ; 7. Normalize task-list checkboxes.
-        html := HtmlNorm._NormalizeTaskListItems(html)
-
-        ; 8. Extract thinking blocks.
-        html := HtmlNorm._ExtractThinkingBlocks(html)
-
-        ; 9. Promote inline-code spans.
+        ; 6. Promote inline-code spans.
         html := RegExReplace(html, "is)<span\b[^>]*\bclass=`"[^`"]*\b(?:inline-markdown|font-mono)\b[^`"]*`"[^>]*>(.*?)</span>", "<code>$1</code>")
 
-        ; 10. Extract whitespace-sensitive user message text.
+        ; 7. Extract whitespace-sensitive user message text.
         html := HtmlNorm._ExtractUserMessages(html)
 
-        ; 11. Strip Claude Web language-label divs (font-small p-3.5 pb-0).
+        ; 8. Strip Claude Web language-label divs (font-small p-3.5 pb-0).
         html := RegExReplace(html, "is)<div\b[^>]*\bclass=`"[^`"]*\bfont-small\b[^`"]*\bp-3[^`"]*`"[^>]*>.*?</div>", "")
 
-        ; 12. Strip long footnote hrefs, keeping only the #fragment.
+        ; 9. Strip long footnote hrefs, keeping only the #fragment.
         html := RegExReplace(html, "i)href=`"[^`"]*#(user-content-[^`"]*)`"", "href=`"#$1`"")
 
-        ; 12b. Strip <p> wrapper inside footnote definition <li> elements.
+        ; 9b. Strip <p> wrapper inside footnote definition <li> elements.
         ;      <li id="user-content-fn-N"><p>text</p></li> → <li id="...">text</li>
         ;      Without this, pandoc renders footnote lists in loose format (number on
         ;      its own line, content indented), instead of tight (number + content inline).
         html := RegExReplace(html, "is)(<li\b[^>]*\bid=`"user-content-fn-[^`"]*`"[^>]*>)\s*<p\b[^>]*>(.*?)</p>\s*(</li>)", "$1$2$3")
 
-        ; 12c. Tight-list normalization: unwrap solitary paragraph wrappers in list items.
+        ; 9c. Tight-list normalization: unwrap solitary paragraph wrappers in list items.
         ;      <li><p>text</p></li> → <li>text</li>
         ;      This avoids loose-list markdown output (blank lines between items).
         html := HtmlNorm._NormalizeTightListItems(html)
 
-        ; 13. Strip residual <span> tags.
+        ; 10. Strip residual <span> tags.
         html := RegExReplace(html, "i)</?+span\b[^>]*+>", "")
 
-        ; 14. Wrap bare top-level <li> siblings in <ol>.
+        ; 11. Wrap bare top-level <li> siblings in <ol>.
         htmlNoTrailingBr := RegExReplace(html, "is)(?:<br\b[^>]*+>\s*+)++$", "")
         trimmed := Trim(htmlNoTrailingBr, " `t`r`n")
         if (trimmed != "" && RegExMatch(trimmed, "is)^(?:<li\b[^>]*+>.*?</li>\s*)+$"))
             html := "<ol>" . trimmed . "</ol>"
 
-        ; 15. Normalize <code> elements.
+        ; 12. Normalize <code> elements.
         html := HtmlNorm._NormalizeCodeElements(html)
 
-        ; 16. Unwrap nested containers that obscure code blocks.
-        if (source != "chatgpt" || HtmlNorm._HasChatGptCodeContainerShape(html))
-            html := HtmlNorm._UnwrapNestedContainers(html)
+        ; 13. Unwrap nested containers that obscure code blocks.
+        html := HtmlNorm._UnwrapNestedContainers(html)
 
         return html
+    }
+
+    /**
+     * Applies the initial high-signal transforms only to discovered top-level regions.
+     * This prototypes region-aware normalization without moving the whole pipeline.
+     * @param {string} html
+     * @param {string} source
+     * @returns {string}
+     */
+    static _ApplyRegionScopedTransforms(html, source) {
+        if !HtmlNorm._HasRegionScopedWork(html, source)
+            return html
+
+        regions := HtmlNorm._DiscoverRegions(html, source)
+        if (regions.Length = 0)
+            return html
+
+        out := ""
+        for _, region in regions {
+            regionHtml := region["html"]
+            if region["hasChatGptCode"]
+                regionHtml := HtmlNorm._NormalizeChatGptCodeBlocks(regionHtml)
+            if region["hasKatex"]
+                regionHtml := HtmlNorm._NormalizeKatexMath(regionHtml)
+            if region["hasTaskList"]
+                regionHtml := HtmlNorm._NormalizeTaskListItems(regionHtml)
+            if region["hasThinking"]
+                regionHtml := HtmlNorm._ExtractThinkingBlocks(regionHtml)
+            out .= regionHtml
+        }
+        return out
+    }
+
+    /**
+     * Splits HTML into top-level regions and annotates the first scoped-transform features.
+     * @param {string} html
+     * @param {string} source
+     * @returns {Array}
+     */
+    static _DiscoverRegions(html, source) {
+        regions := []
+        pos := 1
+        len := StrLen(html)
+        tagPat := "is)<([a-z][a-z0-9:-]*)\b[^>]*>"
+
+        while (pos <= len) {
+            if !RegExMatch(html, tagPat, &mTag, pos) {
+                regions.Push(HtmlNorm._BuildRegion(SubStr(html, pos), source, true))
+                break
+            }
+
+            if (mTag.Pos > pos)
+                regions.Push(HtmlNorm._BuildRegion(SubStr(html, pos, mTag.Pos - pos), source, true))
+
+            tagName := StrLower(mTag[1])
+            if (HtmlNorm._IsVoidHtmlTag(tagName) || RegExMatch(mTag[0], "/\s*>$")) {
+                endPos := mTag.Pos + mTag.Len - 1
+            } else {
+                endPos := HtmlNorm._FindMatchingElementEnd(html, mTag.Pos, tagName)
+                if !endPos {
+                    regions.Push(HtmlNorm._BuildRegion(SubStr(html, mTag.Pos), source))
+                    break
+                }
+            }
+
+            regions.Push(HtmlNorm._BuildRegion(SubStr(html, mTag.Pos, endPos - mTag.Pos + 1), source))
+            pos := endPos + 1
+        }
+
+        return regions
+    }
+
+    static _BuildRegion(regionHtml, source, isText := false) {
+        if (isText) {
+            return Map(
+                "html", regionHtml,
+                "kind", "text",
+                "hasChatGptCode", false,
+                "hasKatex", false,
+                "hasTaskList", false,
+                "hasThinking", false
+            )
+        }
+
+        kind := ""
+        if RegExMatch(regionHtml, "is)^<([a-z][a-z0-9:-]*)\b", &mOpen)
+            kind := StrLower(mOpen[1])
+
+        return Map(
+            "html", regionHtml,
+            "kind", kind,
+            "hasChatGptCode", (source = "chatgpt" && InStr(regionHtml, "overflow-visible")),
+            "hasKatex", InStr(regionHtml, "katex"),
+            "hasTaskList", (InStr(regionHtml, "<li") && (InStr(regionHtml, "task-list-item") || InStr(regionHtml, "todoItem_"))),
+            "hasThinking", (InStr(regionHtml, "<details") && InStr(regionHtml, "thinking"))
+        )
+    }
+
+    static _HasRegionScopedWork(html, source) {
+        if (source = "chatgpt" && InStr(html, "overflow-visible"))
+            return true
+        if (InStr(html, "katex"))
+            return true
+        if (InStr(html, "<details") && InStr(html, "thinking"))
+            return true
+        if (InStr(html, "<li") && (InStr(html, "task-list-item") || InStr(html, "todoItem_")))
+            return true
+        return false
+    }
+
+    static _IsVoidHtmlTag(tagName) {
+        static voidTags := Map(
+            "area", true,
+            "base", true,
+            "br", true,
+            "col", true,
+            "embed", true,
+            "hr", true,
+            "img", true,
+            "input", true,
+            "link", true,
+            "meta", true,
+            "param", true,
+            "source", true,
+            "track", true,
+            "wbr", true
+        )
+        return voidTags.Has(tagName)
     }
 
     ; ─────────────────────────────────────────────────────────────────────────
