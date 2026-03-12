@@ -98,33 +98,59 @@ class HtmlNorm {
   static Normalize(htmlFrag, source, showPoster, showImg) {
     HtmlNorm._thinkingBlocks := []
     HtmlNorm._userMsgBlocks  := []
-    html := htmlFrag
+    ctx := Map(
+      "source", source,
+      "showPoster", showPoster,
+      "showImg", showImg
+    )
 
-    ; 1. Handle <img> tags.
-    html := HtmlNorm._ProcessImgTags(html, showImg)
+    return HtmlNorm._ApplyNormalizeStages(htmlFrag, ctx)
+  }
 
-    ; 2. Inject poster-label placeholders.
-    if showPoster
-      html := HtmlNorm._InjectPosterPlaceholders(html, source)
+  static _ApplyNormalizeStages(html, ctx) {
+    for _, stage in HtmlNormNormalizeStages.Build() {
+      if !HtmlNorm._ShouldApplyNormalizeStage(stage, html, ctx)
+        continue
+      html := HtmlNorm._ApplyNormalizeStage(stage, html, ctx)
+    }
+    return html
+  }
 
-    ; 3. Convert tool diff containers into canonical language-diff code blocks.
-    html := HtmlNorm._NormalizeSimpleDiffBlocks(html)
+  static _ShouldApplyNormalizeStage(stage, html, ctx) {
+    if stage.Has("enabled")
+      return stage["enabled"].Call(ctx, html)
+    return true
+  }
 
-    ; 4. Preserve semantic inline entity buttons, then strip UI buttons.
-    html := RegExReplace(html
-      , "is)<button\b(?=[^>]*\bbehavior-btn\b)(?=[^>]*\bentity-underline\b)[^>]*>(.*?)</button>"
-      , "<u>$1</u>")
-    html := RegExReplace(html, "is)<button\b[^>]*>.*?</button>", "")
+  static _ApplyNormalizeStage(stage, html, ctx) {
+    if stage.Has("applyCtx")
+      return stage["applyCtx"].Call(html, ctx)
+    if stage.Has("apply")
+      return stage["apply"].Call(html)
+    return RegExReplace(html, stage["replacePat"], stage["replaceWith"])
+  }
 
-    ; 5. Run the current segment-scoped transform subset on discovered top-level blocks.
-    html := HtmlNorm._ApplySegmentScopedTransforms(html, source)
+  static _ApplyImgStage(html, ctx) {
+    return HtmlNorm._ProcessImgTags(html, ctx["showImg"])
+  }
 
-    ; 6. Wrap bare top-level <li> siblings in <ol>.
+  static _ShouldApplyPosterStage(ctx, html := "") {
+    return ctx["showPoster"]
+  }
+
+  static _ApplyPosterStage(html, ctx) {
+    return HtmlNorm._InjectPosterPlaceholders(html, ctx["source"])
+  }
+
+  static _ApplySegmentStage(html, ctx) {
+    return HtmlNorm._ApplySegmentScopedTransforms(html, ctx["source"])
+  }
+
+  static _WrapBareTopLevelListItems(html) {
     htmlNoTrailingBr := RegExReplace(html, "is)(?:<br\b[^>]*+>\s*+)++$", "")
     trimmed := Trim(htmlNoTrailingBr, " `t`r`n")
     if (trimmed != "" && RegExMatch(trimmed, "is)^(?:<li\b[^>]*+>.*?</li>\s*)+$"))
-      html := "<ol>" . trimmed . "</ol>"
-
+      return "<ol>" . trimmed . "</ol>"
     return html
   }
 

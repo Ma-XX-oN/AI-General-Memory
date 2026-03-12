@@ -56,3 +56,35 @@ class HtmlNormSegmentSpecs {
     )
   }
 }
+
+class HtmlNormNormalizeStages {
+  static Build() {
+    static stages := ""
+    if IsObject(stages)
+      return stages
+
+    stages := [
+      Map("applyCtx", ObjBindMethod(HtmlNorm, "_ApplyImgStage")),
+      Map("enabled", ObjBindMethod(HtmlNorm, "_ShouldApplyPosterStage"), "applyCtx", ObjBindMethod(HtmlNorm, "_ApplyPosterStage")),
+      Map("apply", ObjBindMethod(HtmlNorm, "_NormalizeSimpleDiffBlocks")),
+      HtmlNormNormalizeStages._RegexStage(
+        "is)<button\b(?=[^>]*\bbehavior-btn\b)(?=[^>]*\bentity-underline\b)[^>]*>(.*?)</button>",
+        "<u>$1</u>"
+      ),
+      HtmlNormNormalizeStages._RegexStage(
+        "is)<button\b[^>]*>.*?</button>",
+        ""
+      ),
+      Map("applyCtx", ObjBindMethod(HtmlNorm, "_ApplySegmentStage")),
+      Map("apply", ObjBindMethod(HtmlNorm, "_WrapBareTopLevelListItems"))
+    ]
+    return stages
+  }
+
+  static _RegexStage(replacePat, replaceWith) {
+    return Map(
+      "replacePat", replacePat,
+      "replaceWith", replaceWith
+    )
+  }
+}
