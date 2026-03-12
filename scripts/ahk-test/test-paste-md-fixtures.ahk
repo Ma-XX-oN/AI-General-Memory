@@ -17,6 +17,7 @@ emitFixtureOutputLogs := false
 
 passed := 0
 failed := 0
+suiteStartTick := A_TickCount
 
 /**
  * Fixture registry: one fixture source log per entry.
@@ -56,6 +57,8 @@ if (opts["listOnly"]) {
 if (opts["fixtureIndex"] > 0) {
   idx := opts["fixtureIndex"]
   fixtures := [fixtures[idx]]
+} else if (opts["fixturePath"] != "") {
+  fixtures := [opts["fixturePath"]]
 }
 
 emitFixtureOutputLogs := opts["emitFixtureOutputLogs"]
@@ -75,123 +78,130 @@ required := [
 
 Log("── PasteAsMd fixture regressions ─────────────────────────────")
 for fx in fixtures {
-  path := A_ScriptDir "\" fx
+  fixtureStartTick := A_TickCount
+  path := _ResolveFixturePath(fx)
   Log("")
-  Log("Fixture: " fx)
-
-  Chk("fixture exists", FileExist(path) != "", path)
-  if !FileExist(path)
-    continue
-
-  logText := FileRead(path, "UTF-8")
-  scenarios := ParseFixtureScenarios(logText)
-  Chk("scenario metadata parsed", scenarios.Length > 0)
-  if (scenarios.Length = 0)
-    continue
+  Log("Fixture: " _Basename(path))
+  if (_IsCustomFixtureArg(fx))
+    Log("  Path: " path)
 
   try {
-    sections := ParseDbgSections(logText)
-    Chk("debug sections parsed", true)
-  } catch as e {
-    Chk("debug sections parsed", false, e.Message)
-    continue
-  }
+    Chk("fixture exists", FileExist(path) != "", path)
+    if !FileExist(path)
+      continue
 
-  missing := false
-  for label in required {
-    has := sections.Has(label)
-    Chk("section present: " label, has)
-    if !has
-      missing := true
-  }
-  if missing
-    continue
+    logText := FileRead(path, "UTF-8")
+    scenarios := ParseFixtureScenarios(logText)
+    Chk("scenario metadata parsed", scenarios.Length > 0)
+    if (scenarios.Length = 0)
+      continue
 
-  /**
-   * Seam inputs decoded from captured debug sections.
-   */
-  expectedSource := Trim(SectionToText(sections[PasteMd.LOG_SECTION_SOURCE]), " `t`r`n")
-  plain := SectionToText(sections[PasteMd.LOG_SECTION_PLAIN])
-  cfHtml := SectionToText(sections[PasteMd.LOG_SECTION_CFHTML])
-  for sc in scenarios {
-    caseId := sc["case"]
-    /**
-     * Default scenario uses unsuffixed files.
-     * Metadata scenarios use .<CASE> suffixes.
-     */
-    expectedPath := _SiblingWithSuffix(path, caseId = "" ? expectedSuffix : ("." caseId expectedSuffix))
-    actualPath := _SiblingWithSuffix(path, caseId = "" ? actualSuffix : ("." caseId actualSuffix))
-    outputLogPath := _SiblingWithSuffix(path, caseId = "" ? ".fixture.log" : ("." caseId ".fixture.log"))
-    Log("Scenario: " (caseId = "" ? "default" : caseId))
-
-    prevPromptFn := ""
     try {
-      if (sc["hasPrompt"]) {
-        if HasMethod(PasteMd, "SetOrderedListPromptProvider") {
-          promptFn := MakePromptProvider(sc["prompt"])
-          prevPromptFn := PasteMd.SetOrderedListPromptProvider(promptFn)
+      sections := ParseDbgSections(logText)
+      Chk("debug sections parsed", true)
+    } catch as e {
+      Chk("debug sections parsed", false, e.Message)
+      continue
+    }
+
+    missing := false
+    for label in required {
+      has := sections.Has(label)
+      Chk("section present: " label, has)
+      if !has
+        missing := true
+    }
+    if missing
+      continue
+
+    /**
+     * Seam inputs decoded from captured debug sections.
+     */
+    expectedSource := Trim(SectionToText(sections[PasteMd.LOG_SECTION_SOURCE]), " `t`r`n")
+    plain := SectionToText(sections[PasteMd.LOG_SECTION_PLAIN])
+    cfHtml := SectionToText(sections[PasteMd.LOG_SECTION_CFHTML])
+    for sc in scenarios {
+      caseId := sc["case"]
+      /**
+       * Default scenario uses unsuffixed files.
+       * Metadata scenarios use .<CASE> suffixes.
+       */
+      expectedPath := _SiblingWithSuffix(path, caseId = "" ? expectedSuffix : ("." caseId expectedSuffix))
+      actualPath := _SiblingWithSuffix(path, caseId = "" ? actualSuffix : ("." caseId actualSuffix))
+      outputLogPath := _SiblingWithSuffix(path, caseId = "" ? ".fixture.log" : ("." caseId ".fixture.log"))
+      Log("Scenario: " (caseId = "" ? "default" : caseId))
+
+      prevPromptFn := ""
+      try {
+        if (sc["hasPrompt"]) {
+          if HasMethod(PasteMd, "SetOrderedListPromptProvider") {
+            promptFn := MakePromptProvider(sc["prompt"])
+            prevPromptFn := PasteMd.SetOrderedListPromptProvider(promptFn)
+          } else {
+            Log("  note: prompt scenario skipped (provider unavailable): " caseId)
+            continue
+          }
+        }
+
+        ; Match runtime UI behavior: speaker labels are tied to quoted mode only.
+        showPoster := sc["asQuoted"]
+        converted := PasteMd._ConvertFromCaptured(plain, cfHtml, sc["asQuoted"], showPoster, false, sc["hasPrompt"])
+        if (emitFixtureOutputLogs)
+          _WriteFixtureOutputLog(outputLogPath, plain, cfHtml, converted, sc["asQuoted"])
+        ChkEqNorm("source", converted["source"], expectedSource)
+        aborted := converted.Has("aborted") ? converted["aborted"] : false
+
+        if (sc["expectAbort"]) {
+          Chk("conversion aborted", aborted)
         } else {
-          Log("  note: prompt scenario skipped (provider unavailable): " caseId)
+          Chk("conversion not aborted", !aborted)
+        }
+
+        finalMd := converted["finalMd"]
+        _WriteUtf8(actualPath, finalMd)
+
+        if (aborted) {
+          if FileExist(expectedPath) {
+            expectedFinal := FileRead(expectedPath, "UTF-8")
+            ChkEqNorm("finalMd", finalMd, expectedFinal)
+          } else {
+            Log("  note: aborted scenario expected output missing, comparison skipped: " _Basename(expectedPath))
+          }
           continue
         }
-      }
 
-      ; Match runtime UI behavior: speaker labels are tied to quoted mode only.
-      showPoster := sc["asQuoted"]
-      converted := PasteMd._ConvertFromCaptured(plain, cfHtml, sc["asQuoted"], showPoster, false, sc["hasPrompt"])
-      if (emitFixtureOutputLogs)
-        _WriteFixtureOutputLog(outputLogPath, plain, cfHtml, converted, sc["asQuoted"])
-      ChkEqNorm("source", converted["source"], expectedSource)
-      aborted := converted.Has("aborted") ? converted["aborted"] : false
-
-      if (sc["expectAbort"]) {
-        Chk("conversion aborted", aborted)
-      } else {
-        Chk("conversion not aborted", !aborted)
-      }
-
-      finalMd := converted["finalMd"]
-      _WriteUtf8(actualPath, finalMd)
-
-      if (aborted) {
         if FileExist(expectedPath) {
           expectedFinal := FileRead(expectedPath, "UTF-8")
-          ChkEqNorm("finalMd", finalMd, expectedFinal)
+          ChkEqNorm("finalMd from " expectedPath, finalMd, expectedFinal)
         } else {
-          Log("  note: aborted scenario expected output missing, comparison skipped: " _Basename(expectedPath))
+          Log("  note: expected output missing, comparison skipped: " _Basename(expectedPath))
         }
-        continue
+
+        Chk("no placeholder: ¤POSTER_", !InStr(finalMd, "¤POSTER_"))
+        Chk("no placeholder: ¤USERMSG_", !InStr(finalMd, "¤USERMSG_"))
+        Chk("no placeholder: ¤THINKING_", !InStr(finalMd, "¤THINKING_"))
+        Chk("no placeholder: ¤CHK¤", !InStr(finalMd, "¤CHK¤"))
+        Chk("no placeholder: ¤UNCHK¤", !InStr(finalMd, "¤UNCHK¤"))
+
+      } finally {
+        if (prevPromptFn != "" && HasMethod(PasteMd, "SetOrderedListPromptProvider"))
+          PasteMd.SetOrderedListPromptProvider(prevPromptFn)
       }
-
-      if FileExist(expectedPath) {
-        expectedFinal := FileRead(expectedPath, "UTF-8")
-        ChkEqNorm("finalMd from " expectedPath, finalMd, expectedFinal)
-      } else {
-        Log("  note: expected output missing, comparison skipped: " _Basename(expectedPath))
-      }
-
-      Chk("no placeholder: ¤POSTER_", !InStr(finalMd, "¤POSTER_"))
-      Chk("no placeholder: ¤USERMSG_", !InStr(finalMd, "¤USERMSG_"))
-      Chk("no placeholder: ¤THINKING_", !InStr(finalMd, "¤THINKING_"))
-      Chk("no placeholder: ¤CHK¤", !InStr(finalMd, "¤CHK¤"))
-      Chk("no placeholder: ¤UNCHK¤", !InStr(finalMd, "¤UNCHK¤"))
-
-    } finally {
-      if (prevPromptFn != "" && HasMethod(PasteMd, "SetOrderedListPromptProvider"))
-        PasteMd.SetOrderedListPromptProvider(prevPromptFn)
     }
+  } finally {
+    Log("  Elapsed: " _FormatElapsedMs(A_TickCount - fixtureStartTick))
   }
 }
 
 Log("")
-Log("Results: " passed " passed, " failed " failed")
-ExitApp
+Log("Suite elapsed: " _FormatElapsedMs(A_TickCount - suiteStartTick))
+TestFinish()
 
 /**
  * Parses fixture harness CLI arguments.
  * Supported switches:
  * - /ls
- * - /fixture:<n>
+ * - /fixture:<n|path>
  * - /fixtureOutputLogs:0|1
  * @param {Array} args - Raw CLI args (A_Args).
  * @param {integer} fixtureCount - Number of available fixtures.
@@ -202,6 +212,7 @@ ParseHarnessOptions(args, fixtureCount) {
     "error", "",
     "listOnly", false,
     "fixtureIndex", 0,
+    "fixturePath", "",
     "emitFixtureOutputLogs", false
   )
 
@@ -210,17 +221,26 @@ ParseHarnessOptions(args, fixtureCount) {
       opts["listOnly"] := true
       continue
     }
-    if RegExMatch(arg, "i)^/fixture:(\d+)$", &mFixture) {
-      idx := Integer(mFixture[1])
-      if (idx < 1 || idx > fixtureCount) {
-        opts["error"] := "/fixture index out of range: " idx " (valid 1.." fixtureCount ")"
-        return opts
-      }
-      if (opts["fixtureIndex"] > 0) {
+    if RegExMatch(arg, "i)^/fixture:(.+)$", &mFixture) {
+      fixtureSpec := Trim(mFixture[1])
+      if (opts["fixtureIndex"] > 0 || opts["fixturePath"] != "") {
         opts["error"] := "duplicate /fixture argument"
         return opts
       }
-      opts["fixtureIndex"] := idx
+      if (fixtureSpec = "") {
+        opts["error"] := "empty /fixture argument"
+        return opts
+      }
+      if RegExMatch(fixtureSpec, "^\d+$") {
+        idx := Integer(fixtureSpec)
+        if (idx < 1 || idx > fixtureCount) {
+          opts["error"] := "/fixture index out of range: " idx " (valid 1.." fixtureCount ")"
+          return opts
+        }
+        opts["fixtureIndex"] := idx
+      } else {
+        opts["fixturePath"] := _ResolveFixturePath(fixtureSpec)
+      }
       continue
     }
     if RegExMatch(arg, "i)^/fixtureOutputLogs:([01])$", &mOutput) {
@@ -233,6 +253,22 @@ ParseHarnessOptions(args, fixtureCount) {
   }
 
   return opts
+}
+
+_ResolveFixturePath(fixtureSpec) {
+  if RegExMatch(fixtureSpec, "i)^(?:[A-Z]:[\\/]|\\\\)")
+    return fixtureSpec
+  return A_ScriptDir "\" fixtureSpec
+}
+
+_IsCustomFixtureArg(fixtureSpec) {
+  return InStr(fixtureSpec, "\")
+    || InStr(fixtureSpec, "/")
+    || RegExMatch(fixtureSpec, "i)^[A-Z]:")
+}
+
+_FormatElapsedMs(elapsedMs) {
+  return elapsedMs " ms (" Format("{:.3f}", elapsedMs / 1000.0) " s)"
 }
 
 /**

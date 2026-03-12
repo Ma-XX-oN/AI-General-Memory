@@ -98,7 +98,7 @@ Canonical fixture note:
 | Switch | Effect |
 |---|---|
 | `/ls` | Lists fixture indices/files and exits. |
-| `/fixture:<n>` | Runs only fixture index `n` from `/ls`. |
+| `/fixture:<n\|path>` | Runs only fixture index `n` from `/ls`, or a specific fixture log path/name when the value is not numeric. Relative paths resolve from `scripts/ahk-test`. |
 | `/fixtureOutputLogs:0\|1` | Enables/disables per-scenario fixture output logs (`0` default, `1` enabled). |
 
 Examples:
@@ -107,6 +107,8 @@ Examples:
 %AHK% ahk-test\test-paste-md-fixtures.ahk
 %AHK% ahk-test\test-paste-md-fixtures.ahk /ls
 %AHK% ahk-test\test-paste-md-fixtures.ahk /fixture:7
+%AHK% ahk-test\test-paste-md-fixtures.ahk /fixture:PasteAsMd_ChatGPT-ButtonLinks.log
+%AHK% ahk-test\test-paste-md-fixtures.ahk /fixture:..\tmp\PasteAsMd_large.log
 %AHK% ahk-test\test-paste-md-fixtures.ahk /fixture:7 /fixtureOutputLogs:1
 %AHK% ahk-test\test-paste-md-fixtures.ahk /fixtureOutputLogs:1
 ```
@@ -114,6 +116,10 @@ Examples:
 No switches run the full fixture suite.
 `/fixtureOutputLogs:1` with no other switch runs the full fixture set and emits
 per-scenario `.fixture.log` files.
+
+The harness log records `Elapsed: ...` for each fixture and `Suite elapsed: ...`
+for the full run, so branch-to-branch timing comparisons can be taken from
+`test-paste-md-fixtures.log`.
 
 Cleanup is handled by `test-clean.ahk`:
 
