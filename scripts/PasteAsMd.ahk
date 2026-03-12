@@ -620,6 +620,9 @@ class PasteMd {
         mdAfterOrderedList := md
       }
 
+      if (asQuoted)
+        md := PasteMd.NormalizeWhitespaceOnlyMarkdownLines(md)
+
       if (showPoster) {
         PasteMd._BusyUpdate("Applying poster labels")
         assistantLabel := PasteMd._ResolveAssistantLabel(cfHtml)
@@ -1620,6 +1623,16 @@ class PasteMd {
   }
 
   /**
+   * Canonicalizes whitespace-only markdown lines before quote formatting.
+   * This keeps blank-line semantics while avoiding ">   " artifacts later.
+   * @param {string} md - Markdown text before quote formatting
+   * @returns {string} Markdown with whitespace-only lines reduced to empty lines
+   */
+  static NormalizeWhitespaceOnlyMarkdownLines(md) {
+    return RegExReplace(md, "m)^[ \t]+$", "")
+  }
+
+  /**
    * Converts quoted blank spacer lines (">") adjacent to poster headings
    * back into truly blank lines.
    * @param {string} md - Markdown text after poster placeholder replacement
@@ -1632,18 +1645,27 @@ class PasteMd {
     lines := StrSplit(md, "`n")
     Loop lines.Length {
       i := A_Index
-      if (Trim(lines[i], " `t") != ">")
+      if !RegExMatch(RTrim(lines[i], " `t"), "^##[ \t]++\S++")
         continue
 
-      prevIsPosterHeading := (i > 1) && RegExMatch(RTrim(lines[i - 1], " `t"), "^##[ \t]++\S++")
-      nextIsPosterHeading := (i < lines.Length) && RegExMatch(RTrim(lines[i + 1], " `t"), "^##[ \t]++\S++")
-      if (prevIsPosterHeading || nextIsPosterHeading)
-        lines[i] := ""
+      j := i - 1
+      while (j >= 1 && Trim(lines[j], " `t") = ">") {
+        lines[j] := (j = i - 1) ? "" : Chr(1)
+        j--
+      }
+
+      j := i + 1
+      while (j <= lines.Length && Trim(lines[j], " `t") = ">") {
+        lines[j] := (j = i + 1) ? "" : Chr(1)
+        j++
+      }
     }
 
     out := ""
     firstOut := true
     Loop lines.Length {
+      if (lines[A_Index] = Chr(1))
+        continue
       out .= (firstOut ? "" : "`n") lines[A_Index]
       firstOut := false
     }

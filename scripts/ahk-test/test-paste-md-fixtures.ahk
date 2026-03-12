@@ -78,6 +78,10 @@ required := [
 ]
 
 Log("── PasteAsMd fixture regressions ─────────────────────────────")
+Chk("NormalizeWhitespaceOnlyMarkdownLines clears spacer-only lines", PasteMd.NormalizeWhitespaceOnlyMarkdownLines("alpha`n   `nomega") = "alpha`n`nomega")
+Chk("QuoteMarkdown preserves canonical blank lines", PasteMd.QuoteMarkdown(PasteMd.NormalizeWhitespaceOnlyMarkdownLines("alpha`n   `nomega")) = "> alpha`n>`n> omega")
+Chk("UnquoteBlankLinesAroundPosterHeadings accepts spaced quote spacers", PasteMd.UnquoteBlankLinesAroundPosterHeadings("## User`n>   `n## ChatGPT") = "## User`n`n## ChatGPT")
+Chk("UnquoteBlankLinesAroundPosterHeadings collapses spacer runs", PasteMd.UnquoteBlankLinesAroundPosterHeadings("> body`n>`n>   `n## User`n>   `n>`n> answer") = "> body`n`n## User`n`n> answer")
 for fx in fixtures {
   fixtureStartTick := A_TickCount
   path := _ResolveFixturePath(fx)
