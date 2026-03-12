@@ -208,10 +208,11 @@ HtmlNorm._thinkingBlocks := []
 scopedNorm := HtmlNorm._ApplySegmentScopedTransforms(scopedHtml, "chatgpt")
 scopedRejoined := ""
 for _, segment in segments
-  scopedRejoined .= segment["html"]
+  scopedRejoined .= HtmlNorm._ReadSegmentText(scopedHtml, segment)
 
 Chk("scoped segments split into top-level blocks", segments.Length = 5)
 Chk("scoped segments rejoin to original html", scopedRejoined = scopedHtml)
+Chk("scoped segments do not store copied html payloads", !segments[1].Has("html"))
 Chk("scoped segments do not expose offsets", !segments[1].Has("start") && !segments[1].Has("end"))
 Chk("scoped segments flag chatgpt code block", segments[2]["hasChatGptCode"])
 Chk("scoped segments flag task list block", segments[3]["hasTaskList"])

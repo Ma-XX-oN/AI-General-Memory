@@ -127,8 +127,8 @@ class HtmlNorm {
   }
 
   /**
-   * Applies the current segment-scoped transforms by rewriting ordered segment
-   * payloads and joining them back in sequence.
+   * Applies the current segment-scoped transforms by rewriting ordered
+   * segments from the original HTML and joining them back in sequence.
    * @param {string} html
    * @param {string} source
    * @returns {string}
@@ -144,16 +144,16 @@ class HtmlNorm {
     out := ""
     changed := false
     for _, segment in segments {
-      replacement := HtmlNorm._TransformSegment(segment)
-      if (replacement != segment["html"])
+      replacement := HtmlNorm._TransformSegment(html, segment)
+      if (replacement != HtmlNorm._ReadSegmentText(html, segment))
         changed := true
       out .= replacement
     }
     return changed ? out : html
   }
 
-  static _TransformSegment(segment) {
-    replacement := segment["html"]
+  static _TransformSegment(sourceHtml, segment) {
+    replacement := HtmlNorm._ReadSegmentText(sourceHtml, segment)
     if !segment["hasWork"]
       return replacement
 
@@ -187,15 +187,20 @@ class HtmlNorm {
     return specs
   }
 
-  static _NewSegment(kind, segmentHtml) {
+  static _NewSegment(kind, startPos, segmentLen) {
     segment := Map(
       "kind", kind,
-      "html", segmentHtml,
+      "_start", startPos,
+      "_len", segmentLen,
       "hasWork", false
     )
     for _, spec in HtmlNorm._GetSegmentTransformSpecs()
       segment[spec["flag"]] := false
     return segment
+  }
+
+  static _ReadSegmentText(html, segment) {
+    return SubStr(html, segment["_start"], segment["_len"])
   }
 
   static _PromoteInlineCodeSpans(html) {
@@ -232,7 +237,7 @@ class HtmlNorm {
 
   /**
    * Discovers top-level HTML segments and annotates the scoped-transform
-   * features for each ordered payload.
+   * features for each ordered span.
    * @param {string} html
    * @param {string} source
    * @returns {Array}
@@ -245,12 +250,12 @@ class HtmlNorm {
 
     while (pos <= len) {
       if !RegExMatch(html, tagPat, &mTag, pos) {
-        segments.Push(HtmlNorm._BuildSegment(SubStr(html, pos, len - pos + 1), source, true))
+        segments.Push(HtmlNorm._BuildSegment(html, pos, len - pos + 1, source, true))
         break
       }
 
       if (mTag.Pos > pos)
-        segments.Push(HtmlNorm._BuildSegment(SubStr(html, pos, mTag.Pos - pos), source, true))
+        segments.Push(HtmlNorm._BuildSegment(html, pos, mTag.Pos - pos, source, true))
 
       tagName := StrLower(mTag[1])
       if (HtmlNorm._IsVoidHtmlTag(tagName) || RegExMatch(mTag[0], "/\s*>$")) {
@@ -258,27 +263,27 @@ class HtmlNorm {
       } else {
         endPos := HtmlNorm._FindMatchingElementEnd(html, mTag.Pos, tagName)
         if !endPos {
-          segments.Push(HtmlNorm._BuildSegment(SubStr(html, mTag.Pos, len - mTag.Pos + 1), source))
+          segments.Push(HtmlNorm._BuildSegment(html, mTag.Pos, len - mTag.Pos + 1, source, false, tagName))
           break
         }
       }
 
-      segments.Push(HtmlNorm._BuildSegment(SubStr(html, mTag.Pos, endPos - mTag.Pos + 1), source))
+      segments.Push(HtmlNorm._BuildSegment(html, mTag.Pos, endPos - mTag.Pos + 1, source, false, tagName))
       pos := endPos + 1
     }
 
     return segments
   }
 
-  static _BuildSegment(segmentHtml, source, isText := false) {
+  static _BuildSegment(html, startPos, segmentLen, source, isText := false, kind := "") {
     if isText
-      return HtmlNorm._NewSegment("text", segmentHtml)
+      return HtmlNorm._NewSegment("text", startPos, segmentLen)
 
-    kind := ""
-    if RegExMatch(segmentHtml, "is)^<([a-z][a-z0-9:-]*)\b", &mOpen)
+    if (kind = "" && RegExMatch(html, "is)<([a-z][a-z0-9:-]*)\b", &mOpen, startPos) && mOpen.Pos = startPos)
       kind := StrLower(mOpen[1])
 
-    segment := HtmlNorm._NewSegment(kind, segmentHtml)
+    segment := HtmlNorm._NewSegment(kind, startPos, segmentLen)
+    segmentHtml := HtmlNorm._ReadSegmentText(html, segment)
     for _, spec in HtmlNorm._GetSegmentTransformSpecs() {
       hasWork := spec["detect"].Call(segmentHtml, source)
       segment[spec["flag"]] := hasWork
