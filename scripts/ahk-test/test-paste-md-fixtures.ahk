@@ -36,6 +36,7 @@ fixtures := [
   "PasteAsMd_ChatGPT.log",
   "PasteAsMd_ChatGPT-with-User.log",
   "PasteAsMd_ChatGPT-with-User2.log",
+  "PasteAsMd_ChatGPT-FirstUserPrompt.log",
   "PasteAsMd_ChatGPT-ButtonLinks.log",
   "PasteAsMd_ChatGPT-TrailingEmptyBullet.log",
 ]

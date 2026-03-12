@@ -163,7 +163,8 @@ class HtmlNorm {
         html := HtmlNorm._NormalizeCodeElements(html)
 
         ; 16. Unwrap nested containers that obscure code blocks.
-        html := HtmlNorm._UnwrapNestedContainers(html)
+        if (source != "chatgpt" || HtmlNorm._HasChatGptCodeContainerShape(html))
+            html := HtmlNorm._UnwrapNestedContainers(html)
 
         return html
     }
@@ -733,6 +734,13 @@ class HtmlNorm {
             html := RegExReplace(html, "is)<div\b[^>]*>\s*<div\b[^>]*>\s*(<code\b[^>]*>.*?</code>)\s*</div>\s*</div>", "$1")
         }
         return html
+    }
+
+    static _HasChatGptCodeContainerShape(html) {
+        return RegExMatch(html, "is)^\s*<pre\b[^>]+>\s*<pre\b[^>]*><code\b")
+            || RegExMatch(html, "is)^\s*<pre\b[^>]*\bcode-block__code\b[^>]*>\s*<code\b")
+            || RegExMatch(html, "is)^\s*<div\b[^>]*>\s*<div\b[^>]*>\s*<pre><code\b")
+            || RegExMatch(html, "is)^\s*<div\b[^>]*>\s*<div\b[^>]*>\s*<code\b")
     }
 
     /**
