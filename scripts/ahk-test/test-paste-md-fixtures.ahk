@@ -10,9 +10,6 @@
 #Include ../PasteAsMd.ahk
 #Include test-helpers.ahk
 
-_logPath := A_ScriptDir "\test-paste-md-fixtures.log"
-try FileDelete _logPath
-; Per-fixture output logs are controlled via CLI only: /fixtureOutputLogs:0|1
 emitFixtureOutputLogs := false
 
 passed := 0
@@ -44,6 +41,9 @@ fixtures := [
 ]
 
 opts := ParseHarnessOptions(A_Args, fixtures.Length)
+_logPath := opts["logPath"] != "" ? opts["logPath"] : A_ScriptDir "\test-paste-md-fixtures.log"
+try FileDelete _logPath
+; Per-fixture output logs are controlled via CLI only: /fixtureOutputLogs:0|1
 if (opts["error"] != "") {
   Log("Argument error: " opts["error"])
   ExitApp 2
@@ -202,6 +202,7 @@ TestFinish()
  * Supported switches:
  * - /ls
  * - /fixture:<n|path>
+ * - /log:<path>
  * - /fixtureOutputLogs:0|1
  * @param {Array} args - Raw CLI args (A_Args).
  * @param {integer} fixtureCount - Number of available fixtures.
@@ -213,6 +214,7 @@ ParseHarnessOptions(args, fixtureCount) {
     "listOnly", false,
     "fixtureIndex", 0,
     "fixturePath", "",
+    "logPath", "",
     "emitFixtureOutputLogs", false
   )
 
@@ -247,6 +249,19 @@ ParseHarnessOptions(args, fixtureCount) {
       opts["emitFixtureOutputLogs"] := (mOutput[1] = "1")
       continue
     }
+    if RegExMatch(arg, "i)^/log:(.+)$", &mLog) {
+      if (opts["logPath"] != "") {
+        opts["error"] := "duplicate /log argument"
+        return opts
+      }
+      logSpec := Trim(mLog[1])
+      if (logSpec = "") {
+        opts["error"] := "empty /log argument"
+        return opts
+      }
+      opts["logPath"] := _ResolveHarnessPath(logSpec)
+      continue
+    }
 
     opts["error"] := "unknown argument: " arg
     return opts
@@ -259,6 +274,12 @@ _ResolveFixturePath(fixtureSpec) {
   if RegExMatch(fixtureSpec, "i)^(?:[A-Z]:[\\/]|\\\\)")
     return fixtureSpec
   return A_ScriptDir "\" fixtureSpec
+}
+
+_ResolveHarnessPath(pathSpec) {
+  if RegExMatch(pathSpec, "i)^(?:[A-Z]:[\\/]|\\\\)")
+    return pathSpec
+  return A_ScriptDir "\" pathSpec
 }
 
 _IsCustomFixtureArg(fixtureSpec) {

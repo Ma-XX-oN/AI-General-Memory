@@ -107,6 +107,7 @@ Canonical fixture note:
 |---|---|
 | `/ls` | Lists fixture indices/files and exits. |
 | `/fixture:<n\|path>` | Runs only fixture index `n` from `/ls`, or a specific fixture log path/name when the value is not numeric. Relative paths resolve from `scripts/ahk-test`. |
+| `/log:<path>` | Writes the harness log to a specific path. Relative paths resolve from `scripts/ahk-test`. |
 | `/fixtureOutputLogs:0\|1` | Enables/disables per-scenario fixture output logs (`0` default, `1` enabled). |
 
 Examples:
@@ -117,6 +118,7 @@ Examples:
 %AHK% ahk-test\test-paste-md-fixtures.ahk /fixture:7
 %AHK% ahk-test\test-paste-md-fixtures.ahk /fixture:PasteAsMd_ChatGPT-ButtonLinks.log
 %AHK% ahk-test\test-paste-md-fixtures.ahk /fixture:..\tmp\PasteAsMd_large.log
+%AHK% ahk-test\test-paste-md-fixtures.ahk /fixture:7 /log:..\tmp\fixture-7.log
 %AHK% ahk-test\test-paste-md-fixtures.ahk /fixture:7 /fixtureOutputLogs:1
 %AHK% ahk-test\test-paste-md-fixtures.ahk /fixtureOutputLogs:1
 ```
@@ -128,6 +130,7 @@ per-scenario `.fixture.log` files.
 The harness log records `Elapsed: ...` for each fixture and `Suite elapsed: ...`
 for the full run, so branch-to-branch timing comparisons can be taken from
 `test-paste-md-fixtures.log`.
+Use `/log:<path>` when multiple harness runs need separate logs.
 
 Cleanup is handled by `test-clean.ahk`:
 
