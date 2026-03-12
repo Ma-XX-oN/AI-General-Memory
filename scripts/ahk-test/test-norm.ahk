@@ -214,6 +214,4 @@ Chk("canonical pre/code emitted",     InStr(normGpt, "<pre><code>") || InStr(nor
 Chk("def foo preserved",              InStr(normGpt, "def") && InStr(normGpt, "foo"))
 
 ; ── summary ───────────────────────────────────────────────────────────────────
-Log("")
-Log("Results: " passed " passed, " failed " failed")
-ExitApp
+TestFinish()

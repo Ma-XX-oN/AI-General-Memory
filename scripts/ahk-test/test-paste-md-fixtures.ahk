@@ -195,8 +195,7 @@ for fx in fixtures {
 
 Log("")
 Log("Suite elapsed: " _FormatElapsedMs(A_TickCount - suiteStartTick))
-Log("Results: " passed " passed, " failed " failed")
-ExitApp(failed ? 1 : 0)
+TestFinish()
 
 /**
  * Parses fixture harness CLI arguments.

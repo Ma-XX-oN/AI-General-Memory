@@ -54,9 +54,7 @@ Chk("user poster inferred from context",
     ClipboardWaiter.ExtractPosterFromContext(cfPosterUser) = "User")
 
 ; ── summary ───────────────────────────────────────────────────────────────────
-Log("")
-Log("Results: " passed " passed, " failed " failed")
-ExitApp
+TestFinish()
 
 BuildCfHtml(preFragmentHtml, fragmentHtml, postFragmentHtml := "") {
   startMarker := "<!--StartFragment-->"

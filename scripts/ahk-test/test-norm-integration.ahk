@@ -334,6 +334,4 @@ Chk("CX usermsg: not re-extracted by ChatGPT pattern after Codex extraction",
     !InStr(SubStr(cxStillOut, InStr(cxStillOut, "¤USERMSG_") + 10), "¤USERMSG_"))
 
 ; ── summary ───────────────────────────────────────────────────────────────────
-Log("")
-Log("Results: " passed " passed, " failed " failed")
-ExitApp
+TestFinish()

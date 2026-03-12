@@ -230,6 +230,4 @@ Chk("firstChild empty",      r.firstChild = "")
 Chk("lastChild empty",       r.lastChild = "")
 
 ; ── summary ───────────────────────────────────────────────────────────────────
-Log("")
-Log("Results: " passed " passed, " failed " failed")
-ExitApp
+TestFinish()

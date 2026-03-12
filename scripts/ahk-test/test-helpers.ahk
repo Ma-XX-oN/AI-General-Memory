@@ -2,30 +2,29 @@
 ; test-helpers — shared utilities for HtmlParser/HtmlDom test scripts
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; Suppress error dialogs: route all unhandled exceptions to stderr and exit.
+; Suppress error dialogs and force a non-zero process exit on fatal test errors.
 OnError _TestFatalHandler
 
 /**
  * Global OnError handler for test scripts.
- * Writes the error message and AHK call-stack to stderr, then exits cleanly.
+ * Writes the error to the test log and stderr, suppresses the popup, and exits 1.
  * @param {Error} e    - The thrown error object.
- * @param {string} mode - AHK error mode string (unused here).
- * @returns {integer} -1 to suppress the error dialog.
+ * @param {string} mode - AHK error mode string.
  */
 _TestFatalHandler(e, mode) {
-  msg := "FATAL: " e.Message "`nStack:`n" e.Stack "`n"
+  global _logPath
+
+  msg := "FATAL (" mode "): " e.Message "`nStack:`n" e.Stack "`n"
+  try
+    if (IsSet(_logPath) && _logPath != "")
+      FileAppend msg, _logPath, "UTF-8"
+  catch
+  {}
   try
     FileAppend msg, "**", "UTF-8"
-  catch {
-    global _logPath
-    try {
-      if (IsSet(_logPath) && _logPath != "")
-        FileAppend msg, _logPath, "UTF-8"
-      else
-        FileAppend msg, A_Temp "\ahk-test-fatal.log", "UTF-8"
-    }
-  }
-  return -1
+  catch
+    try FileAppend msg, A_Temp "\ahk-test-fatal.log", "UTF-8"
+  ExitApp 1
 }
 
 /**
@@ -82,4 +81,15 @@ Chk(label, cond, detail := "") {
     Log("  FAIL " label (detail != "" ? " — " detail : ""))
     failed++
   }
+}
+
+/**
+ * Writes the standard summary and exits non-zero when any checks failed.
+ * Callers must declare `passed` and `failed` as globals.
+ */
+TestFinish() {
+  global passed, failed
+  Log("")
+  Log("Results: " passed " passed, " failed " failed")
+  ExitApp(failed ? 1 : 0)
 }

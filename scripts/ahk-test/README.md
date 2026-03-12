@@ -28,6 +28,14 @@ set AHK="C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe"
 
 Results are written to `*.log` files alongside each test script.
 
+Important:
+
+- The maintained AHK test scripts exit non-zero on failures:
+  - logged `Chk(...)` failures return exit code `1` via the shared `TestFinish()` helper
+  - uncaught fatal errors are routed through the shared `OnError` handler and exit `1` without the popup path
+- Treat the process exit code as the primary pass/fail signal.
+- Inspect the corresponding `*.log` file for failure details, including the `Results: X passed, Y failed` summary and any `FAIL` lines.
+
 Clean generated test logs:
 
 ```bat
@@ -229,7 +237,7 @@ once the clipboard HTML contains non-ASCII text.
 
 The runtime fix keeps the existing numeric headers and applies them correctly:
 
-- `ClipboardWaiter.GetHtml()` now decodes the clipboard payload as UTF-8 text.
+- `ClipboardWaiter.GetHtml()` decodes the clipboard payload as UTF-8 text.
 - `ClipboardWaiter.SelectHtmlSection()` re-encodes that text as UTF-8 and slices
   the requested byte range directly from the stored offsets.
 - `PasteMd` consumers that inspect the pre-fragment context now use the same

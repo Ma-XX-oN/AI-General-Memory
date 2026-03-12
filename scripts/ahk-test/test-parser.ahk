@@ -110,6 +110,4 @@ Chk("class=foo",       n.Length > 0 && n[1].Attr("class") = "foo", n.Length > 0 
 Chk("data-id=abc123",  n.Length > 0 && n[1].Attr("data-id") = "abc123", n.Length > 0 ? n[1].Attr("data-id") : "")
 
 ; ── summary ──────────────────────────────────────────────────────────────────
-Log("")
-Log("Results: " passed " passed, " failed " failed")
-ExitApp
+TestFinish()
