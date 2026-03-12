@@ -214,10 +214,12 @@ Chk("scoped segments split into top-level blocks", segments.Length = 5)
 Chk("scoped segments rejoin to original html", scopedRejoined = scopedHtml)
 Chk("scoped segments do not store copied html payloads", !segments[1].Has("html"))
 Chk("scoped segments do not expose offsets", !segments[1].Has("start") && !segments[1].Has("end"))
-Chk("scoped segments flag chatgpt code block", segments[2]["hasChatGptCode"])
-Chk("scoped segments flag task list block", segments[3]["hasTaskList"])
-Chk("scoped segments flag thinking block", segments[4]["hasThinking"])
-Chk("scoped segments flag katex block", segments[5]["hasKatex"])
+Chk("scoped segments preserve top-level element kinds",
+  segments[1]["kind"] = "p" && segments[2]["kind"] = "pre" && segments[3]["kind"] = "ul"
+  && segments[4]["kind"] = "details" && segments[5]["kind"] = "p")
+Chk("scoped segments stay structure-only",
+  !segments[2].Has("hasChatGptCode") && !segments[3].Has("hasTaskList")
+  && !segments[4].Has("hasThinking") && !segments[5].Has("hasKatex"))
 Chk("scoped code block canonicalized", InStr(scopedNorm, "<pre><code>") && InStr(scopedNorm, "print(1)"))
 Chk("scoped task list canonicalized",
   InStr(scopedNorm, '<li><input type="checkbox" disabled checked /> Done</li>'))
@@ -240,8 +242,10 @@ HtmlNorm._userMsgBlocks := []
 scopedTextNorm := HtmlNorm._ApplySegmentScopedTransforms(scopedTextHtml, "chatgpt")
 
 Chk("text segments split into inline + user blocks", segmentsText.Length = 2)
-Chk("text segment flags inline code block", segmentsText[1]["hasInlineCode"])
-Chk("text segment flags user message block", segmentsText[2]["hasUserMsg"])
+Chk("text segments preserve top-level element kinds",
+  segmentsText[1]["kind"] = "p" && segmentsText[2]["kind"] = "div")
+Chk("text segments stay structure-only",
+  !segmentsText[1].Has("hasInlineCode") && !segmentsText[2].Has("hasUserMsg"))
 Chk("text inline code promoted", InStr(scopedTextNorm, "<code>hi</code>"))
 Chk("text user message placeholder inserted", InStr(scopedTextNorm, "<p>¤USERMSG_1¤</p>"))
 Chk("text user message stored with newline",
@@ -258,10 +262,12 @@ segmentsList := HtmlNorm._DiscoverSegments(scopedListHtml, "claudeweb")
 scopedListNorm := HtmlNorm._ApplySegmentScopedTransforms(scopedListHtml, "claudeweb")
 
 Chk("list segments split into four top-level blocks", segmentsList.Length = 4)
-Chk("list segment flags language label block", segmentsList[1]["hasClaudeWebLabel"])
-Chk("list segment flags tight-list block", segmentsList[2]["hasTightList"])
-Chk("list segment flags footnote href block", segmentsList[3]["hasFootnoteHref"])
-Chk("list segment flags footnote list block", segmentsList[4]["hasFootnoteList"])
+Chk("list segments preserve top-level element kinds",
+  segmentsList[1]["kind"] = "div" && segmentsList[2]["kind"] = "ul"
+  && segmentsList[3]["kind"] = "p" && segmentsList[4]["kind"] = "ol")
+Chk("list segments stay structure-only",
+  !segmentsList[1].Has("hasClaudeWebLabel") && !segmentsList[2].Has("hasTightList")
+  && !segmentsList[3].Has("hasFootnoteHref") && !segmentsList[4].Has("hasFootnoteList"))
 Chk("list language label removed", !InStr(scopedListNorm, "font-small p-3.5 pb-0") && !InStr(scopedListNorm, ">Python<"))
 Chk("list leaf paragraph unwrapped", InStr(scopedListNorm, "<li>Leaf item</li>"))
 Chk("list nested parent paragraph unwrapped", InStr(scopedListNorm, "<li>Parent item<ul>"))
@@ -279,8 +285,10 @@ segmentsCode := HtmlNorm._DiscoverSegments(scopedCodeHtml, "claudeweb")
 scopedCodeNorm := HtmlNorm._ApplySegmentScopedTransforms(scopedCodeHtml, "claudeweb")
 
 Chk("code segments split into code + prose blocks", segmentsCode.Length = 2)
-Chk("code segment flags code normalization", segmentsCode[1]["hasCodeWork"])
-Chk("code segment flags container unwrap", segmentsCode[1]["hasCodeContainers"])
+Chk("code segments preserve top-level element kinds",
+  segmentsCode[1]["kind"] = "div" && segmentsCode[2]["kind"] = "p")
+Chk("code segments stay structure-only",
+  !segmentsCode[1].Has("hasCodeWork") && !segmentsCode[1].Has("hasCodeContainers"))
 Chk("code block normalized and unwrapped",
   InStr(scopedCodeNorm, '<pre><code class="language-python">print(1)`nprint(2)</code></pre>'))
 Chk("code wrapper classes removed", !InStr(scopedCodeNorm, "code-block__code"))
@@ -295,7 +303,8 @@ segmentsSpan := HtmlNorm._DiscoverSegments(scopedSpanHtml, "unknown")
 scopedSpanNorm := HtmlNorm._ApplySegmentScopedTransforms(scopedSpanHtml, "unknown")
 
 Chk("span cleanup stays one top-level block", segmentsSpan.Length = 1)
-Chk("span cleanup flags residual spans", segmentsSpan[1]["hasResidualSpan"])
+Chk("span cleanup segment keeps element kind", segmentsSpan[1]["kind"] = "p")
+Chk("span cleanup stays structure-only", !segmentsSpan[1].Has("hasResidualSpan"))
 Chk("span cleanup removes wrapper tags", scopedSpanNorm = "<p>Alpha Beta</p>")
 
 ; ── 9: Full Normalize — Claude Code minimal ───────────────────────────────────

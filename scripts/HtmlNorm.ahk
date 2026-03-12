@@ -146,24 +146,26 @@ class HtmlNorm {
     out := ""
     changed := false
     for _, segment in segments {
-      replacement := HtmlNorm._TransformSegment(html, segment)
-      if (replacement != HtmlNorm._ReadSegmentText(html, segment))
+      segmentHtml := HtmlNorm._ReadSegmentText(html, segment)
+      replacement := HtmlNorm._TransformSegmentText(segmentHtml, source)
+      if (replacement != segmentHtml)
         changed := true
       out .= replacement
     }
     return changed ? out : html
   }
 
-  static _TransformSegment(sourceHtml, segment) {
-    replacement := HtmlNorm._ReadSegmentText(sourceHtml, segment)
-    if !segment["hasWork"]
-      return replacement
-
+  static _TransformSegmentText(segmentHtml, source := "") {
+    replacement := segmentHtml
     for _, spec in HtmlNorm._GetSegmentTransformSpecs() {
-      if segment[spec["flag"]]
+      if HtmlNorm._SpecHasWork(spec, segmentHtml, source)
         replacement := HtmlNorm._ApplySegmentSpec(spec, replacement)
     }
     return replacement
+  }
+
+  static _TransformSegment(sourceHtml, segment, source := "") {
+    return HtmlNorm._TransformSegmentText(HtmlNorm._ReadSegmentText(sourceHtml, segment), source)
   }
 
   static _GetSegmentTransformSpecs() {
@@ -188,15 +190,11 @@ class HtmlNorm {
   }
 
   static _NewSegment(kind, startPos, segmentLen) {
-    segment := Map(
+    return Map(
       "kind", kind,
       "_start", startPos,
-      "_len", segmentLen,
-      "hasWork", false
+      "_len", segmentLen
     )
-    for _, spec in HtmlNorm._GetSegmentTransformSpecs()
-      segment[spec["flag"]] := false
-    return segment
   }
 
   static _ReadSegmentText(html, segment) {
@@ -218,12 +216,12 @@ class HtmlNorm {
 
     while (pos <= len) {
       if !RegExMatch(html, tagPat, &mTag, pos) {
-        segments.Push(HtmlNorm._BuildSegment(html, pos, len - pos + 1, source, true))
+        segments.Push(HtmlNorm._BuildSegment(html, pos, len - pos + 1, true))
         break
       }
 
       if (mTag.Pos > pos)
-        segments.Push(HtmlNorm._BuildSegment(html, pos, mTag.Pos - pos, source, true))
+        segments.Push(HtmlNorm._BuildSegment(html, pos, mTag.Pos - pos, true))
 
       tagName := StrLower(mTag[1])
       if (HtmlNorm._IsVoidHtmlTag(tagName) || RegExMatch(mTag[0], "/\s*>$")) {
@@ -231,34 +229,26 @@ class HtmlNorm {
       } else {
         endPos := HtmlNorm._FindMatchingElementEnd(html, mTag.Pos, tagName)
         if !endPos {
-          segments.Push(HtmlNorm._BuildSegment(html, mTag.Pos, len - mTag.Pos + 1, source, false, tagName))
+          segments.Push(HtmlNorm._BuildSegment(html, mTag.Pos, len - mTag.Pos + 1, false, tagName))
           break
         }
       }
 
-      segments.Push(HtmlNorm._BuildSegment(html, mTag.Pos, endPos - mTag.Pos + 1, source, false, tagName))
+      segments.Push(HtmlNorm._BuildSegment(html, mTag.Pos, endPos - mTag.Pos + 1, false, tagName))
       pos := endPos + 1
     }
 
     return segments
   }
 
-  static _BuildSegment(html, startPos, segmentLen, source, isText := false, kind := "") {
+  static _BuildSegment(html, startPos, segmentLen, isText := false, kind := "") {
     if isText
       return HtmlNorm._NewSegment("text", startPos, segmentLen)
 
     if (kind = "" && RegExMatch(html, "is)<([a-z][a-z0-9:-]*)\b", &mOpen, startPos) && mOpen.Pos = startPos)
       kind := StrLower(mOpen[1])
 
-    segment := HtmlNorm._NewSegment(kind, startPos, segmentLen)
-    segmentHtml := HtmlNorm._ReadSegmentText(html, segment)
-    for _, spec in HtmlNorm._GetSegmentTransformSpecs() {
-      hasWork := HtmlNorm._SpecHasWork(spec, segmentHtml, source)
-      segment[spec["flag"]] := hasWork
-      if hasWork
-        segment["hasWork"] := true
-    }
-    return segment
+    return HtmlNorm._NewSegment(kind, startPos, segmentLen)
   }
 
   static _HasSegmentScopedWork(html, source) {
