@@ -143,13 +143,14 @@ class HtmlNorm {
 
     replacements := []
     for _, region in regions {
+      if !HtmlNorm._RegionHasWork(region)
+        continue
       replacement := HtmlNorm._BuildRegionReplacement(html, region)
-      if (replacement != "")
-        replacements.Push(Map(
-          "start", region["start"],
-          "end", region["end"],
-          "text", replacement
-        ))
+      replacements.Push(Map(
+        "start", region["start"],
+        "end", region["end"],
+        "text", replacement
+      ))
     }
 
     if (replacements.Length = 0)
