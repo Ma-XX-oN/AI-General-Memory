@@ -98,6 +98,7 @@
 
 ### Documentation And Diagrams
 
+- In general documentation, avoid non-essential temporal/status phrasing such as "now", "currently", "before", or "previously"; state the invariant directly unless timeline context is the point (for example in a changelog).
 - For OpenSCAD JS documentation, require JSDoc on public symbols and use `@slot`/`@deref` plus full `@type` docs for slot-based constants/typedefs.
 - For GitHub markdown docs, avoid raw `<svg>` tags and sanitize punctuation-heavy anchors when generating intra-doc links.
 - For GitHub markdown diagrams that must align, prefer plain ASCII (`+`, `-`, `|`) over Unicode box-drawing characters because GitHub monospace rendering can drift.
