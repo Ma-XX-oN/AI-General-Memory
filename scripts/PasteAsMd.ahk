@@ -799,11 +799,12 @@ class PasteMd {
   /**
    * Runs pandoc to convert HTML content to GitHub-flavored markdown.
    * @param {string} html - HTML content to convert
-   * @param {string} pandocExe - Path to pandoc executable
-   * @returns {string} Markdown text, or empty string on conversion/read failure
-   */
+  * @param {string} pandocExe - Path to pandoc executable
+  * @returns {string} Markdown text, or empty string on conversion/read failure
+  */
   static HtmlToGfmViaPandoc(html, pandocExe) {
-    tmpBase := A_Temp "\chatgpt_md_" A_TickCount
+    pid := DllCall("GetCurrentProcessId", "UInt")
+    tmpBase := A_Temp "\chatgpt_md_" pid "_" A_TickCount
     tmpHtml := tmpBase ".html"
     tmpMd := tmpBase ".md"
 
