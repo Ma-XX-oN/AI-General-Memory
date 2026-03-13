@@ -1042,11 +1042,31 @@ class PasteMd {
       line := SubStr(line, 1, m.Pos - 1) replacement SubStr(line, m.Pos + m.Len)
     }
 
-    ; Remove any unknown tags that are not escaped
-    line := RegExReplace(line, "\G((?&inside_htag))(?<!\\)<(?:[^>'`"]++|(?&quoted_string))*+>" PasteMd.RE_HTML_LIB, "$1")
-    line := RegExReplace(line, "((?:[^\\]|\\[^<>])++)\\([<>])" PasteMd.RE_HTML_LIB, "$1$2")
+    line := PasteMd._StripUnknownInlineHtmlOutsideCodeSpans(line)
 
     return line
+  }
+
+  static _StripUnknownInlineHtmlOutsideCodeSpans(line) {
+    pat := "(?&codespan)" PasteMd.RE_HTML_LIB
+    out := ""
+    pos := 1
+    while RegExMatch(line, pat, &m, pos) {
+      if (m.Pos > pos)
+        out .= PasteMd._StripUnknownInlineHtmlSegment(SubStr(line, pos, m.Pos - pos))
+      out .= m[0]
+      pos := m.Pos + m.Len
+    }
+    if (pos <= StrLen(line))
+      out .= PasteMd._StripUnknownInlineHtmlSegment(SubStr(line, pos))
+    return out
+  }
+
+  static _StripUnknownInlineHtmlSegment(segment) {
+    ; Remove any unknown tags that are not escaped.
+    segment := RegExReplace(segment, "\G((?&inside_htag))(?<!\\)<(?:[^>'`"]++|(?&quoted_string))*+>" PasteMd.RE_HTML_LIB, "$1")
+    segment := RegExReplace(segment, "((?:[^\\]|\\[^<>])++)\\([<>])" PasteMd.RE_HTML_LIB, "$1$2")
+    return segment
   }
 
   /**

@@ -82,6 +82,10 @@ Chk("NormalizeWhitespaceOnlyMarkdownLines clears spacer-only lines", PasteMd.Nor
 Chk("QuoteMarkdown preserves canonical blank lines", PasteMd.QuoteMarkdown(PasteMd.NormalizeWhitespaceOnlyMarkdownLines("alpha`n   `nomega")) = "> alpha`n>`n> omega")
 Chk("UnquoteBlankLinesAroundPosterHeadings accepts spaced quote spacers", PasteMd.UnquoteBlankLinesAroundPosterHeadings("## User`n>   `n## ChatGPT") = "## User`n`n## ChatGPT")
 Chk("UnquoteBlankLinesAroundPosterHeadings collapses spacer runs", PasteMd.UnquoteBlankLinesAroundPosterHeadings("> body`n>`n>   `n## User`n>   `n>`n> answer") = "> body`n`n## User`n`n> answer")
+bt := Chr(96)
+nbsp := Chr(160)
+inlineTagCode := "- Comments, maybe" nbsp bt "<script>" bt "/" bt "<style>" bt nbsp "if they ever appear."
+Chk("CleanMarkdown preserves tags inside inline code spans", PasteMd.CleanMarkdown(inlineTagCode) = inlineTagCode)
 for fx in fixtures {
   fixtureStartTick := A_TickCount
   path := _ResolveFixturePath(fx)
