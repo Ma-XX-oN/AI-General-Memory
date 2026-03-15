@@ -29,6 +29,10 @@ progress. These defaults apply to all projects unless a project-specific
    if each individual part was previously approved.
 4. Run dependent operations sequentially and verify each step.
 5. For long-running commands, capture output once to a log and inspect the log.
+6. Be aware that commands that run freely inside the sandbox can become much
+   stricter when they must run outside it. For outside-sandbox workflows, keep
+   command shapes stable and keep transient helper files out of repos so their
+   creation and cleanup do not trigger extra approval prompts.
 
 ## Commit Workflow (Bash / Claude Code)
 
@@ -73,3 +77,7 @@ command unique, defeating pre-approval.
 5. Use a stable commit command shape:
    - `git commit -F $commitMsgPath`
 6. Do not store transient commit message files in repos.
+7. Reason for rules 4-6: a temp file under `%TEMP%` avoids repository writes for
+   commit-message plumbing. That matters because sandboxed git commands may work
+   with little friction, while outside-sandbox commands are stricter about
+   approval shape and cleanup side effects.
