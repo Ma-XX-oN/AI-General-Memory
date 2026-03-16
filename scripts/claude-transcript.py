@@ -345,20 +345,43 @@ def _session_grep(path, *, plain=None, rx=None, before=0, after=0):
                             texts.append(block.get("text", ""))
                         elif btype == "thinking":
                             texts.append(block.get("thinking", ""))
-                        elif btype == "tool_use" and block.get("name") == "TodoWrite":
-                            todos = block.get("input", {}).get("todos", [])
-                            if todos:
-                                lines = []
-                                for j, item in enumerate(todos, 1):
-                                    c = item.get("content", "")
-                                    s = item.get("status", "pending")
-                                    if s == "completed":
-                                        lines.append(f"{j}. ~~{c}~~")
-                                    elif s == "in_progress":
-                                        lines.append(f"{j}. **{c}**")
-                                    else:
-                                        lines.append(f"{j}. {c}")
-                                texts.append("\n".join(lines))
+                        elif btype == "tool_use":
+                            name = block.get("name", "")
+                            inp = block.get("input", {})
+                            if name == "TodoWrite":
+                                todos = inp.get("todos", [])
+                                if todos:
+                                    lines = []
+                                    for j, item in enumerate(todos, 1):
+                                        c = item.get("content", "")
+                                        s = item.get("status", "pending")
+                                        if s == "completed":
+                                            lines.append(f"{j}. ~~{c}~~")
+                                        elif s == "in_progress":
+                                            lines.append(f"{j}. **{c}**")
+                                        else:
+                                            lines.append(f"{j}. {c}")
+                                    texts.append("\n".join(lines))
+                            elif name == "Edit":
+                                parts = []
+                                old_s = inp.get("old_string", "")
+                                new_s = inp.get("new_string", "")
+                                if old_s:
+                                    parts.extend(f"- {l}" for l in old_s.splitlines())
+                                if new_s:
+                                    parts.extend(f"+ {l}" for l in new_s.splitlines())
+                                if parts:
+                                    texts.append("\n".join(parts))
+                            elif name in ("Write", "NotebookEdit"):
+                                c = inp.get("content") or inp.get("new_source", "")
+                                if c:
+                                    texts.append(
+                                        "\n".join(f"+ {l}" for l in c.splitlines())
+                                    )
+                            elif name == "Bash":
+                                cmd = inp.get("command", "")
+                                if cmd:
+                                    texts.append(f"$ {cmd}")
                 for text in texts:
                     hunks.extend(
                         _grep_context(text, plain=plain, rx=rx, before=before, after=after)
