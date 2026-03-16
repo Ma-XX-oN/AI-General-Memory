@@ -124,30 +124,49 @@ def generate_transcript(path):
 
     # Render
     out = []
-    for msg in msgs:
+    i = 0
+    while i < len(msgs):
+        msg = msgs[i]
+
         if msg["role"] == "user":
             img_md = "\n".join(f'![image]({url})' for url in msg["images"])
             block = f'## User\n\n{msg["text"]}'
             if img_md:
                 block += f"\n\n{img_md}"
             out.append(block + "\n")
+            i += 1
 
-        elif msg["role"] == "codex" and msg["phase"] == "commentary":
-            quoted = "\n".join("> " + line for line in msg["text"].splitlines())
-            out.append(f"> *Codex*\n\n{quoted}\n")
+        else:  # codex turn (commentary and/or final answer share one ## Codex heading)
+            # Collect all consecutive commentary items for this turn
+            commentary_items = []
+            while i < len(msgs) and msgs[i]["role"] == "codex" and msgs[i]["phase"] == "commentary":
+                commentary_items.append(msgs[i]["text"])
+                i += 1
 
-        else:  # final Codex answer
-            block = f'## Codex\n\n{msg["text"]}'
-            if msg["patches"]:
-                n = len(msg["patches"])
-                label = f"{n} file change{'s' if n != 1 else ''}"
-                patches_md = "\n\n".join(
-                    f"```diff\n{p}\n```" for p in msg["patches"]
-                )
-                block += (
-                    f"\n\n<details>\n<summary>{label}</summary>\n\n"
-                    f"{patches_md}\n\n</details>"
-                )
+            # Peek at the next message: is it the final answer for this turn?
+            final_msg = None
+            if i < len(msgs) and msgs[i]["role"] == "codex" and msgs[i]["phase"] != "commentary":
+                final_msg = msgs[i]
+                i += 1
+
+            # Build a single ## Codex block for the whole turn
+            block = "## Codex"
+            if commentary_items:
+                separator = "\n\n>\n\n"
+                inner = separator.join(commentary_items)
+                block += f"\n\n<details>\n<summary>Thoughts</summary>\n\n{inner}\n\n</details>"
+            if final_msg:
+                block += f"\n\n{final_msg['text']}"
+                if final_msg["patches"]:
+                    n = len(final_msg["patches"])
+                    label = f"{n} file change{'s' if n != 1 else ''}"
+                    patches_md = "\n\n".join(
+                        f"```diff\n{p}\n```" for p in final_msg["patches"]
+                    )
+                    block += (
+                        f"\n\n<details>\n<summary>{label}</summary>\n\n"
+                        f"{patches_md}\n\n</details>"
+                    )
             out.append(block + "\n")
 
     return "\n".join(out)
