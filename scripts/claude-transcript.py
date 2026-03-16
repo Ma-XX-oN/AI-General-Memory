@@ -146,6 +146,17 @@ def find_session(session_id, proj_dir):
         if os.path.splitext(os.path.basename(path))[0] == session_id:
             return path, None
 
+    # UUID prefix match — allows the 8-char prefix shown in grep output
+    if re.match(r'^[0-9a-f-]+$', session_id, re.IGNORECASE):
+        prefix_matches = [
+            path for _, path in files
+            if os.path.splitext(os.path.basename(path))[0].startswith(session_id)
+        ]
+        if len(prefix_matches) == 1:
+            return prefix_matches[0], None
+        elif len(prefix_matches) > 1:
+            return None, [(_session_title(p), p) for p in prefix_matches]
+
     # Title glob with optional :N suffix
     which = None
     pattern = session_id
