@@ -433,8 +433,13 @@ def generate_transcript(path):
 
     title = _session_title(path)
     sid = os.path.splitext(os.path.basename(path))[0]
+    ctime_dt = _session_ctime(path)
+    mtime_dt = datetime.datetime.fromtimestamp(os.path.getmtime(path))
+    ctime_str = ctime_dt.strftime("%Y-%m-%d %H:%M") if ctime_dt else mtime_dt.strftime("%Y-%m-%d %H:%M")
+    mtime_str = mtime_dt.strftime("%Y-%m-%d %H:%M")
+    proj_label = _project_label(os.path.dirname(path))
 
-    out = [f"# {title}\n\n*Session: {sid}*\n"]
+    out = [f"# {title}\n\n*Session: {sid}  [{proj_label}]  {ctime_str} → {mtime_str}*\n"]
 
     last_user_text = None  # deduplicate retried user messages
     for rec in records:
