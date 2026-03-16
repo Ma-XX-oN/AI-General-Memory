@@ -403,8 +403,8 @@ if __name__ == "__main__":
         metavar="PATTERN",
         dest="grep_re",
         help=(
-            "List sessions matching PATTERN (case-insensitive regex via 'regex' module) "
-            "and exit.  Install with: pip install regex"
+            "List sessions matching PATTERN (case-insensitive regex) and exit.  "
+            "Uses 'regex' module if installed (pip install regex), otherwise 're'."
         ),
     )
     ap.add_argument(
@@ -434,17 +434,12 @@ if __name__ == "__main__":
     if args.grep or args.grep_re:
         if args.grep_re:
             try:
-                import regex as _regex
+                import regex as _remod
             except ImportError:
-                print(
-                    "The 'regex' module is required for --grep-re.  Install it with:\n"
-                    "  pip install regex",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
+                import re as _remod
             try:
-                rx = _regex.compile(args.grep_re, _regex.IGNORECASE)
-            except _regex.error as exc:
+                rx = _remod.compile(args.grep_re, _remod.IGNORECASE)
+            except _remod.error as exc:
                 print(f"Invalid regex: {exc}", file=sys.stderr)
                 sys.exit(1)
             results = grep_sessions(proj_dir, rx=rx)
