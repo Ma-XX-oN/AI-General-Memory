@@ -3,18 +3,25 @@
 codex-transcript.py - Generate a Markdown transcript from a Codex session.
 
 Usage:
-    python codex-transcript.py <session-id> [output-file]
+    python codex-transcript.py --id <glob>            match session by thread name
+    python codex-transcript.py --id <glob>:<N>        pick Nth match when ambiguous
+    python codex-transcript.py --id latest            most recently updated session
+    python codex-transcript.py --id <session-uuid>    raw session UUID
+    python codex-transcript.py --list                 list all sessions
+    python codex-transcript.py --id <id> [output]    write transcript to file
 
-If output-file is omitted, the transcript is written to stdout.
 CODEX_HOME defaults to ~/.codex if the environment variable is not set.
 
 The transcript includes:
   - User messages with embedded images (inline base64 data URIs)
-  - Codex commentary turns (blockquoted)
+  - Codex thinking turns (collapsed in <details><summary>Thoughts</summary>)
   - Codex final-answer turns
   - apply_patch diffs attached to the final answer that triggered them
 """
 
+import argparse
+import datetime
+import fnmatch
 import glob
 import json
 import os
@@ -22,12 +29,15 @@ import re
 import sys
 
 
-def find_session_file(session_id):
-    """Find the JSONL session file for the given session ID."""
-    codex_home = os.environ.get(
+def _codex_home():
+    return os.environ.get(
         "CODEX_HOME", os.path.join(os.path.expanduser("~"), ".codex")
     )
-    sessions_dir = os.path.join(codex_home, "sessions")
+
+
+def _find_session_file(session_id):
+    """Find the JSONL session file for the given raw session ID."""
+    sessions_dir = os.path.join(_codex_home(), "sessions")
     pattern = os.path.join(sessions_dir, "**", f"*{session_id}*.jsonl")
     matches = glob.glob(pattern, recursive=True)
     if not matches:
@@ -36,10 +46,111 @@ def find_session_file(session_id):
             f"Searched: {sessions_dir}"
         )
     if len(matches) > 1:
-        print(f"Warning: multiple matches, using first:", file=sys.stderr)
+        print("Warning: multiple matches, using first:", file=sys.stderr)
         for m in matches:
             print(f"  {m}", file=sys.stderr)
     return matches[0]
+
+
+def _read_session_index():
+    """
+    Read session_index.jsonl and return a list of session dicts,
+    de-duplicated by id and sorted newest-first by updated_at.
+    """
+    path = os.path.join(_codex_home(), "session_index.jsonl")
+    if not os.path.exists(path):
+        return []
+    entries = {}  # id → entry with the latest updated_at
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            rec = json.loads(line)
+            sid = rec.get("id")
+            if not sid:
+                continue
+            if (
+                sid not in entries
+                or rec.get("updated_at", "") > entries[sid].get("updated_at", "")
+            ):
+                entries[sid] = rec
+    result = list(entries.values())
+    result.sort(key=lambda r: r.get("updated_at", ""), reverse=True)
+    return result
+
+
+def find_session(session_id):
+    """
+    Resolve *session_id* to a JSONL file path.
+
+    Accepts:
+      - ``'latest'``: most recently updated session
+      - a UUID: direct file lookup (backward-compatible)
+      - a title glob (``*`` / ``?``): case-insensitive fnmatch on thread_name
+      - ``<glob>:<N>``: pick the Nth (1-based) match when ambiguous
+
+    Returns ``(path, None)`` on unambiguous success.
+    Returns ``(None, [entry, ...])`` when multiple matches exist and
+    no ``:N`` index was provided.
+    """
+    entries = _read_session_index()
+
+    # 'latest' — most recently updated entry
+    if session_id == "latest":
+        if not entries:
+            raise FileNotFoundError("session_index.jsonl is empty or not found")
+        return _find_session_file(entries[0]["id"]), None
+
+    # Bare UUID-like string (no wildcards, no colon): try direct file lookup first
+    if "*" not in session_id and "?" not in session_id and ":" not in session_id:
+        try:
+            return _find_session_file(session_id), None
+        except FileNotFoundError:
+            pass  # fall through to title-glob search
+
+    # Title glob with optional :N suffix
+    which = None
+    pattern = session_id
+    if ":" in session_id:
+        head, tail = session_id.rsplit(":", 1)
+        if tail.isdigit():
+            pattern, which = head, int(tail)
+
+    # Bare words implicitly get wildcard wrapping
+    if "*" not in pattern and "?" not in pattern:
+        pattern = f"*{pattern}*"
+
+    if not entries:
+        raise FileNotFoundError("session_index.jsonl is empty or not found")
+
+    matches = [
+        e for e in entries
+        if fnmatch.fnmatch(e.get("thread_name", "").lower(), pattern.lower())
+    ]
+
+    if not matches:
+        raise FileNotFoundError(f"No session matching '{session_id}'")
+    if len(matches) == 1:
+        return _find_session_file(matches[0]["id"]), None
+    if which is not None:
+        if 1 <= which <= len(matches):
+            return _find_session_file(matches[which - 1]["id"]), None
+        raise ValueError(f"Index {which} out of range (1\u2013{len(matches)})")
+    return None, matches
+
+
+def list_sessions():
+    """Print a numbered session list to stdout."""
+    entries = _read_session_index()
+    if not entries:
+        print("No sessions found.", file=sys.stderr)
+        return
+    for i, e in enumerate(entries, 1):
+        dt = e.get("updated_at", "")[:16].replace("T", " ")
+        name = e.get("thread_name", "(no name)")
+        sid = e.get("id", "")
+        print(f"{i:3}. [{dt}] {name:<60}  ({sid[:8]}...)")
 
 
 def get_images_before(lines, idx):
@@ -173,22 +284,71 @@ def generate_transcript(path):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print(f"Usage: {sys.argv[0]} <session-id> [output-file]", file=sys.stderr)
+    ap = argparse.ArgumentParser(
+        description="Generate a Markdown transcript from a Codex session.",
+        epilog=(
+            "Examples:\n"
+            "  %(prog)s --list\n"
+            "  %(prog)s --id latest out.md\n"
+            "  %(prog)s --id 'beam overlap'\n"
+            "  %(prog)s --id 'beam*:2' out.md\n"
+            "  %(prog)s --id 019cd051-c2ac-72e0-ab6f-3e620157607a"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    ap.add_argument(
+        "--id",
+        metavar="GLOB_OR_UUID",
+        help=(
+            "Select session by thread-name glob, UUID, or 'latest'. "
+            "Append :<N> to pick the Nth result when ambiguous."
+        ),
+    )
+    ap.add_argument(
+        "--list",
+        action="store_true",
+        help="List all sessions and exit.",
+    )
+    ap.add_argument(
+        "output",
+        nargs="?",
+        help="Output file path (default: stdout).",
+    )
+    args = ap.parse_args()
+
+    if args.list:
+        list_sessions()
+        sys.exit(0)
+
+    if not args.id:
+        ap.print_help(sys.stderr)
         sys.exit(1)
 
-    session_id = sys.argv[1]
-    outfile = sys.argv[2] if len(sys.argv) > 2 else None
+    try:
+        session_path, ambiguous = find_session(args.id)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
 
-    session_path = find_session_file(session_id)
+    if ambiguous:
+        print(
+            f"Ambiguous: {len(ambiguous)} sessions match '{args.id}':",
+            file=sys.stderr,
+        )
+        for i, e in enumerate(ambiguous, 1):
+            name = e.get("thread_name", "(no name)")
+            sid = e.get("id", "")
+            print(f"  {i:3}. {name:<60}  ({sid[:8]}...)", file=sys.stderr)
+        print(f"\nUse --id '{args.id}:<N>' to select one.", file=sys.stderr)
+        sys.exit(1)
+
     print(f"Session: {session_path}", file=sys.stderr)
-
     transcript = generate_transcript(session_path)
 
-    if outfile:
-        with open(outfile, "w", encoding="utf-8") as f:
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as f:
             f.write(transcript)
-        print(f"Written to: {outfile}", file=sys.stderr)
+        print(f"Written to: {args.output}", file=sys.stderr)
     else:
         sys.stdout.reconfigure(encoding="utf-8")
         print(transcript)

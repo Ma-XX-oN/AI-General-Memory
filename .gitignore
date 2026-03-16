@@ -32,6 +32,7 @@
 !scripts/HtmlDom.ahk
 !scripts/CopyClip.ahk
 !scripts/TT_Simple.ahk
+!scripts/claude-transcript.py
 !scripts/codex-transcript.py
 !scripts/ahk-test
 !scripts/ahk-test/**
