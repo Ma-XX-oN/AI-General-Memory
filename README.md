@@ -8,6 +8,9 @@ Shared knowledge files for Claude Code and Codex.
 
 - [Purpose](#purpose)
 - [Contents](#contents)
+  - [AI Data](#ai-data)
+  - [Scripts](#scripts)
+  - [User Files](#user-files)
 - [Claude Code](#claude-code)
   - [How to Install For Claude Code](#how-to-install-for-claude-code)
     - [Resolve `CLAUDE_DIR`](#resolve-claude_dir)
@@ -40,34 +43,45 @@ ending tools somewhat useful as well, though mostly for confirmation purposes.
 
 ## Contents
 
-Most of these files are used by the AIs.  There are a couple used
-directly/indirectly by the users.
+Most of these files are used by the AIs. A few are used directly by the user.
 
-| File | Purpose |
-|------|---------|
-| [`CLAUDE.md`](CLAUDE.md) | Global instructions and lessons for Claude Code |
-| [`CODEX.md`](CODEX.md) | Global instructions and lessons for Codex |
-| [`AGENTS.md`](AGENTS.md) | Project-level bootstrap template for Codex projects |
-| [`LICENSE`](LICENSE) | Apache License 2.0 terms for repository content |
-| [`NOTICE`](NOTICE) | Project and contributor attribution notice file |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Contribution workflow and expectations |
-| [`AUTHORS.md`](AUTHORS.md) | Maintainer and contributor attribution list |
-| [`social-preview.svg`](social-preview.svg) | Repository social preview artwork by collaborative effort between Claude Code and Codex |
-| [`ahk.md`](ahk.md) | AutoHotkey v2 patterns and pitfalls (Git Bash, strings, concat) — referenced from CLAUDE.md |
-| [`build_issues.md`](build_issues.md) | Build and linker mismatch triage playbook |
-| [`regex-patterns.md`](regex-patterns.md) | Reusable regex patterns referenced from CLAUDE.md / CODEX.md |
-| [`testing.md`](testing.md) | Testing guidelines and discipline referenced from CLAUDE.md |
-| [`workflow.md`](workflow.md) | TTD/testing/command-workflow guidance for Codex to reduce approval friction |
-| [`scripts/session-pid.sh`](scripts/session-pid.sh) | Print the stable AI agent session PID (bash entry point — must be sourced) |
-| [`scripts/session-pid.ps1`](scripts/session-pid.ps1) | Print the stable AI agent session PID (PowerShell implementation, called by session-pid.sh and usable directly from Codex) |
-| [`scripts/normalize-eol.ps1`](scripts/normalize-eol.ps1) | Utility to normalize file EOL style (`CRLF` or `LF`) |
-| [`scripts/show-eol.ps1`](scripts/show-eol.ps1) | Utility to report file EOL style (`CRLF`, `LF`, `CR`, `Mixed`, `None`) |
-| [`scripts/show-eol.pl`](scripts/show-eol.pl) | Perl utility to report file EOL style (`CRLF`, `LF`, `CR`, `Mixed`, `None`) |
-| [`scripts/normalize-eol.pl`](scripts/normalize-eol.pl) | Perl utility to normalize file EOL style (`CRLF` or `LF`) |
-| [`scripts/PasteAsMd.ahk`](scripts/PasteAsMd.ahk) | <h2>User helper script for user-to-AI communication via markdown-safe paste</h2><ul><li>Requires [AutoHotkey](https://www.autohotkey.com/) and [pandoc](https://pandoc.org/).</li><li>Maps `Ctrl-Alt-Shift-v` to a menu to paste as Markdown or quoted Markdown.</li><li>*not an AI runtime tool*</li></ul> |
-| [`scripts/CopyClip.ahk`](scripts/PasteAsMd.ahk) | <h2>User helper script to display what types were copied with keyboard shortcuts</h2><ul><li>Requires [AutoHotkey](https://www.autohotkey.com/).</li><li>Tracks `Ctrl-c`, `Ctrl-Ins`, `Ctrl-PrtSc` and `Alt-PrtSc`.</li><li>Useful to confirm copy since sometimes it can take some time to fill clipboard or fingers don't hit right keys.<li>*not an AI runtime tool*</li></ul> |
-| [`scripts/ClipHelper.ahk`](scripts/ClipHelper.ahk) | Clipboard/CF_HTML utility used by `PasteAsMd.ahk`.<ul><li>*not an AI runtime tool*</li></ul> |
-| [`.gitignore`](.gitignore) | Deny-all with explicit exceptions for knowledge files |
+### AI Data
+
+| File | User | Purpose |
+| --- | --- | --- |
+| [`CLAUDE.md`](CLAUDE.md) | Claude | Global instructions and lessons for Claude Code |
+| [`CODEX.md`](CODEX.md) | Codex | Global instructions and lessons for Codex |
+| [`AGENTS.md`](AGENTS.md) | Codex | Project-level bootstrap template for Codex projects |
+| [`ahk.md`](ahk.md) | AIs | AutoHotkey v2 patterns and pitfalls (Git Bash, strings, concat) |
+| [`build_issues.md`](build_issues.md) | AIs | Build and linker mismatch triage playbook |
+| [`regex-patterns.md`](regex-patterns.md) | AIs | Reusable regex patterns |
+| [`testing.md`](testing.md) | AIs | Testing guidelines and discipline |
+| [`workflow.md`](workflow.md) | AIs | TTD/testing/command-workflow guidance to reduce approval friction |
+
+### Scripts
+
+| File | User | Purpose |
+| --- | --- | --- |
+| [`scripts/session-pid.sh`](scripts/session-pid.sh) | AIs | Print the stable AI agent session PID (bash entry point — must be sourced) |
+| [`scripts/session-pid.ps1`](scripts/session-pid.ps1) | AIs | Print the stable AI agent session PID (PowerShell implementation, called by `session-pid.sh` and usable directly from Codex) |
+| [`scripts/normalize-eol.ps1`](scripts/normalize-eol.ps1) | All | Normalize file EOL style (`CRLF` or `LF`) — PowerShell |
+| [`scripts/normalize-eol.pl`](scripts/normalize-eol.pl) | All | Normalize file EOL style (`CRLF` or `LF`) — Perl |
+| [`scripts/show-eol.ps1`](scripts/show-eol.ps1) | All | Report file EOL style (`CRLF`, `LF`, `CR`, `Mixed`, `None`) — PowerShell |
+| [`scripts/show-eol.pl`](scripts/show-eol.pl) | All | Report file EOL style (`CRLF`, `LF`, `CR`, `Mixed`, `None`) — Perl |
+| [`scripts/PasteAsMd.ahk`](scripts/PasteAsMd.ahk) | User | User-to-AI communication via markdown-safe paste.<ul><li>Requires [AutoHotkey](https://www.autohotkey.com/) and [pandoc](https://pandoc.org/).</li><li>Maps `Ctrl-Alt-Shift-v` to a menu to paste as Markdown or quoted Markdown.</li></ul> |
+| [`scripts/CopyClip.ahk`](scripts/CopyClip.ahk) | User | Display what clipboard types were copied with keyboard shortcuts.<ul><li>Requires [AutoHotkey](https://www.autohotkey.com()).</li><li>Tracks `Ctrl-c`, `Ctrl-Ins`, `Ctrl-PrtSc` and `Alt-PrtSc`.</li><li>Useful to confirm copy since clipboard fill can lag.</li></ul> |
+| [`scripts/codex-transcript.py`](scripts/codex-transcript.py) | User | Generate a Markdown transcript from a Codex session.<ul><li>Usage: `python scripts/codex-transcript.py <session-id> [output.md]`</li><li>Embeds images inline as base64 data URIs, blockquotes commentary turns, attaches file diffs in collapsible `<details>` blocks.</li></ul> |
+
+### User Files
+
+| File | User | Purpose |
+| --- | --- | --- |
+| [`social-preview.svg`](social-preview.svg) | User | Repository social preview artwork |
+| [`LICENSE`](LICENSE) | User | Apache License 2.0 terms for repository content |
+| [`NOTICE`](NOTICE) | User | Project and contributor attribution notice file |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | User | Contribution workflow and expectations |
+| [`AUTHORS.md`](AUTHORS.md) | User | Maintainer and contributor attribution list |
+| [`.gitignore`](.gitignore) | User | Deny-all with explicit exceptions for tracked files |
 
 ## Claude Code
 
