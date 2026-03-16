@@ -497,11 +497,13 @@ def generate_transcript(path):
                 )
 
             if todo_ops:
-                # Show the final todo state from the last TodoWrite in this turn
-                last_todos = todo_ops[-1].get("input", {}).get("todos", [])
-                if last_todos:
+                # Render every TodoWrite in this turn so the progression is visible
+                for op in todo_ops:
+                    todos = op.get("input", {}).get("todos", [])
+                    if not todos:
+                        continue
                     items_md = ""
-                    for item in last_todos:
+                    for item in todos:
                         text = item.get("content", "")
                         status = item.get("status", "pending")
                         if status == "completed":
