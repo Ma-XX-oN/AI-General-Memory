@@ -158,6 +158,24 @@ def find_session(session_id, proj_dir):
     return None, matches
 
 
+def _session_ctime(path):
+    """Return creation datetime from the first JSONL record with a *timestamp* field."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            for raw in f:
+                raw = raw.strip()
+                if not raw:
+                    continue
+                rec = json.loads(raw)
+                ts = rec.get("timestamp")
+                if ts:
+                    ts_clean = ts.rstrip("Z").split(".")[0]  # "2026-03-14T02:19:59"
+                    return datetime.datetime.strptime(ts_clean, "%Y-%m-%dT%H:%M:%S")
+    except Exception:
+        pass
+    return None
+
+
 def list_sessions(proj_dir):
     """Print a numbered session list to stdout."""
     files = _session_files(proj_dir)
@@ -441,7 +459,12 @@ if __name__ == "__main__":
             "  %(prog)s --id latest out.md\n"
             "  %(prog)s --id 'codex session'\n"
             "  %(prog)s --id 'codex*:2' out.md\n"
-            "  %(prog)s --id f4b19167-d8a7-4a10-81c5-d03920efd017"
+            "  %(prog)s --id f4b19167-d8a7-4a10-81c5-d03920efd017\n"
+            "\n"
+            "Grep output header format:\n"
+            "  [creation]-[modification]  title (uuid-prefix)\n"
+            "  Creation time: timestamp of the first record in the session JSONL.\n"
+            "  Modification time: file mtime."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -558,10 +581,13 @@ if __name__ == "__main__":
             for session_idx, (mtime, path, hunks) in enumerate(results):
                 if session_idx > 0:
                     print()
-                dt = datetime.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
+                mtime_str = datetime.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
                 title = _session_title(path)
                 sid = os.path.splitext(os.path.basename(path))[0]
-                print(f"[{dt}] {title} ({sid[:8]})")
+                ctime_dt = _session_ctime(path)
+                ctime_str = ctime_dt.strftime("%Y-%m-%d %H:%M") if ctime_dt else mtime_str
+                print(f"[{ctime_str}]-[{mtime_str}]")
+                print(f"{title} ({sid[:8]})")
                 for hunk_idx, hunk in enumerate(hunks):
                     if hunk_idx > 0:
                         print("--")

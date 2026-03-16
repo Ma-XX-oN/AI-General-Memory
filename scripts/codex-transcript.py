@@ -242,6 +242,16 @@ def _session_grep(path, *, plain=None, rx=None, before=0, after=0):
     return hunks
 
 
+def _uuid7_ctime(sid):
+    """Return creation datetime embedded in a UUID v7 session ID (first 48 bits = ms since epoch)."""
+    try:
+        hex48 = sid.replace("-", "")[:12]
+        ms = int(hex48, 16)
+        return datetime.datetime.fromtimestamp(ms / 1000)
+    except Exception:
+        return None
+
+
 def grep_sessions(*, plain=None, rx=None, before=0, after=0):
     """Return [(mtime, path, entry_or_None, hunks), ...] for sessions with matching text."""
     sessions_dir = os.path.join(_codex_home(), "sessions")
@@ -399,7 +409,12 @@ if __name__ == "__main__":
             "  %(prog)s --id latest out.md\n"
             "  %(prog)s --id 'beam overlap'\n"
             "  %(prog)s --id 'beam*:2' out.md\n"
-            "  %(prog)s --id 019cd051-c2ac-72e0-ab6f-3e620157607a"
+            "  %(prog)s --id 019cd051-c2ac-72e0-ab6f-3e620157607a\n"
+            "\n"
+            "Grep output header format:\n"
+            "  [creation]-[modification]  title (uuid-prefix)\n"
+            "  Creation time: decoded from the UUID v7 session ID (first 48 bits = ms since epoch).\n"
+            "  Modification time: updated_at from session_index.jsonl."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -509,14 +524,17 @@ if __name__ == "__main__":
                 if session_idx > 0:
                     print()
                 if entry:
-                    dt = entry.get("updated_at", "")[:16].replace("T", " ")
+                    mtime_str = entry.get("updated_at", "")[:16].replace("T", " ")
                     name = entry.get("thread_name", "(no name)")
                     sid = entry.get("id", "")
                 else:
-                    dt = datetime.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
+                    mtime_str = datetime.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
                     name = os.path.splitext(os.path.basename(path))[0]
                     sid = name
-                print(f"[{dt}] {name} ({sid[:8]})")
+                ctime_dt = _uuid7_ctime(sid) if entry else None
+                ctime_str = ctime_dt.strftime("%Y-%m-%d %H:%M") if ctime_dt else mtime_str
+                print(f"[{ctime_str}]-[{mtime_str}]")
+                print(f"{name} ({sid[:8]})")
                 for hunk_idx, hunk in enumerate(hunks):
                     if hunk_idx > 0:
                         print("--")
