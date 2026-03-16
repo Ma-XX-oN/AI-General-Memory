@@ -61,6 +61,25 @@ def _project_dir(project_path=None):
     return os.path.join(_claude_dir(), "projects", key)
 
 
+def _all_project_dirs():
+    """Return all project directory paths under the Claude config projects folder."""
+    base = os.path.join(_claude_dir(), "projects")
+    if not os.path.isdir(base):
+        return []
+    return sorted(
+        os.path.join(base, d)
+        for d in os.listdir(base)
+        if os.path.isdir(os.path.join(base, d))
+    )
+
+
+def _project_label(proj_dir):
+    """Extract a short human-readable label from an encoded project directory name."""
+    name = os.path.basename(proj_dir)
+    parts = [p for p in re.split(r"-+", name) if p]
+    return parts[-1] if parts else name
+
+
 # ── Session lookup ────────────────────────────────────────────────────────────
 
 def _session_files(proj_dir):
@@ -462,9 +481,10 @@ if __name__ == "__main__":
             "  %(prog)s --id f4b19167-d8a7-4a10-81c5-d03920efd017\n"
             "\n"
             "Grep output header format:\n"
-            "  [creation]-[modification]  title (uuid-prefix)\n"
+            "  [creation]-[modification] [project]  title (uuid-prefix)\n"
             "  Creation time: timestamp of the first record in the session JSONL.\n"
-            "  Modification time: file mtime."
+            "  Modification time: file mtime.\n"
+            "  [project] label appears only with --all-projects."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -527,22 +547,45 @@ if __name__ == "__main__":
         help="Project directory to search (default: current working directory).",
     )
     ap.add_argument(
+        "--all-projects",
+        action="store_true",
+        dest="all_projects",
+        help="Search all projects (with --grep/--grep-re/--list) instead of just the current one.",
+    )
+    ap.add_argument(
         "output",
         nargs="?",
         help="Output file path (default: stdout).",
     )
     args = ap.parse_args()
 
-    proj_dir = _project_dir(args.project)
-    if not os.path.isdir(proj_dir):
-        print(
-            f"No Claude Code project directory found:\n  {proj_dir}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+    if args.all_projects:
+        proj_dirs = _all_project_dirs()
+        proj_dir = None
+    else:
+        proj_dir = _project_dir(args.project)
+        if not os.path.isdir(proj_dir):
+            print(
+                f"No Claude Code project directory found:\n  {proj_dir}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        proj_dirs = [proj_dir]
 
     if args.list:
-        list_sessions(proj_dir)
+        if args.all_projects:
+            all_files = []
+            for pd in proj_dirs:
+                for mtime, path in _session_files(pd):
+                    all_files.append((mtime, path, pd))
+            all_files.sort(reverse=True)
+            for i, (mtime, path, pd) in enumerate(all_files, 1):
+                dt = datetime.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
+                title = _session_title(path)
+                sid = os.path.splitext(os.path.basename(path))[0]
+                print(f"{i:3}. [{dt}] {title:<60}  ({sid[:8]}...) [{_project_label(pd)}]")
+        else:
+            list_sessions(proj_dir)
         sys.exit(0)
 
     if args.grep or args.grep_re:
@@ -564,21 +607,29 @@ if __name__ == "__main__":
             except _remod.error as exc:
                 print(f"Invalid regex: {exc}", file=sys.stderr)
                 sys.exit(1)
-            results = grep_sessions(proj_dir, rx=rx, before=before, after=after)
+            all_results = []
+            for pd in proj_dirs:
+                for item in grep_sessions(pd, rx=rx, before=before, after=after):
+                    all_results.append((pd, *item))
             label = f"grep-re '{args.grep_re}'"
         else:
-            results = grep_sessions(proj_dir, plain=args.grep.lower(), before=before, after=after)
+            all_results = []
+            for pd in proj_dirs:
+                for item in grep_sessions(pd, plain=args.grep.lower(), before=before, after=after):
+                    all_results.append((pd, *item))
             label = f"grep '{args.grep}'"
-        if not results:
+        all_results.sort(key=lambda x: x[1], reverse=True)
+        if not all_results:
             print(f"No sessions match {label}.", file=sys.stderr)
         elif args.ls:
-            for i, (mtime, path, _hunks) in enumerate(results, 1):
+            for i, (pd, mtime, path, _hunks) in enumerate(all_results, 1):
                 dt = datetime.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
                 title = _session_title(path)
                 sid = os.path.splitext(os.path.basename(path))[0]
-                print(f"{i:3}. [{dt}] {title:<60}  ({sid[:8]}...)")
+                plabel = f" [{_project_label(pd)}]" if args.all_projects else ""
+                print(f"{i:3}. [{dt}] {title:<60}  ({sid[:8]}...){plabel}")
         else:
-            for session_idx, (mtime, path, hunks) in enumerate(results):
+            for session_idx, (pd, mtime, path, hunks) in enumerate(all_results):
                 if session_idx > 0:
                     print()
                 mtime_str = datetime.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
@@ -586,7 +637,8 @@ if __name__ == "__main__":
                 sid = os.path.splitext(os.path.basename(path))[0]
                 ctime_dt = _session_ctime(path)
                 ctime_str = ctime_dt.strftime("%Y-%m-%d %H:%M") if ctime_dt else mtime_str
-                print(f"[{ctime_str}]-[{mtime_str}]")
+                plabel = f" [{_project_label(pd)}]" if args.all_projects else ""
+                print(f"[{ctime_str}]-[{mtime_str}]{plabel}")
                 print(f"{title} ({sid[:8]})")
                 for hunk_idx, hunk in enumerate(hunks):
                     if hunk_idx > 0:
@@ -597,6 +649,10 @@ if __name__ == "__main__":
 
     if not args.id:
         ap.print_help(sys.stderr)
+        sys.exit(1)
+
+    if proj_dir is None:
+        print("--all-projects cannot be used with --id", file=sys.stderr)
         sys.exit(1)
 
     try:
