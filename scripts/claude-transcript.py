@@ -208,13 +208,26 @@ def list_sessions(proj_dir):
         print(f"{i:3}. [{dt}] {title:<60}  ({sid[:8]}...)")
 
 
-_COLOR_MATCH = "\033[1;31m"
-_COLOR_RESET  = "\033[0m"
+try:
+    import colorama as _cm
+    if hasattr(_cm, "just_fix_windows_console"):
+        _cm.just_fix_windows_console()
+    _C_RESET   = _cm.Style.RESET_ALL
+    _C_MATCH   = _cm.Style.BRIGHT + _cm.Fore.RED
+    _C_DATE    = _cm.Fore.CYAN
+    _C_PROJECT = _cm.Fore.YELLOW
+    _C_TITLE   = _cm.Style.BRIGHT
+except ImportError:
+    _C_RESET   = "\033[0m"
+    _C_MATCH   = "\033[1;31m"
+    _C_DATE    = "\033[36m"
+    _C_PROJECT = "\033[33m"
+    _C_TITLE   = "\033[1m"
 
 
-def _ansi(s, code, *, active):
-    """Wrap *s* in ANSI escape *code* when *active*."""
-    return f"\033[{code}m{s}\033[0m" if active else s
+def _ansi(s, color, *, active):
+    """Wrap *s* in *color* ANSI escape when *active*, resetting after."""
+    return f"{color}{s}{_C_RESET}" if active else s
 
 
 def _plain_to_ignorepunct_rx(plain):
@@ -236,7 +249,7 @@ def _colorize(line, spans, *, active):
     out, prev = [], 0
     for start, end in sorted(spans):
         out.append(line[prev:start])
-        out.append(_COLOR_MATCH + line[start:end] + _COLOR_RESET)
+        out.append(_C_MATCH + line[start:end] + _C_RESET)
         prev = end
     out.append(line[prev:])
     return "".join(out)
@@ -424,8 +437,12 @@ def generate_transcript(path):
                 b for b in content
                 if b.get("type") == "tool_use" and b.get("name") == "Bash"
             ]
+            todo_ops = [
+                b for b in content
+                if b.get("type") == "tool_use" and b.get("name") == "TodoWrite"
+            ]
 
-            if not thinking and not texts and not file_ops and not bash_ops:
+            if not thinking and not texts and not file_ops and not bash_ops and not todo_ops:
                 continue
 
             block = "## Claude"
@@ -478,6 +495,25 @@ def generate_transcript(path):
                     f"\n\n<details>\n<summary>{label}</summary>\n"
                     f"{cmds_md}\n</details>"
                 )
+
+            if todo_ops:
+                # Show the final todo state from the last TodoWrite in this turn
+                last_todos = todo_ops[-1].get("input", {}).get("todos", [])
+                if last_todos:
+                    items_md = ""
+                    for item in last_todos:
+                        text = item.get("content", "")
+                        status = item.get("status", "pending")
+                        if status == "completed":
+                            items_md += f"\n- ~~{text}~~"
+                        elif status == "in_progress":
+                            items_md += f"\n- **{text}**"
+                        else:
+                            items_md += f"\n- {text}"
+                    block += (
+                        f"\n\n<details>\n<summary>Todos</summary>\n"
+                        f"{items_md}\n\n</details>"
+                    )
 
             out.append(block + "\n")
 
@@ -669,10 +705,10 @@ if __name__ == "__main__":
                 ctime_dt = _session_ctime(path)
                 ctime_str = ctime_dt.strftime("%Y-%m-%d %H:%M") if ctime_dt else mtime_str
                 plabel = f" [{_project_label(pd)}]" if args.all_projects else ""
-                date_part = _ansi(f"[{ctime_str}]-[{mtime_str}]", "36", active=use_color)
-                proj_part = _ansi(plabel, "33", active=use_color) if plabel else ""
+                date_part = _ansi(f"[{ctime_str}]-[{mtime_str}]", _C_DATE, active=use_color)
+                proj_part = _ansi(plabel, _C_PROJECT, active=use_color) if plabel else ""
                 print(f"{date_part}{proj_part}")
-                print(_ansi(f"{title} ({sid[:8]})", "1", active=use_color))
+                print(_ansi(f"{title} ({sid[:8]})", _C_TITLE, active=use_color))
                 for hunk_idx, hunk in enumerate(hunks):
                     if hunk_idx > 0:
                         print("--")

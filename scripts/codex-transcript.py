@@ -153,13 +153,26 @@ def list_sessions():
         print(f"{i:3}. [{dt}] {name:<60}  ({sid[:8]}...)")
 
 
-_COLOR_MATCH = "\033[1;31m"
-_COLOR_RESET  = "\033[0m"
+try:
+    import colorama as _cm
+    if hasattr(_cm, "just_fix_windows_console"):
+        _cm.just_fix_windows_console()
+    _C_RESET   = _cm.Style.RESET_ALL
+    _C_MATCH   = _cm.Style.BRIGHT + _cm.Fore.RED
+    _C_DATE    = _cm.Fore.CYAN
+    _C_PROJECT = _cm.Fore.YELLOW
+    _C_TITLE   = _cm.Style.BRIGHT
+except ImportError:
+    _C_RESET   = "\033[0m"
+    _C_MATCH   = "\033[1;31m"
+    _C_DATE    = "\033[36m"
+    _C_PROJECT = "\033[33m"
+    _C_TITLE   = "\033[1m"
 
 
-def _ansi(s, code, *, active):
-    """Wrap *s* in ANSI escape *code* when *active*."""
-    return f"\033[{code}m{s}\033[0m" if active else s
+def _ansi(s, color, *, active):
+    """Wrap *s* in *color* ANSI escape when *active*, resetting after."""
+    return f"{color}{s}{_C_RESET}" if active else s
 
 
 def _plain_to_ignorepunct_rx(plain):
@@ -181,7 +194,7 @@ def _colorize(line, spans, *, active):
     out, prev = [], 0
     for start, end in sorted(spans):
         out.append(line[prev:start])
-        out.append(_COLOR_MATCH + line[start:end] + _COLOR_RESET)
+        out.append(_C_MATCH + line[start:end] + _C_RESET)
         prev = end
     out.append(line[prev:])
     return "".join(out)
@@ -564,8 +577,8 @@ if __name__ == "__main__":
                     sid = name
                 ctime_dt = _uuid7_ctime(sid) if entry else None
                 ctime_str = ctime_dt.strftime("%Y-%m-%d %H:%M") if ctime_dt else mtime_str
-                print(_ansi(f"[{ctime_str}]-[{mtime_str}]", "36", active=use_color))
-                print(_ansi(f"{name} ({sid[:8]})", "1", active=use_color))
+                print(_ansi(f"[{ctime_str}]-[{mtime_str}]", _C_DATE, active=use_color))
+                print(_ansi(f"{name} ({sid[:8]})", _C_TITLE, active=use_color))
                 for hunk_idx, hunk in enumerate(hunks):
                     if hunk_idx > 0:
                         print("--")
