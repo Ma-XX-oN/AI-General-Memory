@@ -157,6 +157,23 @@ _COLOR_MATCH = "\033[1;31m"
 _COLOR_RESET  = "\033[0m"
 
 
+def _ansi(s, code, *, active):
+    """Wrap *s* in ANSI escape *code* when *active*."""
+    return f"\033[{code}m{s}\033[0m" if active else s
+
+
+def _plain_to_ignorepunct_rx(plain):
+    """
+    Build a regex from a plain search string that ignores punctuation.
+
+    Splits *plain* on non-word characters, then joins the resulting words
+    with ``[^\\w]*`` so any punctuation/whitespace between words in the
+    target text is accepted.
+    """
+    words = [re.escape(w) for w in re.split(r"[^\w]+", plain.lower()) if w]
+    return re.compile(r"[^\w]*".join(words), re.IGNORECASE)
+
+
 def _colorize(line, spans, *, active):
     """Highlight match *spans* within *line* using ANSI codes when *active*."""
     if not active or not spans:
@@ -452,6 +469,15 @@ if __name__ == "__main__":
         help="With --grep/--grep-re: show a numbered session list instead of matching lines.",
     )
     ap.add_argument(
+        "--ignore-punctuation",
+        action="store_true",
+        dest="ignore_punct",
+        help=(
+            "With --grep: strip punctuation from both the search string and each "
+            "line before matching, so backticks, dashes, etc. are ignored."
+        ),
+    )
+    ap.add_argument(
         "-A", "--after-context",
         metavar="N", type=int, default=0, dest="after_context",
         help="With --grep/--grep-re: print N lines of context after each match.",
@@ -504,7 +530,12 @@ if __name__ == "__main__":
             results = grep_sessions(rx=rx, before=before, after=after)
             label = f"grep-re '{args.grep_re}'"
         else:
-            results = grep_sessions(plain=args.grep.lower(), before=before, after=after)
+            if args.ignore_punct:
+                _rx = _plain_to_ignorepunct_rx(args.grep)
+                _kw = {"rx": _rx}
+            else:
+                _kw = {"plain": args.grep.lower()}
+            results = grep_sessions(before=before, after=after, **_kw)
             label = f"grep '{args.grep}'"
         if not results:
             print(f"No sessions match {label}.", file=sys.stderr)
@@ -533,8 +564,8 @@ if __name__ == "__main__":
                     sid = name
                 ctime_dt = _uuid7_ctime(sid) if entry else None
                 ctime_str = ctime_dt.strftime("%Y-%m-%d %H:%M") if ctime_dt else mtime_str
-                print(f"[{ctime_str}]-[{mtime_str}]")
-                print(f"{name} ({sid[:8]})")
+                print(_ansi(f"[{ctime_str}]-[{mtime_str}]", "36", active=use_color))
+                print(_ansi(f"{name} ({sid[:8]})", "1", active=use_color))
                 for hunk_idx, hunk in enumerate(hunks):
                     if hunk_idx > 0:
                         print("--")

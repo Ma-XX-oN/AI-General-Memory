@@ -212,6 +212,23 @@ _COLOR_MATCH = "\033[1;31m"
 _COLOR_RESET  = "\033[0m"
 
 
+def _ansi(s, code, *, active):
+    """Wrap *s* in ANSI escape *code* when *active*."""
+    return f"\033[{code}m{s}\033[0m" if active else s
+
+
+def _plain_to_ignorepunct_rx(plain):
+    """
+    Build a regex from a plain search string that ignores punctuation.
+
+    Splits *plain* on non-word characters, then joins the resulting words
+    with ``[^\\w]*`` so any punctuation/whitespace between words in the
+    target text is accepted.
+    """
+    words = [re.escape(w) for w in re.split(r"[^\w]+", plain.lower()) if w]
+    return re.compile(r"[^\w]*".join(words), re.IGNORECASE)
+
+
 def _colorize(line, spans, *, active):
     """Highlight match *spans* within *line* using ANSI codes when *active*."""
     if not active or not spans:
@@ -522,6 +539,15 @@ if __name__ == "__main__":
         help="With --grep/--grep-re: show a numbered session list instead of matching lines.",
     )
     ap.add_argument(
+        "--ignore-punctuation",
+        action="store_true",
+        dest="ignore_punct",
+        help=(
+            "With --grep: strip punctuation from both the search string and each "
+            "line before matching, so backticks, dashes, etc. are ignored."
+        ),
+    )
+    ap.add_argument(
         "-A", "--after-context",
         metavar="N", type=int, default=0, dest="after_context",
         help="With --grep/--grep-re: print N lines of context after each match.",
@@ -613,9 +639,14 @@ if __name__ == "__main__":
                     all_results.append((pd, *item))
             label = f"grep-re '{args.grep_re}'"
         else:
+            if args.ignore_punct:
+                _rx = _plain_to_ignorepunct_rx(args.grep)
+                _kw = {"rx": _rx}
+            else:
+                _kw = {"plain": args.grep.lower()}
             all_results = []
             for pd in proj_dirs:
-                for item in grep_sessions(pd, plain=args.grep.lower(), before=before, after=after):
+                for item in grep_sessions(pd, before=before, after=after, **_kw):
                     all_results.append((pd, *item))
             label = f"grep '{args.grep}'"
         all_results.sort(key=lambda x: x[1], reverse=True)
@@ -638,8 +669,10 @@ if __name__ == "__main__":
                 ctime_dt = _session_ctime(path)
                 ctime_str = ctime_dt.strftime("%Y-%m-%d %H:%M") if ctime_dt else mtime_str
                 plabel = f" [{_project_label(pd)}]" if args.all_projects else ""
-                print(f"[{ctime_str}]-[{mtime_str}]{plabel}")
-                print(f"{title} ({sid[:8]})")
+                date_part = _ansi(f"[{ctime_str}]-[{mtime_str}]", "36", active=use_color)
+                proj_part = _ansi(plabel, "33", active=use_color) if plabel else ""
+                print(f"{date_part}{proj_part}")
+                print(_ansi(f"{title} ({sid[:8]})", "1", active=use_color))
                 for hunk_idx, hunk in enumerate(hunks):
                     if hunk_idx > 0:
                         print("--")
