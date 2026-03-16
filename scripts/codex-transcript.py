@@ -258,15 +258,22 @@ def _session_grep(path, *, plain=None, rx=None, before=0, after=0):
                 if not raw:
                     continue
                 rec = json.loads(raw)
-                if rec.get("type") != "event_msg":
-                    continue
+                rtype = rec.get("type")
                 payload = rec.get("payload", {})
-                if payload.get("type") not in ("user_message", "agent_message"):
-                    continue
-                text = payload.get("message", "")
-                hunks.extend(
-                    _grep_context(text, plain=plain, rx=rx, before=before, after=after)
-                )
+                if rtype == "event_msg":
+                    if payload.get("type") not in ("user_message", "agent_message"):
+                        continue
+                    text = payload.get("message", "")
+                    if text:
+                        hunks.extend(
+                            _grep_context(text, plain=plain, rx=rx, before=before, after=after)
+                        )
+                elif rtype == "response_item" and payload.get("type") == "custom_tool_call":
+                    inp = payload.get("input", "")
+                    if inp:
+                        hunks.extend(
+                            _grep_context(inp, plain=plain, rx=rx, before=before, after=after)
+                        )
     except Exception:
         pass
     return hunks
