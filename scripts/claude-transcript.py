@@ -171,8 +171,74 @@ def list_sessions(proj_dir):
         print(f"{i:3}. [{dt}] {title:<60}  ({sid[:8]}...)")
 
 
-def _session_grep(path, *, plain=None, rx=None):
-    """Return True if any message text in the session at *path* matches the search term."""
+_COLOR_MATCH = "\033[1;31m"
+_COLOR_RESET  = "\033[0m"
+
+
+def _colorize(line, spans, *, active):
+    """Highlight match *spans* within *line* using ANSI codes when *active*."""
+    if not active or not spans:
+        return line
+    out, prev = [], 0
+    for start, end in sorted(spans):
+        out.append(line[prev:start])
+        out.append(_COLOR_MATCH + line[start:end] + _COLOR_RESET)
+        prev = end
+    out.append(line[prev:])
+    return "".join(out)
+
+
+def _grep_context(text, *, plain=None, rx=None, before=0, after=0):
+    """
+    Find all matches in *text* and return context hunks.
+
+    Each hunk is a list of ``(is_match, line_text, spans)`` tuples where
+    *spans* is a list of ``(start, end)`` character offsets of matches
+    within *line_text*.
+    """
+    lines = text.splitlines()
+    if not lines:
+        return []
+
+    match_info = {}  # line_idx -> [(start, end), ...]
+    for i, line in enumerate(lines):
+        if plain is not None:
+            spans, pos, lower = [], 0, line.lower()
+            while True:
+                idx = lower.find(plain, pos)
+                if idx < 0:
+                    break
+                spans.append((idx, idx + len(plain)))
+                pos = idx + 1
+            if spans:
+                match_info[i] = spans
+        elif rx is not None:
+            spans = [(m.start(), m.end()) for m in rx.finditer(line)]
+            if spans:
+                match_info[i] = spans
+
+    if not match_info:
+        return []
+
+    # Build context ranges, merging adjacent/overlapping ones
+    ranges = []
+    for m in sorted(match_info):
+        lo, hi = max(0, m - before), min(len(lines) - 1, m + after)
+        if ranges and lo <= ranges[-1][1] + 1:
+            ranges[-1][1] = max(ranges[-1][1], hi)
+        else:
+            ranges.append([lo, hi])
+
+    return [
+        [(i in match_info, lines[i], match_info.get(i, []))
+         for i in range(lo, hi + 1)]
+        for lo, hi in ranges
+    ]
+
+
+def _session_grep(path, *, plain=None, rx=None, before=0, after=0):
+    """Return all context hunks from matching messages in the session at *path*."""
+    hunks = []
     try:
         with open(path, encoding="utf-8") as f:
             for raw in f:
@@ -202,22 +268,22 @@ def _session_grep(path, *, plain=None, rx=None):
                         elif btype == "thinking":
                             texts.append(block.get("thinking", ""))
                 for text in texts:
-                    if plain is not None and plain in text.lower():
-                        return True
-                    if rx is not None and rx.search(text):
-                        return True
+                    hunks.extend(
+                        _grep_context(text, plain=plain, rx=rx, before=before, after=after)
+                    )
     except Exception:
         pass
-    return False
+    return hunks
 
 
-def grep_sessions(proj_dir, *, plain=None, rx=None):
-    """Return [(mtime, path), ...] for sessions whose text matches the search term."""
-    return [
-        (mtime, path)
-        for mtime, path in _session_files(proj_dir)
-        if _session_grep(path, plain=plain, rx=rx)
-    ]
+def grep_sessions(proj_dir, *, plain=None, rx=None, before=0, after=0):
+    """Return [(mtime, path, hunks), ...] for sessions with matching text."""
+    results = []
+    for mtime, path in _session_files(proj_dir):
+        hunks = _session_grep(path, plain=plain, rx=rx, before=before, after=after)
+        if hunks:
+            results.append((mtime, path, hunks))
+    return results
 
 
 # ── Transcript generation ─────────────────────────────────────────────────────
@@ -408,6 +474,31 @@ if __name__ == "__main__":
         ),
     )
     ap.add_argument(
+        "--ls",
+        action="store_true",
+        help="With --grep/--grep-re: show a numbered session list instead of matching lines.",
+    )
+    ap.add_argument(
+        "-A", "--after-context",
+        metavar="N", type=int, default=0, dest="after_context",
+        help="With --grep/--grep-re: print N lines of context after each match.",
+    )
+    ap.add_argument(
+        "-B", "--before-context",
+        metavar="N", type=int, default=0, dest="before_context",
+        help="With --grep/--grep-re: print N lines of context before each match.",
+    )
+    ap.add_argument(
+        "-C", "--context",
+        metavar="N", type=int, default=None,
+        help="With --grep/--grep-re: print N lines of context before and after each match.",
+    )
+    ap.add_argument(
+        "--color", "--colour",
+        metavar="WHEN", default="auto", choices=["always", "auto", "never"],
+        help="Colorize matches: always, auto (tty; default), or never.",
+    )
+    ap.add_argument(
         "--project",
         metavar="PATH",
         help="Project directory to search (default: current working directory).",
@@ -432,6 +523,14 @@ if __name__ == "__main__":
         sys.exit(0)
 
     if args.grep or args.grep_re:
+        before = args.before_context
+        after = args.after_context
+        if args.context is not None:
+            before = after = args.context
+        use_color = (
+            args.color == "always"
+            or (args.color == "auto" and sys.stdout.isatty())
+        )
         if args.grep_re:
             try:
                 import regex as _remod
@@ -442,19 +541,32 @@ if __name__ == "__main__":
             except _remod.error as exc:
                 print(f"Invalid regex: {exc}", file=sys.stderr)
                 sys.exit(1)
-            results = grep_sessions(proj_dir, rx=rx)
+            results = grep_sessions(proj_dir, rx=rx, before=before, after=after)
             label = f"grep-re '{args.grep_re}'"
         else:
-            results = grep_sessions(proj_dir, plain=args.grep.lower())
+            results = grep_sessions(proj_dir, plain=args.grep.lower(), before=before, after=after)
             label = f"grep '{args.grep}'"
         if not results:
             print(f"No sessions match {label}.", file=sys.stderr)
-        else:
-            for i, (mtime, path) in enumerate(results, 1):
+        elif args.ls:
+            for i, (mtime, path, _hunks) in enumerate(results, 1):
                 dt = datetime.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
                 title = _session_title(path)
                 sid = os.path.splitext(os.path.basename(path))[0]
                 print(f"{i:3}. [{dt}] {title:<60}  ({sid[:8]}...)")
+        else:
+            for session_idx, (mtime, path, hunks) in enumerate(results):
+                if session_idx > 0:
+                    print()
+                dt = datetime.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
+                title = _session_title(path)
+                sid = os.path.splitext(os.path.basename(path))[0]
+                print(f"[{dt}] {title} ({sid[:8]})")
+                for hunk_idx, hunk in enumerate(hunks):
+                    if hunk_idx > 0:
+                        print("--")
+                    for is_match, line, spans in hunk:
+                        print(_colorize(line, spans, active=use_color))
         sys.exit(0)
 
     if not args.id:
