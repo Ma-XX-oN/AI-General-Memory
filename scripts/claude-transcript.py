@@ -572,7 +572,7 @@ if __name__ == "__main__":
         "--id",
         metavar="GLOB_OR_UUID",
         help=(
-            "Select session by title glob, UUID, or 'latest'. "
+            "Select session by title glob, UUID (or prefix), or 'latest'. "
             "Append :<N> to pick the Nth result when ambiguous."
         ),
     )
