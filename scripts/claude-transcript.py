@@ -171,6 +171,55 @@ def list_sessions(proj_dir):
         print(f"{i:3}. [{dt}] {title:<60}  ({sid[:8]}...)")
 
 
+def _session_grep(path, *, plain=None, rx=None):
+    """Return True if any message text in the session at *path* matches the search term."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            for raw in f:
+                raw = raw.strip()
+                if not raw:
+                    continue
+                rec = json.loads(raw)
+                if rec.get("isSidechain"):
+                    continue
+                texts = []
+                rtype = rec.get("type")
+                if rtype == "user":
+                    content = rec.get("message", {}).get("content", [])
+                    if not isinstance(content, list):
+                        continue
+                    for block in content:
+                        if block.get("type") == "text":
+                            texts.append(_strip_system(block.get("text", "")))
+                elif rtype == "assistant":
+                    msg = rec.get("message", {})
+                    if msg.get("model") == "<synthetic>":
+                        continue
+                    for block in msg.get("content", []):
+                        btype = block.get("type")
+                        if btype == "text":
+                            texts.append(block.get("text", ""))
+                        elif btype == "thinking":
+                            texts.append(block.get("thinking", ""))
+                for text in texts:
+                    if plain is not None and plain in text.lower():
+                        return True
+                    if rx is not None and rx.search(text):
+                        return True
+    except Exception:
+        pass
+    return False
+
+
+def grep_sessions(proj_dir, *, plain=None, rx=None):
+    """Return [(mtime, path), ...] for sessions whose text matches the search term."""
+    return [
+        (mtime, path)
+        for mtime, path in _session_files(proj_dir)
+        if _session_grep(path, plain=plain, rx=rx)
+    ]
+
+
 # ── Transcript generation ─────────────────────────────────────────────────────
 
 def _user_text(content):
@@ -343,6 +392,21 @@ if __name__ == "__main__":
         action="store_true",
         help="List sessions for the project and exit.",
     )
+    grep_group = ap.add_mutually_exclusive_group()
+    grep_group.add_argument(
+        "--grep",
+        metavar="TEXT",
+        help="List sessions containing TEXT (plain case-insensitive substring) and exit.",
+    )
+    grep_group.add_argument(
+        "--grep-re",
+        metavar="PATTERN",
+        dest="grep_re",
+        help=(
+            "List sessions matching PATTERN (case-insensitive regex via 'regex' module) "
+            "and exit.  Install with: pip install regex"
+        ),
+    )
     ap.add_argument(
         "--project",
         metavar="PATH",
@@ -365,6 +429,37 @@ if __name__ == "__main__":
 
     if args.list:
         list_sessions(proj_dir)
+        sys.exit(0)
+
+    if args.grep or args.grep_re:
+        if args.grep_re:
+            try:
+                import regex as _regex
+            except ImportError:
+                print(
+                    "The 'regex' module is required for --grep-re.  Install it with:\n"
+                    "  pip install regex",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            try:
+                rx = _regex.compile(args.grep_re, _regex.IGNORECASE)
+            except _regex.error as exc:
+                print(f"Invalid regex: {exc}", file=sys.stderr)
+                sys.exit(1)
+            results = grep_sessions(proj_dir, rx=rx)
+            label = f"grep-re '{args.grep_re}'"
+        else:
+            results = grep_sessions(proj_dir, plain=args.grep.lower())
+            label = f"grep '{args.grep}'"
+        if not results:
+            print(f"No sessions match {label}.", file=sys.stderr)
+        else:
+            for i, (mtime, path) in enumerate(results, 1):
+                dt = datetime.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
+                title = _session_title(path)
+                sid = os.path.splitext(os.path.basename(path))[0]
+                print(f"{i:3}. [{dt}] {title:<60}  ({sid[:8]}...)")
         sys.exit(0)
 
     if not args.id:

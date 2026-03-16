@@ -153,6 +153,47 @@ def list_sessions():
         print(f"{i:3}. [{dt}] {name:<60}  ({sid[:8]}...)")
 
 
+def _session_grep(path, *, plain=None, rx=None):
+    """Return True if any message text in the Codex session at *path* matches the search term."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            for raw in f:
+                raw = raw.strip()
+                if not raw:
+                    continue
+                rec = json.loads(raw)
+                if rec.get("type") != "event_msg":
+                    continue
+                payload = rec.get("payload", {})
+                if payload.get("type") not in ("user_message", "agent_message"):
+                    continue
+                text = payload.get("message", "")
+                if plain is not None and plain in text.lower():
+                    return True
+                if rx is not None and rx.search(text):
+                    return True
+    except Exception:
+        pass
+    return False
+
+
+def grep_sessions(*, plain=None, rx=None):
+    """Return [(mtime, path, entry_or_None), ...] for sessions matching the search term."""
+    sessions_dir = os.path.join(_codex_home(), "sessions")
+    if not os.path.isdir(sessions_dir):
+        return []
+    index_entries = _read_session_index()
+    results = []
+    for path in glob.glob(os.path.join(sessions_dir, "**", "*.jsonl"), recursive=True):
+        if not _session_grep(path, plain=plain, rx=rx):
+            continue
+        base = os.path.splitext(os.path.basename(path))[0]
+        entry = next((e for e in index_entries if e.get("id", "") in base), None)
+        results.append((os.path.getmtime(path), path, entry))
+    results.sort(key=lambda x: x[0], reverse=True)
+    return results
+
+
 def get_images_before(lines, idx):
     """
     Return base64 image data URIs from the response_item/user that
@@ -309,6 +350,21 @@ if __name__ == "__main__":
         action="store_true",
         help="List all sessions and exit.",
     )
+    grep_group = ap.add_mutually_exclusive_group()
+    grep_group.add_argument(
+        "--grep",
+        metavar="TEXT",
+        help="List sessions containing TEXT (plain case-insensitive substring) and exit.",
+    )
+    grep_group.add_argument(
+        "--grep-re",
+        metavar="PATTERN",
+        dest="grep_re",
+        help=(
+            "List sessions matching PATTERN (case-insensitive regex via 'regex' module) "
+            "and exit.  Install with: pip install regex"
+        ),
+    )
     ap.add_argument(
         "output",
         nargs="?",
@@ -318,6 +374,42 @@ if __name__ == "__main__":
 
     if args.list:
         list_sessions()
+        sys.exit(0)
+
+    if args.grep or args.grep_re:
+        if args.grep_re:
+            try:
+                import regex as _regex
+            except ImportError:
+                print(
+                    "The 'regex' module is required for --grep-re.  Install it with:\n"
+                    "  pip install regex",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            try:
+                rx = _regex.compile(args.grep_re, _regex.IGNORECASE)
+            except _regex.error as exc:
+                print(f"Invalid regex: {exc}", file=sys.stderr)
+                sys.exit(1)
+            results = grep_sessions(rx=rx)
+            label = f"grep-re '{args.grep_re}'"
+        else:
+            results = grep_sessions(plain=args.grep.lower())
+            label = f"grep '{args.grep}'"
+        if not results:
+            print(f"No sessions match {label}.", file=sys.stderr)
+        else:
+            for i, (mtime, path, entry) in enumerate(results, 1):
+                if entry:
+                    dt = entry.get("updated_at", "")[:16].replace("T", " ")
+                    name = entry.get("thread_name", "(no name)")
+                    sid = entry.get("id", "")
+                else:
+                    dt = datetime.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
+                    name = os.path.splitext(os.path.basename(path))[0]
+                    sid = name
+                print(f"{i:3}. [{dt}] {name:<60}  ({sid[:8]}...)")
         sys.exit(0)
 
     if not args.id:
