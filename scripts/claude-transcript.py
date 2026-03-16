@@ -595,8 +595,8 @@ if __name__ == "__main__":
         action="store_true",
         dest="ignore_punct",
         help=(
-            "With --grep: strip punctuation from both the search string and each "
-            "line before matching, so backticks, dashes, etc. are ignored."
+            "With --grep: ignore punctuation and HTML tags when matching, so "
+            "backticks, dashes, HTML tags, etc. between words are skipped."
         ),
     )
     ap.add_argument(
