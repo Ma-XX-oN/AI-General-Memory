@@ -177,14 +177,14 @@ def _ansi(s, color, *, active):
 
 def _plain_to_ignorepunct_rx(plain):
     """
-    Build a regex from a plain search string that ignores punctuation.
+    Build a regex from a plain search string that ignores punctuation and tags.
 
     Splits *plain* on non-word characters, then joins the resulting words
-    with ``[^\\w]*`` so any punctuation/whitespace between words in the
-    target text is accepted.
+    with ``(?:<[^>]+>|[^\\w])*`` so any punctuation, whitespace, or
+    HTML/XML tags between words in the target text are accepted.
     """
     words = [re.escape(w) for w in re.split(r"[^\w]+", plain.lower()) if w]
-    return re.compile(r"[^\w]*".join(words), re.IGNORECASE)
+    return re.compile(r"(?:<[^>]+>|[^\w])*".join(words), re.IGNORECASE)
 
 
 def _colorize(line, spans, *, active):
@@ -442,7 +442,7 @@ if __name__ == "__main__":
             "  %(prog)s --id 019cd051-c2ac-72e0-ab6f-3e620157607a\n"
             "\n"
             "Grep output header format:\n"
-            "  [creation]-[modification]  title (uuid-prefix)\n"
+            "  [creation]-[modification]  (uuid-prefix) title\n"
             "  Creation time: decoded from the UUID v7 session ID (first 48 bits = ms since epoch).\n"
             "  Modification time: updated_at from session_index.jsonl."
         ),
@@ -578,7 +578,7 @@ if __name__ == "__main__":
                 ctime_dt = _uuid7_ctime(sid) if entry else None
                 ctime_str = ctime_dt.strftime("%Y-%m-%d %H:%M") if ctime_dt else mtime_str
                 print(_ansi(f"[{ctime_str}]-[{mtime_str}]", _C_DATE, active=use_color))
-                print(_ansi(f"{name} ({sid[:8]})", _C_TITLE, active=use_color))
+                print(_ansi(f"({sid[:8]}) {name}", _C_TITLE, active=use_color))
                 for hunk_idx, hunk in enumerate(hunks):
                     if hunk_idx > 0:
                         print("--")

@@ -232,14 +232,14 @@ def _ansi(s, color, *, active):
 
 def _plain_to_ignorepunct_rx(plain):
     """
-    Build a regex from a plain search string that ignores punctuation.
+    Build a regex from a plain search string that ignores punctuation and tags.
 
     Splits *plain* on non-word characters, then joins the resulting words
-    with ``[^\\w]*`` so any punctuation/whitespace between words in the
-    target text is accepted.
+    with ``(?:<[^>]+>|[^\\w])*`` so any punctuation, whitespace, or
+    HTML/XML tags between words in the target text are accepted.
     """
     words = [re.escape(w) for w in re.split(r"[^\w]+", plain.lower()) if w]
-    return re.compile(r"[^\w]*".join(words), re.IGNORECASE)
+    return re.compile(r"(?:<[^>]+>|[^\w])*".join(words), re.IGNORECASE)
 
 
 def _colorize(line, spans, *, active):
@@ -334,6 +334,20 @@ def _session_grep(path, *, plain=None, rx=None, before=0, after=0):
                             texts.append(block.get("text", ""))
                         elif btype == "thinking":
                             texts.append(block.get("thinking", ""))
+                        elif btype == "tool_use" and block.get("name") == "TodoWrite":
+                            todos = block.get("input", {}).get("todos", [])
+                            if todos:
+                                lines = []
+                                for j, item in enumerate(todos, 1):
+                                    c = item.get("content", "")
+                                    s = item.get("status", "pending")
+                                    if s == "completed":
+                                        lines.append(f"{j}. ~~{c}~~")
+                                    elif s == "in_progress":
+                                        lines.append(f"{j}. **{c}**")
+                                    else:
+                                        lines.append(f"{j}. {c}")
+                                texts.append("\n".join(lines))
                 for text in texts:
                     hunks.extend(
                         _grep_context(text, plain=plain, rx=rx, before=before, after=after)
@@ -503,15 +517,15 @@ def generate_transcript(path):
                     if not todos:
                         continue
                     items_md = ""
-                    for item in todos:
+                    for j, item in enumerate(todos, 1):
                         text = item.get("content", "")
                         status = item.get("status", "pending")
                         if status == "completed":
-                            items_md += f"\n- ~~{text}~~"
+                            items_md += f"\n{j}. ~~{text}~~"
                         elif status == "in_progress":
-                            items_md += f"\n- **{text}**"
+                            items_md += f"\n{j}. **{text}**"
                         else:
-                            items_md += f"\n- {text}"
+                            items_md += f"\n{j}. {text}"
                     block += (
                         f"\n\n<details>\n<summary>Todos</summary>\n"
                         f"{items_md}\n\n</details>"
@@ -536,7 +550,7 @@ if __name__ == "__main__":
             "  %(prog)s --id f4b19167-d8a7-4a10-81c5-d03920efd017\n"
             "\n"
             "Grep output header format:\n"
-            "  [creation]-[modification] [project]  title (uuid-prefix)\n"
+            "  [creation]-[modification] [project]  (uuid-prefix) title\n"
             "  Creation time: timestamp of the first record in the session JSONL.\n"
             "  Modification time: file mtime.\n"
             "  [project] label appears only with --all-projects."
@@ -710,7 +724,7 @@ if __name__ == "__main__":
                 date_part = _ansi(f"[{ctime_str}]-[{mtime_str}]", _C_DATE, active=use_color)
                 proj_part = _ansi(plabel, _C_PROJECT, active=use_color) if plabel else ""
                 print(f"{date_part}{proj_part}")
-                print(_ansi(f"{title} ({sid[:8]})", _C_TITLE, active=use_color))
+                print(_ansi(f"({sid[:8]}) {title}", _C_TITLE, active=use_color))
                 for hunk_idx, hunk in enumerate(hunks):
                     if hunk_idx > 0:
                         print("--")
