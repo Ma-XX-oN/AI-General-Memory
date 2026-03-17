@@ -9,7 +9,10 @@
 #   019cf2fa — "Implement wall builder per comment" (contains "lattice")
 #   019cf1f9 — "Clarify TriPts migration plan"      (contains "moving on")
 
-SCRIPT="python scripts/AI-transcript.py"
+# python.exe: in MSYS2/Git Bash, 'python' resolves to the MSYS2 Python while
+# 'python.exe' resolves to the Windows Python on the Windows PATH.
+PYTHON="python.exe"
+SCRIPT="$PYTHON scripts/AI-transcript.py"
 PASS=0
 FAIL=0
 TEST=1
@@ -163,12 +166,12 @@ check "--grep-re works (finds/not)"  0  "error" "!"  $SCRIPT --grep-re "lattice[
 # ── Optional-dependency degradation ─────────────────────────────────────────
 echo
 echo "-- Optional-dependency degradation (colorama)"
-if python -c "import colorama" 2>/dev/null; then
-  pip uninstall -y colorama -q 2>/dev/null
+if $PYTHON -c "import colorama" 2>/dev/null; then
+  $PYTHON -m pip uninstall -y colorama -q 2>/dev/null
   check_ansi "--color always without colorama: no ANSI"  no  $SCRIPT --color always --ls
   check     "warning printed when colorama absent"        0  "colorama not installed"  ""  $SCRIPT --color always --ls
   check     "--color never without colorama: exits 0"     0  ""  ""   $SCRIPT --color never --ls
-  pip install colorama -q 2>/dev/null
+  $PYTHON -m pip install colorama -q 2>/dev/null
   echo "  (colorama restored)"
 else
   TESTS_SKIPPED=4
@@ -178,13 +181,13 @@ fi
 
 echo
 echo "-- Optional-dependency degradation (regex)"
-if python -c "import regex" 2>/dev/null; then
-  pip uninstall -y regex -q 2>/dev/null
+if $PYTHON -c "import regex" 2>/dev/null; then
+  $PYTHON -m pip uninstall -y regex -q 2>/dev/null
   check "--grep-re without regex: falls back to re, exits 0"  0  ""       ""   $SCRIPT --grep-re "lattice" --ls
   check "--grep-re without regex: still finds sessions"        0  "codex"  ""   $SCRIPT --grep-re "lattice" --ls
   check "invalid --grep-re without regex: clean error"         1  "Invalid regex"  ""  $SCRIPT --grep-re "unclosed["
   check "invalid --grep-re without regex: no Traceback"        1  "Traceback"      "!" $SCRIPT --grep-re "unclosed["
-  pip install regex -q 2>/dev/null
+  $PYTHON -m pip install regex -q 2>/dev/null
   echo "  (regex restored)"
 else
   TESTS_SKIPPED=4
