@@ -653,17 +653,23 @@ Run each command and compare the header lines visually.
 
 - I'm noticing there's some redundancy in how we're getting mtime — `_session_files` already returns it for sorting, but then `_make_session` reads the file again. I could optimize this by building sessions in a single pass instead of reading files twice, but keeping it simple for now should work fine.
   - I hope this is resolved.
+  - **Resolved — Bug #9.**  `_session_files` now passes mtime directly into `_make_session` (no redundant `os.path.getmtime`).  A new `_cl_session_meta` helper opens the file once and extracts title, ctime, and record count in a single pass.
 
 - Since the ID formats differ between Claude and Codex stores, conflicts are unlikely in practice, but I still need to handle the merge logic in `main()` where it iterates through active stores and collects results from each.
   - How do they differ?  Need to document.
+  - **Claude IDs are UUID v4** (random, e.g. `f4b19167-d8a7-4a10-81c5-d03920efd017`).  **Codex IDs are UUID v7** (timestamp-embedded, e.g. `019cf2fa-…`); recent Codex IDs always start with `019`.  In practice the namespaces rarely overlap, but `main()` handles it: when a prefix resolves in both stores the candidates from both are combined and reported as ambiguous — the user must qualify with `--claude` or `--codex`.
 
 - > Looking back at the plan, the transcript output includes its own header in the same format as what `print_session_header()` produces, but since transcripts are written to files or piped to stdout, colors are always disabled for that header. So `transcript()` will format the header without ANSI color codes, while `print_session_header()` handles the colored version for terminal display in other contexts like `--grep` or `--id --ls`. Building the transcript function...
   - This is a single central function, right?  What you are describing here sounds like you either have 2 implementations or are passing different arguments to the same function.  Neither of which should happen.
+  - **Resolved — Bug #10.**  `_format_session_lines(session, use_color)` is the single implementation.  `print_session_header()` calls it with `use_color=use_color`; `transcript()` calls it with `use_color=False`.  No duplication.
 
 - > so it counts all non-empty lines regardless of whether we skip the JSON parsing.
   - Why would there be empty lines?  Make the assumption that there aren't any.
+  - **Resolved — Bug #11.**  Blank-line guard removed; `_count_records` now uses `sum(1 for _ in f)`.
 
-## Bugs
+## Bugs resolved
+
+All 11 bugs below are verified by `AI-transcript-tests.sh` (39/39 passing).
 
 - After installing colorama, got errors:
 
@@ -689,8 +695,9 @@ Run each command and compare the header lines visually.
   AttributeError: 'AnsiToWin32' object has no attribute 'isatty'
   ```
 
-  - Commented them out for now.  Still no colours shown. Should be fixed.  
+  - Commented them out for now.  Still no colours shown. Should be fixed.
   - Graceful handling of if modules exist or not should be added to testing matrix.
+  - **Fixed.** Root cause: colorama defaulted `convert=True` on the MSYS2 pseudo-console, intercepting ANSI codes via the Win32 API rather than writing raw bytes.  Fix: `colorama.init(strip=False)` preserves ANSI codes in the byte stream.  Color presence/absence with and without colorama installed is covered by tests 7–12.
 
 - When using `--words-only --grep "movi ng on"`, matched `"moving on"`.  Words
   need to be with word boundaries.  E.g. `"moving`, followed by 1 or more
@@ -703,6 +710,7 @@ Run each command and compare the header lines visually.
     punctuating text should be treated as a word boundary.
   - I think this makes sense. Do you agree?
   - Add to testing matrix.
+  - **Agreed and fixed.**  The separator regex distinguishes: (a) bare HTML tag(s) between word characters → zero-width (no boundary, words stay adjacent); (b) punctuation/whitespace (with or without HTML tags) between word characters → one-or-more non-word chars (boundary allowed).  Tests 15–17 cover the false-positive (`"movi ng on"` must not match) and true-positive (`"moving on"` must match).
 
 - **`--grep-re` always uses `re`; should prefer `regex` when available.**
   Currently `re.compile(pattern, re.IGNORECASE)` is called unconditionally.

@@ -9,12 +9,6 @@
 #   019cf2fa — "Implement wall builder per comment" (contains "lattice")
 #   019cf1f9 — "Clarify TriPts migration plan"      (contains "moving on")
 
-# Use the .venv Python (MSYS2-based).  MSYS2 Python's colorama writes raw ANSI
-# bytes to pipes (POSIX behaviour), which grep -qP '\x1b' can detect.  The
-# Windows Python Launcher ('py') uses Win32 console API calls instead, so the
-# ESC byte never appears in $() captured output, breaking the ANSI checks.
-PYTHON=".venv/bin/python"
-SCRIPT="$PYTHON scripts/AI-transcript.py"
 PASS=0
 FAIL=0
 TEST=1
@@ -112,6 +106,18 @@ check_ansi() {
 
 cd "$(dirname "$0")/.." || exit 1
 
+# Create a throw-away venv so the script is self-contained.  MSYS2 Python
+# writes raw ANSI bytes to pipes (POSIX behaviour), making ESC bytes
+# detectable by grep -qP '\x1b'.
+VENV="/tmp/venv.$$"
+python -m venv "$VENV" || { echo "Failed to create venv"; exit 1; }
+trap 'rm -rf "$VENV"' EXIT
+if   [[ -f "$VENV/bin/python"     ]]; then PYTHON="$VENV/bin/python"
+elif [[ -f "$VENV/Scripts/python" ]]; then PYTHON="$VENV/Scripts/python"
+else echo "Cannot find Python in venv at $VENV"; exit 1
+fi
+SCRIPT="$PYTHON scripts/AI-transcript.py"
+
 echo "=== AI-transcript.py regression tests ==="
 echo
 
@@ -174,15 +180,16 @@ echo
 echo "-- regex module: selection (Bug #7) + degradation"
 _regex_was_installed=false
 $PYTHON -c "import regex" 2>/dev/null && _regex_was_installed=true
-! $_regex_was_installed && $PYTHON -m pip install regex -q 2>/dev/null
+! $_regex_was_installed && $PYTHON -m pip install regex -q # 2>/dev/null
 check "--grep-re \\d+ exits 0"       0  ""      ""   $SCRIPT --grep-re "lattice[0-9]+" --ls
 check "--grep-re works (finds/not)"  0  "error" "!"  $SCRIPT --grep-re "lattice[0-9]+" --ls
-$PYTHON -m pip uninstall -y regex -q 2>/dev/null
+$PYTHON -m pip uninstall -y regex -q # 2>/dev/null
 check "--grep-re without regex: falls back to re, exits 0"  0  ""       ""   $SCRIPT --grep-re "lattice" --ls
 check "--grep-re without regex: still finds sessions"        0  "codex"  ""   $SCRIPT --grep-re "lattice" --ls
 check "invalid --grep-re without regex: clean error"         1  "Invalid regex"  ""  $SCRIPT --grep-re "unclosed["
 check "invalid --grep-re without regex: no Traceback"        1  "Traceback"      "!" $SCRIPT --grep-re "unclosed["
-$_regex_was_installed && { $PYTHON -m pip install regex -q 2>/dev/null; echo "  (regex restored)"; }
+$_regex_was_installed && { $PYTHON -m pip install regex -q #2>/dev/null; 
+  echo "  (regex restored)"; }
 
 # ── Bug #8: AND check correctness (perf fix must not break results) ───────────
 echo
