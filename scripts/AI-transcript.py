@@ -34,6 +34,12 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 
+# Configure stdout for UTF-8 before colorama can wrap sys.stdout with AnsiToWin32.
+# AnsiToWin32 lacks .reconfigure(), so this must run while stdout is still a
+# plain TextIOWrapper.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 
 # ── XML tags injected by Claude Code ─────────────────────────────────────────
 
@@ -74,14 +80,10 @@ except ImportError:
 # ── Shared utilities ──────────────────────────────────────────────────────────
 
 def _count_records(path):
-    """Count non-empty lines in a JSONL file (= number of JSON records)."""
+    """Count lines in a JSONL file (= number of JSON records)."""
     try:
-        count = 0
         with open(path, encoding="utf-8") as f:
-            for line in f:
-                if line.strip():
-                    count += 1
-        return count
+            return sum(1 for _ in f)
     except Exception:
         return 0
 
@@ -113,7 +115,8 @@ def _plain_to_words_only_rx(plain):
     HTML/XML tags between words in the target text are accepted.
     """
     words = [re.escape(w) for w in re.split(r"[^\w]+", plain.lower()) if w]
-    return re.compile(r"(?:<[^>]+>|[^\w])*".join(words), re.IGNORECASE)
+    sep = r"(?:<[^>]+>)*(?:[^\w<>](?:<[^>]+>)*)+"
+    return re.compile(sep.join(words), re.IGNORECASE)
 
 
 def _grep_context(text, *, plain=None, rx=None, before=0, after=0):
@@ -204,11 +207,12 @@ class SessionStore(ABC):
         """
 
     @abstractmethod
-    def grep(self, session, *, plain=None, rx=None, before=0, after=0):
+    def grep(self, session, *, plain=None, rx=None, before=0, after=0, first_only=False):
         """Return context hunks for all matches in *session*.
 
         Each hunk is a list of ``(is_match, line_text, [(start, end), ...])``
-        tuples.
+        tuples.  When *first_only* is True, return as soon as any match is
+        found (used for fast AND membership checks).
         """
 
     @abstractmethod
@@ -272,69 +276,71 @@ def _cl_strip_system(text):
     return _SYSTEM_TAG_RE.sub("", text).strip()
 
 
-def _cl_session_title(path):
-    """
-    Derive a display title from the session file.
+def _cl_session_meta(path):
+    """Return ``(title, ctime, rc)`` for the Claude JSONL session at *path*.
 
-    Returns the first real user text, falling back to the first non-empty
-    non-synthetic assistant text, then ``"(no title)"``.  Reads up to the
-    first 80 characters after stripping system-injected content.
+    Reads the file once, extracting all three values in a single pass:
+
+    * *title* — first real user text (stripped of system tags), falling back
+      to the first non-synthetic assistant text, then ``"(no title)"``.
+    * *ctime* — ``datetime`` from the first record with a *timestamp* field,
+      or ``None`` if absent.
+    * *rc*    — total number of non-blank lines (= JSON record count).
     """
+    title = "(no title)"
+    ctime = None
+    rc = 0
+    asst_fallback = None
     try:
-        asst_fallback = None
         with open(path, encoding="utf-8") as f:
             for raw in f:
                 raw = raw.strip()
                 if not raw:
                     continue
+                rc += 1
                 rec = json.loads(raw)
                 if rec.get("isSidechain"):
                     continue
-                rtype = rec.get("type")
-                if rtype == "user":
-                    for block in rec.get("message", {}).get("content", []):
-                        if block.get("type") != "text":
-                            continue
-                        text = _cl_strip_system(block.get("text", ""))
-                        if text:
-                            return text[:80]
-                elif rtype == "assistant" and asst_fallback is None:
-                    msg = rec.get("message", {})
-                    if msg.get("model") == "<synthetic>":
-                        continue
-                    for block in msg.get("content", []):
-                        if block.get("type") == "text":
-                            text = block.get("text", "").strip()
+                if ctime is None:
+                    ts = rec.get("timestamp")
+                    if ts:
+                        try:
+                            ts_clean = ts.rstrip("Z").split(".")[0]
+                            ctime = datetime.datetime.strptime(ts_clean, "%Y-%m-%dT%H:%M:%S")
+                        except Exception:
+                            pass
+                if title == "(no title)":
+                    rtype = rec.get("type")
+                    if rtype == "user":
+                        for block in rec.get("message", {}).get("content", []):
+                            if block.get("type") != "text":
+                                continue
+                            text = _cl_strip_system(block.get("text", ""))
                             if text:
-                                asst_fallback = text[:80]
+                                title = text[:80]
                                 break
-        if asst_fallback:
-            return asst_fallback
+                    elif rtype == "assistant" and asst_fallback is None:
+                        msg = rec.get("message", {})
+                        if msg.get("model") != "<synthetic>":
+                            for block in msg.get("content", []):
+                                if block.get("type") == "text":
+                                    text = block.get("text", "").strip()
+                                    if text:
+                                        asst_fallback = text[:80]
+                                        break
     except Exception:
         pass
-    return "(no title)"
+    if title == "(no title)" and asst_fallback:
+        title = asst_fallback
+    return title, ctime, rc
 
 
-def _cl_session_ctime(path):
-    """Return creation datetime from the first JSONL record with a *timestamp* field."""
-    try:
-        with open(path, encoding="utf-8") as f:
-            for raw in f:
-                raw = raw.strip()
-                if not raw:
-                    continue
-                rec = json.loads(raw)
-                ts = rec.get("timestamp")
-                if ts:
-                    ts_clean = ts.rstrip("Z").split(".")[0]
-                    return datetime.datetime.strptime(ts_clean, "%Y-%m-%dT%H:%M:%S")
-    except Exception:
-        pass
-    return None
+def _cl_session_grep(path, *, plain=None, rx=None, before=0, after=0, first_only=False):
+    """Return context hunks from matching content in the Claude session at *path*.
 
-
-def _cl_session_grep(path, *, plain=None, rx=None, before=0, after=0):
-    """Return all context hunks from matching content in the Claude session at *path*."""
+    When *first_only* is True, return as soon as any match is found (used for
+    the AND membership check in :func:`_session_display_hunks`).
+    """
     hunks = []
     try:
         with open(path, encoding="utf-8") as f:
@@ -405,6 +411,8 @@ def _cl_session_grep(path, *, plain=None, rx=None, before=0, after=0):
                     hunks.extend(
                         _grep_context(text, plain=plain, rx=rx, before=before, after=after)
                     )
+                    if first_only and hunks:
+                        return hunks
     except Exception:
         pass
     return hunks
@@ -452,14 +460,12 @@ class ClaudeSessionStore(SessionStore):
         pd = _cl_project_dir(self._project)
         return [pd] if os.path.isdir(pd) else []
 
-    def _make_session(self, path, proj_dir):
-        """Build a Session from a Claude JSONL file path."""
+    def _make_session(self, path, mtime_float, proj_dir):
+        """Build a Session from a Claude JSONL file path and known mtime."""
         path = str(path)
         sid = os.path.splitext(os.path.basename(path))[0]
-        title = _cl_session_title(path)
-        ctime = _cl_session_ctime(path)
-        mtime = datetime.datetime.fromtimestamp(os.path.getmtime(path))
-        rc = _count_records(path)
+        title, ctime, rc = _cl_session_meta(path)
+        mtime = datetime.datetime.fromtimestamp(mtime_float)
         return Session(
             source="claude",
             id=sid,
@@ -474,8 +480,8 @@ class ClaudeSessionStore(SessionStore):
     def sessions(self, *, all_projects=False):
         result = []
         for pd in self._project_dirs(all_projects):
-            for _, path in _cl_session_files(pd):
-                result.append(self._make_session(path, pd))
+            for mtime_f, path in _cl_session_files(pd):
+                result.append(self._make_session(path, mtime_f, pd))
         result.sort(key=lambda s: s.mtime, reverse=True)
         return result
 
@@ -500,20 +506,20 @@ class ClaudeSessionStore(SessionStore):
                 continue
 
             # Exact UUID match (filename stem == pattern)
-            for _, path in files:
+            for mtime_f, path in files:
                 stem = os.path.splitext(os.path.basename(path))[0]
                 if stem == id_or_glob:
-                    return self._make_session(path, pd), []
+                    return self._make_session(path, mtime_f, pd), []
 
             # UUID prefix match — valid hex+dash string, allows 8-char short prefix.
             # Only skip title glob when prefix actually matched something; otherwise
             # fall through so e.g. "FEA" (all hex digits) still does a title search.
             if re.match(r"^[0-9a-f-]+$", id_or_glob, re.IGNORECASE):
                 prefix_found = []
-                for _, path in files:
+                for mtime_f, path in files:
                     stem = os.path.splitext(os.path.basename(path))[0]
                     if stem.startswith(id_or_glob):
-                        prefix_found.append(self._make_session(path, pd))
+                        prefix_found.append(self._make_session(path, mtime_f, pd))
                 if prefix_found:
                     all_matches.extend(prefix_found)
                     continue  # skip title glob — UUID prefix took priority
@@ -523,10 +529,10 @@ class ClaudeSessionStore(SessionStore):
                 id_or_glob if ("*" in id_or_glob or "?" in id_or_glob)
                 else f"*{id_or_glob}*"
             )
-            for _, path in files:
-                title = _cl_session_title(path)
+            for mtime_f, path in files:
+                title, _, _ = _cl_session_meta(path)
                 if fnmatch.fnmatch(title.lower(), glob_pat.lower()):
-                    all_matches.append(self._make_session(path, pd))
+                    all_matches.append(self._make_session(path, mtime_f, pd))
 
         if not all_matches:
             raise FileNotFoundError(f"No Claude session matching '{id_or_glob}'")
@@ -534,9 +540,10 @@ class ClaudeSessionStore(SessionStore):
             return all_matches[0], []
         return None, all_matches
 
-    def grep(self, session, *, plain=None, rx=None, before=0, after=0):
+    def grep(self, session, *, plain=None, rx=None, before=0, after=0, first_only=False):
         return _cl_session_grep(
-            str(session.path), plain=plain, rx=rx, before=before, after=after
+            str(session.path), plain=plain, rx=rx, before=before, after=after,
+            first_only=first_only,
         )
 
     def transcript(self, session):
@@ -545,13 +552,8 @@ class ClaudeSessionStore(SessionStore):
         with open(path, encoding="utf-8") as f:
             records = [json.loads(l) for l in f if l.strip()]
 
-        ctime_str = session.ctime.strftime("%Y-%m-%d %H:%M")
-        mtime_str = session.mtime.strftime("%Y-%m-%d %H:%M")
-        proj_str = f" [{session.project}]" if session.project else ""
-        out = [
-            f"[claude] [{ctime_str}]-[{mtime_str}]{proj_str} records: {session.rc}\n"
-            f"({session.id[:8]}) {session.title}\n"
-        ]
+        line1, line2 = _format_session_lines(session)
+        out = [f"{line1}\n{line2}\n"]
 
         last_user_text = None  # deduplicate retried user messages
         for rec in records:
@@ -799,8 +801,11 @@ def _cx_uuid7_ctime(sid):
         return None
 
 
-def _cx_session_grep(path, *, plain=None, rx=None, before=0, after=0):
-    """Return all context hunks from matching messages in the Codex session at *path*."""
+def _cx_session_grep(path, *, plain=None, rx=None, before=0, after=0, first_only=False):
+    """Return context hunks from matching messages in the Codex session at *path*.
+
+    When *first_only* is True, return as soon as any match is found.
+    """
     hunks = []
     try:
         with open(path, encoding="utf-8") as f:
@@ -819,12 +824,16 @@ def _cx_session_grep(path, *, plain=None, rx=None, before=0, after=0):
                         hunks.extend(
                             _grep_context(text, plain=plain, rx=rx, before=before, after=after)
                         )
+                        if first_only and hunks:
+                            return hunks
                 elif rtype == "response_item" and payload.get("type") == "custom_tool_call":
                     inp = payload.get("input", "")
                     if inp:
                         hunks.extend(
                             _grep_context(inp, plain=plain, rx=rx, before=before, after=after)
                         )
+                        if first_only and hunks:
+                            return hunks
     except Exception:
         pass
     return hunks
@@ -1011,9 +1020,10 @@ class CodexSessionStore(SessionStore):
             return all_matches[0], []
         return None, all_matches
 
-    def grep(self, session, *, plain=None, rx=None, before=0, after=0):
+    def grep(self, session, *, plain=None, rx=None, before=0, after=0, first_only=False):
         return _cx_session_grep(
-            str(session.path), plain=plain, rx=rx, before=before, after=after
+            str(session.path), plain=plain, rx=rx, before=before, after=after,
+            first_only=first_only,
         )
 
     def transcript(self, session):
@@ -1050,12 +1060,8 @@ class CodexSessionStore(SessionStore):
             if msg["role"] == "user":
                 prev_idx = msg["idx"]
 
-        ctime_str = session.ctime.strftime("%Y-%m-%d %H:%M")
-        mtime_str = session.mtime.strftime("%Y-%m-%d %H:%M")
-        out = [
-            f"[codex] [{ctime_str}]-[{mtime_str}] records: {session.rc}\n"
-            f"({session.id[:8]}) {session.title}\n"
-        ]
+        line1, line2 = _format_session_lines(session)
+        out = [f"{line1}\n{line2}\n"]
 
         i = 0
         while i < len(msgs):
@@ -1157,9 +1163,9 @@ def _session_display_hunks(store, session, patterns_kw, before, after):
         hunks = store.grep(session, before=before, after=after, **patterns_kw[0])
         return hunks if hunks else None
 
-    # Multiple patterns: AND check (with no context to avoid loading full content)
+    # Multiple patterns: AND check — stop scanning as soon as first match found
     for kw in patterns_kw:
-        if not store.grep(session, before=0, after=0, **kw):
+        if not store.grep(session, before=0, after=0, first_only=True, **kw):
             return None
 
     # All patterns match — build combined OR regex for display
@@ -1303,7 +1309,7 @@ def main():
         help=(
             "Search sessions matching PATTERN (case-insensitive regex). "
             "Repeatable with AND/OR semantics like --grep. "
-            "Cannot be combined with --grep."
+            "May be combined with --grep."
         ),
     )
 
@@ -1379,13 +1385,7 @@ def main():
 
     args = ap.parse_args()
 
-    # Reconfigure stdout for UTF-8 so non-ASCII session content prints correctly
-    sys.stdout.reconfigure(encoding="utf-8")
-
     # ── Validate argument combinations ─────────────────────────────────────────
-
-    if args.grep and args.grep_re:
-        ap.error("--grep and --grep-re cannot be combined")
 
     if args.output and (args.grep or args.grep_re):
         ap.error("output file cannot be used with --grep/--grep-re (transcript mode only)")
@@ -1405,7 +1405,7 @@ def main():
 
     use_color = (
         args.color == "always"
-        or (args.color == "auto" and sys.stdout.isatty())
+        or (args.color == "auto" and sys.__stdout__.isatty())
     )
     if use_color and not _COLORAMA_OK:
         print(
@@ -1471,14 +1471,18 @@ def main():
             except _remod.error as exc:
                 print(f"Invalid regex: {exc}", file=sys.stderr)
                 sys.exit(1)
-            grep_label = f"grep-re {args.grep_re}"
-        else:
+        if args.grep:
             for p in args.grep:
                 if args.words_only:
                     patterns_kw.append({"rx": _plain_to_words_only_rx(p)})
                 else:
                     patterns_kw.append({"plain": p.lower()})
-            grep_label = f"grep {args.grep}"
+        labels = []
+        if args.grep_re:
+            labels.append(f"grep-re {args.grep_re}")
+        if args.grep:
+            labels.append(f"grep {args.grep}")
+        grep_label = " AND ".join(labels)
 
     # ── Dispatch ───────────────────────────────────────────────────────────────
 
@@ -1540,7 +1544,6 @@ def main():
                 fh.write(transcript_text)
             print(f"Written to: {args.output}", file=sys.stderr)
         else:
-            sys.stdout.reconfigure(encoding="utf-8")
             print(transcript_text)
         sys.exit(0)
 
