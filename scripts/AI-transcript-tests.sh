@@ -9,10 +9,11 @@
 #   019cf2fa — "Implement wall builder per comment" (contains "lattice")
 #   019cf1f9 — "Clarify TriPts migration plan"      (contains "moving on")
 
-# 'py' is the Windows Python Launcher (C:\Windows\py.exe).  It lives outside
-# MSYS2's PATH so it always resolves to the Windows Python, regardless of
-# which 'python' or 'python.exe' MSYS2/Git Bash would pick up first.
-PYTHON="py"
+# Use the .venv Python (MSYS2-based).  MSYS2 Python's colorama writes raw ANSI
+# bytes to pipes (POSIX behaviour), which grep -qP '\x1b' can detect.  The
+# Windows Python Launcher ('py') uses Win32 console API calls instead, so the
+# ESC byte never appears in $() captured output, breaking the ANSI checks.
+PYTHON=".venv/bin/python"
 SCRIPT="$PYTHON scripts/AI-transcript.py"
 PASS=0
 FAIL=0
@@ -127,13 +128,23 @@ echo "-- Bug #1: --grep + --grep-re mixing"
 check "mixing exits 0"                        0  ""                    ""   $SCRIPT --grep "lattice" --grep-re "wall" --ls
 check "mixing: no 'cannot be combined' msg"   0  "cannot be combined"  "!"  $SCRIPT --grep "lattice" --grep-re "wall" --ls
 
-# ── Bug #2/#3: colorama color modes ──────────────────────────────────────────
+# ── Bug #2/#3 (colorama present) + degradation (colorama absent) ─────────────
 echo
-echo "-- Bug #2/#3: colorama color modes"
-check_ansi "--color always: ANSI codes present"    yes  $SCRIPT --color always --ls
-check_ansi "--color never: ANSI codes absent"      no   $SCRIPT --color never  --ls
-# --color auto in a pipe: isatty() returns False → no ANSI expected
-check_ansi "--color auto in pipe: ANSI codes absent"  no   $SCRIPT --color auto --ls
+echo "-- Colorama: color modes (Bug #2/#3) + degradation"
+_colorama_was_installed=false
+$PYTHON -c "import colorama" 2>/dev/null && _colorama_was_installed=true
+! $_colorama_was_installed && $PYTHON -m pip install colorama -q  #2>/dev/null
+$PYTHON -c "import colorama" 2>/dev/null || { echo "didn't install colorama"; exit 1; }
+check_ansi "--color always: ANSI codes present"          yes  $SCRIPT --color always --ls
+check_ansi "--color never: ANSI codes absent"            no   $SCRIPT --color never  --ls
+check_ansi "--color auto in pipe: ANSI codes absent"     no   $SCRIPT --color auto   --ls
+$PYTHON -m pip uninstall -y colorama -q #2>/dev/null
+$PYTHON -c "import colorama" 2>/dev/null && { echo "colorama is still installed"; exit 1; }
+check_ansi "--color always without colorama: no ANSI"    no   $SCRIPT --color always --ls
+check     "warning printed when colorama absent"          0   "colorama not installed"  ""  $SCRIPT --color always --ls
+check     "--color never without colorama: exits 0"       0   ""  ""   $SCRIPT --color never --ls
+$_colorama_was_installed && { $PYTHON -m pip install colorama -q #2>/dev/null;
+  echo "  (colorama restored)"; }
 
 # ── Bug #4: UnicodeEncodeError on → content ───────────────────────────────────
 echo
@@ -158,46 +169,20 @@ check "invalid regex exits 1"        1  ""             ""   $SCRIPT --grep-re "u
 check "invalid regex: clean message" 1  "Invalid regex" ""  $SCRIPT --grep-re "unclosed["
 check "invalid regex: no Traceback"  1  "Traceback"    "!"  $SCRIPT --grep-re "unclosed["
 
-# ── Bug #7 (already fixed): --grep-re uses regex/re ─────────────────────────
+# ── Bug #7 (regex present) + degradation (regex absent) ─────────────────────
 echo
-echo "-- Bug #7: --grep-re module selection"
+echo "-- regex module: selection (Bug #7) + degradation"
+_regex_was_installed=false
+$PYTHON -c "import regex" 2>/dev/null && _regex_was_installed=true
+! $_regex_was_installed && $PYTHON -m pip install regex -q 2>/dev/null
 check "--grep-re \\d+ exits 0"       0  ""      ""   $SCRIPT --grep-re "lattice[0-9]+" --ls
 check "--grep-re works (finds/not)"  0  "error" "!"  $SCRIPT --grep-re "lattice[0-9]+" --ls
-
-# ── Optional-dependency degradation ─────────────────────────────────────────
-echo
-echo "-- Optional-dependency degradation (colorama)"
-if $PYTHON -c "import colorama" 2>/dev/null; then
-  $PYTHON -m pip uninstall -y colorama -q 2>/dev/null
-  check_ansi "--color always without colorama: no ANSI"  no  $SCRIPT --color always --ls
-  check     "warning printed when colorama absent"        0  "colorama not installed"  ""  $SCRIPT --color always --ls
-  check     "--color never without colorama: exits 0"     0  ""  ""   $SCRIPT --color never --ls
-  $PYTHON -m pip install colorama -q 2>/dev/null
-  echo "  (colorama restored)"
-else
-  # colorama already absent — run tests directly; no install/uninstall needed
-  check_ansi "--color always without colorama: no ANSI"  no  $SCRIPT --color always --ls
-  check     "warning printed when colorama absent"        0  "colorama not installed"  ""  $SCRIPT --color always --ls
-  check     "--color never without colorama: exits 0"     0  ""  ""   $SCRIPT --color never --ls
-fi
-
-echo
-echo "-- Optional-dependency degradation (regex)"
-if $PYTHON -c "import regex" 2>/dev/null; then
-  $PYTHON -m pip uninstall -y regex -q 2>/dev/null
-  check "--grep-re without regex: falls back to re, exits 0"  0  ""       ""   $SCRIPT --grep-re "lattice" --ls
-  check "--grep-re without regex: still finds sessions"        0  "codex"  ""   $SCRIPT --grep-re "lattice" --ls
-  check "invalid --grep-re without regex: clean error"         1  "Invalid regex"  ""  $SCRIPT --grep-re "unclosed["
-  check "invalid --grep-re without regex: no Traceback"        1  "Traceback"      "!" $SCRIPT --grep-re "unclosed["
-  $PYTHON -m pip install regex -q 2>/dev/null
-  echo "  (regex restored)"
-else
-  # regex already absent — run tests directly; no install/uninstall needed
-  check "--grep-re without regex: falls back to re, exits 0"  0  ""       ""   $SCRIPT --grep-re "lattice" --ls
-  check "--grep-re without regex: still finds sessions"        0  "codex"  ""   $SCRIPT --grep-re "lattice" --ls
-  check "invalid --grep-re without regex: clean error"         1  "Invalid regex"  ""  $SCRIPT --grep-re "unclosed["
-  check "invalid --grep-re without regex: no Traceback"        1  "Traceback"      "!" $SCRIPT --grep-re "unclosed["
-fi
+$PYTHON -m pip uninstall -y regex -q 2>/dev/null
+check "--grep-re without regex: falls back to re, exits 0"  0  ""       ""   $SCRIPT --grep-re "lattice" --ls
+check "--grep-re without regex: still finds sessions"        0  "codex"  ""   $SCRIPT --grep-re "lattice" --ls
+check "invalid --grep-re without regex: clean error"         1  "Invalid regex"  ""  $SCRIPT --grep-re "unclosed["
+check "invalid --grep-re without regex: no Traceback"        1  "Traceback"      "!" $SCRIPT --grep-re "unclosed["
+$_regex_was_installed && { $PYTHON -m pip install regex -q 2>/dev/null; echo "  (regex restored)"; }
 
 # ── Bug #8: AND check correctness (perf fix must not break results) ───────────
 echo
