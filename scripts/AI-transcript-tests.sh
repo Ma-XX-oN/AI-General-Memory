@@ -18,12 +18,12 @@ SELECTED=("$@")
 # test_selected N — returns 0 (true) if test N should run.
 # With no selected tests, all run.  Otherwise only the listed numbers run.
 test_selected() {
-    [[ ${#SELECTED[@]} -eq 0 ]] && return 0
-    local n="$1" t
-    for t in "${SELECTED[@]}"; do
-        [[ "$t" == "$n" ]] && return 0
-    done
-    return 1
+  [[ ${#SELECTED[@]} -eq 0 ]] && return 0
+  local n="$1" t
+  for t in "${SELECTED[@]}"; do
+    [[ "$t" == "$n" ]] && return 0
+  done
+  return 1
 }
 
 # check DESCRIPTION WANT_EXIT PATTERN INVERT CMD...
