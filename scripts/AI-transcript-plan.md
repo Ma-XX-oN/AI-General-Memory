@@ -261,6 +261,23 @@ def _ansi(s, color, *, active) -> str
 
 These are identical in both current scripts and can be copied verbatim.
 
+### Optional dependency: `regex` module
+
+`--grep-re` compiles patterns at startup.  The third-party `regex` package
+(when installed) provides richer syntax: Unicode properties (`\p{Lu}`), set
+operations, possessive quantifiers, atomic groups, etc.  The stdlib `re` is
+always the fallback.
+
+Pattern: mirror colorama — try `import regex as _re_mod` at the top; set
+`_REGEX_OK = True`.  On `ImportError` fall back to `import re as _re_mod`;
+set `_REGEX_OK = False`.  All regex compilation goes through `_re_mod.compile`.
+
+**Error handling for invalid patterns:** wrap every `_re_mod.compile(pattern)`
+in a try/except, catch `_re_mod.error` (or `Exception` since both modules raise
+a subclass of `re.error`), print a clear message to stderr
+(`error: invalid pattern '...': <msg>`) and exit non-zero.  Never let a raw
+traceback reach the user for a bad `--grep-re` argument.
+
 ---
 
 ## CLI design
@@ -344,10 +361,16 @@ switcher.  Full behaviour:
 
 - **Session level — AND**: only sessions containing *all* patterns are shown.
 - **Line level — OR**: any line matching *any* pattern is highlighted.
+- **Mixing `--grep` and `--grep-re` is allowed**: plain and regex patterns may
+  be combined freely.  Each contributes one AND-term at the session level and
+  one OR-arm at the line level.
 
 Example: `--grep FEA --grep lattice` finds sessions discussing both, and
 highlights every line that mentions either.  This mirrors piping greps:
 `grep FEA | grep lattice` at the session level.
+
+Example: `--grep FEA --grep-re "lattice\d+"` — plain AND regex in one
+invocation; sessions must contain both, and any matching line is highlighted.
 
 **Repeated flags — three categories:**
 
@@ -360,7 +383,6 @@ highlights every line that mentions either.  This mirrors piping greps:
 
 **Invalid combinations** (argparse should reject):
 
-- `--grep` and `--grep-re` together (plain and regex are exclusive)
 - `--claude`, `--codex`, and `--both-AIs` more than one at a time
 - `output` without `--id`
 - `output` with `--grep*` (even if `--id` is also present — `output` is for transcript only)
@@ -554,8 +576,13 @@ always suppresses the normal output in favour of list rows.  Standalone `--ls`
 | 12 | `--grep "FEA" --id f4b19167` | Hunks from session f4b19167 only | sphere dir |
 | 13 | `--grep "FEA" --grep "lattice"` | Only sessions matching both; lines matching either | sphere dir |
 | 14 | `--grep "FEA" --grep "zzz"` | No output (AND: no session contains both) | sphere dir |
-| 15 | `--grep "FEA" --grep-re "lattice"` | argparse error: plain and regex are exclusive | any dir |
+| 15 | `--grep "FEA" --grep-re "lattice\d+"` | Sessions containing both; lines matching either | sphere dir |
 | 16 | `--claude --codex` | argparse error: mutually exclusive source flags | any dir |
+| 17 | `--grep-re "lattice\d+"` (`regex` installed) | Uses `regex` module; results identical to row 8 | any dir |
+| 18 | `--grep-re "lattice\d+"` (`regex` absent) | Falls back to `re`; results identical | any dir |
+| 19 | `--grep-re "unclosed["` | Clean error to stderr; exit 1 | any dir |
+| 20 | `--grep-re "\p{Lu}"` (`regex` installed) | Matches uppercase Unicode letters | any dir |
+| 21 | `--grep-re "\p{Lu}"` (`regex` absent) | Clean error: `\p` not supported by `re` | any dir |
 
 ### Matrix 4 — Format/header consistency
 
@@ -604,6 +631,118 @@ Run each command and compare the header lines visually.
   ```
 - **ignore case flag `-i`**  Should be case sensitive unless `-i` is passed.
 
+- **Record/timestamp range filtering.**  Allow the user to restrict output to a
+  sub-range of a session, useful for long sessions.  Two flavours:
+  - **By record number:** `--records M:N` (1-based, inclusive) — include only
+    JSONL records M through N.  Works with `--id` (transcript slice) and
+    `--grep` (restrict the search window).
+  - **By timestamp:** `--since DATETIME` / `--until DATETIME` — include only
+    records whose `timestamp` field (Claude) or UUID-v7-derived time (Codex)
+    falls within the given range.  Accepts ISO-8601 or human-friendly strings
+    (e.g. `"2026-03-17 04:00"`).
+  - Both flavours should compose with `--grep`, `--id`, and `-n`/`-d` prefixes.
+
 - Consolidate consecutive Claude turns into one heading
   - > Each API round-trip creates a separate JSONL record. When Claude uses a tool (Bash, Read, Edit), the sequence is: `assistant` (text + tool_use) → `user` (tool_results) → `assistant` (continuation). Each `assistant` record gets its own `## Claude` heading. This is the existing behavior from `claude-transcript.py` — the new code preserves it exactly. Consolidating consecutive Claude turns into one heading would be a post-MVP improvement if desired.
-  - I think it's desired.
+  - It's desired.  The next consecutive `## Claude` heading isn't needed.  It would be implied by the `<details><summary>Thinking...</summary>...</details>` block preceding it.
+
+- Need a user facing document to show how to use this which is probably accessible from the `--help` switch.  If too much, maybe a `--help --verbose` for extra detail.
+  - **Known limitation to document:** Messages sent by the user while Claude is actively running tools ("queued" / interrupt messages) are held in memory only and never written as user records to the session JSONL.  They are not recoverable from the file; the only trace is Claude's subsequent thinking or response text that references them.  The generated transcript will therefore be missing those user turns.
+
+## Questions
+
+- I'm noticing there's some redundancy in how we're getting mtime — `_session_files` already returns it for sorting, but then `_make_session` reads the file again. I could optimize this by building sessions in a single pass instead of reading files twice, but keeping it simple for now should work fine.
+  - I hope this is resolved.
+
+- Since the ID formats differ between Claude and Codex stores, conflicts are unlikely in practice, but I still need to handle the merge logic in `main()` where it iterates through active stores and collects results from each.
+  - How do they differ?  Need to document.
+
+- > Looking back at the plan, the transcript output includes its own header in the same format as what `print_session_header()` produces, but since transcripts are written to files or piped to stdout, colors are always disabled for that header. So `transcript()` will format the header without ANSI color codes, while `print_session_header()` handles the colored version for terminal display in other contexts like `--grep` or `--id --ls`. Building the transcript function...
+  - This is a single central function, right?  What you are describing here sounds like you either have 2 implementations or are passing different arguments to the same function.  Neither of which should happen.
+
+- > so it counts all non-empty lines regardless of whether we skip the JSON parsing.
+  - Why would there be empty lines?  Make the assumption that there aren't any.
+
+## Bugs
+
+- After installing colorama, got errors:
+
+  ```text
+  adria@DESKTOP-P0W3R MINGW64 /c/Users/adria/projects/sphere (master %)
+  $ ~/winhome/.codex/scripts/AI-transcript.py --words-only --grep "movi ng on" > /dev/null
+  Traceback (most recent call last):
+  File "C:/msys64/home/adria/winhome/.codex/scripts/AI-transcript.py", line 1571, in <module>
+      main()
+  File "C:/msys64/home/adria/winhome/.codex/scripts/AI-transcript.py", line 1383, in main
+      sys.stdout.reconfigure(encoding="utf-8")
+      ^^^^^^^^^^^^^^^^^^^^^^
+  AttributeError: 'AnsiToWin32' object has no attribute 'reconfigure'
+  
+  adria@DESKTOP-P0W3R MINGW64 /c/Users/adria/projects/sphere (master %)
+  $ ~/winhome/.codex/scripts/AI-transcript.py --words-only --grep "movi ng on" > /dev/null
+  Traceback (most recent call last):
+  File "C:/msys64/home/adria/winhome/.codex/scripts/AI-transcript.py", line 1571, in <module>
+      main()
+  File "C:/msys64/home/adria/winhome/.codex/scripts/AI-transcript.py", line 1408, in main
+      or (args.color == "auto" and sys.stdout.isatty())
+                                  ^^^^^^^^^^^^^^^^^
+  AttributeError: 'AnsiToWin32' object has no attribute 'isatty'
+  ```
+
+  - Commented them out for now.  Still no colours shown. Should be fixed.  
+  - Graceful handling of if modules exist or not should be added to testing matrix.
+
+- When using `--words-only --grep "movi ng on"`, matched `"moving on"`.  Words
+  need to be with word boundaries.  E.g. `"moving`, followed by 1 or more
+  non-word characters, followed by `"on"`.
+  - Separating non-punctuating text with intervening punctuating text should be
+    treated as a word boundary.
+  - Separating non-punctuating text with intervening HTML tags text should NOT
+    be treated as a word boundary.
+  - Separating non-punctuating text with intervening HTML tags text and
+    punctuating text should be treated as a word boundary.
+  - I think this makes sense. Do you agree?
+  - Add to testing matrix.
+
+- **`--grep-re` always uses `re`; should prefer `regex` when available.**
+  Currently `re.compile(pattern, re.IGNORECASE)` is called unconditionally.
+  Fix: add optional `import regex as _re_mod` at module top (like colorama),
+  fall back to `import re as _re_mod`.  Use `_re_mod.compile` everywhere a
+  user-supplied pattern is compiled.  Also test that `regex` is installed in
+  the dev environment and add it to the graceful-handling test matrix.
+
+- **No error handling for invalid `--grep-re` patterns.**  A bad pattern
+  currently raises an unhandled `re.error` traceback.  Fix: wrap
+  `_re_mod.compile(pattern)` in try/except and exit with a clean message.
+
+- **`ap.error` blocking `--grep` + `--grep-re` mixing.**  `main()` currently
+  calls `ap.error("--grep and --grep-re cannot be combined")` when both flags
+  are present.  Remove this check — mixing is now explicitly allowed (see CLI
+  design above).
+
+- **AND check scans entire file unnecessarily.**  `_session_display_hunks`
+  calls `store.grep(session, before=0, after=0, **kw)` for each pattern to
+  test membership.  It only needs to know whether *any* match exists — scanning
+  the rest of the file after the first hit is wasted work.  Fix: add a
+  `first_only=True` mode to `_cl_session_grep` / `_cx_session_grep` (or a
+  separate `has_match` helper) that returns as soon as one match is found.
+
+- **Triple file open in `ClaudeSessionStore._make_session`.**  For each session,
+  `_cl_session_ctime`, `_cl_session_title`, and `_count_records` each open the
+  JSONL file separately — three opens per session.  Additionally, `_make_session`
+  calls `os.path.getmtime` even though `_cl_session_files` already returned the
+  mtime, so that value is discarded and recomputed.  Fix: merge title, ctime, and
+  record-count extraction into a single pass; pass the already-known mtime in from
+  the caller.
+
+- **`transcript()` duplicates the session header format.**  Both
+  `ClaudeSessionStore.transcript()` and `CodexSessionStore.transcript()` build
+  the two-line header as inline f-strings rather than calling `_format_session_lines`.
+  This means any future change to the header format must be made in three places
+  and will silently diverge.  Fix: add a `use_color=False` parameter to
+  `transcript()` (or strip the header from `transcript()` entirely and have the
+  caller emit it via `print_session_header`).
+
+- **`_count_records` needlessly skips blank lines.**  The `if line.strip()` guard
+  is defensive — Claude Code JSONL files do not contain blank lines.  Simplify to
+  `return sum(1 for _ in f)`.
