@@ -603,51 +603,71 @@ Run each command and compare the header lines visually.
 
 ## Future work (post-MVP)
 
-### Grep line-number and timestamp prefixes
+1. **`-n` — record number prefix.**  Prepend the 1-based line number within the
+   `.jsonl` file to each matched grep line, right-justified to the digit-width
+   of the total record count (which is always shown in the header).  Example
+   with 120 records:
 
-- **`-n` — record number prefix.**  Prepend the 1-based line number within the
-  `.jsonl` file to each matched grep line, right-justified to the digit-width
-  of the total record count (which is always shown in the header).  Example
-  with 120 records:
+   ```text
+   [ctime]-[mtime] [proj] records: 120
+   (f4b19167) title
+    23: matched text
+   ```
 
-  ```text
-  [ctime]-[mtime] [proj] records: 120
-  (f4b19167) title
-   23: matched text
-  ```
+2. **`-d` — timestamp prefix.**  Prepend `[<timestamp>]:` (followed by a
+   space) to each matched grep line.  Timestamp source per AI:
+   - Claude: explicit `timestamp` field present on every JSONL record.
+   - Codex: decode from the UUID v7 embedded timestamp (first 48 bits →
+     milliseconds since epoch).
 
-- **`-d` — timestamp prefix.**  Prepend `[<timestamp>]:` (followed by a
-  space) to each matched grep line.  Timestamp source per AI:
-  - Claude: explicit `timestamp` field present on every JSONL record.
-  - Codex: decode from the UUID v7 embedded timestamp (first 48 bits →
-    milliseconds since epoch).
+3. **Combined `-n -d` prefix order.**  When both flags are active, timestamp
+   comes first and the right-justified line number follows, so the number
+   column stays vertically aligned regardless of timestamp width:
 
-- **Combined `-n -d` prefix order.**  When both flags are active, timestamp
-  comes first and the right-justified line number follows, so the number
-  column stays vertically aligned regardless of timestamp width:
+   ```text
+   [<timestamp>]: 23: matched text
+   ```
 
-  ```text
-  [<timestamp>]: 23: matched text
-  ```
-- **ignore case flag `-i`**  Should be case sensitive unless `-i` is passed.
+4. **Ignore case flag `-i`.**  Should be case-sensitive unless `-i` is passed.
 
-- **Record/timestamp range filtering.**  Allow the user to restrict output to a
-  sub-range of a session, useful for long sessions.  Two flavours:
-  - **By record number:** `--records M:N` (1-based, inclusive) — include only
-    JSONL records M through N.  Works with `--id` (transcript slice) and
-    `--grep` (restrict the search window).
-  - **By timestamp:** `--since DATETIME` / `--until DATETIME` — include only
-    records whose `timestamp` field (Claude) or UUID-v7-derived time (Codex)
-    falls within the given range.  Accepts ISO-8601 or human-friendly strings
-    (e.g. `"2026-03-17 04:00"`).
-  - Both flavours should compose with `--grep`, `--id`, and `-n`/`-d` prefixes.
+5. **Record/timestamp range filtering.**  Allow the user to restrict output to a
+   sub-range of a session, useful for long sessions.  Two flavours:
+   - **By record number:** `--records M:N` (1-based, inclusive) — include only
+     JSONL records M through N.  Works with `--id` (transcript slice) and
+     `--grep` (restrict the search window).
+   - **By timestamp:** `--since DATETIME` / `--until DATETIME` — include only
+     records whose `timestamp` field (Claude) or UUID-v7-derived time (Codex)
+     falls within the given range.  Accepts ISO-8601 or human-friendly strings
+     (e.g. `"2026-03-17 04:00"`).
+   - Both flavours should compose with `--grep`, `--id`, and `-n`/`-d` prefixes.
 
-- Consolidate consecutive Claude turns into one heading
-  - > Each API round-trip creates a separate JSONL record. When Claude uses a tool (Bash, Read, Edit), the sequence is: `assistant` (text + tool_use) → `user` (tool_results) → `assistant` (continuation). Each `assistant` record gets its own `## Claude` heading. This is the existing behavior from `claude-transcript.py` — the new code preserves it exactly. Consolidating consecutive Claude turns into one heading would be a post-MVP improvement if desired.
-  - It's desired.  The next consecutive `## Claude` heading isn't needed.  It would be implied by the `<details><summary>Thinking...</summary>...</details>` block preceding it.
+6. **Consolidate consecutive Claude turns into one heading.**  Each API
+   round-trip creates a separate JSONL record; when Claude uses a tool the
+   sequence is `assistant` (text + tool_use) → `user` (tool_results) →
+   `assistant` (continuation), each getting its own `## Claude` heading.  The
+   next consecutive `## Claude` heading isn't needed — it would be implied by
+   the `<details><summary>Thinking...</summary></details>` block preceding it.
 
-- Need a user facing document to show how to use this which is probably accessible from the `--help` switch.  If too much, maybe a `--help --verbose` for extra detail.
-  - **Known limitation to document:** Messages sent by the user while Claude is actively running tools ("queued" / interrupt messages) are held in memory only and never written as user records to the session JSONL.  They are not recoverable from the file; the only trace is Claude's subsequent thinking or response text that references them.  The generated transcript will therefore be missing those user turns.
+7. **`--project` flag semantics hardening.**  `--project PATH` is Claude-only;
+   it should imply `--claude` and produce errors in the following states:
+   - `--project` combined with `--codex` → error: "`--project` is for Claude
+     sessions; remove `--codex` or drop `--project`."
+   - `--project` combined with `--both-AIs` → error: same message.
+   - `--project PATH` where `PATH` has no matching entry under
+     `~/.claude/projects/` → error: "No Claude project found for `PATH`."
+   - `--all-projects --codex` → error: "`--all-projects` applies to Claude
+     only; it cannot be combined with `--codex`."
+   - `--all-projects --both-AIs` (or no source flag) → valid: all Claude
+     sessions from all projects plus all Codex sessions.
+
+8. **User-facing documentation.**  Accessible from the `--help` switch; use
+   `--help --verbose` for extra detail if the standard help is too long.
+   - **Known limitation to document:** Messages sent by the user while Claude
+     is actively running tools ("queued" / interrupt messages) are held in
+     memory only and never written as user records to the session JSONL.  They
+     are not recoverable from the file; the only trace is Claude's subsequent
+     thinking or response text that references them.  The generated transcript
+     will therefore be missing those user turns.
 
 ## Questions
 
