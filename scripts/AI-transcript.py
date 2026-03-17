@@ -34,12 +34,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 
-# Configure stdout for UTF-8 before colorama can wrap sys.stdout with AnsiToWin32.
-# AnsiToWin32 lacks .reconfigure(), so this must run while stdout is still a
-# plain TextIOWrapper.
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8")
-
 
 # ── XML tags injected by Claude Code ─────────────────────────────────────────
 
@@ -75,6 +69,16 @@ except ImportError:
     _C_PROJECT = ""
     _C_TITLE   = ""
     _COLORAMA_OK = False
+
+# Configure stdout for UTF-8 after colorama has had a chance to wrap it.
+# If colorama wrapped sys.stdout with AnsiToWin32 (which lacks .reconfigure()),
+# fall back to the underlying stream it wraps.
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except AttributeError:
+    _underlying = getattr(sys.stdout, "wrapped", getattr(sys.stdout, "stream", None))
+    if _underlying is not None and hasattr(_underlying, "reconfigure"):
+        _underlying.reconfigure(encoding="utf-8")
 
 
 # ── Shared utilities ──────────────────────────────────────────────────────────
