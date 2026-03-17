@@ -14,6 +14,10 @@ PASS=0
 FAIL=0
 TEST=1
 SELECTED=("$@")
+RESET="$(tput sgr0)"
+RED="$(tput setaf 1)"
+GREEN="$(tput setaf 2)"
+YELLOW="$(tput setaf 3)"
 
 # test_selected N — returns 0 (true) if test N should run.
 # With no selected tests, all run.  Otherwise only the listed numbers run.
@@ -50,10 +54,10 @@ check() {
     fi
 
     if [[ $ok -eq 1 ]]; then
-        printf '%d. PASS  %s\n' $TEST "$desc"
+        printf '%d. %sPASS%s  %s\n' $TEST "$GREEN" "$RESET" "$desc"
         ((PASS++))
     else
-        printf '%d. FAIL  %s\n' $TEST "$desc"
+        printf '%d. %sFAIL%s  %s\n' $TEST "$RED" "$RESET" "$desc"
         [[ $rc -ne $want_rc ]] && printf '      exit: got %d, want %d\n' "$rc" "$want_rc"
         if [[ -n "$pattern" ]]; then
         [[ "$invert" == "!" ]] \
@@ -64,7 +68,7 @@ check() {
         ((FAIL++))
     fi
   else
-    printf '%d. SKIPPED  %s\n' $TEST "$desc"  
+    printf '%d. %sSKIPPED%s  %s\n' $TEST "$YELLOW" "$RESET" "$desc"
   fi
   ((TEST++))
 }
@@ -86,17 +90,17 @@ check_ansi() {
     [[ "$want_present" == "no"  && $found -eq 1 ]] && ok=0
 
     if [[ $ok -eq 1 ]]; then
-      printf '%d. PASS  %s\n' $TEST "$desc"
+      printf '%d. %sPASS%s  %s\n' $TEST "$GREEN" "$RESET" "$desc"
       ((PASS++))
     else
-      printf '%d. FAIL  %s\n' $TEST "$desc"
+      printf '%d. %sFAIL%s  %s\n' $TEST "$RED" "$RESET" "$desc"
       [[ $rc -ne 0 ]] && printf '      exit: got %d, want 0\n' "$rc"
       [[ "$want_present" == "yes" && $found -eq 0 ]] && printf '      no ANSI codes in output\n'
       [[ "$want_present" == "no"  && $found -eq 1 ]] && printf '      ANSI codes present (should be absent)\n'
       ((FAIL++))
     fi
   else
-    printf '%d. SKIPPED  %s\n' $TEST "$desc"  
+    printf '%d. %sSKIPPED%s  %s\n' $TEST "$YELLOW" "$RESET" "$desc"
   fi
   ((TEST++))
 }
