@@ -32,8 +32,8 @@
 !scripts/HtmlDom.ahk
 !scripts/CopyClip.ahk
 !scripts/TT_Simple.ahk
-!scripts/claude-transcript.py
-!scripts/codex-transcript.py
+!scripts/AI-transcript.py
+!scripts/AI-transcript-plan.md
 !scripts/ahk-test
 !scripts/ahk-test/**
 scripts/ahk-test/*.actual.md
