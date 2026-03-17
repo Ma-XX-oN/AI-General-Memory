@@ -9,9 +9,10 @@
 #   019cf2fa — "Implement wall builder per comment" (contains "lattice")
 #   019cf1f9 — "Clarify TriPts migration plan"      (contains "moving on")
 
-# python.exe: in MSYS2/Git Bash, 'python' resolves to the MSYS2 Python while
-# 'python.exe' resolves to the Windows Python on the Windows PATH.
-PYTHON="python.exe"
+# 'py' is the Windows Python Launcher (C:\Windows\py.exe).  It lives outside
+# MSYS2's PATH so it always resolves to the Windows Python, regardless of
+# which 'python' or 'python.exe' MSYS2/Git Bash would pick up first.
+PYTHON="py"
 SCRIPT="$PYTHON scripts/AI-transcript.py"
 PASS=0
 FAIL=0
@@ -174,9 +175,10 @@ if $PYTHON -c "import colorama" 2>/dev/null; then
   $PYTHON -m pip install colorama -q 2>/dev/null
   echo "  (colorama restored)"
 else
-  TESTS_SKIPPED=4
-  printf '%d. %sSKIP%s %d: colorama not currently installed\n' "$TEST" "$YELLOW" "$RESET" "$TESTS_SKIPPED"
-  ((TEST+=$TESTS_SKIPPED))
+  # colorama already absent — run tests directly; no install/uninstall needed
+  check_ansi "--color always without colorama: no ANSI"  no  $SCRIPT --color always --ls
+  check     "warning printed when colorama absent"        0  "colorama not installed"  ""  $SCRIPT --color always --ls
+  check     "--color never without colorama: exits 0"     0  ""  ""   $SCRIPT --color never --ls
 fi
 
 echo
@@ -190,9 +192,11 @@ if $PYTHON -c "import regex" 2>/dev/null; then
   $PYTHON -m pip install regex -q 2>/dev/null
   echo "  (regex restored)"
 else
-  TESTS_SKIPPED=4
-  printf '%d. %sSKIP%s %d: regex not currently installed\n' "$TEST" "$YELLOW" "$RESET" "$TESTS_SKIPPED"
-  ((TEST+=$TESTS_SKIPPED))
+  # regex already absent — run tests directly; no install/uninstall needed
+  check "--grep-re without regex: falls back to re, exits 0"  0  ""       ""   $SCRIPT --grep-re "lattice" --ls
+  check "--grep-re without regex: still finds sessions"        0  "codex"  ""   $SCRIPT --grep-re "lattice" --ls
+  check "invalid --grep-re without regex: clean error"         1  "Invalid regex"  ""  $SCRIPT --grep-re "unclosed["
+  check "invalid --grep-re without regex: no Traceback"        1  "Traceback"      "!" $SCRIPT --grep-re "unclosed["
 fi
 
 # ── Bug #8: AND check correctness (perf fix must not break results) ───────────
