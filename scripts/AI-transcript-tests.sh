@@ -1,0 +1,168 @@
+#!/usr/bin/env bash
+# AI-transcript-tests.sh — regression tests for AI-transcript.py
+# Run from the .codex directory:  bash scripts/AI-transcript-tests.sh
+#
+# Sessions used (local machine):
+#   019cd970 — "Verify log files for CRLF switch"  (contains → arrows)
+#   019cf2fa — "Implement wall builder per comment" (contains "lattice")
+#   019cf1f9 — "Clarify TriPts migration plan"      (contains "moving on")
+
+SCRIPT="python scripts/AI-transcript.py"
+PASS=0
+FAIL=0
+
+# check DESCRIPTION WANT_EXIT PATTERN INVERT CMD...
+#   WANT_EXIT  expected exit code
+#   PATTERN    grep -E pattern to match in combined stdout+stderr ("" = skip)
+#   INVERT     "!" = pattern must NOT be present; "" = must be present
+check() {
+    local desc="$1" want_rc="$2" pattern="$3" invert="$4"
+    shift 4
+
+    local out rc
+    out=$("$@" 2>&1)
+    rc=$?
+
+    local ok=1
+    [[ $rc -ne $want_rc ]] && ok=0
+    if [[ -n "$pattern" ]]; then
+        if echo "$out" | grep -qE "$pattern"; then
+            [[ "$invert" == "!" ]] && ok=0
+        else
+            [[ "$invert" != "!" ]] && ok=0
+        fi
+    fi
+
+    if [[ $ok -eq 1 ]]; then
+        printf 'PASS  %s\n' "$desc"
+        ((PASS++))
+    else
+        printf 'FAIL  %s\n' "$desc"
+        [[ $rc -ne $want_rc ]] && printf '      exit: got %d, want %d\n' "$rc" "$want_rc"
+        if [[ -n "$pattern" ]]; then
+            [[ "$invert" == "!" ]] \
+                && printf '      output unexpectedly contains: %s\n' "$pattern" \
+                || printf '      output missing: %s\n' "$pattern"
+        fi
+        printf '      output: %s\n' "$(echo "$out" | head -2 | tr '\n' '|')"
+        ((FAIL++))
+    fi
+}
+
+# ANSI check: grep -P '\x1b' detects ESC byte in output
+check_ansi() {
+    local desc="$1" want_present="$2"   # want_present: "yes" or "no"
+    shift 2
+    local out rc
+    out=$("$@" 2>&1); rc=$?
+    local found=0
+    echo "$out" | grep -qP '\x1b' && found=1
+
+    local ok=1
+    [[ $rc -ne 0 ]] && ok=0
+    [[ "$want_present" == "yes" && $found -eq 0 ]] && ok=0
+    [[ "$want_present" == "no"  && $found -eq 1 ]] && ok=0
+
+    if [[ $ok -eq 1 ]]; then
+        printf 'PASS  %s\n' "$desc"
+        ((PASS++))
+    else
+        printf 'FAIL  %s\n' "$desc"
+        [[ $rc -ne 0 ]] && printf '      exit: got %d, want 0\n' "$rc"
+        [[ "$want_present" == "yes" && $found -eq 0 ]] && printf '      no ANSI codes in output\n'
+        [[ "$want_present" == "no"  && $found -eq 1 ]] && printf '      ANSI codes present (should be absent)\n'
+        ((FAIL++))
+    fi
+}
+
+cd "$(dirname "$0")/.." || exit 1
+
+echo "=== AI-transcript.py regression tests ==="
+echo
+
+# ── Sanity ────────────────────────────────────────────────────────────────────
+echo "-- Sanity"
+check "--ls exits 0"                     0  "(codex|claude)"  ""   $SCRIPT --ls
+check "--help exits 0"                   0  "usage"           ""   $SCRIPT --help
+check "--grep finds lattice sessions"    0  "codex"           ""   $SCRIPT --grep "lattice" --ls
+check "--grep-re finds lattice sessions" 0  "codex"           ""   $SCRIPT --grep-re "lattice" --ls
+
+# ── Bug #1: ap.error blocking --grep + --grep-re mixing ───────────────────────
+echo
+echo "-- Bug #1: --grep + --grep-re mixing"
+check "mixing exits 0"                        0  ""                    ""   $SCRIPT --grep "lattice" --grep-re "wall" --ls
+check "mixing: no 'cannot be combined' msg"   0  "cannot be combined"  "!"  $SCRIPT --grep "lattice" --grep-re "wall" --ls
+
+# ── Bug #2/#3: colorama color modes ──────────────────────────────────────────
+echo
+echo "-- Bug #2/#3: colorama color modes"
+check_ansi "--color always has ANSI codes"  yes  $SCRIPT --color always --ls
+check_ansi "--color never has no ANSI"      no   $SCRIPT --color never  --ls
+# --color auto in a pipe: isatty() is False → no ANSI (correct after fix too)
+check_ansi "--color auto in pipe: no ANSI"  no   $SCRIPT --color auto --ls
+
+# ── Bug #4: UnicodeEncodeError on → content ───────────────────────────────────
+echo
+echo "-- Bug #4: Unicode → content"
+# grep with context (no --ls) prints matching lines including → glyph
+check "--grep '→' exits 0"                0  ""                    ""   $SCRIPT --grep "→" --id 019cd970
+check "--grep '→': no UnicodeEncodeError" 0  "UnicodeEncodeError"  "!"  $SCRIPT --grep "→" --id 019cd970
+
+# ── Bug #5: words-only zero-width separator ────────────────────────────────────
+echo
+echo "-- Bug #5: --words-only separator"
+# "movi ng on" should NOT match "moving on" (zero-width bug)
+check "false-positive: 'movi ng on' → 0 matches"  0  "No sessions match"   ""  $SCRIPT --words-only --grep "movi ng on"
+check "false-positive: no session listed"          0  "(codex|claude)"      "!" $SCRIPT --words-only --grep "movi ng on"
+# "moving on" SHOULD still match
+check "true-positive: 'moving on' finds sessions"  0  "No sessions match"   "!" $SCRIPT --words-only --grep "moving on"
+
+# ── Bug #6 (already fixed): invalid --grep-re ────────────────────────────────
+echo
+echo "-- Bug #6: invalid --grep-re pattern"
+check "invalid regex exits 1"        1  ""             ""   $SCRIPT --grep-re "unclosed["
+check "invalid regex: clean message" 1  "Invalid regex" ""  $SCRIPT --grep-re "unclosed["
+check "invalid regex: no Traceback"  1  "Traceback"    "!"  $SCRIPT --grep-re "unclosed["
+
+# ── Bug #7 (already fixed): --grep-re uses regex/re ─────────────────────────
+echo
+echo "-- Bug #7: --grep-re module selection"
+check "--grep-re \\d+ exits 0"       0  ""      ""   $SCRIPT --grep-re "lattice[0-9]+" --ls
+check "--grep-re works (finds/not)"  0  "error" "!"  $SCRIPT --grep-re "lattice[0-9]+" --ls
+
+# ── Bug #8: AND check correctness (perf fix must not break results) ───────────
+echo
+echo "-- Bug #8: AND check correctness"
+# Single pattern and AND-of-two should both work
+check "AND: two --grep flags exit 0"  0  "codex"  ""   $SCRIPT --grep "lattice" --grep "wall" --ls
+# A pattern that exists + one that doesn't → no match
+check "AND: impossible combo → 0"     0  "No sessions match"  ""  $SCRIPT --grep "lattice" --grep "ZZZIMPOSSIBLEZZZ"
+
+# ── Bug #9/#10/#11: structural fixes (output should be unchanged) ─────────────
+echo
+echo "-- Bugs #9/#10/#11: structural (output unchanged)"
+check "--ls record count visible"         0  "records:"    ""  $SCRIPT --ls
+check "transcript --id has header"        0  "019cf2fa"    ""  $SCRIPT --id 019cf2fa --ls
+check "--ls title shown"                  0  "wall builder" "" $SCRIPT --ls
+
+# ── Per-AI source flags ───────────────────────────────────────────────────────
+echo
+echo "-- Per-AI source flags"
+check "--codex --ls exits 0"                        0  "codex"   ""  $SCRIPT --codex --ls
+check "--claude --all-projects --ls has sessions"   0  "claude"  ""  $SCRIPT --claude --all-projects --ls
+check "--codex --grep finds sessions"               0  "codex"   ""  $SCRIPT --codex --grep "lattice" --ls
+check "--claude --all-projects --grep exits 0"      0  ""        ""  $SCRIPT --claude --all-projects --grep "lattice" --ls
+check "--codex --grep-re exits 0"                   0  "codex"   ""  $SCRIPT --codex --grep-re "lattice" --ls
+check "--claude --all-projects --grep-re exits 0"   0  ""        ""  $SCRIPT --claude --all-projects --grep-re "lattice" --ls
+# --id resolves from both stores
+check "--id resolves codex session"       0  "019cf2fa"  "" $SCRIPT --id 019cf2fa --ls
+# transcript works for each store
+check "codex transcript exits 0"          0  "019cf2fa"  "" $SCRIPT --codex --id 019cf2fa
+
+# ── Summary ──────────────────────────────────────────────────────────────────
+echo
+TOTAL=$((PASS + FAIL))
+printf '=== %d/%d passed' "$PASS" "$TOTAL"
+[[ $FAIL -gt 0 ]] && printf ' (%d FAILED)' "$FAIL"
+printf '\n'
+[[ $FAIL -eq 0 ]]

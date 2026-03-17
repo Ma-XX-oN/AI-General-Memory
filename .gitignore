@@ -34,6 +34,7 @@
 !scripts/TT_Simple.ahk
 !scripts/AI-transcript.py
 !scripts/AI-transcript-plan.md
+!scripts/AI-transcript-tests.sh
 !scripts/ahk-test
 !scripts/ahk-test/**
 scripts/ahk-test/*.actual.md
