@@ -96,10 +96,10 @@ check "mixing: no 'cannot be combined' msg"   0  "cannot be combined"  "!"  $SCR
 # ── Bug #2/#3: colorama color modes ──────────────────────────────────────────
 echo
 echo "-- Bug #2/#3: colorama color modes"
-check_ansi "--color always has ANSI codes"  yes  $SCRIPT --color always --ls
-check_ansi "--color never has no ANSI"      no   $SCRIPT --color never  --ls
-# --color auto in a pipe: isatty() is False → no ANSI (correct after fix too)
-check_ansi "--color auto in pipe: no ANSI"  no   $SCRIPT --color auto --ls
+check_ansi "--color always: ANSI codes present"    yes  $SCRIPT --color always --ls
+check_ansi "--color never: ANSI codes absent"      no   $SCRIPT --color never  --ls
+# --color auto in a pipe: isatty() returns False → no ANSI expected
+check_ansi "--color auto in pipe: ANSI codes absent"  no   $SCRIPT --color auto --ls
 
 # ── Bug #4: UnicodeEncodeError on → content ───────────────────────────────────
 echo
