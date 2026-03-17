@@ -1407,7 +1407,7 @@ def main():
         args.color == "always"
         or (args.color == "auto" and sys.stdout.isatty())
     )
-    if args.color == "always" and not _COLORAMA_OK:
+    if use_color and not _COLORAMA_OK:
         print(
             "Warning: colorama not installed; color output disabled. "
             "pip install colorama",
