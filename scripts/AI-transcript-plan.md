@@ -746,3 +746,27 @@ Run each command and compare the header lines visually.
 - **`_count_records` needlessly skips blank lines.**  The `if line.strip()` guard
   is defensive — Claude Code JSONL files do not contain blank lines.  Simplify to
   `return sum(1 for _ in f)`.
+
+---
+
+### Bug verification matrix
+
+Commands are run against a real session known to contain the relevant content.
+`SESSION` = a Claude session id prefix that contains the text "lattice" and an
+arrow character `→`.  Substitute a real prefix from your environment.
+
+| # | Bug | Before command | Expected broken output | Expected fixed output |
+|---|-----|----------------|------------------------|----------------------|
+| 1 | `ap.error` blocks `--grep`+`--grep-re` mixing | `python AI-transcript.py --grep "FEA" --grep-re "lattice"` | `error: --grep and --grep-re cannot be combined` | Sessions matching both patterns listed |
+| 2 | colorama `AnsiToWin32` lacks `reconfigure` | `python AI-transcript.py --color always --ls` | `AttributeError: 'AnsiToWin32' object has no attribute 'reconfigure'` | Coloured session list |
+| 3 | colorama `AnsiToWin32` lacks `isatty` | `python AI-transcript.py --color auto --ls` | `AttributeError: 'AnsiToWin32' object has no attribute 'isatty'` | Session list (colour if TTY) |
+| 4 | Unicode encode error in `_colorize` | `python AI-transcript.py --color never --id SESSION --grep "→"` | `UnicodeEncodeError: 'charmap' codec can't encode character '\u2192'` | Lines containing `→` printed |
+| 5 | `--words-only` zero-width separator | `python AI-transcript.py --words-only --grep "movi ng on"` | Matches sessions containing "moving on" (false positive) | No sessions matched |
+| 5b | `--words-only` positive case preserved | `python AI-transcript.py --words-only --grep "moving on"` | (must still match after fix) | Sessions containing "moving on" listed |
+| 6 | Invalid `--grep-re` pattern | `python AI-transcript.py --grep-re "unclosed["` | Raw `re.error` / `regex.error` traceback | `error: invalid pattern 'unclosed[': …` printed to stderr, exit 1 |
+| 7a | `--grep-re` uses `re` when `regex` absent | `pip uninstall -y regex && python AI-transcript.py --grep-re "lattice\d+"` | Uses `re` (acceptable fallback) | Uses `re`, no crash |
+| 7b | `--grep-re` uses `regex` when present | `pip install regex && python AI-transcript.py --grep-re "lattice\d+"` | Uses `re` regardless (bug) | Uses `regex` module |
+| 8 | AND check full-scan (perf only) | `python -c "import cProfile; ..."` or count grep calls in source | `store.grep(…)` called N times per pattern with no early exit | Returns after first non-matching pattern found |
+| 9 | Triple file open in `_make_session` | Grep source: `grep -c "open(" AI-transcript.py` in `_make_session` scope | 3 separate `open()` calls per session | Single `open()` in merged `_cl_session_meta` |
+| 10 | `transcript()` header duplication | Grep source for f-string header lines | Header f-string appears in 3 places | Only in `_format_session_lines`; `transcript()` calls it |
+| 11 | `_count_records` blank-line guard | Grep source: `if line.strip():` in `_count_records` | Guard present | Simplified to `sum(1 for _ in f)` |
