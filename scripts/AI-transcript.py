@@ -54,8 +54,9 @@ _SYSTEM_TAG_RE = re.compile(
 
 try:
     import colorama as _cm
-    if hasattr(_cm, "just_fix_windows_console"):
-        _cm.just_fix_windows_console()
+    # strip=False: never discard ANSI codes (just_fix_windows_console() sets
+    # strip=True when stdout is not a TTY, which breaks piped/captured output).
+    _cm.init(strip=False, autoreset=False)
     _C_RESET   = _cm.Style.RESET_ALL
     _C_MATCH   = _cm.Style.BRIGHT + _cm.Fore.RED
     _C_DATE    = _cm.Fore.CYAN
