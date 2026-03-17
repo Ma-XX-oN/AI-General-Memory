@@ -130,6 +130,34 @@ echo "-- Bug #7: --grep-re module selection"
 check "--grep-re \\d+ exits 0"       0  ""      ""   $SCRIPT --grep-re "lattice[0-9]+" --ls
 check "--grep-re works (finds/not)"  0  "error" "!"  $SCRIPT --grep-re "lattice[0-9]+" --ls
 
+# ── Optional-dependency degradation ─────────────────────────────────────────
+echo
+echo "-- Optional-dependency degradation (colorama)"
+if python -c "import colorama" 2>/dev/null; then
+    pip uninstall -y colorama -q 2>/dev/null
+    check_ansi "--color always without colorama: no ANSI"  no  $SCRIPT --color always --ls
+    check     "warning printed when colorama absent"        0  "colorama not installed"  ""  $SCRIPT --color always --ls
+    check     "--color never without colorama: exits 0"     0  ""  ""   $SCRIPT --color never --ls
+    pip install colorama -q 2>/dev/null
+    echo "  (colorama restored)"
+else
+    echo "  SKIP: colorama not currently installed"
+fi
+
+echo
+echo "-- Optional-dependency degradation (regex)"
+if python -c "import regex" 2>/dev/null; then
+    pip uninstall -y regex -q 2>/dev/null
+    check "--grep-re without regex: falls back to re, exits 0"  0  ""       ""   $SCRIPT --grep-re "lattice" --ls
+    check "--grep-re without regex: still finds sessions"        0  "codex"  ""   $SCRIPT --grep-re "lattice" --ls
+    check "invalid --grep-re without regex: clean error"         1  "Invalid regex"  ""  $SCRIPT --grep-re "unclosed["
+    check "invalid --grep-re without regex: no Traceback"        1  "Traceback"      "!" $SCRIPT --grep-re "unclosed["
+    pip install regex -q 2>/dev/null
+    echo "  (regex restored)"
+else
+    echo "  SKIP: regex not currently installed"
+fi
+
 # ── Bug #8: AND check correctness (perf fix must not break results) ───────────
 echo
 echo "-- Bug #8: AND check correctness"
