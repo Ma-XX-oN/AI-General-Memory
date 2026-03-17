@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # AI-transcript-tests.sh — regression tests for AI-transcript.py
-# Run from the .codex directory:  bash scripts/AI-transcript-tests.sh
+# Run from the .codex directory:  bash scripts/AI-transcript-tests.sh [N [N...]]
+#   With no args: run all tests.
+#   With one or more test numbers: run only those tests (others are skipped).
 #
 # Sessions used (local machine):
 #   019cd970 — "Verify log files for CRLF switch"  (contains → arrows)
@@ -10,15 +12,29 @@
 SCRIPT="python scripts/AI-transcript.py"
 PASS=0
 FAIL=0
+TEST=1
+SELECTED=("$@")
+
+# test_selected N — returns 0 (true) if test N should run.
+# With no selected tests, all run.  Otherwise only the listed numbers run.
+test_selected() {
+    [[ ${#SELECTED[@]} -eq 0 ]] && return 0
+    local n="$1" t
+    for t in "${SELECTED[@]}"; do
+        [[ "$t" == "$n" ]] && return 0
+    done
+    return 1
+}
 
 # check DESCRIPTION WANT_EXIT PATTERN INVERT CMD...
 #   WANT_EXIT  expected exit code
 #   PATTERN    grep -E pattern to match in combined stdout+stderr ("" = skip)
 #   INVERT     "!" = pattern must NOT be present; "" = must be present
 check() {
-    local desc="$1" want_rc="$2" pattern="$3" invert="$4"
-    shift 4
+  local desc="$1" want_rc="$2" pattern="$3" invert="$4"
+  shift 4
 
+  if test_selected $TEST; then 
     local out rc
     out=$("$@" 2>&1)
     rc=$?
@@ -27,32 +43,38 @@ check() {
     [[ $rc -ne $want_rc ]] && ok=0
     if [[ -n "$pattern" ]]; then
         if echo "$out" | grep -qE "$pattern"; then
-            [[ "$invert" == "!" ]] && ok=0
+        [[ "$invert" == "!" ]] && ok=0
         else
-            [[ "$invert" != "!" ]] && ok=0
+        [[ "$invert" != "!" ]] && ok=0
         fi
     fi
 
     if [[ $ok -eq 1 ]]; then
-        printf 'PASS  %s\n' "$desc"
+        printf '%d. PASS  %s\n' $TEST "$desc"
         ((PASS++))
     else
-        printf 'FAIL  %s\n' "$desc"
+        printf '%d. FAIL  %s\n' $TEST "$desc"
         [[ $rc -ne $want_rc ]] && printf '      exit: got %d, want %d\n' "$rc" "$want_rc"
         if [[ -n "$pattern" ]]; then
-            [[ "$invert" == "!" ]] \
-                && printf '      output unexpectedly contains: %s\n' "$pattern" \
-                || printf '      output missing: %s\n' "$pattern"
+        [[ "$invert" == "!" ]] \
+            && printf '      output unexpectedly contains: %s\n' "$pattern" \
+            || printf '      output missing: %s\n' "$pattern"
         fi
         printf '      output: %s\n' "$(echo "$out" | head -2 | tr '\n' '|')"
         ((FAIL++))
     fi
+  else
+    printf '%d. SKIPPED  %s\n' $TEST "$desc"  
+  fi
+  ((TEST++))
 }
 
 # ANSI check: grep -P '\x1b' detects ESC byte in output
 check_ansi() {
-    local desc="$1" want_present="$2"   # want_present: "yes" or "no"
-    shift 2
+  local desc="$1" want_present="$2"   # want_present: "yes" or "no"
+  shift 2
+
+  if test_selected $TEST; then 
     local out rc
     out=$("$@" 2>&1); rc=$?
     local found=0
@@ -64,15 +86,19 @@ check_ansi() {
     [[ "$want_present" == "no"  && $found -eq 1 ]] && ok=0
 
     if [[ $ok -eq 1 ]]; then
-        printf 'PASS  %s\n' "$desc"
-        ((PASS++))
+      printf '%d. PASS  %s\n' $TEST "$desc"
+      ((PASS++))
     else
-        printf 'FAIL  %s\n' "$desc"
-        [[ $rc -ne 0 ]] && printf '      exit: got %d, want 0\n' "$rc"
-        [[ "$want_present" == "yes" && $found -eq 0 ]] && printf '      no ANSI codes in output\n'
-        [[ "$want_present" == "no"  && $found -eq 1 ]] && printf '      ANSI codes present (should be absent)\n'
-        ((FAIL++))
+      printf '%d. FAIL  %s\n' $TEST "$desc"
+      [[ $rc -ne 0 ]] && printf '      exit: got %d, want 0\n' "$rc"
+      [[ "$want_present" == "yes" && $found -eq 0 ]] && printf '      no ANSI codes in output\n'
+      [[ "$want_present" == "no"  && $found -eq 1 ]] && printf '      ANSI codes present (should be absent)\n'
+      ((FAIL++))
     fi
+  else
+    printf '%d. SKIPPED  %s\n' $TEST "$desc"  
+  fi
+  ((TEST++))
 }
 
 cd "$(dirname "$0")/.." || exit 1
@@ -134,28 +160,32 @@ check "--grep-re works (finds/not)"  0  "error" "!"  $SCRIPT --grep-re "lattice[
 echo
 echo "-- Optional-dependency degradation (colorama)"
 if python -c "import colorama" 2>/dev/null; then
-    pip uninstall -y colorama -q 2>/dev/null
-    check_ansi "--color always without colorama: no ANSI"  no  $SCRIPT --color always --ls
-    check     "warning printed when colorama absent"        0  "colorama not installed"  ""  $SCRIPT --color always --ls
-    check     "--color never without colorama: exits 0"     0  ""  ""   $SCRIPT --color never --ls
-    pip install colorama -q 2>/dev/null
-    echo "  (colorama restored)"
+  pip uninstall -y colorama -q 2>/dev/null
+  check_ansi "--color always without colorama: no ANSI"  no  $SCRIPT --color always --ls
+  check     "warning printed when colorama absent"        0  "colorama not installed"  ""  $SCRIPT --color always --ls
+  check     "--color never without colorama: exits 0"     0  ""  ""   $SCRIPT --color never --ls
+  pip install colorama -q 2>/dev/null
+  echo "  (colorama restored)"
 else
-    echo "  SKIP: colorama not currently installed"
+  TESTS_SKIPPED=4
+  echo "$TEST. SKIP $TESTS_SKIPPED: colorama not currently installed"
+  ((TEST+=$TESTS_SKIPPED))
 fi
 
 echo
 echo "-- Optional-dependency degradation (regex)"
 if python -c "import regex" 2>/dev/null; then
-    pip uninstall -y regex -q 2>/dev/null
-    check "--grep-re without regex: falls back to re, exits 0"  0  ""       ""   $SCRIPT --grep-re "lattice" --ls
-    check "--grep-re without regex: still finds sessions"        0  "codex"  ""   $SCRIPT --grep-re "lattice" --ls
-    check "invalid --grep-re without regex: clean error"         1  "Invalid regex"  ""  $SCRIPT --grep-re "unclosed["
-    check "invalid --grep-re without regex: no Traceback"        1  "Traceback"      "!" $SCRIPT --grep-re "unclosed["
-    pip install regex -q 2>/dev/null
-    echo "  (regex restored)"
+  pip uninstall -y regex -q 2>/dev/null
+  check "--grep-re without regex: falls back to re, exits 0"  0  ""       ""   $SCRIPT --grep-re "lattice" --ls
+  check "--grep-re without regex: still finds sessions"        0  "codex"  ""   $SCRIPT --grep-re "lattice" --ls
+  check "invalid --grep-re without regex: clean error"         1  "Invalid regex"  ""  $SCRIPT --grep-re "unclosed["
+  check "invalid --grep-re without regex: no Traceback"        1  "Traceback"      "!" $SCRIPT --grep-re "unclosed["
+  pip install regex -q 2>/dev/null
+  echo "  (regex restored)"
 else
-    echo "  SKIP: regex not currently installed"
+  TESTS_SKIPPED=4
+  echo "$TEST. SKIP $TESTS_SKIPPED tests: regex not currently installed"
+  ((TEST+=$TESTS_SKIPPED))
 fi
 
 # ── Bug #8: AND check correctness (perf fix must not break results) ───────────
