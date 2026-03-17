@@ -172,7 +172,7 @@ if python -c "import colorama" 2>/dev/null; then
   echo "  (colorama restored)"
 else
   TESTS_SKIPPED=4
-  echo "$TEST. SKIP $TESTS_SKIPPED: colorama not currently installed"
+  printf '%d. %sSKIP%s %d: colorama not currently installed\n' "$TEST" "$YELLOW" "$RESET" "$TESTS_SKIPPED"
   ((TEST+=$TESTS_SKIPPED))
 fi
 
@@ -188,7 +188,7 @@ if python -c "import regex" 2>/dev/null; then
   echo "  (regex restored)"
 else
   TESTS_SKIPPED=4
-  echo "$TEST. SKIP $TESTS_SKIPPED tests: regex not currently installed"
+  printf '%d. %sSKIP%s %d: regex not currently installed\n' "$TEST" "$YELLOW" "$RESET" "$TESTS_SKIPPED"
   ((TEST+=$TESTS_SKIPPED))
 fi
 
