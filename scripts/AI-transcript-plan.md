@@ -692,12 +692,29 @@ Run each command and compare the header lines visually.
     suggesting `pip install tzdata`, then fall back to local time and continue.
     `--tz` automatically implies `-d`.
 
-11. [ ] **Colored `ERROR:` / `WARNING:` message prefixes.**  All messages emitted
-    to stderr should be prefixed with a coloured label when colour is available:
-    - `ERROR:` in red (`colorama.Fore.RED`)
+11. [ ] **Colored `INFO:` / `WARNING:` / `ERROR:` message prefixes.**  All messages
+    emitted via `_info()` / `_warn()` / `_error()` should gain colour when colour
+    is available:
+    - `INFO:` in bright white (`colorama.Style.BRIGHT`)
     - `WARNING:` in yellow (`colorama.Fore.YELLOW`)
+    - `ERROR:` in red (`colorama.Fore.RED`)
     Follow the same colorama availability check already used by `--color`; fall
     back to plain text when colorama is absent or the stream is not a TTY.
+
+12. [ ] **`--ts-fmt` — timestamp format string for `-d` output.**  Allows the user
+    to override the default `strftime` format used when displaying timestamps with
+    `-d`.  Default format: `%Y-%m-%d %H:%M:%S` (matches current display after
+    item 10 is implemented).  Example: `--ts-fmt "%H:%M"` to show time only.
+    - Not sure if this will be a thing:  Should also be settable via the
+    `AI_TRANSCRIPT_TS_FMT` environment variable (CLI flag takes precedence).
+
+13. [ ] **`.AI-transcript.rc` — per-user config file for default flags.**  A simple
+    config file (TOML or `key = value` format) read from `~/.AI-transcript.rc`
+    (or `~/.config/AI-transcript.rc`) at startup before argument parsing.  Allows
+    persistent defaults for any flag (e.g. `tz = America/New_York`,
+    `ts_fmt = %H:%M:%S`, `color = auto`).  CLI flags always take precedence over
+    rc file values.  Unknown keys produce a `WARNING:` to stderr; a missing file
+    is silently ignored.
 
 ## Questions
 

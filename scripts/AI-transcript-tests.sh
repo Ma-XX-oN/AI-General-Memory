@@ -172,7 +172,7 @@ check "true-positive: 'moving on' finds sessions"  0  "No sessions match"   "!" 
 echo
 echo "-- Bug #6: invalid --grep-re pattern"
 check "invalid regex exits 1"        1  ""             ""   $SCRIPT --grep-re "unclosed["
-check "invalid regex: clean message" 1  "Invalid regex" ""  $SCRIPT --grep-re "unclosed["
+check "invalid regex: clean message" 1  "ERROR: invalid regex" ""  $SCRIPT --grep-re "unclosed["
 check "invalid regex: no Traceback"  1  "Traceback"    "!"  $SCRIPT --grep-re "unclosed["
 
 # ── Bug #7 (regex present) + degradation (regex absent) ─────────────────────
@@ -186,7 +186,7 @@ check "--grep-re works (finds/not)"  0  "error" "!"  $SCRIPT --grep-re "lattice[
 $PYTHON -m pip uninstall -y regex -q # 2>/dev/null
 check "--grep-re without regex: falls back to re, exits 0"  0  ""       ""   $SCRIPT --grep-re "lattice" --ls
 check "--grep-re without regex: still finds sessions"        0  "codex"  ""   $SCRIPT --grep-re "lattice" --ls
-check "invalid --grep-re without regex: clean error"         1  "Invalid regex"  ""  $SCRIPT --grep-re "unclosed["
+check "invalid --grep-re without regex: clean error"         1  "ERROR: invalid regex"  ""  $SCRIPT --grep-re "unclosed["
 check "invalid --grep-re without regex: no Traceback"        1  "Traceback"      "!" $SCRIPT --grep-re "unclosed["
 $_regex_was_installed && { $PYTHON -m pip install regex -q #2>/dev/null; 
   echo "  (regex restored)"; }
@@ -251,6 +251,18 @@ echo
 echo "-- Combined -n -d prefix order"
 # With both -n and -d: timestamp appears before record number on the same line
 check "-n -d: timestamp then rec number"  0  "^\[20[0-9][0-9]-.*\]: [0-9]+:"  ""  $SCRIPT --codex --id 019cf2fa --grep "lattice" -n -d
+
+# ── Timezone display (--tz flag) ─────────────────────────────────────────────
+echo
+echo "-- Timezone display (--tz flag)"
+# --tz UTC: implies -d; UTC is always available without tzdata
+check "--tz UTC: implies -d, timestamp present"   0  "^\[20[0-9][0-9]-"  ""  $SCRIPT --codex --id 019cf2fa --grep "lattice" --tz UTC
+# --tz ±HH:MM: fixed offset, no external deps
+check "--tz +00:00: fixed offset timestamp present"  0  "^\[20[0-9][0-9]-"  ""  $SCRIPT --codex --id 019cf2fa --grep "lattice" --tz +00:00
+# --tz with unresolvable IANA name: Warning on stderr, exit 0
+check "--tz invalid zone: Warning emitted, exit 0"  0  "WARNING:"  ""  $SCRIPT --codex --id 019cf2fa --grep "lattice" --tz "Not/AZone"
+# --tz with unresolvable IANA name: fallback to local time, timestamp still shown
+check "--tz invalid zone: fallback timestamp shown"  0  "^\[20[0-9][0-9]-"  ""  $SCRIPT --codex --id 019cf2fa --grep "lattice" --tz "Not/AZone"
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo

@@ -82,6 +82,23 @@ except AttributeError:
     _underlying.reconfigure(encoding="utf-8")
 
 
+# ── Diagnostic helpers ────────────────────────────────────────────────────────
+
+def _info(msg):
+  """Print ``INFO: <msg>`` to stderr."""
+  print(f"INFO: {msg}", file=sys.stderr)
+
+
+def _warn(msg):
+  """Print ``WARNING: <msg>`` to stderr."""
+  print(f"WARNING: {msg}", file=sys.stderr)
+
+
+def _error(msg):
+  """Print ``ERROR: <msg>`` to stderr."""
+  print(f"ERROR: {msg}", file=sys.stderr)
+
+
 # ── Shared utilities ──────────────────────────────────────────────────────────
 
 def _count_records(path):
@@ -787,7 +804,7 @@ def _cx_find_session_file(session_id):
       f"Searched: {sessions_dir}"
     )
   if len(matches) > 1:
-    print("Warning: multiple matches, using first:", file=sys.stderr)
+    _warn("multiple matches, using first:")
     for m in matches:
       print(f"  {m}", file=sys.stderr)
   return matches[0]
@@ -1196,8 +1213,72 @@ def print_session_list_row(i, session, *, use_color=False):
 
 # ── Hunk-line prefix builder ──────────────────────────────────────────────────
 
+def _parse_ts(ts_str, tz=None):
+  """Normalise and convert a JSONL ISO-8601 timestamp string.
+
+  Strips sub-second precision, replaces a trailing ``Z`` with ``+00:00`` so
+  that ``datetime.fromisoformat`` accepts it, then converts to *tz*.  With
+  ``tz=None`` the result is in the local system timezone (``dt.astimezone()``
+  with no argument uses the OS locale).
+
+  Returns a ``"YYYY-MM-DD HH:MM:SS"`` string, or ``"?"`` when *ts_str* is
+  falsy.
+  """
+  if not ts_str:
+    return "?"
+  # Strip sub-second digits (e.g. .123456 or .8795484)
+  s = re.sub(r"\.\d+", "", ts_str)
+  # Normalise Z suffix so fromisoformat accepts it
+  s = s.replace("Z", "+00:00")
+  try:
+    dt = datetime.datetime.fromisoformat(s)
+    dt = dt.astimezone(tz)
+    return dt.strftime("%Y-%m-%d %H:%M:%S")
+  except (ValueError, OSError):
+    # Fallback: best-effort raw slice
+    return ts_str[:19].replace("T", " ")
+
+
+def _resolve_tz(tz_str):
+  """Resolve a timezone string to a ``datetime.tzinfo`` object.
+
+  Accepts:
+
+  - ``±HH:MM`` fixed offset (e.g. ``-04:00``, ``+05:30``) — resolved as a
+    ``datetime.timezone``; no external dependencies.
+  - IANA name (e.g. ``America/New_York``, ``UTC``) — resolved via
+    ``zoneinfo`` (Python 3.9 stdlib).  Requires the ``tzdata`` package on
+    platforms that do not ship a system timezone database (e.g. Windows).
+
+  Returns ``(tzinfo, warning_msg)``.  On success *warning_msg* is ``None``.
+  On IANA resolution failure *tzinfo* is ``None`` (caller falls back to local
+  time) and *warning_msg* is a ``WARNING:`` string ready to print to stderr.
+  """
+  m = re.match(r"^([+-])(\d{2}):(\d{2})$", tz_str)
+  if m:
+    sign, hh, mm = m.group(1), int(m.group(2)), int(m.group(3))
+    offset = datetime.timedelta(hours=hh, minutes=mm)
+    if sign == "-":
+      offset = -offset
+    return datetime.timezone(offset), None
+  # IANA name path
+  try:
+    import zoneinfo  # noqa: PLC0415
+    return zoneinfo.ZoneInfo(tz_str), None
+  except ImportError:
+    return None, (
+      "zoneinfo module not available; pip install tzdata; "
+      "falling back to local time."
+    )
+  except KeyError:
+    return None, (
+      f"timezone '{tz_str}' not found; "
+      "pip install tzdata; falling back to local time."
+    )
+
+
 def _build_hunk_prefix(rec_no, ts_str, *, show_date=False, record_number=False,
-                       rec_width=1):
+                       rec_width=1, tz=None):
   """Return the prefix string to prepend to every line of a grep hunk.
 
   *rec_width* is the field width for right-justifying the record number,
@@ -1210,12 +1291,7 @@ def _build_hunk_prefix(rec_no, ts_str, *, show_date=False, record_number=False,
   """
   prefix = ""
   if show_date:
-    if ts_str:
-      # Normalise the ISO timestamp: trim fractional seconds and Z suffix,
-      # replace the T separator with a space.
-      ts_display = ts_str[:19].replace("T", " ")
-    else:
-      ts_display = "?"
+    ts_display = _parse_ts(ts_str, tz)
     prefix += f"[{ts_display}]: "
   if record_number:
     prefix += f"{rec_no:{rec_width}}: "
@@ -1289,11 +1365,11 @@ def _resolve_single_session(stores, id_val, all_projects):
     except FileNotFoundError:
       pass
     except ValueError as exc:
-      print(f"Error: {exc}", file=sys.stderr)
+      _error(str(exc))
       sys.exit(1)
 
   if not all_matches:
-    print(f"Error: No session matching '{id_val}'", file=sys.stderr)
+    _error(f"No session matching '{id_val}'")
     sys.exit(1)
 
   if len(all_matches) == 1:
@@ -1302,14 +1378,11 @@ def _resolve_single_session(stores, id_val, all_projects):
   if which is not None:
     if 1 <= which <= len(all_matches):
       return all_matches[which - 1]
-    print(
-      f"Error: Index {which} out of range (1\u2013{len(all_matches)})",
-      file=sys.stderr,
-    )
+    _error(f"Index {which} out of range (1\u2013{len(all_matches)})")
     sys.exit(1)
 
   # Ambiguous
-  print(f"Ambiguous: {len(all_matches)} sessions match '{id_val}':", file=sys.stderr)
+  _error(f"Ambiguous: {len(all_matches)} sessions match '{id_val}':")
   for i, sess in enumerate(all_matches, 1):
     proj = f" [{sess.project}]" if sess.project else ""
     print(
@@ -1434,6 +1507,15 @@ def main():
     action="store_true", dest="show_date",
     help="With --grep: prefix each output line with the record timestamp.",
   )
+  ap.add_argument(
+    "--tz",
+    metavar="ZONE", dest="tz", default=None,
+    help=(
+      "Timezone for -d timestamps: IANA name (e.g. America/New_York) or "
+      "±HH:MM fixed offset (e.g. -04:00). Implies -d. "
+      "Defaults to local system time when omitted."
+    ),
+  )
 
   # Context lines
   ap.add_argument(
@@ -1490,14 +1572,21 @@ def main():
 
   id_args = args.id or []
   if len(id_args) > 1:
-    print(
-      f"Warning: --id given {len(id_args)} times; using last value '{id_args[-1]}'",
-      file=sys.stderr,
-    )
+    _warn(f"--id given {len(id_args)} times; using last value '{id_args[-1]}'")
   id_val = id_args[-1] if id_args else None
 
   if args.output and not id_val:
     ap.error("output file requires --id")
+
+  # ── Timezone resolution ─────────────────────────────────────────────────────
+
+  _display_tz = None  # None → local system time via dt.astimezone()
+  if args.tz:
+    args.show_date = True  # --tz implies -d
+    _display_tz, _tz_warn = _resolve_tz(args.tz)
+    if _tz_warn:
+      _warn(_tz_warn)
+      _display_tz = None  # fall back to local time
 
   # ── Color setup ────────────────────────────────────────────────────────────
 
@@ -1506,11 +1595,7 @@ def main():
     or (args.color == "auto" and sys.__stdout__ is not None and sys.__stdout__.isatty())
   )
   if use_color and not _COLORAMA_OK:
-    print(
-      "Warning: colorama not installed; color output disabled. "
-      "pip install colorama",
-      file=sys.stderr,
-    )
+    _warn("colorama not installed; color output disabled. pip install colorama")
     use_color = False
 
   # ── Store setup ────────────────────────────────────────────────────────────
@@ -1521,18 +1606,12 @@ def main():
   stores = {}  # ordered: "claude" before "codex"
   if args.codex:
     if not codex_store.is_available():
-      print(
-        "Error: Codex is not installed (~/.codex/sessions/ not found)",
-        file=sys.stderr,
-      )
+      _error("Codex is not installed (~/.codex/sessions/ not found)")
       sys.exit(1)
     stores["codex"] = codex_store
   elif args.claude:
     if not claude_store.is_available():
-      print(
-        "Error: Claude is not installed (~/.claude/projects/ not found)",
-        file=sys.stderr,
-      )
+      _error("Claude is not installed (~/.claude/projects/ not found)")
       sys.exit(1)
     stores["claude"] = claude_store
   else:
@@ -1542,7 +1621,7 @@ def main():
     if codex_store.is_available():
       stores["codex"] = codex_store
     if not stores:
-      print("Error: Neither Claude nor Codex is installed", file=sys.stderr)
+      _error("Neither Claude nor Codex is installed")
       sys.exit(1)
 
   # ── Build grep patterns ────────────────────────────────────────────────────
@@ -1569,7 +1648,7 @@ def main():
           rx = _remod.compile(p, flags)
           patterns_kw.append({"rx": rx})
       except _remod.error as exc:
-        print(f"Invalid regex: {exc}", file=sys.stderr)
+        _error(f"invalid regex: {exc}")
         sys.exit(1)
     if args.grep:
       for p in args.grep:
@@ -1609,7 +1688,7 @@ def main():
         matched.append((session, hunks))
 
     if not matched:
-      print(f"No sessions match {grep_label}.", file=sys.stderr)
+      _info(f"No sessions match {grep_label}.")
     elif args.ls:
       i = 0
       for session, _ in matched:
@@ -1629,7 +1708,8 @@ def main():
           prefix = _build_hunk_prefix(rec_no, ts_str,
                                       show_date=args.show_date,
                                       record_number=args.record_number,
-                                      rec_width=rec_width)
+                                      rec_width=rec_width,
+                                      tz=_display_tz)
           for _is_match, line, spans in hunk_lines:
             print(prefix + _colorize(line, spans, active=use_color))
     sys.exit(0)
@@ -1642,14 +1722,14 @@ def main():
       print_session_list_row(1, session, use_color=use_color)
       sys.exit(0)
 
-    print(f"Session: {session.path}", file=sys.stderr)
+    _info(f"Session: {session.path}")
     store = stores[session.source]
     transcript_text = store.transcript(session)
 
     if args.output:
       with open(args.output, "w", encoding="utf-8") as fh:
         fh.write(transcript_text)
-      print(f"Written to: {args.output}", file=sys.stderr)
+      _info(f"Written to: {args.output}")
     else:
       print(transcript_text)
     sys.exit(0)
@@ -1662,7 +1742,7 @@ def main():
     all_sessions.sort(key=lambda s: s.mtime, reverse=True)
 
     if not all_sessions:
-      print("No sessions found.", file=sys.stderr)
+      _info("No sessions found.")
     else:
       i = 0
       for session in all_sessions:
