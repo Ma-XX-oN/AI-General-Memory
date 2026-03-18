@@ -680,7 +680,7 @@ Run each command and compare the header lines visually.
    output, then after each `## User/Claude/Codex` should have `` [<timestamp>]``
    placed after it.
 
-10. [ ] **`--tz` — timezone display for `-d` timestamps.**  By default `-d` should
+10. [x] **`--tz` — timezone display for `-d` timestamps.**  By default `-d` should
     show timestamps converted to the local system timezone rather than raw UTC.
     A `--tz ZONE` flag overrides the target zone; `ZONE` may be:
     - An IANA name (`America/New_York`, `Europe/London`, `UTC`, …) resolved via
