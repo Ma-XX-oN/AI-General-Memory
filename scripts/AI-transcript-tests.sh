@@ -264,6 +264,27 @@ check "--tz invalid zone: Warning emitted, exit 0"  0  "WARNING:"  ""  $SCRIPT -
 # --tz with unresolvable IANA name: fallback to local time, timestamp still shown
 check "--tz invalid zone: fallback timestamp shown"  0  "^\[20[0-9][0-9]-"  ""  $SCRIPT --codex --id 019cf2fa --grep "lattice" --tz "Not/AZone"
 
+# ── Record-range filter (--records) ──────────────────────────────────────────
+echo
+echo "-- Record-range filter (--records)"
+# :10 — first 10 records; record 7 is the first with content
+check "--records :10: numbered output present"  0  "^ [0-9]"       ""  $SCRIPT --codex --id 019cf2fa --grep "." -n --records :10
+# 7:7 — only record 7 (first record with content)
+check "--records 7:7: record 7 present"         0  "^ 7:"          ""  $SCRIPT --codex --id 019cf2fa --grep "." -n --records 7:7
+check "--records 7:7: no record 8"              0  "^ 8:"          "!" $SCRIPT --codex --id 019cf2fa --grep "." -n --records 7:7
+# -4: — negative index; records 90-93; record 90 has content
+check "--records=-4:: last records present"     0  "^[[:space:]]*[0-9]" ""  $SCRIPT --codex --id 019cf2fa --grep "." -n --records=-4:
+check "--records 9999:9999: no matches"         0  "INFO:"         ""  $SCRIPT --codex --id 019cf2fa --grep "." --records 9999:9999
+
+# ── Timestamp filter (--since / --until) ─────────────────────────────────────
+echo
+echo "-- Timestamp filter (--since / --until)"
+check "--since future: no matches"              0  "INFO:"         ""  $SCRIPT --codex --id 019cf2fa --grep "lattice" --since "2099-01-01"
+check "--until past: no matches"                0  "INFO:"         ""  $SCRIPT --codex --id 019cf2fa --grep "lattice" --until "2000-01-01"
+check "--since 2026-01-01: has matches"         0  "lattice"       ""  $SCRIPT --codex --id 019cf2fa --grep "lattice" --since "2026-01-01"
+check "--since relative -9999:00: has matches"  0  "lattice"       ""  $SCRIPT --codex --id 019cf2fa --grep "lattice" --since="-9999:00"
+check "--until +offset relative to since"       0  "lattice"       ""  $SCRIPT --codex --id 019cf2fa --grep "lattice" --since "2026-01-01" --until "+9999:00"
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo
 TOTAL=$((PASS + FAIL))

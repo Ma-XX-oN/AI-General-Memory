@@ -230,6 +230,52 @@ class Session:
   rc:      int                # number of JSON records in the .jsonl file
 
 
+@dataclass
+class RecordFilter:
+  """Resolved record-range and timestamp-range bounds for session iteration.
+
+  All bounds are inclusive and optional (None = no bound on that side).
+  *rec_lo* and *rec_hi* are 1-based JSONL line numbers (matching rec_no).
+  *ts_lo* and *ts_hi* are tz-aware UTC datetimes.
+  """
+  rec_lo: "int | None" = None
+  rec_hi: "int | None" = None
+  ts_lo:  "datetime.datetime | None" = None
+  ts_hi:  "datetime.datetime | None" = None
+
+  def is_trivial(self) -> bool:
+    """True when no bounds are set (no filtering needed)."""
+    return all(v is None for v in (self.rec_lo, self.rec_hi,
+                                    self.ts_lo,  self.ts_hi))
+
+  def allows_rec(self, rec_no: int) -> bool:
+    """True when rec_no is within [rec_lo, rec_hi]."""
+    if self.rec_lo is not None and rec_no < self.rec_lo:
+      return False
+    if self.rec_hi is not None and rec_no > self.rec_hi:
+      return False
+    return True
+
+  def past_hi(self, rec_no: int) -> bool:
+    """True when rec_no exceeds the upper bound — safe to break early."""
+    return self.rec_hi is not None and rec_no > self.rec_hi
+
+  def allows_ts(self, ts_str: "str | None") -> bool:
+    """True when ts_str falls within [ts_lo, ts_hi]."""
+    if self.ts_lo is None and self.ts_hi is None:
+      return True
+    if ts_str is None:
+      return True   # no timestamp → don't filter it out
+    dt = _parse_ts_to_dt(ts_str)
+    if dt is None:
+      return True   # unparseable → don't filter out
+    if self.ts_lo is not None and dt < self.ts_lo:
+      return False
+    if self.ts_hi is not None and dt > self.ts_hi:
+      return False
+    return True
+
+
 # ── SessionStore ABC ──────────────────────────────────────────────────────────
 
 class SessionStore(ABC):
@@ -257,7 +303,8 @@ class SessionStore(ABC):
   @abstractmethod
   def grep(self, session: "Session", *, plain: "str | None" = None,
            rx: "re.Pattern | None" = None, before: int = 0, after: int = 0,
-           first_only: bool = False, ignore_case: bool = False) -> "list[tuple]":
+           first_only: bool = False, ignore_case: bool = False,
+           rec_filter: "RecordFilter | None" = None) -> "list[tuple]":
     """Return context hunks for all matches in *session*.
 
     Each element of the returned list is a ``(rec_no, ts_str, hunk_lines)``
@@ -267,11 +314,16 @@ class SessionStore(ABC):
 
     When *first_only* is True, return as soon as any match is found (used
     for fast AND membership checks).
+    If *rec_filter* is given, only records passing the filter are searched.
     """
 
   @abstractmethod
-  def transcript(self, session: "Session") -> str:
-    """Return the full Markdown transcript string for *session*."""
+  def transcript(self, session: "Session",
+                 rec_filter: "RecordFilter | None" = None) -> str:
+    """Return the full Markdown transcript string for *session*.
+
+    If *rec_filter* is given, only records passing the filter are included.
+    """
 
 
 # ── Claude-specific helpers ───────────────────────────────────────────────────
@@ -390,7 +442,7 @@ def _cl_session_meta(path):
 
 
 def _cl_session_grep(path, *, plain=None, rx=None, before=0, after=0, first_only=False,
-           ignore_case=False):
+           ignore_case=False, rec_filter=None):
   """Return context hunks from matching content in the Claude session at *path*.
 
   Each element of the returned list is a ``(rec_no, ts_str, hunk_lines)`` tuple
@@ -400,6 +452,7 @@ def _cl_session_grep(path, *, plain=None, rx=None, before=0, after=0, first_only
 
   When *first_only* is True, return as soon as any match is found (used for
   the AND membership check in :func:`_session_display_hunks`).
+  If *rec_filter* is given, only records passing the filter are searched.
   """
   result = []
   rec_no = 0
@@ -410,10 +463,17 @@ def _cl_session_grep(path, *, plain=None, rx=None, before=0, after=0, first_only
         if not raw:
           continue
         rec_no += 1
+        if rec_filter and not rec_filter.is_trivial():
+          if rec_filter.past_hi(rec_no):
+            break
+          if not rec_filter.allows_rec(rec_no):
+            continue
         rec = json.loads(raw)
         if rec.get("isSidechain"):
           continue
         ts_str = rec.get("timestamp")
+        if rec_filter and not rec_filter.allows_ts(ts_str):
+          continue
         texts = []
         rtype = rec.get("type")
         if rtype == "user":
@@ -606,17 +666,30 @@ class ClaudeSessionStore(SessionStore):
     return None, all_matches
 
   def grep(self, session, *, plain=None, rx=None, before=0, after=0, first_only=False,
-       ignore_case=False):
+       ignore_case=False, rec_filter=None):
     return _cl_session_grep(
       str(session.path), plain=plain, rx=rx, before=before, after=after,
-      first_only=first_only, ignore_case=ignore_case,
+      first_only=first_only, ignore_case=ignore_case, rec_filter=rec_filter,
     )
 
-  def transcript(self, session):
+  def transcript(self, session, rec_filter=None):
     """Return the full Markdown transcript for *session*."""
     path = str(session.path)
     with open(path, encoding="utf-8") as f:
-      records = [json.loads(l) for l in f if l.strip()]
+      if rec_filter and not rec_filter.is_trivial():
+        records = []
+        for i, raw in enumerate((l for l in f if l.strip()), start=1):
+          rec_no = i
+          if rec_filter.past_hi(rec_no):
+            break
+          if not rec_filter.allows_rec(rec_no):
+            continue
+          rec = json.loads(raw)
+          if not rec_filter.allows_ts(rec.get("timestamp")):
+            continue
+          records.append(rec)
+      else:
+        records = [json.loads(l) for l in f if l.strip()]
 
     line1, line2 = _format_session_lines(session)
     out = [f"{line1}\n{line2}\n"]
@@ -868,7 +941,7 @@ def _cx_uuid7_ctime(sid):
 
 
 def _cx_session_grep(path, *, plain=None, rx=None, before=0, after=0, first_only=False,
-           ignore_case=False):
+           ignore_case=False, rec_filter=None):
   """Return context hunks from matching messages in the Codex session at *path*.
 
   Each element of the returned list is a ``(rec_no, ts_str, hunk_lines)`` tuple
@@ -877,6 +950,7 @@ def _cx_session_grep(path, *, plain=None, rx=None, before=0, after=0, first_only
   ``(is_match, line_text, spans)`` tuples.
 
   When *first_only* is True, return as soon as any match is found.
+  If *rec_filter* is given, only records passing the filter are searched.
   """
   result = []
   rec_no = 0
@@ -887,8 +961,15 @@ def _cx_session_grep(path, *, plain=None, rx=None, before=0, after=0, first_only
         if not raw:
           continue
         rec_no += 1
+        if rec_filter and not rec_filter.is_trivial():
+          if rec_filter.past_hi(rec_no):
+            break
+          if not rec_filter.allows_rec(rec_no):
+            continue
         rec = json.loads(raw)
         ts_str = rec.get("timestamp")
+        if rec_filter and not rec_filter.allows_ts(ts_str):
+          continue
         rtype = rec.get("type")
         payload = rec.get("payload", {})
         if rtype == "event_msg":
@@ -1104,17 +1185,30 @@ class CodexSessionStore(SessionStore):
     return None, all_matches
 
   def grep(self, session, *, plain=None, rx=None, before=0, after=0, first_only=False,
-       ignore_case=False):
+       ignore_case=False, rec_filter=None):
     return _cx_session_grep(
       str(session.path), plain=plain, rx=rx, before=before, after=after,
-      first_only=first_only, ignore_case=ignore_case,
+      first_only=first_only, ignore_case=ignore_case, rec_filter=rec_filter,
     )
 
-  def transcript(self, session):
+  def transcript(self, session, rec_filter=None):
     """Return the full Markdown transcript for *session*."""
     path = str(session.path)
     with open(path, encoding="utf-8") as f:
-      lines = [json.loads(l) for l in f if l.strip()]
+      if rec_filter and not rec_filter.is_trivial():
+        lines = []
+        for i, raw in enumerate((l for l in f if l.strip()), start=1):
+          rec_no = i
+          if rec_filter.past_hi(rec_no):
+            break
+          if not rec_filter.allows_rec(rec_no):
+            continue
+          rec = json.loads(raw)
+          if not rec_filter.allows_ts(rec.get("timestamp")):
+            continue
+          lines.append(rec)
+      else:
+        lines = [json.loads(l) for l in f if l.strip()]
 
     # First pass: collect messages in order
     msgs = []
@@ -1231,6 +1325,17 @@ def print_session_list_row(i, session, *, use_color=False):
 
 # ── Hunk-line prefix builder ──────────────────────────────────────────────────
 
+def _parse_ts_to_dt(ts_str):
+  """Parse a JSONL ISO-8601 timestamp to a tz-aware UTC datetime, or None."""
+  if not ts_str:
+    return None
+  s = re.sub(r"\.\d+", "", ts_str).replace("Z", "+00:00")
+  try:
+    return datetime.datetime.fromisoformat(s)
+  except ValueError:
+    return None
+
+
 def _parse_ts(ts_str, tz=None):
   """Normalise and convert a JSONL ISO-8601 timestamp string.
 
@@ -1295,6 +1400,135 @@ def _resolve_tz(tz_str):
     )
 
 
+def _parse_record_range(s, rc):
+  """Parse ``"M:N"`` into a ``(lo, hi)`` 1-based inclusive pair.
+
+  Either part may be empty (defaults: 1 and *rc* respectively).
+  Negative values resolve Python-style: ``-1`` = *rc*, ``-2`` = *rc*-1, etc.
+  Returns ``(lo, hi)`` clamped to ``[1, rc]``.  Raises ``ValueError`` on bad
+  input.
+  """
+  if ":" not in s:
+    raise ValueError(f"--records: expected M:N, got {s!r}")
+  left, _, right = s.partition(":")
+  def resolve(part, default):
+    if not part.strip():
+      return default
+    n = int(part)           # raises ValueError if not an int
+    if n < 0:
+      n = rc + n + 1        # -1 → rc, -2 → rc-1, …
+    return max(1, min(n, rc))
+  lo = resolve(left,  1)
+  hi = resolve(right, rc)
+  return lo, hi
+
+
+def _rollback_dt(dt, unit, tz):
+  """Roll *dt* back by one unit (``'day'``, ``'month'``, or ``'year'``).
+
+  Raises ``ValueError`` if the resulting date does not exist (e.g. Feb 30).
+  """
+  if unit == "day":
+    return dt - datetime.timedelta(days=1)
+  local = dt.astimezone(tz).replace(tzinfo=None)
+  if unit == "month":
+    m, y = local.month - 1, local.year
+    if m == 0:
+      m, y = 12, y - 1
+    try:
+      rolled = local.replace(year=y, month=m)
+    except ValueError:
+      raise ValueError(f"Day {local.day} does not exist in {y}-{m:02d}")
+  else:  # year
+    try:
+      rolled = local.replace(year=local.year - 1)
+    except ValueError:
+      raise ValueError(
+        f"Date {local.month:02d}-{local.day:02d} does not exist "
+        f"in {local.year - 1}")
+  return rolled.replace(tzinfo=tz).astimezone(datetime.timezone.utc)
+
+
+def _parse_datetime_filter(s, ref_tz=None, anchor_dt=None):
+  """Parse a partial datetime string to a tz-aware UTC datetime.
+
+  Absolute (no prefix):
+
+  - ``yyyy-MM-dd [hh:mm[:ss]]`` — full date; time defaults to midnight
+  - ``MM-dd [hh:mm[:ss]]`` — current year assumed; wraps to prev year if future
+  - ``dd hh:mm[:ss]`` — current month assumed; wraps to prev month if future
+  - ``hh:mm[:ss]`` — today assumed; wraps to yesterday if future
+
+  Relative (``-`` prefix, for ``--since``): offset from now:
+  ``-mm``, ``-[dd ]hh:mm[:ss]``
+
+  Relative (``+`` prefix, for ``--until``; requires *anchor_dt*):
+  ``+mm``, ``+[dd ]hh:mm[:ss]`` — offset added to *anchor_dt*.
+
+  Sub-leading components are normalised (``-100:90`` → ``−101:30``).
+  Year/month components in relative form are not yet supported.
+  Raises ``ValueError`` on unparseable input or invalid rollback date.
+  """
+  s = s.strip()
+  tz = ref_tz or datetime.timezone.utc
+
+  # ── Relative offset (- or +) ────────────────────────────────────────────────
+  if s and s[0] in "+-":
+    sign = 1 if s[0] == "+" else -1
+    body = s[1:]
+    # Optional leading days component separated by a single space
+    if " " in body:
+      day_str, body = body.split(" ", 1)
+      days = int(day_str)
+    else:
+      days = 0
+    parts = body.split(":")
+    if len(parts) == 1:
+      h, m, sec = 0, int(parts[0]), 0    # bare number = minutes
+    elif len(parts) == 2:
+      h, m, sec = int(parts[0]), int(parts[1]), 0
+    else:
+      h, m, sec = int(parts[0]), int(parts[1]), int(parts[2])
+    # timedelta normalises out-of-range sub-components automatically
+    delta = datetime.timedelta(days=days, hours=h, minutes=m, seconds=sec) * sign
+    if sign > 0:
+      if anchor_dt is None:
+        raise ValueError("--until +offset requires --since to be set first")
+      return anchor_dt + delta
+    return datetime.datetime.now(datetime.timezone.utc) + delta
+
+  # ── Absolute ────────────────────────────────────────────────────────────────
+  now = datetime.datetime.now(tz)
+  # Each tuple: (fmt, fill_year, fill_month, fill_day, rollback_unit)
+  # rollback_unit: if resolved dt > now, roll back by this unit.
+  formats = [
+    ("%Y-%m-%d %H:%M:%S", None,     None,      None,    None),
+    ("%Y-%m-%d %H:%M",    None,     None,      None,    None),
+    ("%Y-%m-%d",          None,     None,      None,    None),    # midnight, no rollback
+    ("%m-%d %H:%M:%S",    now.year, None,      None,    "year"),
+    ("%m-%d %H:%M",       now.year, None,      None,    "year"),
+    ("%m-%d",             now.year, None,      None,    "year"),  # midnight, rollback year
+    ("%d %H:%M:%S",       now.year, now.month, None,    "month"),
+    ("%d %H:%M",          now.year, now.month, None,    "month"),
+    ("%H:%M:%S",          now.year, now.month, now.day, "day"),
+    ("%H:%M",             now.year, now.month, now.day, "day"),
+  ]
+  for fmt, yr, mo, dy, rollback in formats:
+    try:
+      dt = datetime.datetime.strptime(s, fmt)
+      if yr is not None: dt = dt.replace(year=yr)
+      if mo is not None: dt = dt.replace(month=mo)
+      if dy is not None: dt = dt.replace(day=dy)
+      dt = dt.replace(tzinfo=tz).astimezone(datetime.timezone.utc)
+      now_utc = now.astimezone(datetime.timezone.utc)
+      if rollback and dt > now_utc:
+        dt = _rollback_dt(dt, rollback, tz)
+      return dt
+    except ValueError:
+      continue
+  raise ValueError(f"Cannot parse datetime: {s!r}")
+
+
 def _build_hunk_prefix(rec_no, ts_str, *, show_date=False, record_number=False,
                        rec_width=1, tz=None, use_color=False):
   """Return the prefix string to prepend to every line of a grep hunk.
@@ -1324,7 +1558,8 @@ def _build_hunk_prefix(rec_no, ts_str, *, show_date=False, record_number=False,
 
 # ── Multi-pattern grep helper ─────────────────────────────────────────────────
 
-def _session_display_hunks(store, session, patterns_kw, before, after, *, ignore_case=False):
+def _session_display_hunks(store, session, patterns_kw, before, after, *,
+                           ignore_case=False, rec_filter=None):
   """Return display hunks if *session* matches ALL patterns (AND), else None.
 
   When multiple patterns are given:
@@ -1339,14 +1574,15 @@ def _session_display_hunks(store, session, patterns_kw, before, after, *, ignore
   """
   if len(patterns_kw) == 1:
     hunks = store.grep(
-      session, before=before, after=after, ignore_case=ignore_case, **patterns_kw[0]
+      session, before=before, after=after, ignore_case=ignore_case,
+      rec_filter=rec_filter, **patterns_kw[0]
     )
     return hunks if hunks else None
 
   # Multiple patterns: AND check — stop scanning as soon as first match found
   for kw in patterns_kw:
     if not store.grep(session, before=0, after=0, first_only=True,
-                      ignore_case=ignore_case, **kw):
+                      ignore_case=ignore_case, rec_filter=rec_filter, **kw):
       return None
 
   # All patterns match — build combined OR regex for display
@@ -1359,7 +1595,7 @@ def _session_display_hunks(store, session, patterns_kw, before, after, *, ignore
   flags = re.IGNORECASE if ignore_case else 0
   combined_rx = re.compile("|".join(f"(?:{p})" for p in parts), flags)
   return store.grep(session, rx=combined_rx, before=before, after=after,
-                    ignore_case=ignore_case)
+                    ignore_case=ignore_case, rec_filter=rec_filter)
 
 
 # ── Session resolution helper ─────────────────────────────────────────────────
@@ -1540,6 +1776,33 @@ def main():
       "Defaults to local system time when omitted."
     ),
   )
+  ap.add_argument(
+    "--records",
+    metavar="M:N", dest="records", default=None,
+    help=(
+      "Restrict to JSONL records M through N (1-based, inclusive). "
+      "Either bound may be omitted (:N = 1..N, M: = M..end). "
+      "Negative indices: -1 = last record, -2 = second-to-last, etc."
+    ),
+  )
+  ap.add_argument(
+    "--since",
+    metavar="DT", dest="since", default=None,
+    help=(
+      "Include only records at or after DT. "
+      "Absolute: hh:mm[:ss], dd hh:mm, MM-dd, yyyy-MM-dd [hh:mm[:ss]]. "
+      "Relative: -mm or -[dd ]hh:mm[:ss] (offset from now)."
+    ),
+  )
+  ap.add_argument(
+    "--until",
+    metavar="DT", dest="until", default=None,
+    help=(
+      "Include only records at or before DT. "
+      "Absolute: same forms as --since. "
+      "Relative: +mm or +[dd ]hh:mm[:ss] (offset from --since; requires --since)."
+    ),
+  )
 
   # Context lines
   ap.add_argument(
@@ -1611,6 +1874,41 @@ def main():
     if _tz_warn:
       _warn(_tz_warn)
       _display_tz = None  # fall back to local time
+
+  # ── Record filter ──────────────────────────────────────────────────────────
+
+  _rec_filter = None
+  if args.records or args.since or args.until:
+    _rec_filter = RecordFilter()
+    if args.since:
+      try:
+        _rec_filter.ts_lo = _parse_datetime_filter(args.since, _display_tz)
+      except ValueError as e:
+        _error(str(e))
+        sys.exit(1)
+    if args.until:
+      try:
+        _rec_filter.ts_hi = _parse_datetime_filter(
+          args.until, _display_tz, anchor_dt=_rec_filter.ts_lo)
+      except ValueError as e:
+        _error(str(e))
+        sys.exit(1)
+    # --records range is resolved per-session (may need session.rc for negatives)
+
+  def _resolve_rec_filter(session):
+    """Return a RecordFilter with rec_lo/rec_hi resolved for *session*."""
+    if not args.records:
+      return _rec_filter
+    try:
+      lo, hi = _parse_record_range(args.records, session.rc)
+    except ValueError as e:
+      _error(str(e))
+      sys.exit(1)
+    return RecordFilter(
+      rec_lo=lo, rec_hi=hi,
+      ts_lo=_rec_filter.ts_lo if _rec_filter else None,
+      ts_hi=_rec_filter.ts_hi if _rec_filter else None,
+    )
 
   # ── Color setup ────────────────────────────────────────────────────────────
 
@@ -1706,7 +2004,8 @@ def main():
     for session in candidates:
       store = stores[session.source]
       hunks = _session_display_hunks(
-        store, session, patterns_kw, before, after, ignore_case=args.ignore_case
+        store, session, patterns_kw, before, after, ignore_case=args.ignore_case,
+        rec_filter=_resolve_rec_filter(session),
       )
       if hunks is not None:
         matched.append((session, hunks))
@@ -1749,7 +2048,7 @@ def main():
 
     _info(f"Session: {session.path}")
     store = stores[session.source]
-    transcript_text = store.transcript(session)
+    transcript_text = store.transcript(session, rec_filter=_resolve_rec_filter(session))
 
     if args.output:
       with open(args.output, "w", encoding="utf-8") as fh:

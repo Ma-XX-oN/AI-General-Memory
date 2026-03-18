@@ -630,7 +630,7 @@ Run each command and compare the header lines visually.
 
 4. [x] **Ignore case flag `-i`.**  Should be case-sensitive unless `-i` is passed.
 
-5. [ ] **Record/timestamp range filtering.**  Allow the user to restrict output to a
+5. [x] **Record/timestamp range filtering.**  Allow the user to restrict output to a
    sub-range of a session, useful for long sessions.  Two flavours:
    - **By record number:** `--records M:N` (1-based, inclusive) — include only
      JSONL records M through N.  Works with `--id` (transcript slice) and
@@ -647,6 +647,11 @@ Run each command and compare the header lines visually.
      relative.  No leading means absolute.
    - Record numbers can take a - prefix as well.  -1 means last record, -2 is
      second last, etc.  Just like python's indexing.
+   - **Note (implemented 2026-03-18):** Relative offsets (`-`/`+` prefix) currently
+     support `±[dd ]hh:mm[:ss]` and bare `±mm` (minutes) only.  Year/month
+     components in relative form (e.g. `-2m`, `-1y`) are deferred to a future item.
+     Negative record indices (`--records=-N:`) require the `=` form to avoid
+     argparse treating the value as a flag.
 
 6. [ ] **Consolidate consecutive Claude turns into one heading.**  Each API
    round-trip creates a separate JSONL record; when Claude uses a tool the
