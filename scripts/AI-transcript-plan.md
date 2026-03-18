@@ -692,14 +692,26 @@ Run each command and compare the header lines visually.
     suggesting `pip install tzdata`, then fall back to local time and continue.
     `--tz` automatically implies `-d`.
 
-11. [ ] **Colored `INFO:` / `WARNING:` / `ERROR:` message prefixes.**  All messages
-    emitted via `_info()` / `_warn()` / `_error()` should gain colour when colour
-    is available:
-    - `INFO:` in bright white (`colorama.Style.BRIGHT`)
-    - `WARNING:` in yellow (`colorama.Fore.YELLOW`)
-    - `ERROR:` in red (`colorama.Fore.RED`)
-    Follow the same colorama availability check already used by `--color`; fall
-    back to plain text when colorama is absent or the stream is not a TTY.
+11. [x] **Colored diagnostic prefixes and grep/header elements.**  All colorisable
+    output now goes through named `_C_*` constants in the colorama block for easy
+    tuning.  Colors applied when colorama is installed and the relevant stream is a
+    TTY; plain text otherwise.
+
+    *Diagnostic prefixes* (stderr, via `_info()`/`_warn()`/`_error()`):
+    - `INFO:` — `_C_INFO` (`Fore.BLUE`)
+    - `WARNING:` — `_C_WARN` (`Fore.YELLOW`)
+    - `ERROR:` — `_C_ERROR` (`Fore.RED`)
+
+    *Grep output* (stdout):
+    - `-d` timestamp prefix `[YYYY-MM-DD HH:MM:SS]:` — `_C_RECDATE` (`Fore.CYAN`)
+    - `-n` record-number prefix `N:` — `_C_RECNO` (`Style.DIM`)
+
+    *Session header* (stdout):
+    - `[claude]` / `[codex]` source label, `[project]` — `_C_PROJECT` (`Fore.GREEN`)
+    - `[ctime]-[mtime]` date range — `_C_DATE` (`Fore.CYAN`)
+    - `(uuid8) title` — `_C_TITLE` (`Style.BRIGHT`)
+    - `records: N` — `_C_RECORDS` (`Style.DIM`)
+    - Match highlights — `_C_MATCH` (`Style.BRIGHT + Fore.RED`)
 
 12. [ ] **`--ts-fmt` — timestamp format string for `-d` output.**  Allows the user
     to override the default `strftime` format used when displaying timestamps with

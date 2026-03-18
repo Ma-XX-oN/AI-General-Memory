@@ -57,18 +57,26 @@ try:
   # strip=False: never discard ANSI codes (just_fix_windows_console() sets
   # strip=True when stdout is not a TTY, which breaks piped/captured output).
   _cm.init(strip=False, autoreset=False)
-  _C_RESET   = _cm.Style.RESET_ALL
-  _C_MATCH   = _cm.Style.BRIGHT + _cm.Fore.RED
-  _C_DATE    = _cm.Fore.CYAN
-  _C_PROJECT = _cm.Fore.YELLOW
-  _C_TITLE   = _cm.Style.BRIGHT
+
+  # ── Diagnostic prefix colors — edit these to taste ──────────────────────
+  # Fore: RED  GREEN  YELLOW  BLUE  CYAN  MAGENTA  WHITE
+  # Style: BRIGHT  DIM   — combine with +, e.g. _cm.Fore.BLUE + _cm.Style.DIM
+  _C_RESET    = _cm.Style.RESET_ALL
+  _C_MATCH    = _cm.Style.BRIGHT + _cm.Fore.RED
+  _C_DATE     = _cm.Fore.CYAN
+  _C_PROJECT  = _cm.Fore.GREEN
+  _C_TITLE    = _cm.Style.BRIGHT
+  _C_RECDATE  = _cm.Fore.CYAN              # -d timestamp prefix
+  _C_RECNO    = _cm.Style.DIM              # -n record-number prefix
+  _C_RECORDS  = _cm.Style.DIM              # "records: N" in session header
+  _C_INFO     = _cm.Fore.BLUE                   # INFO:    messages
+  _C_WARN     = _cm.Fore.YELLOW                 # WARNING: messages
+  _C_ERROR    = _cm.Fore.RED                    # ERROR:   messages
   _COLORAMA_OK = True
 except ImportError:
-  _C_RESET   = ""
-  _C_MATCH   = ""
-  _C_DATE    = ""
-  _C_PROJECT = ""
-  _C_TITLE   = ""
+  _C_RESET = _C_MATCH = _C_DATE = _C_PROJECT = _C_TITLE = ""
+  _C_RECDATE = _C_RECNO = _C_RECORDS = ""
+  _C_INFO  = _C_WARN  = _C_ERROR = ""
   _COLORAMA_OK = False
 
 # Configure stdout for UTF-8 after colorama has had a chance to wrap it.
@@ -84,19 +92,28 @@ except AttributeError:
 
 # ── Diagnostic helpers ────────────────────────────────────────────────────────
 
+def _diag(color, label, msg):
+  """Print a prefixed diagnostic line to stderr, with colour when available."""
+  use_color = _COLORAMA_OK and sys.stderr.isatty()
+  if use_color:
+    print(f"{color}{label}{_C_RESET} {msg}", file=sys.stderr)
+  else:
+    print(f"{label} {msg}", file=sys.stderr)
+
+
 def _info(msg):
   """Print ``INFO: <msg>`` to stderr."""
-  print(f"INFO: {msg}", file=sys.stderr)
+  _diag(_C_INFO, "INFO:", msg)
 
 
 def _warn(msg):
   """Print ``WARNING: <msg>`` to stderr."""
-  print(f"WARNING: {msg}", file=sys.stderr)
+  _diag(_C_WARN, "WARNING:", msg)
 
 
 def _error(msg):
   """Print ``ERROR: <msg>`` to stderr."""
-  print(f"ERROR: {msg}", file=sys.stderr)
+  _diag(_C_ERROR, "ERROR:", msg)
 
 
 # ── Shared utilities ──────────────────────────────────────────────────────────
@@ -1190,7 +1207,8 @@ def _format_session_lines(session, *, use_color=False):
     _ansi(f" [{session.project}]", _C_PROJECT, active=use_color)
     if session.project else ""
   )
-  line1 = f"{ai_part} {date_part}{proj_part} records: {session.rc}"
+  rec_part = _ansi(f"records: {session.rc}", _C_RECORDS, active=use_color)
+  line1 = f"{ai_part} {date_part}{proj_part} {rec_part}"
   line2 = _ansi(f"({session.id[:8]}) {session.title}", _C_TITLE, active=use_color)
   return line1, line2
 
@@ -1278,7 +1296,7 @@ def _resolve_tz(tz_str):
 
 
 def _build_hunk_prefix(rec_no, ts_str, *, show_date=False, record_number=False,
-                       rec_width=1, tz=None):
+                       rec_width=1, tz=None, use_color=False):
   """Return the prefix string to prepend to every line of a grep hunk.
 
   *rec_width* is the field width for right-justifying the record number,
@@ -1292,9 +1310,15 @@ def _build_hunk_prefix(rec_no, ts_str, *, show_date=False, record_number=False,
   prefix = ""
   if show_date:
     ts_display = _parse_ts(ts_str, tz)
-    prefix += f"[{ts_display}]: "
+    if use_color:
+      prefix += f"{_C_RECDATE}[{ts_display}]:{_C_RESET} "
+    else:
+      prefix += f"[{ts_display}]: "
   if record_number:
-    prefix += f"{rec_no:{rec_width}}: "
+    if use_color:
+      prefix += f"{_C_RECNO}{rec_no:{rec_width}}:{_C_RESET} "
+    else:
+      prefix += f"{rec_no:{rec_width}}: "
   return prefix
 
 
@@ -1709,7 +1733,8 @@ def main():
                                       show_date=args.show_date,
                                       record_number=args.record_number,
                                       rec_width=rec_width,
-                                      tz=_display_tz)
+                                      tz=_display_tz,
+                                      use_color=use_color)
           for _is_match, line, spans in hunk_lines:
             print(prefix + _colorize(line, spans, active=use_color))
     sys.exit(0)
