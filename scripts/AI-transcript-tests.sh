@@ -24,7 +24,7 @@ test_selected() {
   [[ ${#SELECTED[@]} -eq 0 ]] && return 0
   local n="$1" t
   for t in "${SELECTED[@]}"; do
-    [[ "$t" == "$n" ]] && return 0
+  [[ "$t" == "$n" ]] && return 0
   done
   return 1
 }
@@ -38,36 +38,36 @@ check() {
   shift 4
 
   if test_selected $TEST; then 
-    local out rc
-    out=$("$@" 2>&1)
-    rc=$?
+  local out rc
+  out=$("$@" 2>&1)
+  rc=$?
 
-    local ok=1
-    [[ $rc -ne $want_rc ]] && ok=0
-    if [[ -n "$pattern" ]]; then
-        if echo "$out" | grep -qE "$pattern"; then
-        [[ "$invert" == "!" ]] && ok=0
-        else
-        [[ "$invert" != "!" ]] && ok=0
-        fi
-    fi
-
-    if [[ $ok -eq 1 ]]; then
-        printf '%d. %sPASS%s  %s\n' $TEST "$GREEN" "$RESET" "$desc"
-        ((PASS++))
+  local ok=1
+  [[ $rc -ne $want_rc ]] && ok=0
+  if [[ -n "$pattern" ]]; then
+    if echo "$out" | grep -qE "$pattern"; then
+    [[ "$invert" == "!" ]] && ok=0
     else
-        printf '%d. %sFAIL%s  %s\n' $TEST "$RED" "$RESET" "$desc"
-        [[ $rc -ne $want_rc ]] && printf '      exit: got %d, want %d\n' "$rc" "$want_rc"
-        if [[ -n "$pattern" ]]; then
-        [[ "$invert" == "!" ]] \
-            && printf '      output unexpectedly contains: %s\n' "$pattern" \
-            || printf '      output missing: %s\n' "$pattern"
-        fi
-        printf '      output: %s\n' "$(echo "$out" | head -2 | tr '\n' '|')"
-        ((FAIL++))
+    [[ "$invert" != "!" ]] && ok=0
     fi
+  fi
+
+  if [[ $ok -eq 1 ]]; then
+    printf '%d. %sPASS%s  %s\n' $TEST "$GREEN" "$RESET" "$desc"
+    ((PASS++))
   else
-    printf '%d. %sSKIPPED%s  %s\n' $TEST "$YELLOW" "$RESET" "$desc"
+    printf '%d. %sFAIL%s  %s\n' $TEST "$RED" "$RESET" "$desc"
+    [[ $rc -ne $want_rc ]] && printf '      exit: got %d, want %d\n' "$rc" "$want_rc"
+    if [[ -n "$pattern" ]]; then
+    [[ "$invert" == "!" ]] \
+      && printf '      output unexpectedly contains: %s\n' "$pattern" \
+      || printf '      output missing: %s\n' "$pattern"
+    fi
+    printf '      output: %s\n' "$(echo "$out" | head -2 | tr '\n' '|')"
+    ((FAIL++))
+  fi
+  else
+  printf '%d. %sSKIPPED%s  %s\n' $TEST "$YELLOW" "$RESET" "$desc"
   fi
   ((TEST++))
 }
@@ -78,28 +78,28 @@ check_ansi() {
   shift 2
 
   if test_selected $TEST; then 
-    local out rc
-    out=$("$@" 2>&1); rc=$?
-    local found=0
-    echo "$out" | grep -qP '\x1b' && found=1
+  local out rc
+  out=$("$@" 2>&1); rc=$?
+  local found=0
+  echo "$out" | grep -qP '\x1b' && found=1
 
-    local ok=1
-    [[ $rc -ne 0 ]] && ok=0
-    [[ "$want_present" == "yes" && $found -eq 0 ]] && ok=0
-    [[ "$want_present" == "no"  && $found -eq 1 ]] && ok=0
+  local ok=1
+  [[ $rc -ne 0 ]] && ok=0
+  [[ "$want_present" == "yes" && $found -eq 0 ]] && ok=0
+  [[ "$want_present" == "no"  && $found -eq 1 ]] && ok=0
 
-    if [[ $ok -eq 1 ]]; then
-      printf '%d. %sPASS%s  %s\n' $TEST "$GREEN" "$RESET" "$desc"
-      ((PASS++))
-    else
-      printf '%d. %sFAIL%s  %s\n' $TEST "$RED" "$RESET" "$desc"
-      [[ $rc -ne 0 ]] && printf '      exit: got %d, want 0\n' "$rc"
-      [[ "$want_present" == "yes" && $found -eq 0 ]] && printf '      no ANSI codes in output\n'
-      [[ "$want_present" == "no"  && $found -eq 1 ]] && printf '      ANSI codes present (should be absent)\n'
-      ((FAIL++))
-    fi
+  if [[ $ok -eq 1 ]]; then
+    printf '%d. %sPASS%s  %s\n' $TEST "$GREEN" "$RESET" "$desc"
+    ((PASS++))
   else
-    printf '%d. %sSKIPPED%s  %s\n' $TEST "$YELLOW" "$RESET" "$desc"
+    printf '%d. %sFAIL%s  %s\n' $TEST "$RED" "$RESET" "$desc"
+    [[ $rc -ne 0 ]] && printf '      exit: got %d, want 0\n' "$rc"
+    [[ "$want_present" == "yes" && $found -eq 0 ]] && printf '      no ANSI codes in output\n'
+    [[ "$want_present" == "no"  && $found -eq 1 ]] && printf '      ANSI codes present (should be absent)\n'
+    ((FAIL++))
+  fi
+  else
+  printf '%d. %sSKIPPED%s  %s\n' $TEST "$YELLOW" "$RESET" "$desc"
   fi
   ((TEST++))
 }
@@ -219,6 +219,38 @@ check "--claude --all-projects --grep-re exits 0"   0  ""        ""  $SCRIPT --c
 check "--id resolves codex session"       0  "019cf2fa"  "" $SCRIPT --id 019cf2fa --ls
 # transcript works for each store
 check "codex transcript exits 0"          0  "019cf2fa"  "" $SCRIPT --codex --id 019cf2fa
+
+# ── Case sensitivity (-i flag) ────────────────────────────────────────────────
+echo
+echo "-- Case sensitivity (-i flag)"
+# Default: case-sensitive — uppercase LATTICE must NOT match lowercase "lattice"
+check "case-sensitive default: LATTICE → no match"        0  "No sessions match"  ""  $SCRIPT --codex --grep "LATTICE" --ls
+check "case-sensitive default: LATTICE → no sessions"     0  "codex"              "!" $SCRIPT --codex --grep "LATTICE" --ls
+# With -i: uppercase LATTICE should find "lattice" sessions
+check "-i: LATTICE finds codex sessions"                  0  "No sessions match"  "!" $SCRIPT --codex --grep "LATTICE" -i --ls
+check "-i: sessions listed"                               0  "codex"              ""  $SCRIPT --codex --grep "LATTICE" -i --ls
+
+# ── Record number prefix (-n flag) ────────────────────────────────────────────
+echo
+echo "-- Record number prefix (-n flag)"
+# Without -n: output must NOT start any line with digits+colon
+check "no -n: no record number prefix"    0  "^[0-9]+:"   "!" $SCRIPT --codex --id 019cf2fa --grep "lattice"
+# With -n: at least one output line must start with digits+colon
+check "-n: record number prefix present"  0  "^[0-9]+:"   ""  $SCRIPT --codex --id 019cf2fa --grep "lattice" -n
+
+# ── Timestamp prefix (-d flag) ────────────────────────────────────────────────
+echo
+echo "-- Timestamp prefix (-d flag)"
+# Without -d: no line starts with [YYYY-
+check "no -d: no timestamp prefix"        0  "^\[20[0-9][0-9]-"  "!" $SCRIPT --codex --id 019cf2fa --grep "lattice"
+# With -d: at least one line starts with [YYYY-
+check "-d: timestamp prefix present"      0  "^\[20[0-9][0-9]-"  ""  $SCRIPT --codex --id 019cf2fa --grep "lattice" -d
+
+# ── Combined -n -d ordering ───────────────────────────────────────────────────
+echo
+echo "-- Combined -n -d prefix order"
+# With both -n and -d: timestamp appears before record number on the same line
+check "-n -d: timestamp then rec number"  0  "^\[20[0-9][0-9]-.*\]: [0-9]+:"  ""  $SCRIPT --codex --id 019cf2fa --grep "lattice" -n -d
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo

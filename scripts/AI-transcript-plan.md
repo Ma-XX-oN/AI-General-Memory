@@ -603,7 +603,7 @@ Run each command and compare the header lines visually.
 
 ## Future work (post-MVP)
 
-1. **`-n` — record number prefix.**  Prepend the 1-based line number within the
+1. [x] **`-n` — record number prefix.**  Prepend the 1-based line number within the
    `.jsonl` file to each matched grep line, right-justified to the digit-width
    of the total record count (which is always shown in the header).  Example
    with 120 records:
@@ -614,13 +614,13 @@ Run each command and compare the header lines visually.
     23: matched text
    ```
 
-2. **`-d` — timestamp prefix.**  Prepend `[<timestamp>]:` (followed by a
+2. [x] **`-d` — timestamp prefix.**  Prepend `[<timestamp>]:` (followed by a
    space) to each matched grep line.  Timestamp source per AI:
    - Claude: explicit `timestamp` field present on every JSONL record.
    - Codex: decode from the UUID v7 embedded timestamp (first 48 bits →
      milliseconds since epoch).
 
-3. **Combined `-n -d` prefix order.**  When both flags are active, timestamp
+3. [x] **Combined `-n -d` prefix order.**  When both flags are active, timestamp
    comes first and the right-justified line number follows, so the number
    column stays vertically aligned regardless of timestamp width:
 
@@ -628,9 +628,9 @@ Run each command and compare the header lines visually.
    [<timestamp>]: 23: matched text
    ```
 
-4. **Ignore case flag `-i`.**  Should be case-sensitive unless `-i` is passed.
+4. [x] **Ignore case flag `-i`.**  Should be case-sensitive unless `-i` is passed.
 
-5. **Record/timestamp range filtering.**  Allow the user to restrict output to a
+5. [ ] **Record/timestamp range filtering.**  Allow the user to restrict output to a
    sub-range of a session, useful for long sessions.  Two flavours:
    - **By record number:** `--records M:N` (1-based, inclusive) — include only
      JSONL records M through N.  Works with `--id` (transcript slice) and
@@ -640,15 +640,22 @@ Run each command and compare the header lines visually.
      falls within the given range.  Accepts ISO-8601 or human-friendly strings
      (e.g. `"2026-03-17 04:00"`).
    - Both flavours should compose with `--grep`, `--id`, and `-n`/`-d` prefixes.
+   - Timestamps don't have to be complete ISO DATETIMEs, if `hh:mm` or
+     `hh:mm:ss` is given, today is assumed in the current timezone stated by the
+     computer.  --tz will allow this to change later.  I guess the general form
+     would be `[+|-][[[[[yyyy-]MM-]dd ]hh:]mm][:ss]`. The leading +/- indicates
+     relative.  No leading means absolute.
+   - Record numbers can take a - prefix as well.  -1 means last record, -2 is
+     second last, etc.  Just like python's indexing.
 
-6. **Consolidate consecutive Claude turns into one heading.**  Each API
+6. [ ] **Consolidate consecutive Claude turns into one heading.**  Each API
    round-trip creates a separate JSONL record; when Claude uses a tool the
    sequence is `assistant` (text + tool_use) → `user` (tool_results) →
    `assistant` (continuation), each getting its own `## Claude` heading.  The
    next consecutive `## Claude` heading isn't needed — it would be implied by
    the `<details><summary>Thinking...</summary></details>` block preceding it.
 
-7. **`--project` flag semantics hardening.**  `--project PATH` is Claude-only;
+7. [ ] **`--project` flag semantics hardening.**  `--project PATH` is Claude-only;
    it should imply `--claude` and produce errors in the following states:
    - `--project` combined with `--codex` → error: "`--project` is for Claude
      sessions; remove `--codex` or drop `--project`."
@@ -660,7 +667,7 @@ Run each command and compare the header lines visually.
    - `--all-projects --both-AIs` (or no source flag) → valid: all Claude
      sessions from all projects plus all Codex sessions.
 
-8. **User-facing documentation.**  Accessible from the `--help` switch; use
+8. [ ] **User-facing documentation.**  Accessible from the `--help` switch; use
    `--help --verbose` for extra detail if the standard help is too long.
    - **Known limitation to document:** Messages sent by the user while Claude
      is actively running tools ("queued" / interrupt messages) are held in
@@ -668,6 +675,29 @@ Run each command and compare the header lines visually.
      are not recoverable from the file; the only trace is Claude's subsequent
      thinking or response text that references them.  The generated transcript
      will therefore be missing those user turns.
+
+9. [ ] **Timestamp each user/AI header marker**  If `-d` is used with transcript
+   output, then after each `## User/Claude/Codex` should have `` [<timestamp>]``
+   placed after it.
+
+10. [ ] **`--tz` — timezone display for `-d` timestamps.**  By default `-d` should
+    show timestamps converted to the local system timezone rather than raw UTC.
+    A `--tz ZONE` flag overrides the target zone; `ZONE` may be:
+    - An IANA name (`America/New_York`, `Europe/London`, `UTC`, …) resolved via
+      `zoneinfo` (stdlib Python 3.9+).
+    - A fixed UTC offset in `±HH:MM` form (`-04:00`, `+05:30`, …) resolved as a
+      `datetime.timezone` — no external dependency.
+    If an IANA name cannot be resolved (typically because `tzdata` is not
+    installed on Windows), emit a `WARNING:` to stderr explaining the issue and
+    suggesting `pip install tzdata`, then fall back to local time and continue.
+    `--tz` automatically implies `-d`.
+
+11. [ ] **Colored `ERROR:` / `WARNING:` message prefixes.**  All messages emitted
+    to stderr should be prefixed with a coloured label when colour is available:
+    - `ERROR:` in red (`colorama.Fore.RED`)
+    - `WARNING:` in yellow (`colorama.Fore.YELLOW`)
+    Follow the same colorama availability check already used by `--color`; fall
+    back to plain text when colorama is absent or the stream is not a TTY.
 
 ## Questions
 
