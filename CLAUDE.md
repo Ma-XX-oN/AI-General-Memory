@@ -138,6 +138,12 @@ fact that caused the change.
 For any question about current file contents, do a fresh read of the target
 file in the same turn before answering; do not answer from cached context alone.
 
+Before editing any file, read the **entire affected section** — not just the
+area you expect to change.  Content after the intended insertion point often
+constrains where and how the edit should be made.  When asked to "add to" a
+list or section, default to appending at the end of that list/section, not
+inserting at the first plausible gap.
+
 ### Keep each command as its own tool call
 
 Never chain commands with `&&`, `;`, or `|` unless the whole pipeline was
@@ -149,6 +155,26 @@ forcing the user to re-approve what should have been a prompt-free operation.
 
 Do independent transforms first; do dependent or lossy transforms last.
 Preserve semantic meaning before simplifying representation.
+
+### Indentation: always 2 spaces
+
+Use **2-space indentation** in all code (Python, JavaScript, shell, etc.) and
+in all Markdown files.  Never use 4-space indentation.  When editing an
+existing file that uses 4-space indentation, convert the whole file to 2-space
+as part of the edit — never leave a file with mixed indentation.
+
+### Design philosophy: encapsulation and TDD
+
+- Prefer object or object-like structures (classes, dataclasses, named tuples,
+  dicts with a defined schema) over loose collections of parallel variables.
+  Encapsulation is the default; bare data is the exception.
+- Break problems into the smallest testable units possible.  Every non-trivial
+  function should be testable in isolation, without standing up a full system.
+- Aim for Test-Driven Development (TDD): write the failing test first, then
+  write only enough code to make it pass.  Never write more code than the
+  current failing test requires.
+- Design pipelines so each stage has a clear input/output contract.  Make the
+  seams between stages explicit so they can be unit-tested independently.
 
 ### Design principles
 
@@ -191,6 +217,73 @@ Preserve semantic meaning before simplifying representation.
   don't optimize a single element in isolation.
 - For SVG styling, use redundant encodings (color + line-style/weight) so
   meaning is clear under color-vision deficiencies and grayscale.
+
+### Check off plan items when implemented
+
+Whenever a Future work item in a plan document (e.g. `AI-transcript-plan.md`) is fully implemented
+and committed, immediately check it off in the plan (`[ ]` → `[x]`) and commit that change in the
+same commit or a follow-up commit before moving on.  Never leave a completed item unchecked.
+
+### Always use the Write tool for commit message files
+
+Never use a bash heredoc to write the commit message temp file.  The Write tool
+correctly places the file at `C:/tmp/`; a bash heredoc writing to `/tmp/` may
+land in a different location on Windows (Git Bash and Windows resolve `/tmp/`
+differently), causing git to silently read a stale file from a previous commit.
+
+### SVG `<text>` elements need explicit fill in VS Code dark theme
+
+VS Code's dark theme overrides the default SVG text color to invisible.  Always
+set an explicit `fill` color on every `<text>` element in SVGs embedded in
+Markdown files intended for VS Code preview.
+
+### Call `sys.stdout.reconfigure` before initializing colorama
+
+colorama wraps `sys.stdout` with `AnsiToWin32`, which does not implement
+`reconfigure` or `isatty`.  Call `sys.stdout.reconfigure(encoding="utf-8")`
+before importing or initializing colorama, not after.
+
+### Use a virtual environment for test scripts that depend on packages
+
+On Windows with multiple Python installs, bash resolves `python` to whichever
+install appears first in `PATH`, which may lack required packages.  Use a
+virtual environment in test scripts so the interpreter and packages are
+determined by the venv, not PATH order.
+
+### Read the full section before renumbering
+
+Before converting a numbered list to headings or renumbering any sequence, read
+the entire section to confirm all existing numbers.  Never start editing until
+the complete number sequence is confirmed in one read — partial knowledge leads
+to collisions and forced reverts.
+
+### Ask for actual data before declaring a constraint acceptable
+
+Never say a design constraint (memory usage, file size, performance) is "fine"
+without knowing the actual numbers.  Ask the user for the concrete data first;
+do not assume and then be corrected mid-implementation.
+
+### Per-iteration exception handling in batch loops
+
+In loops where partial results are acceptable (search, grep, batch processing),
+catch exceptions inside the loop body — not around the whole loop — and log the
+error before continuing.  A single `try/except` outside the loop aborts all
+remaining iterations on the first failure.  Never use bare `except: pass`;
+always log skipped records so failures are visible.
+
+### Search before guessing; ask if search fails
+
+When uncertain about a platform behavior, API contract, or environment
+limitation, search for documentation first.  If no answer is found, ask the
+user.  Never guess and iterate blindly through variations hoping one sticks.
+
+### Geometric calculations: formula first, then apply mechanically
+
+When doing geometry (SVG coordinates, ellipse intersections, rotations), write
+out the complete formula once with consistent variable names before computing
+any numbers.  Apply it mechanically to each point.  Do not re-derive from
+scratch mid-stream — re-derivation under pressure introduces errors and causes
+spiraling.
 
 ## AutoHotkey v2
 
