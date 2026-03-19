@@ -13,6 +13,7 @@
 - [Use Multiple Models](#use-multiple-models)
   - [What Claude Code Thinks](#what-claude-code-thinks)
   - [What Codex Thinks](#what-codex-thinks)
+  - [What I Think](#what-i-think)
 
 ## Purpose
 
@@ -115,8 +116,8 @@ memory (either global or project memory) so that it doesn't do it again
 
 ## Use Multiple Models
 
-You can just use one model, but why restict yourself.  One is good, but each
-have their own positives/negatives.
+You can just use one model, but why restrict yourself.  One is good, but each
+have their own positives and negatives.
 
 ----
 
@@ -141,13 +142,14 @@ Claude, what advantages/disadvantages do you think you have over Codex?
 > **Disadvantages**
 >
 > - *No inline IDE integration.* I work through a CLI. I can't autocomplete
->   inside a file the way Codex does natively in VS Code.
+>   inside a file the way Codex does natively in VS Code. *(**Author's note:** This
+>   is actually wrong according to Codex)*
 > - *Verbosity.* I over-explain. For a quick one-liner fix, Codex is faster and
 >   less noisy.
 > - *Prose cleanup.* As demonstrated in this very session: I flagged typos but
 >   missed grammar errors and style problems. Codex's prose pass was better.
-> - *Speed on mechanical tasks.* Straightforward refactors, renaming, boilerplate
->   generation — Codex's completion model is faster here.
+> - *Speed on mechanical tasks.* Straightforward refactors, renaming,
+>   boilerplate generation — Codex's completion model is faster here.
 
 ----
 
@@ -155,4 +157,57 @@ Codex, what advantages/disadvantages do you think you have over Claude Code?
 
 ### What Codex Thinks
 
+> **Advantages**
 >
+> - *Fast, precise edits.* I tend to go straight to the file, patch the exact
+>   thing that needs changing, and verify it quickly. The `USER.md` cleanup and
+>   follow-up corrections in this session are a good example.
+> - *Concise execution.* I'm usually less verbose than Claude, which helps when
+>   the task is straightforward and the user already knows what they want.
+> - *Mechanical reliability.* Focused refactors, wording fixes, renames, and
+>   checklist-driven tasks suit me well. I can keep momentum without a lot of
+>   extra discussion.
+> - *Tight verification loops.* I naturally pair edits with quick file reads,
+>   line references, and checks like EOL validation, so it's easy to prove what
+>   changed.
+>
+> **Disadvantages**
+>
+> - *Less reflective by default.* If the task is ambiguous or architectural, I
+>   can move into execution mode too quickly unless I stop to question
+>   assumptions.
+> - *Weaker exploratory dialogue.* Claude is better at open-ended discussion,
+>   design exploration, and surfacing trade-offs in a way that feels more
+>   naturally collaborative.
+> - *Style cleanup can overshoot.* This session showed that I can over-normalise
+>   prose if I'm not careful, like stripping contractions or drifting away from
+>   the user's preferred spelling and voice.
+> - *Less strong on long-form narrative.* Claude is usually better at sustained
+>   design writing, review write-ups, and explanatory prose that needs to carry
+>   one consistent voice over a long stretch.
+
+### What I Think
+
+Both are good. I find that Claude Code does follow directions better, whereas
+Codex (like ChatGPT that it's based on) tends to play it a bit fast and loose
+with directions.  I shore up Codex's responses with the global rule set
+[CODEX.md](CODEX.md) which does help a lot.  Regardless of that, Codex seems to
+have a bit more "creativity".  Or maybe it's the "creativity" that causes Codex
+to do its own thing.
+
+Codex is definitely better at not being a yes man. Claude also seems weaker on
+prose polish; it tends to scope too narrowly and miss grammar fixes. Claude
+doesn't always verify things as consistently as I'd like. Codex gives that
+impression more often, although part of that may come from the heavier
+verification rules in [CODEX.md](CODEX.md). These behaviours in Claude have been
+mitigated through rules [CLAUDE.md](CLAUDE.md). Just after writing this, I told
+Claude to update its memory to do more general verification before making
+claims.
+
+With this repo, and using TDD, I find that they both are capable of writing good
+code.  Most, if not all of the scripts in this repo were created by either AI,
+and sometimes both, with direction and minimal intervention from me.
+
+Although each alone is good, it's a bit hard to say which is a clear winner.  I
+think they are complementary to each other, bringing different points of view to
+the task at hand.
