@@ -1,4 +1,65 @@
-# AI-transcript.py — Design & Implementation Plan
+# AI-transcript.py — Design & Implementation Plan <!-- omit in toc -->
+
+- [Goal](#goal)
+- [Lessons learned from test-run](#lessons-learned-from-test-run)
+  - [Codex session storage quirks](#codex-session-storage-quirks)
+  - [Claude session storage quirks](#claude-session-storage-quirks)
+  - [Grep content coverage](#grep-content-coverage)
+  - [Display invariants](#display-invariants)
+- [Architecture](#architecture)
+  - [Class diagram](#class-diagram)
+  - [Use case diagram](#use-case-diagram)
+  - [`Session` dataclass](#session-dataclass)
+  - [`SessionStore` ABC](#sessionstore-abc)
+  - [`ClaudeSessionStore(SessionStore)`](#claudesessionstoresessionstore)
+  - [`CodexSessionStore(SessionStore)`](#codexsessionstoresessionstore)
+  - [Shared display functions](#shared-display-functions)
+  - [Shared grep utilities](#shared-grep-utilities)
+  - [Optional dependency: `regex` module](#optional-dependency-regex-module)
+- [CLI design](#cli-design)
+  - [Flag dependency hierarchy](#flag-dependency-hierarchy)
+  - [Resolved design questions](#resolved-design-questions)
+  - [`main()` structure](#main-structure)
+- [Implementation steps](#implementation-steps)
+  - [Phase 1 — Skeleton](#phase-1--skeleton)
+  - [Phase 2 — Claude store](#phase-2--claude-store)
+  - [Phase 3 — Codex store](#phase-3--codex-store)
+  - [Phase 4 — Unified paths](#phase-4--unified-paths)
+  - [Phase 5 — Verification](#phase-5--verification)
+  - [Phase 6 — Commit and clean up](#phase-6--commit-and-clean-up)
+- [Test matrix](#test-matrix)
+  - [Setup](#setup)
+  - [Matrix 1 — `--ls` modes](#matrix-1----ls-modes)
+  - [Matrix 2 — `--id` modes](#matrix-2----id-modes)
+  - [Matrix 3 — `--grep` / `--grep-re` modes](#matrix-3----grep----grep-re-modes)
+  - [Matrix 4 — Format/header consistency](#matrix-4--formatheader-consistency)
+- [Future work (post-MVP)](#future-work-post-mvp)
+  - [1. `-n` — record number prefix **(FEATURE)** ***(DONE)***](#1--n--record-number-prefix-feature-done)
+  - [2. `-d` — timestamp prefix **(FEATURE)** ***(DONE)***](#2--d--timestamp-prefix-feature-done)
+  - [3. Combined `-n -d` prefix order **(FEATURE)** ***(DONE)***](#3-combined--n--d-prefix-order-feature-done)
+  - [4. Ignore case flag `-i` **(FEATURE)** ***(DONE)***](#4-ignore-case-flag--i-feature-done)
+  - [5. Record/timestamp range filtering **(FEATURE)** ***(DONE)***](#5-recordtimestamp-range-filtering-feature-done)
+  - [6. Consolidate consecutive Claude turns into one heading **(BUG/FEATURE)**](#6-consolidate-consecutive-claude-turns-into-one-heading-bugfeature)
+  - [7. `--project` flag semantics hardening **(BUG/FEATURE)**](#7---project-flag-semantics-hardening-bugfeature)
+  - [8. User-facing documentation **(FEATURE)**](#8-user-facing-documentation-feature)
+  - [9. Timestamp each user/AI header marker **(FEATURE)** ***(DONE)***](#9-timestamp-each-userai-header-marker-feature-done)
+  - [10. `--tz` — timezone display for `-d` timestamps. **(FEATURE)** ***(DONE)***](#10---tz--timezone-display-for--d-timestamps-feature-done)
+  - [11. Colored diagnostic prefixes and grep/header elements **(FEATURE)** ***(DONE)***](#11-colored-diagnostic-prefixes-and-grepheader-elements-feature-done)
+  - [12. `--ts-fmt` — timestamp format string for `-d` output **(FEATURE)**](#12---ts-fmt--timestamp-format-string-for--d-output-feature)
+  - [13. `.AI-transcript.rc` — per-user config file for default flags **(FEATURE)**](#13-ai-transcriptrc--per-user-config-file-for-default-flags-feature)
+  - [14. mtime should be taken from records **(BUG?/FEATURE?)**](#14-mtime-should-be-taken-from-records-bugfeature)
+  - [15. Colourise the User/AI headings **(FEATURE)**](#15-colourise-the-userai-headings-feature)
+  - [16. Add a `--raw` flag **(FEATURE)**](#16-add-a---raw-flag-feature)
+  - [17. `-A`, `-B` and `-C` switches don't span over records **(BUG)**](#17--a--b-and--c-switches-dont-span-over-records-bug)
+  - [18. `--since`/`--until` doesn't narrow down `--id` glob pattern if ambiguous **(BUG)**](#18---since--until-doesnt-narrow-down---id-glob-pattern-if-ambiguous-bug)
+  - [19. `--ls` doesn't display timestamps **(FEATURE)**](#19---ls-doesnt-display-timestamps-feature)
+  - [20. `-n` and `-d` doesn't work with `--id` **(NOT-A-BUG)** ***(WILL-NOT-IMPLEMENT)***](#20--n-and--d-doesnt-work-with---id-not-a-bug-will-not-implement)
+  - [21. Need a way to state speaker when grepping **(FEATURE)**](#21-need-a-way-to-state-speaker-when-grepping-feature)
+  - [22. `--project` should be able to take just the project name as well](#22---project-should-be-able-to-take-just-the-project-name-as-well)
+- [Questions](#questions)
+- [Bugs resolved](#bugs-resolved)
+  - [Bug verification matrix](#bug-verification-matrix)
+
 
 ## Goal
 
@@ -131,6 +192,168 @@ Each one informs a specific requirement on the new design.
 ---
 
 ## Architecture
+
+### Class diagram
+
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="1100" font-family="Arial,Helvetica,sans-serif">
+  <defs>
+    <marker id="tri" markerWidth="14" markerHeight="10" refX="13" refY="5" orient="auto">
+      <path d="M 0 0 L 13 5 L 0 10 Z" fill="white" stroke="#333" stroke-width="1.5"/>
+    </marker>
+    <marker id="arr" markerWidth="12" markerHeight="8" refX="12" refY="4" orient="auto">
+      <path d="M 0 0 L 12 4 L 0 8" fill="none" stroke="#333" stroke-width="1.5"/>
+    </marker>
+  </defs>
+  <rect width="820" height="1100" fill="white"/>
+  <text x="410" y="28" text-anchor="middle" font-size="17" font-weight="bold" fill="#222">AI-transcript.py &#x2014; Class Diagram</text>
+  <!-- Session -->
+  <rect x="10" y="45" width="220" height="220" fill="white" stroke="none"/>
+  <rect x="10" y="45" width="220" height="52" fill="#dce8f5" stroke="none"/>
+  <rect x="10" y="45" width="220" height="220" fill="none" stroke="#333" stroke-width="1.5"/>
+  <line x1="10" y1="97" x2="230" y2="97" stroke="#333" stroke-width="1"/>
+  <text x="120" y="61" text-anchor="middle" font-size="12" font-style="italic" fill="#555">&#xAB;dataclass&#xBB;</text>
+  <text x="120" y="82" text-anchor="middle" font-size="15" font-weight="bold" fill="#222">Session</text>
+  <text x="18" y="115" font-size="14" fill="#222">source : str</text>
+  <text x="18" y="135" font-size="14" fill="#222">id : str</text>
+  <text x="18" y="155" font-size="14" fill="#222">path : Path</text>
+  <text x="18" y="175" font-size="14" fill="#222">title : str</text>
+  <text x="18" y="195" font-size="14" fill="#222">ctime : datetime</text>
+  <text x="18" y="215" font-size="14" fill="#222">mtime : datetime</text>
+  <text x="18" y="235" font-size="14" fill="#222">project : str?</text>
+  <text x="18" y="255" font-size="14" fill="#222">rc : int</text>
+  <!-- RecordFilter -->
+  <rect x="590" y="45" width="220" height="228" fill="white" stroke="none"/>
+  <rect x="590" y="45" width="220" height="52" fill="#dce8f5" stroke="none"/>
+  <rect x="590" y="45" width="220" height="228" fill="none" stroke="#333" stroke-width="1.5"/>
+  <line x1="590" y1="97" x2="810" y2="97" stroke="#333" stroke-width="1"/>
+  <line x1="590" y1="185" x2="810" y2="185" stroke="#333" stroke-width="1"/>
+  <text x="700" y="61" text-anchor="middle" font-size="12" font-style="italic" fill="#555">&#xAB;dataclass&#xBB;</text>
+  <text x="700" y="82" text-anchor="middle" font-size="15" font-weight="bold" fill="#222">RecordFilter</text>
+  <text x="598" y="115" font-size="14" fill="#222">rec_lo : int?</text>
+  <text x="598" y="135" font-size="14" fill="#222">rec_hi : int?</text>
+  <text x="598" y="155" font-size="14" fill="#222">ts_lo : datetime?</text>
+  <text x="598" y="175" font-size="14" fill="#222">ts_hi : datetime?</text>
+  <text x="598" y="203" font-size="14" fill="#222">is_trivial()</text>
+  <text x="598" y="223" font-size="14" fill="#222">allows_rec()</text>
+  <text x="598" y="243" font-size="14" fill="#222">past_hi()</text>
+  <text x="598" y="263" font-size="14" fill="#222">allows_ts()</text>
+  <!-- SessionStore -->
+  <rect x="260" y="330" width="300" height="160" fill="white" stroke="none"/>
+  <rect x="260" y="330" width="300" height="52" fill="#dce8f5" stroke="none"/>
+  <rect x="260" y="330" width="300" height="160" fill="none" stroke="#333" stroke-width="1.5"/>
+  <line x1="260" y1="382" x2="560" y2="382" stroke="#333" stroke-width="1"/>
+  <text x="410" y="346" text-anchor="middle" font-size="12" font-style="italic" fill="#555">&#xAB;abstract&#xBB;</text>
+  <text x="410" y="367" text-anchor="middle" font-size="15" font-weight="bold" font-style="italic" fill="#222">SessionStore</text>
+  <text x="268" y="400" font-size="14" font-style="italic" fill="#222">is_available()</text>
+  <text x="268" y="420" font-size="14" font-style="italic" fill="#222">sessions()</text>
+  <text x="268" y="440" font-size="14" font-style="italic" fill="#222">find()</text>
+  <text x="268" y="460" font-size="14" font-style="italic" fill="#222">grep()</text>
+  <text x="268" y="480" font-size="14" font-style="italic" fill="#222">transcript()</text>
+  <!-- ClaudeSessionStore -->
+  <rect x="10" y="560" width="255" height="214" fill="white" stroke="none"/>
+  <rect x="10" y="560" width="255" height="38" fill="#dce8f5" stroke="none"/>
+  <rect x="10" y="560" width="255" height="214" fill="none" stroke="#333" stroke-width="1.5"/>
+  <line x1="10" y1="598" x2="265" y2="598" stroke="#333" stroke-width="1"/>
+  <line x1="10" y1="626" x2="265" y2="626" stroke="#333" stroke-width="1"/>
+  <text x="137" y="584" text-anchor="middle" font-size="15" font-weight="bold" fill="#222">ClaudeSessionStore</text>
+  <text x="18" y="616" font-size="14" fill="#222">- _project</text>
+  <text x="18" y="644" font-size="14" fill="#222">+ is_available()</text>
+  <text x="18" y="664" font-size="14" fill="#222">- _project_dirs()</text>
+  <text x="18" y="684" font-size="14" fill="#222">- _make_session()</text>
+  <text x="18" y="704" font-size="14" fill="#222">+ sessions()</text>
+  <text x="18" y="724" font-size="14" fill="#222">+ find()</text>
+  <text x="18" y="744" font-size="14" fill="#222">+ grep()</text>
+  <text x="18" y="764" font-size="14" fill="#222">+ transcript()</text>
+  <!-- CodexSessionStore -->
+  <rect x="555" y="560" width="255" height="186" fill="white" stroke="none"/>
+  <rect x="555" y="560" width="255" height="38" fill="#dce8f5" stroke="none"/>
+  <rect x="555" y="560" width="255" height="186" fill="none" stroke="#333" stroke-width="1.5"/>
+  <line x1="555" y1="598" x2="810" y2="598" stroke="#333" stroke-width="1"/>
+  <text x="682" y="584" text-anchor="middle" font-size="15" font-weight="bold" fill="#222">CodexSessionStore</text>
+  <text x="563" y="616" font-size="14" fill="#222">+ is_available()</text>
+  <text x="563" y="636" font-size="14" fill="#222">- _make_session()</text>
+  <text x="563" y="656" font-size="14" fill="#222">- _make_session_from_path()</text>
+  <text x="563" y="676" font-size="14" fill="#222">+ sessions()</text>
+  <text x="563" y="696" font-size="14" fill="#222">+ find()</text>
+  <text x="563" y="716" font-size="14" fill="#222">+ grep()</text>
+  <text x="563" y="736" font-size="14" fill="#222">+ transcript()</text>
+  <!-- Arrows -->
+  <polyline points="137,560 137,520 310,520 310,490" fill="none" stroke="#333" stroke-width="1.5" marker-end="url(#tri)"/>
+  <polyline points="682,560 682,520 510,520 510,490" fill="none" stroke="#333" stroke-width="1.5" marker-end="url(#tri)"/>
+  <line x1="260" y1="410" x2="230" y2="155" stroke="#333" stroke-width="1.5" stroke-dasharray="7,4" marker-end="url(#arr)"/>
+  <line x1="560" y1="410" x2="590" y2="159" stroke="#333" stroke-width="1.5" stroke-dasharray="7,4" marker-end="url(#arr)"/>
+  <!-- Method Signature Reference -->
+  <line x1="10" y1="820" x2="810" y2="820" stroke="#bbb" stroke-width="1"/>
+  <text x="410" y="845" text-anchor="middle" font-size="14" font-weight="bold" fill="#444">SessionStore &#x2014; Method Signatures</text>
+  <rect x="10" y="858" width="800" height="222" fill="#f5f5f5" rx="4" stroke="#ccc" stroke-width="1"/>
+  <text x="22" y="878" font-family="'Courier New',monospace" font-size="13" fill="#222">is_available() -&gt; bool</text>
+  <text x="22" y="898" font-family="'Courier New',monospace" font-size="13" fill="#222">sessions(*, all_projects=False) -&gt; list[Session]</text>
+  <text x="22" y="918" font-family="'Courier New',monospace" font-size="13" fill="#222">find(id_or_glob, *, all_projects=False)</text>
+  <text x="22" y="938" font-family="'Courier New',monospace" font-size="13" fill="#222">    -&gt; tuple[Session | None, list[Session]]</text>
+  <text x="22" y="958" font-family="'Courier New',monospace" font-size="13" fill="#222">grep(session, *, plain=None, rx=None, before=0, after=0,</text>
+  <text x="22" y="978" font-family="'Courier New',monospace" font-size="13" fill="#222">     first_only=False, ignore_case=False, rec_filter=None) -&gt; list[tuple]</text>
+  <text x="22" y="998" font-family="'Courier New',monospace" font-size="13" fill="#222">transcript(session, rec_filter=None) -&gt; str</text>
+  <text x="22" y="1026" font-family="'Courier New',monospace" font-size="13" fill="#777">ClaudeSessionStore.__init__(project=None)</text>
+  <text x="22" y="1046" font-family="'Courier New',monospace" font-size="13" fill="#777">    # project overrides CWD for project directory detection</text>
+</svg>
+
+### Use case diagram
+
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="590" font-family="Arial,Helvetica,sans-serif">
+  <defs>
+    <marker id="uca" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M 0 0 L 9 4 L 0 8" fill="none" stroke="#333" stroke-width="1.5"/>
+    </marker>
+  </defs>
+  <rect width="820" height="590" fill="white"/>
+  <text x="410" y="25" text-anchor="middle" font-size="17" font-weight="bold" fill="#222">AI-transcript.py &#x2014; Use Case Diagram</text>
+  <!-- system boundary -->
+  <rect x="120" y="42" width="690" height="525" fill="none" stroke="#333" stroke-width="1.5"/>
+  <text x="465" y="68" text-anchor="middle" font-size="14" font-weight="bold" fill="#222">AI-transcript.py</text>
+  <!-- Actor: User -->
+  <circle cx="58" cy="215" r="20" fill="none" stroke="#333" stroke-width="1.5"/>
+  <line x1="58" y1="235" x2="58" y2="280" stroke="#333" stroke-width="1.5"/>
+  <line x1="28" y1="255" x2="88" y2="255" stroke="#333" stroke-width="1.5"/>
+  <line x1="58" y1="280" x2="35" y2="315" stroke="#333" stroke-width="1.5"/>
+  <line x1="58" y1="280" x2="81" y2="315" stroke="#333" stroke-width="1.5"/>
+  <text x="58" y="338" text-anchor="middle" font-size="14" fill="#222">User</text>
+  <!-- Primary use cases (cx=295, rx=100, ry=24) -->
+  <ellipse cx="295" cy="145" rx="100" ry="24" fill="white" stroke="#333" stroke-width="1.5"/>
+  <text x="295" y="150" text-anchor="middle" font-size="13" fill="#222">List sessions</text>
+  <ellipse cx="295" cy="265" rx="100" ry="24" fill="white" stroke="#333" stroke-width="1.5"/>
+  <text x="295" y="270" text-anchor="middle" font-size="13" fill="#222">Search sessions</text>
+  <ellipse cx="295" cy="385" rx="100" ry="24" fill="white" stroke="#333" stroke-width="1.5"/>
+  <text x="295" y="390" text-anchor="middle" font-size="13" fill="#222">View transcript</text>
+  <ellipse cx="295" cy="490" rx="100" ry="24" fill="white" stroke="#333" stroke-width="1.5"/>
+  <text x="295" y="495" text-anchor="middle" font-size="13" fill="#222">Export transcript</text>
+  <!-- Secondary use cases (cx=610, rx=110, ry=24) -->
+  <ellipse cx="610" cy="295" rx="110" ry="24" fill="white" stroke="#333" stroke-width="1.5"/>
+  <text x="610" y="300" text-anchor="middle" font-size="13" fill="#222">Filter by records</text>
+  <ellipse cx="610" cy="430" rx="110" ry="24" fill="white" stroke="#333" stroke-width="1.5"/>
+  <text x="610" y="435" text-anchor="middle" font-size="13" fill="#222">Filter by dates</text>
+  <!-- Actor associations (solid) -->
+  <line x1="82" y1="225" x2="195" y2="145" stroke="#333" stroke-width="1.5" marker-end="url(#uca)"/>
+  <line x1="82" y1="248" x2="195" y2="265" stroke="#333" stroke-width="1.5" marker-end="url(#uca)"/>
+  <line x1="82" y1="262" x2="195" y2="385" stroke="#333" stroke-width="1.5" marker-end="url(#uca)"/>
+  <line x1="82" y1="272" x2="195" y2="490" stroke="#333" stroke-width="1.5" marker-end="url(#uca)"/>
+  <!-- «extend» Filter by records → Search sessions -->
+  <!-- angle=13.4°; label at 25% from source (474,277) rotated along line -->
+  <line x1="500" y1="283" x2="395" y2="258" stroke="#555" stroke-width="1" stroke-dasharray="6,3" marker-end="url(#uca)"/>
+  <text transform="translate(474,277) rotate(13.4)" text-anchor="middle" dy="-5" font-size="11" font-style="italic" fill="#555">&#xAB;extend&#xBB;</text>
+  <!-- «extend» Filter by records → View transcript -->
+  <!-- angle=-34.1°; label at 25% from source (474,325) rotated along line -->
+  <line x1="500" y1="307" x2="395" y2="378" stroke="#555" stroke-width="1" stroke-dasharray="6,3" marker-end="url(#uca)"/>
+  <text transform="translate(474,325) rotate(-34.1)" text-anchor="middle" dy="-5" font-size="11" font-style="italic" fill="#555">&#xAB;extend&#xBB;</text>
+  <!-- «extend» Filter by dates → View transcript -->
+  <!-- angle=14.9°; label at 25% from source (474,411) rotated along line -->
+  <line x1="500" y1="418" x2="395" y2="390" stroke="#555" stroke-width="1" stroke-dasharray="6,3" marker-end="url(#uca)"/>
+  <text transform="translate(474,411) rotate(14.9)" text-anchor="middle" dy="-5" font-size="11" font-style="italic" fill="#555">&#xAB;extend&#xBB;</text>
+  <!-- «extend» Filter by dates → Search sessions -->
+  <!-- exit=(568,408) on upper-left of F-dates ellipse; entry=(337,287) on upper-right of S-sessions -->
+  <!-- angle=27.6°; label at 25% from source (510,378) — clear of E2 crossing at ~(446,344) -->
+  <line x1="568" y1="408" x2="337" y2="287" stroke="#555" stroke-width="1" stroke-dasharray="6,3" marker-end="url(#uca)"/>
+  <text transform="translate(510,378) rotate(27.6)" text-anchor="middle" dy="-5" font-size="11" font-style="italic" fill="#555">&#xAB;extend&#xBB;</text>
+</svg>
 
 ### `Session` dataclass
 
@@ -603,135 +826,243 @@ Run each command and compare the header lines visually.
 
 ## Future work (post-MVP)
 
-1. [x] **`-n` — record number prefix.**  Prepend the 1-based line number within the
-   `.jsonl` file to each matched grep line, right-justified to the digit-width
-   of the total record count (which is always shown in the header).  Example
-   with 120 records:
+### 1. `-n` — record number prefix **(FEATURE)** ***(DONE)***
 
-   ```text
-   [ctime]-[mtime] [proj] records: 120
-   (f4b19167) title
-    23: matched text
-   ```
+- Prepend the 1-based line number within the `.jsonl` file to each matched grep
+  line, right-justified to the digit-width of the total record count (which is
+  always shown in the header).  Example with 120 records:
 
-2. [x] **`-d` — timestamp prefix.**  Prepend `[<timestamp>]:` (followed by a
-   space) to each matched grep line.  Timestamp source per AI:
-   - Claude: explicit `timestamp` field present on every JSONL record.
-   - Codex: decode from the UUID v7 embedded timestamp (first 48 bits →
-     milliseconds since epoch).
+```text
+[ctime]-[mtime] [proj] records: 120
+(f4b19167) title
+ 23: matched text
+```
 
-3. [x] **Combined `-n -d` prefix order.**  When both flags are active, timestamp
-   comes first and the right-justified line number follows, so the number
-   column stays vertically aligned regardless of timestamp width:
+### 2. `-d` — timestamp prefix **(FEATURE)** ***(DONE)***
 
-   ```text
-   [<timestamp>]: 23: matched text
-   ```
+- Prepend `[<timestamp>]:` (followed by a space) to each matched grep line.
+  Timestamp source per AI:
+  - Claude: explicit `timestamp` field present on every JSONL record.
+  - Codex: decode from the UUID v7 embedded timestamp (first 48 bits →
+    milliseconds since epoch).
 
-4. [x] **Ignore case flag `-i`.**  Should be case-sensitive unless `-i` is passed.
+### 3. Combined `-n -d` prefix order **(FEATURE)** ***(DONE)***
 
-5. [x] **Record/timestamp range filtering.**  Allow the user to restrict output to a
-   sub-range of a session, useful for long sessions.  Two flavours:
-   - **By record number:** `--records M:N` (1-based, inclusive) — include only
-     JSONL records M through N.  Works with `--id` (transcript slice) and
-     `--grep` (restrict the search window).
-   - **By timestamp:** `--since DATETIME` / `--until DATETIME` — include only
-     records whose `timestamp` field (Claude) or UUID-v7-derived time (Codex)
-     falls within the given range.  Accepts ISO-8601 or human-friendly strings
-     (e.g. `"2026-03-17 04:00"`).
-   - Both flavours should compose with `--grep`, `--id`, and `-n`/`-d` prefixes.
-   - Timestamps don't have to be complete ISO DATETIMEs, if `hh:mm` or
-     `hh:mm:ss` is given, today is assumed in the current timezone stated by the
-     computer.  --tz will allow this to change later.  I guess the general form
-     would be `[+|-][[[[[yyyy-]MM-]dd ]hh:]mm][:ss]`. The leading +/- indicates
-     relative.  No leading means absolute.
-   - Record numbers can take a - prefix as well.  -1 means last record, -2 is
-     second last, etc.  Just like python's indexing.
-   - **Note (implemented 2026-03-18):** Relative offsets (`-`/`+` prefix) currently
-     support `±[dd ]hh:mm[:ss]` and bare `±mm` (minutes) only.  Year/month
-     components in relative form (e.g. `-2m`, `-1y`) are deferred to a future item.
-     Negative record indices (`--records=-N:`) require the `=` form to avoid
-     argparse treating the value as a flag.
+When both flags are active, timestamp comes first and the right-justified line
+number follows, so the number column stays vertically aligned regardless of
+timestamp width:
 
-6. [ ] **Consolidate consecutive Claude turns into one heading.**  Each API
-   round-trip creates a separate JSONL record; when Claude uses a tool the
-   sequence is `assistant` (text + tool_use) → `user` (tool_results) →
-   `assistant` (continuation), each getting its own `## Claude` heading.  The
-   next consecutive `## Claude` heading isn't needed — it would be implied by
-   the `<details><summary>Thinking...</summary></details>` block preceding it.
+```text
+[<timestamp>]: 23: matched text
+```
 
-7. [ ] **`--project` flag semantics hardening.**  `--project PATH` is Claude-only;
-   it should imply `--claude` and produce errors in the following states:
-   - `--project` combined with `--codex` → error: "`--project` is for Claude
-     sessions; remove `--codex` or drop `--project`."
-   - `--project` combined with `--both-AIs` → error: same message.
-   - `--project PATH` where `PATH` has no matching entry under
-     `~/.claude/projects/` → error: "No Claude project found for `PATH`."
-   - `--all-projects --codex` → error: "`--all-projects` applies to Claude
-     only; it cannot be combined with `--codex`."
-   - `--all-projects --both-AIs` (or no source flag) → valid: all Claude
-     sessions from all projects plus all Codex sessions.
+### 4. Ignore case flag `-i` **(FEATURE)** ***(DONE)***
 
-8. [ ] **User-facing documentation.**  Accessible from the `--help` switch; use
-   `--help --verbose` for extra detail if the standard help is too long.
-   - **Known limitation to document:** Messages sent by the user while Claude
-     is actively running tools ("queued" / interrupt messages) are held in
-     memory only and never written as user records to the session JSONL.  They
-     are not recoverable from the file; the only trace is Claude's subsequent
-     thinking or response text that references them.  The generated transcript
-     will therefore be missing those user turns.
+Should be case-sensitive unless `-i` is passed.
 
-9. [ ] **Timestamp each user/AI header marker**  If `-d` is used with transcript
-   output, then after each `## User/Claude/Codex` should have `` [<timestamp>]``
-   placed after it.
+### 5. Record/timestamp range filtering **(FEATURE)** ***(DONE)***
 
-10. [x] **`--tz` — timezone display for `-d` timestamps.**  By default `-d` should
-    show timestamps converted to the local system timezone rather than raw UTC.
-    A `--tz ZONE` flag overrides the target zone; `ZONE` may be:
-    - An IANA name (`America/New_York`, `Europe/London`, `UTC`, …) resolved via
-      `zoneinfo` (stdlib Python 3.9+).
-    - A fixed UTC offset in `±HH:MM` form (`-04:00`, `+05:30`, …) resolved as a
-      `datetime.timezone` — no external dependency.
-    If an IANA name cannot be resolved (typically because `tzdata` is not
-    installed on Windows), emit a `WARNING:` to stderr explaining the issue and
-    suggesting `pip install tzdata`, then fall back to local time and continue.
-    `--tz` automatically implies `-d`.
+Allow the user to restrict output to a sub-range of a session, useful for long
+sessions.  Two flavours:
 
-11. [x] **Colored diagnostic prefixes and grep/header elements.**  All colorisable
-    output now goes through named `_C_*` constants in the colorama block for easy
-    tuning.  Colors applied when colorama is installed and the relevant stream is a
-    TTY; plain text otherwise.
+- **By record number:** `--records M:N` (1-based, inclusive) — include only
+  JSONL records M through N.  Works with `--id` (transcript slice) and
+  `--grep` (restrict the search window).
+- **By timestamp:** `--since DATETIME` / `--until DATETIME` — include only
+  records whose `timestamp` field (Claude) or UUID-v7-derived time (Codex)
+  falls within the given range.  Accepts ISO-8601 or human-friendly strings
+  (e.g. `"2026-03-17 04:00"`).
+- Both flavours should compose with `--grep`, `--id`, and `-n`/`-d` prefixes.
+- Timestamps don't have to be complete ISO DATETIMEs, if `hh:mm` or
+  `hh:mm:ss` is given, today is assumed in the current timezone stated by the
+  computer.  --tz will allow this to change later.  I guess the general form
+  would be `[+|-][[[[[yyyy-]MM-]dd ]hh:]mm][:ss]`. The leading +/- indicates
+  relative.  No leading means absolute.
+- Record numbers can take a - prefix as well.  -1 means last record, -2 is
+  second last, etc.  Just like python's indexing.
+- **Note (implemented 2026-03-18):** Relative offsets (`-`/`+` prefix) currently
+  support `±[dd ]hh:mm[:ss]` and bare `±mm` (minutes) only.  Year/month
+  components in relative form (e.g. `-2m`, `-1y`) are deferred to a future item.
+  Negative record indices (`--records=-N:`) require the `=` form to avoid
+  argparse treating the value as a flag.
 
-    *Diagnostic prefixes* (stderr, via `_info()`/`_warn()`/`_error()`):
-    - `INFO:` — `_C_INFO` (`Fore.BLUE`)
-    - `WARNING:` — `_C_WARN` (`Fore.YELLOW`)
-    - `ERROR:` — `_C_ERROR` (`Fore.RED`)
+### 6. Consolidate consecutive Claude turns into one heading **(BUG/FEATURE)**
 
-    *Grep output* (stdout):
-    - `-d` timestamp prefix `[YYYY-MM-DD HH:MM:SS]:` — `_C_RECDATE` (`Fore.CYAN`)
-    - `-n` record-number prefix `N:` — `_C_RECNO` (`Style.DIM`)
+Each API round-trip creates a separate JSONL record; when Claude uses a tool
+the sequence is `assistant` (text + tool_use) → `user` (tool_results) →
+`assistant` (continuation), each getting its own `## Claude` heading.  The
+next consecutive `## Claude` heading isn't needed — it would be implied by
+the `<details><summary>Thinking...</summary></details>` block preceding it.
 
-    *Session header* (stdout):
-    - `[claude]` / `[codex]` source label, `[project]` — `_C_PROJECT` (`Fore.GREEN`)
-    - `[ctime]-[mtime]` date range — `_C_DATE` (`Fore.CYAN`)
-    - `(uuid8) title` — `_C_TITLE` (`Style.BRIGHT`)
-    - `records: N` — `_C_RECORDS` (`Style.DIM`)
-    - Match highlights — `_C_MATCH` (`Style.BRIGHT + Fore.RED`)
+### 7. `--project` flag semantics hardening **(BUG/FEATURE)**
 
-12. [ ] **`--ts-fmt` — timestamp format string for `-d` output.**  Allows the user
-    to override the default `strftime` format used when displaying timestamps with
-    `-d`.  Default format: `%Y-%m-%d %H:%M:%S` (matches current display after
-    item 10 is implemented).  Example: `--ts-fmt "%H:%M"` to show time only.
-    - Not sure if this will be a thing:  Should also be settable via the
-    `AI_TRANSCRIPT_TS_FMT` environment variable (CLI flag takes precedence).
+`--project PATH` is Claude-only; it should imply `--claude` and produce errors
+in the following states:
 
-13. [ ] **`.AI-transcript.rc` — per-user config file for default flags.**  A simple
-    config file (TOML or `key = value` format) read from `~/.AI-transcript.rc`
-    (or `~/.config/AI-transcript.rc`) at startup before argument parsing.  Allows
-    persistent defaults for any flag (e.g. `tz = America/New_York`,
-    `ts_fmt = %H:%M:%S`, `color = auto`).  CLI flags always take precedence over
-    rc file values.  Unknown keys produce a `WARNING:` to stderr; a missing file
-    is silently ignored.
+- `--project` combined with `--codex` → error: "`--project` is for Claude
+  sessions; remove `--codex` or drop `--project`."
+- `--project` combined with `--both-AIs` → error: same message.
+- `--project PATH` where `PATH` has no matching entry under
+  `~/.claude/projects/` → error: "No Claude project found for `PATH`."
+- `--all-projects --codex` → error: "`--all-projects` applies to Claude
+  only; it cannot be combined with `--codex`."
+- `--all-projects --both-AIs` (or no source flag) → valid: all Claude
+  sessions from all projects plus all Codex sessions.
+
+### 8. User-facing documentation **(FEATURE)**
+
+Accessible from the `--help` switch; use `--help --verbose` for extra detail
+if the standard help is too long.
+
+- **Known limitation to document:** Messages sent by the user while Claude
+  is actively running tools ("queued" / interrupt messages) are held in
+  memory only and never written as user records to the session JSONL.  They
+  are not recoverable from the file; the only trace is Claude's subsequent
+  thinking or response text that references them.  The generated transcript
+  will therefore be missing those user turns.
+
+### 9. Timestamp each user/AI header marker **(FEATURE)** ***(DONE)***
+
+If `-d` and `-n` are used with transcript output, then after each
+`## User/Claude/Codex` should have `[<timestamp>]` and `<rec_no>` placed after
+it like how it's done when prefixing with grepping.  Should use same code.
+
+### 10. `--tz` — timezone display for `-d` timestamps. **(FEATURE)** ***(DONE)***
+
+By default `-d` should show timestamps converted to the local system timezone
+rather than raw UTC.  A `--tz ZONE` flag overrides the target zone; `ZONE`
+may be:
+
+- An IANA name (`America/New_York`, `Europe/London`, `UTC`, …) resolved via
+  `zoneinfo` (stdlib Python 3.9+).
+- A fixed UTC offset in `±HH:MM` form (`-04:00`, `+05:30`, …) resolved as a
+  `datetime.timezone` — no external dependency.
+
+If an IANA name cannot be resolved (typically because `tzdata` is not
+installed on Windows), emit a `WARNING:` to stderr explaining the issue and
+suggesting `pip install tzdata`, then fall back to local time and continue.
+`--tz` automatically implies `-d`.
+
+### 11. Colored diagnostic prefixes and grep/header elements **(FEATURE)** ***(DONE)***
+
+All colorisable output now goes through named `_C_*` constants in the colorama
+block for easy tuning.  Colors applied when colorama is installed and the
+relevant stream is a TTY; plain text otherwise.
+
+*Diagnostic prefixes* (stderr, via `_info()`/`_warn()`/`_error()`):
+
+- `INFO:` — `_C_INFO` (`Fore.BLUE`)
+- `WARNING:` — `_C_WARN` (`Fore.YELLOW`)
+- `ERROR:` — `_C_ERROR` (`Fore.RED`)
+
+*Grep output* (stdout):
+
+- `-d` timestamp prefix `[YYYY-MM-DD HH:MM:SS]:` — `_C_RECDATE` (`Fore.CYAN`)
+- `-n` record-number prefix `N:` — `_C_RECNO` (`Style.DIM`)
+
+*Session header* (stdout):
+
+- `[claude]` / `[codex]` source label, `[project]` — `_C_PROJECT` (`Fore.GREEN`)
+- `[ctime]-[mtime]` date range — `_C_DATE` (`Fore.CYAN`)
+- `(uuid8) title` — `_C_TITLE` (`Style.BRIGHT`)
+- `records: N` — `_C_RECORDS` (`Style.DIM`)
+- Match highlights — `_C_MATCH` (`Style.BRIGHT + Fore.RED`)
+
+### 12. `--ts-fmt` — timestamp format string for `-d` output **(FEATURE)**
+
+Allows the user to override the default `strftime` format used when displaying
+timestamps with `-d`.  Default format: `%Y-%m-%d %H:%M:%S` (matches current
+display after item 10 is implemented).  Example: `--ts-fmt "%H:%M"` to show
+time only.
+
+- Not sure if this will be a thing: Should also be settable via the
+  `AI_TRANSCRIPT_TS_FMT` environment variable (CLI flag takes precedence).
+
+### 13. `.AI-transcript.rc` — per-user config file for default flags **(FEATURE)**
+
+A simple config file (TOML or `key = value` format) read from
+`~/.AI-transcript.rc` (or `~/.config/AI-transcript.rc`) at startup before
+argument parsing.  Allows persistent defaults for any flag (e.g.
+`tz = America/New_York`, `ts_fmt = %H:%M:%S`, `color = auto`).  CLI flags
+always take precedence over rc file values.  Unknown keys produce a `WARNING:`
+to stderr; a missing file is silently ignored.
+
+### 14. mtime should be taken from records **(BUG?/FEATURE?)**
+
+Currently, mtime is taken from the file, but it should prolly be taken from
+the last record instead as it's more stable.  Agree or disagree?
+
+### 15. Colourise the User/AI headings **(FEATURE)**
+
+If colouring is enabled, the headings should get some colour as well.
+
+### 16. Add a `--raw` flag **(FEATURE)**
+
+That flag will output the specified record range as formatted json (not as one
+long line).  Will look like:
+
+```text
+[<record_num0>]: {
+  "<key0.0>": "<content0.0>",
+  "<key0.1>": "<content0.1>",
+  ...
+  "<key0.N>": "<content0.N>"
+}
+[<record_num1>]: {
+  "<key1.0>": "<content1.0>",
+  "<key1.1>": "<content1.1>",
+  ...
+  "<key1.N>": "<content1.N>"
+}
+...
+[<record_num2>]: {
+  "<key2.0>": "<content2.0>",
+  "<key2.1>": "<content2.1>",
+  ...
+  "<key2.N>": "<content2.N>"
+}
+```
+
+If there are nested structures, then they should be appropriately indented.
+Must be used with `--records` switch as this is for diagnostics.
+
+### 17. `-A`, `-B` and `-C` switches don't span over records **(BUG)**
+
+These need to be able to show context, so if there is no line in the record
+around where it's looking, it should look in the surrounding records.
+
+### 18. `--since`/`--until` doesn't narrow down `--id` glob pattern if ambiguous **(BUG)**
+
+I was looking for something that occurred at a time, but I couldn't because the
+filter didn't filter.
+
+### 19. `--ls` doesn't display timestamps **(FEATURE)**
+
+I can't even determine when a conversation occurred.  Maybe add `-d` to modify
+default listing to show ctime and mtime.
+
+### 20. `-n` and `-d` doesn't work with `--id` **(NOT-A-BUG)** ***(WILL-NOT-IMPLEMENT)***
+
+`--id` is for transcript generation.  `-n` and `-d` will be implemented in item
+\9.  Workaround is to use `--grep-re '^'`.
+
+### 21. Need a way to state speaker when grepping **(FEATURE)**
+
+Grep needs to have a prefix like `U:` for user and `A:` for AI.  It should
+always be there.  If colour is enabled, I think yellow is probably a good
+choice.
+
+### 22. `--project` should be able to take just the project name as well
+
+From the help:
+
+```text
+  --project PATH        Claude project directory (default: current working directory).
+```
+
+States path, but just the last name should be sufficient in most cases.  If not
+should show the paths with a number prefixed to them like an ordered list.  User
+can use the same `:N` notation to disambiguate.
 
 ## Questions
 

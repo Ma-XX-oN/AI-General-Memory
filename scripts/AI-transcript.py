@@ -319,10 +319,18 @@ class SessionStore(ABC):
 
   @abstractmethod
   def transcript(self, session: "Session",
-                 rec_filter: "RecordFilter | None" = None) -> str:
+                 rec_filter: "RecordFilter | None" = None,
+                 use_color: bool = False,
+                 show_date: bool = False,
+                 record_number: bool = False,
+                 display_tz: "datetime.timezone | None" = None) -> str:
     """Return the full Markdown transcript string for *session*.
 
     If *rec_filter* is given, only records passing the filter are included.
+    If *use_color* is True, ANSI colour codes are included in the header.
+    If *show_date* is True, a formatted [timestamp] label is appended to
+    each role heading.  If *record_number* is True, the JSONL record number
+    is appended.  *display_tz* selects the timezone for timestamp display.
     """
 
 
@@ -672,12 +680,14 @@ class ClaudeSessionStore(SessionStore):
       first_only=first_only, ignore_case=ignore_case, rec_filter=rec_filter,
     )
 
-  def transcript(self, session, rec_filter=None):
+  def transcript(self, session, rec_filter=None, use_color=False,
+                 show_date=False, record_number=False, display_tz=None):
     """Return the full Markdown transcript for *session*."""
     path = str(session.path)
     with open(path, encoding="utf-8") as f:
       if rec_filter and not rec_filter.is_trivial():
         records = []
+        rec_nos = []
         for i, raw in enumerate((l for l in f if l.strip()), start=1):
           rec_no = i
           if rec_filter.past_hi(rec_no):
@@ -688,18 +698,29 @@ class ClaudeSessionStore(SessionStore):
           if not rec_filter.allows_ts(rec.get("timestamp")):
             continue
           records.append(rec)
+          rec_nos.append(rec_no)
       else:
         records = [json.loads(l) for l in f if l.strip()]
+        rec_nos = list(range(1, len(records) + 1))
 
-    line1, line2 = _format_session_lines(session)
+    rec_width = len(str(session.rc))
+    line1, line2 = _format_session_lines(session, use_color=use_color)
     out = [f"{line1}\n{line2}\n"]
 
     last_user_text = None  # deduplicate retried user messages
-    for rec in records:
+    for rec_no, rec in zip(rec_nos, records):
       if rec.get("isSidechain"):
         continue
 
       rtype = rec.get("type")
+      suffix = ""
+      if show_date or record_number:
+        s = _build_hunk_prefix(rec_no, rec.get("timestamp"),
+                               show_date=show_date, record_number=record_number,
+                               rec_width=rec_width, tz=display_tz,
+                               use_color=use_color).rstrip()
+        if s:
+          suffix = " " + s
 
       # ── User turn ──────────────────────────────────────────────────
       if rtype == "user":
@@ -711,7 +732,7 @@ class ClaudeSessionStore(SessionStore):
         text = _cl_user_text(content)
         if text and text != last_user_text:
           last_user_text = text
-          out.append(f"## User\n\n{text}\n")
+          out.append(f"## User{suffix}\n\n{text}\n")
 
       # ── Assistant turn ─────────────────────────────────────────────
       elif rtype == "assistant":
@@ -747,7 +768,7 @@ class ClaudeSessionStore(SessionStore):
         if not thinking and not texts and not file_ops and not bash_ops and not todo_ops:
           continue
 
-        block = "## Claude"
+        block = f"## Claude{suffix}"
 
         if thinking:
           inner = "\n\n>\n\n".join(thinking)
@@ -1191,7 +1212,8 @@ class CodexSessionStore(SessionStore):
       first_only=first_only, ignore_case=ignore_case, rec_filter=rec_filter,
     )
 
-  def transcript(self, session, rec_filter=None):
+  def transcript(self, session, rec_filter=None, use_color=False,
+                 show_date=False, record_number=False, display_tz=None):
     """Return the full Markdown transcript for *session*."""
     path = str(session.path)
     with open(path, encoding="utf-8") as f:
@@ -1206,28 +1228,33 @@ class CodexSessionStore(SessionStore):
           rec = json.loads(raw)
           if not rec_filter.allows_ts(rec.get("timestamp")):
             continue
+          rec["_rec_no"] = rec_no
           lines.append(rec)
       else:
         lines = [json.loads(l) for l in f if l.strip()]
 
     # First pass: collect messages in order
+    rec_width = len(str(session.rc))
     msgs = []
     for idx, l in enumerate(lines):
       if l.get("type") != "event_msg":
         continue
       et = l["payload"].get("type")
+      rec_no = l.get("_rec_no", idx + 1)
       if et == "user_message":
         text = l["payload"].get("message", "")
         m = re.search(r"## My request for Codex:\n(.+)", text, re.DOTALL)
         if m:
           text = m.group(1).strip()
         images = _cx_get_images_before(lines, idx)
-        msgs.append({"role": "user", "text": text, "images": images, "idx": idx})
+        msgs.append({"role": "user", "text": text, "images": images, "idx": idx,
+                     "rec_no": rec_no, "ts": l.get("timestamp")})
       elif et == "agent_message":
         phase = l["payload"].get("phase", "")
         text = l["payload"].get("message", "")
         msgs.append(
-          {"role": "codex", "phase": phase, "text": text, "idx": idx, "patches": []}
+          {"role": "codex", "phase": phase, "text": text, "idx": idx,
+           "patches": [], "rec_no": rec_no, "ts": l.get("timestamp")}
         )
 
     # Second pass: attach patches to each final Codex message
@@ -1238,7 +1265,7 @@ class CodexSessionStore(SessionStore):
       if msg["role"] == "user":
         prev_idx = msg["idx"]
 
-    line1, line2 = _format_session_lines(session)
+    line1, line2 = _format_session_lines(session, use_color=use_color)
     out = [f"{line1}\n{line2}\n"]
 
     i = 0
@@ -1246,14 +1273,24 @@ class CodexSessionStore(SessionStore):
       msg = msgs[i]
 
       if msg["role"] == "user":
+        suffix = ""
+        if show_date or record_number:
+          s = _build_hunk_prefix(msg["rec_no"], msg["ts"],
+                                 show_date=show_date, record_number=record_number,
+                                 rec_width=rec_width, tz=display_tz,
+                                 use_color=use_color).rstrip()
+          if s:
+            suffix = " " + s
         img_md = "\n".join(f'![image]({url})' for url in msg["images"])
-        block = f'## User\n\n{msg["text"]}'
+        block = f'## User{suffix}\n\n{msg["text"]}'
         if img_md:
           block += f"\n\n{img_md}"
         out.append(block + "\n")
         i += 1
 
       else:  # codex turn
+        codex_rec_no = msgs[i]["rec_no"]
+        codex_ts = msgs[i]["ts"]
         commentary_items = []
         while i < len(msgs) and msgs[i]["role"] == "codex" and msgs[i]["phase"] == "commentary":
           commentary_items.append(msgs[i]["text"])
@@ -1264,7 +1301,15 @@ class CodexSessionStore(SessionStore):
           final_msg = msgs[i]
           i += 1
 
-        block = "## Codex"
+        suffix = ""
+        if show_date or record_number:
+          s = _build_hunk_prefix(codex_rec_no, codex_ts,
+                                 show_date=show_date, record_number=record_number,
+                                 rec_width=rec_width, tz=display_tz,
+                                 use_color=use_color).rstrip()
+          if s:
+            suffix = " " + s
+        block = f"## Codex{suffix}"
         if commentary_items:
           inner = "\n\n>\n\n".join(commentary_items)
           block += f"\n\n<details>\n<summary>Thoughts</summary>\n\n{inner}\n\n</details>"
@@ -2048,7 +2093,11 @@ def main():
 
     _info(f"Session: {session.path}")
     store = stores[session.source]
-    transcript_text = store.transcript(session, rec_filter=_resolve_rec_filter(session))
+    transcript_text = store.transcript(session, rec_filter=_resolve_rec_filter(session),
+                                        use_color=use_color,
+                                        show_date=args.show_date,
+                                        record_number=args.record_number,
+                                        display_tz=_display_tz)
 
     if args.output:
       with open(args.output, "w", encoding="utf-8") as fh:

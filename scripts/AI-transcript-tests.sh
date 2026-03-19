@@ -285,6 +285,21 @@ check "--since 2026-01-01: has matches"         0  "lattice"       ""  $SCRIPT -
 check "--since relative -9999:00: has matches"  0  "lattice"       ""  $SCRIPT --codex --id 019cf2fa --grep "lattice" --since="-9999:00"
 check "--until +offset relative to since"       0  "lattice"       ""  $SCRIPT --codex --id 019cf2fa --grep "lattice" --since "2026-01-01" --until "+9999:00"
 
+# ── Transcript headings: -d / -n stamps (item 9) ─────────────────────────────
+echo
+echo "-- Transcript headings -d / -n (item 9)"
+# Codex: -d stamps headings with [YYYY-
+check "codex transcript -d: User heading has timestamp"   0  "^## User \[20"    ""  $SCRIPT --codex --id 019cf2fa -d
+check "codex transcript -d: Codex heading has timestamp"  0  "^## Codex \[20"   ""  $SCRIPT --codex --id 019cf2fa -d
+# Codex: -n stamps headings with record number
+check "codex transcript -n: User heading has rec no"      0  "^## User  *[0-9]" ""  $SCRIPT --codex --id 019cf2fa -n
+# Codex: no flags — headings are plain
+check "codex transcript no flags: User heading plain"     0  "^## User$"        ""  $SCRIPT --codex --id 019cf2fa
+check "codex transcript no flags: no bracket in User"     0  "^## User \["      "!" $SCRIPT --codex --id 019cf2fa
+# Claude: -d stamps headings with [YYYY-
+check "claude transcript -d: User heading has timestamp"   0  "^## User \[20"   ""  $SCRIPT --claude --all-projects --id a321be7c -d
+check "claude transcript -d: Claude heading has timestamp" 0  "^## Claude \[20" ""  $SCRIPT --claude --all-projects --id a321be7c -d
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo
 TOTAL=$((PASS + FAIL))
