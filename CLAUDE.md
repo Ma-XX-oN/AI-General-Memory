@@ -23,6 +23,19 @@ to understand the repo structure and conventions.  Then:
 When asked "is there anything else?" or "check again", do a genuinely fresh
 pass rather than assuming prior checks were exhaustive.
 
+### Cover all dimensions when reviewing documents
+
+When reviewing written documents, check all three dimensions — not just
+spelling:
+
+- **Typos/spelling** — words that don't exist
+- **Grammar** — incorrect sentence structure (e.g. missing "to" in "get the
+  AI understand", missing commas, wrong verb form)
+- **Prose quality** — awkward phrasing, wordiness, poor flow, redundancy
+
+Flagging only spelling errors while missing grammar mistakes and style problems
+is an incomplete review.
+
 ### When fixing one of a pair/group, check all siblings
 
 If a comment or pattern appears in multiple places (e.g. parallel comment
