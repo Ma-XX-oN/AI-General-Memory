@@ -290,6 +290,13 @@ When uncertain about a platform behavior, API contract, or environment
 limitation, search for documentation first.  If no answer is found, ask the
 user.  Never guess and iterate blindly through variations hoping one sticks.
 
+### Verify comparative claims before asserting them
+
+When making claims that compare tools, platforms, or services (e.g. "X has
+this feature but Y doesn't"), confirm the claim before stating it as fact.
+Unverified assumptions about other tools' capabilities can be wrong and
+misleading — ask the user or search for confirmation first.
+
 ### Geometric calculations: formula first, then apply mechanically
 
 When doing geometry (SVG coordinates, ellipse intersections, rotations), write
