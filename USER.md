@@ -10,6 +10,9 @@
 - [TDD is Your Friend](#tdd-is-your-friend)
 - [Logging and Replay](#logging-and-replay)
 - [Self Reflection](#self-reflection)
+- [Use Multiple Models](#use-multiple-models)
+  - [What Claude Code Thinks](#what-claude-code-thinks)
+  - [What Codex Thinks](#what-codex-thinks)
 
 ## Purpose
 
@@ -109,3 +112,47 @@ conversation between you and the AI. You can actually use this to help the AI
 reflect on what it has done and possibly give it something to write down in its
 memory (either global or project memory) so that it doesn't do it again
 (mostly).
+
+## Use Multiple Models
+
+You can just use one model, but why restict yourself.  One is good, but each
+have their own positives/negatives.
+
+----
+
+Claude, what advantages/disadvantages do you think you have over Codex?
+
+### What Claude Code Thinks
+
+> **Advantages**
+>
+> - *Reasoning depth.* Extended thinking lets me work through complex problems —
+>   architectural decisions, multi-file debugging, ambiguous requirements — more
+>   thoroughly than a straight completion pass.
+> - *Mixed code-and-prose tasks.* Documentation, commit messages, code review
+>   write-ups, design docs. These play to my strengths.
+> - *Dialogue.* I can ask clarifying questions mid-task, push back on
+>   requirements that seem wrong, and stop when something doesn't feel right
+>   rather than filling in the gaps silently.
+> - *Long-context coherence.* I maintain a consistent understanding across large
+>   codebases and long conversations better than models optimised purely for
+>   completion.
+>
+> **Disadvantages**
+>
+> - *No inline IDE integration.* I work through a CLI. I can't autocomplete
+>   inside a file the way Codex does natively in VS Code.
+> - *Verbosity.* I over-explain. For a quick one-liner fix, Codex is faster and
+>   less noisy.
+> - *Prose cleanup.* As demonstrated in this very session: I flagged typos but
+>   missed grammar errors and style problems. Codex's prose pass was better.
+> - *Speed on mechanical tasks.* Straightforward refactors, renaming, boilerplate
+>   generation — Codex's completion model is faster here.
+
+----
+
+Codex, what advantages/disadvantages do you think you have over Claude Code?
+
+### What Codex Thinks
+
+>
