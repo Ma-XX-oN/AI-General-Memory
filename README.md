@@ -76,6 +76,7 @@ Most of these files are used by the AIs. A few are used directly by the user.
 
 | File | User | Purpose |
 | --- | --- | --- |
+| [`USER.md`](USER.md) | User | Effective techniques for using AI |
 | [`social-preview.svg`](social-preview.svg) | User | Repository social preview artwork |
 | [`LICENSE`](LICENSE) | User | Apache License 2.0 terms for repository content |
 | [`NOTICE`](NOTICE) | User | Project and contributor attribution notice file |

@@ -3,6 +3,7 @@
 
 # Except knowledge files
 !.gitignore
+!USER.md
 !README.md
 !CLAUDE.md
 !CODEX.md
