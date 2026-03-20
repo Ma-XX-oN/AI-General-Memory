@@ -28,6 +28,7 @@
 - For any non-mixed file, after editing, every line must still use that original line ending style; if that cannot be guaranteed, normalize to the original style and report.
 - For PowerShell workflows, use `~/.codex/scripts/show-eol.ps1` (detect) and `~/.codex/scripts/normalize-eol.ps1` (normalize) with an explicit target EOL (`CRLF` or `LF`) instead of ad-hoc EOL commands.
 - For non-PowerShell workflows, use `~/.codex/scripts/show-eol.pl` (detect) and `~/.codex/scripts/normalize-eol.pl` (normalize) instead of ad-hoc EOL commands.
+- Never run EOL normalization and EOL inspection on the same file in parallel; run normalize first and inspect second, because `show-eol` can observe stale or mid-rewrite bytes during `normalize-eol`.
 - Do independent transformations first; do dependent or lossy transformations last.
 - Do not run dependent operations in parallel (for example `git add` -> `git commit` -> `git push`); run them sequentially and verify each step before starting the next to avoid order/race errors.
 - Preserve semantic meaning before simplifying representation.
