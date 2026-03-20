@@ -208,6 +208,8 @@ With this repo, and using TDD, I find that they both are capable of writing good
 code.  Most, if not all of the scripts in this repo were created by either AI,
 and sometimes both, with direction and minimal intervention from me.
 
+Another issue I've found with Claude Code is that it seems to either take more tokens or has less tokens to play with when compared to Codex.  So even though Codex may take a little longer, it can generally do more.
+
 Although each alone is good, it's a bit hard to say which is a clear winner.  I
 think they are complementary to each other, bringing different points of view to
 the task at hand.
