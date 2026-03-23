@@ -5,6 +5,7 @@
 ### Memory Placement
 
 - If the user says to "remember" something, store project-specific rules in the project's `CODEX.md`. Store cross-project rules in `~/.codex/CODEX.md` as global defaults that apply to all projects unless overridden locally.
+- If the user says to store something in "your memory", store it only in Codex global memory (`~/.codex/CODEX.md`, or the configured `$CODEX_HOME/CODEX.md`). Do not store it in project-local memory, `.claude`, or any other tool's memory file.
 
 ### Commit Messages And Timing
 
@@ -27,6 +28,7 @@
 - For any non-mixed file, after editing, every line must still use that original line ending style; if that cannot be guaranteed, normalize to the original style and report.
 - For PowerShell workflows, use `~/.codex/scripts/show-eol.ps1` (detect) and `~/.codex/scripts/normalize-eol.ps1` (normalize) with an explicit target EOL (`CRLF` or `LF`) instead of ad-hoc EOL commands.
 - For non-PowerShell workflows, use `~/.codex/scripts/show-eol.pl` (detect) and `~/.codex/scripts/normalize-eol.pl` (normalize) instead of ad-hoc EOL commands.
+- Never run EOL normalization and EOL inspection on the same file in parallel; run normalize first and inspect second, because `show-eol` can observe stale or mid-rewrite bytes during `normalize-eol`.
 - Do independent transformations first; do dependent or lossy transformations last.
 - Do not run dependent operations in parallel (for example `git add` -> `git commit` -> `git push`); run them sequentially and verify each step before starting the next to avoid order/race errors.
 - Preserve semantic meaning before simplifying representation.
@@ -78,11 +80,14 @@
 - In technical answers, explicitly separate confirmed facts from preferences/inference, and include the strongest counterargument before the final recommendation.
 - If a recommendation changes, state the concrete new fact that caused the change.
 - In Markdown text, when you DO NOT intend the literal sequence `>=`, write it with whitespace as `> =` to prevent auto-conversion to `≥`.
+- For clickable local file references in chat responses on Windows, use Markdown links with a leading slash before the drive path, for example `[label](/c:/absolute/path/to/file.ext#L12)`.
 
 ### Troubleshooting And Guardrails
 
 - For any question about current file contents, perform a fresh read of the target file in the same turn before answering; do not answer from cached context alone.
 - If a required memory/reference file cannot be resolved or opened, stop and tell the user explicitly; do not silently ignore the missing reference or answer as if it had been loaded.
+- When a script or test resolves output paths relative to its own location or executable location (for example via `A_ScriptDir`), treat logs and generated artifacts as worktree-specific; inspect the matching worktree/script directory instead of assuming the current shell's repo path.
+- Do not misdiagnose worktree-relative or executable-relative output-path issues as sandbox problems; first verify the code's path-resolution rule and the fully resolved output path.
 - When asked to re-review ("anything else?", "check again"), do a fresh pass instead of assuming prior checks were exhaustive.
 - When fixing one item in a repeated pattern/group, check sibling occurrences and update them together unless the user explicitly limits scope.
 - Prefer public APIs when fixing external library usage; avoid bypassing behavior by calling private/internal APIs directly unless you are working inside that library.
@@ -96,6 +101,7 @@
 
 ### Documentation And Diagrams
 
+- In general documentation, avoid non-essential temporal/status phrasing such as "now", "currently", "before", or "previously"; state the invariant directly unless timeline context is the point (for example in a changelog).
 - For OpenSCAD JS documentation, require JSDoc on public symbols and use `@slot`/`@deref` plus full `@type` docs for slot-based constants/typedefs.
 - For GitHub markdown docs, avoid raw `<svg>` tags and sanitize punctuation-heavy anchors when generating intra-doc links.
 - For GitHub markdown diagrams that must align, prefer plain ASCII (`+`, `-`, `|`) over Unicode box-drawing characters because GitHub monospace rendering can drift.

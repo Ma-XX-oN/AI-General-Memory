@@ -3,6 +3,7 @@
 
 # Except knowledge files
 !.gitignore
+!USER.md
 !README.md
 !CLAUDE.md
 !CODEX.md
@@ -32,6 +33,9 @@
 !scripts/HtmlDom.ahk
 !scripts/CopyClip.ahk
 !scripts/TT_Simple.ahk
+!scripts/AI-transcript.py
+!scripts/AI-transcript-plan.md
+!scripts/AI-transcript-tests.sh
 !scripts/ahk-test
 !scripts/ahk-test/**
 scripts/ahk-test/*.actual.md
