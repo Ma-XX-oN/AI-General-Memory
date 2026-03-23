@@ -56,6 +56,7 @@
   - [20. `-n` and `-d` doesn't work with `--id` **(NOT-A-BUG)** ***(WILL-NOT-IMPLEMENT)***](#20--n-and--d-doesnt-work-with---id-not-a-bug-will-not-implement)
   - [21. Need a way to state speaker when grepping **(FEATURE)**](#21-need-a-way-to-state-speaker-when-grepping-feature)
   - [22. `--project` should be able to take just the project name as well](#22---project-should-be-able-to-take-just-the-project-name-as-well)
+  - [23. `--id <title-substr>` doesn't work for Codex **(BUG)** ***(RESOLVED)***](#23---id-title-substr-doesnt-work-for-codex-bug-resolved)
 - [Questions](#questions)
 - [Bugs resolved](#bugs-resolved)
   - [Bug verification matrix](#bug-verification-matrix)
@@ -1063,6 +1064,24 @@ From the help:
 States path, but just the last name should be sufficient in most cases.  If not
 should show the paths with a number prefixed to them like an ordered list.  User
 can use the same `:N` notation to disambiguate.
+
+### 23. `--id <title-substr>` doesn't work for Codex **(BUG)** ***(RESOLVED)***
+
+When using the `--id` switch, it doesn't find the conversation with that title.
+
+**Root cause:** `CodexSessionStore.find()` only searched `thread_name` from
+`session_index.jsonl`.  Sessions that exist as files but have no index entry
+(e.g. a session created so recently that Codex hasn't written its index entry
+yet) were invisible to title search.
+
+**Fix:** Added `_cx_first_user_message(path)` which extracts the first
+`event_msg / user_message` payload from the JSONL, strips the IDE-context
+preamble (`## My request for Codex:` block), and returns the first non-empty
+line (up to 100 chars) as a synthetic title.  `_make_session_from_path` now
+uses this as the title for unindexed sessions.  `CodexSessionStore.find()`
+falls back to scanning all session files not in the index when the indexed
+title-glob returns nothing, matching against that synthetic title.
+Test: `--codex --id "I want you to" --ls` → finds session `019d1acc`.
 
 ## Questions
 

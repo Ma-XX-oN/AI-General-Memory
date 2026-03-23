@@ -921,6 +921,39 @@ def _cx_find_session_file(session_id):
   return matches[0]
 
 
+def _cx_first_user_message(path, *, max_chars=100):
+  """Return the first user-message text from a Codex JSONL file, or None.
+
+  Scans records until it finds the first ``event_msg`` with payload type
+  ``user_message``.  The text is stripped and truncated to *max_chars*
+  characters so it can serve as a synthetic session title.
+  """
+  try:
+    with open(path, encoding="utf-8") as f:
+      for line in f:
+        try:
+          rec = json.loads(line)
+        except json.JSONDecodeError:
+          continue
+        if rec.get("type") == "event_msg":
+          payload = rec.get("payload", {})
+          if payload.get("type") == "user_message":
+            text = payload.get("message", "").strip()
+            # Strip IDE context preamble if present (same logic as transcript renderer)
+            m = re.search(r"## My request for Codex:\n(.+)", text, re.DOTALL)
+            if m:
+              text = m.group(1).strip()
+            if text:
+              # Use only the first non-empty line to avoid multi-line titles
+              first_line = next(
+                (l for l in text.splitlines() if l.strip()), text
+              ).strip()
+              return first_line[:max_chars]
+  except Exception:
+    pass
+  return None
+
+
 def _cx_read_session_index():
   """
   Read session_index.jsonl and return a de-duplicated list of session dicts,
@@ -1118,11 +1151,12 @@ class CodexSessionStore(SessionStore):
     if ctime is None:
       ctime = mtime
     rc = _count_records(path)
+    title = _cx_first_user_message(path) or "(no title)"
     return Session(
       source="codex",
       id=sid,
       path=Path(path),
-      title="(no title)",
+      title=title,
       ctime=ctime,
       mtime=mtime,
       project=None,
@@ -1154,6 +1188,7 @@ class CodexSessionStore(SessionStore):
     Note: *all_projects* is ignored (Codex has no project partitioning).
     """
     entries = _cx_read_session_index()
+    indexed_ids = {e.get("id") for e in entries}
 
     if id_or_glob == "latest":
       if not entries:
@@ -1198,6 +1233,23 @@ class CodexSessionStore(SessionStore):
           sess = self._make_session(e)
           if sess:
             all_matches.append(sess)
+
+      # Fallback: scan session files not present in the index (e.g. recent
+      # sessions whose index entry hasn't been written yet).  Use the first
+      # user message as a synthetic title for matching.
+      if not all_matches:
+        sessions_dir = os.path.join(_cx_home(), "sessions")
+        for fpath in glob_mod.glob(
+            os.path.join(sessions_dir, "**", "*.jsonl"), recursive=True
+        ):
+          sid = _cx_session_id_from_path(fpath)
+          if sid in indexed_ids:
+            continue
+          title = _cx_first_user_message(fpath) or ""
+          if fnmatch.fnmatch(title.lower(), glob_pat.lower()):
+            sess = self._make_session_from_path(fpath, entries)
+            if sess:
+              all_matches.append(sess)
 
     if not all_matches:
       raise FileNotFoundError(f"No Codex session matching '{id_or_glob}'")

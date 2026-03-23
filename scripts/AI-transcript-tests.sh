@@ -219,6 +219,8 @@ check "--claude --all-projects --grep-re exits 0"   0  ""        ""  $SCRIPT --c
 check "--id resolves codex session"       0  "019cf2fa"  "" $SCRIPT --id 019cf2fa --ls
 # transcript works for each store
 check "codex transcript exits 0"          0  "019cf2fa"  "" $SCRIPT --codex --id 019cf2fa
+# --id by first-message text for a session not in session_index.jsonl (bug #23)
+check "--id by first-msg for unindexed session"  0  "019d1acc"  "" $SCRIPT --codex --id "I want you to" --ls
 
 # ── Case sensitivity (-i flag) ────────────────────────────────────────────────
 echo
