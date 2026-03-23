@@ -50,12 +50,12 @@
   - [14. mtime should be taken from records **(BUG?/FEATURE?)**](#14-mtime-should-be-taken-from-records-bugfeature)
   - [15. Colourise the User/AI headings **(FEATURE)**](#15-colourise-the-userai-headings-feature)
   - [16. Add a `--raw` flag **(FEATURE)**](#16-add-a---raw-flag-feature)
-  - [17. `-A`, `-B` and `-C` switches don't span over records **(BUG)**](#17--a--b-and--c-switches-dont-span-over-records-bug)
+  - [17. `-A`, `-B` and `-C` switches don't span over records **(FEATURE)**](#17--a--b-and--c-switches-dont-span-over-records-feature)
   - [18. `--since`/`--until` doesn't narrow down `--id` glob pattern if ambiguous **(BUG)**](#18---since--until-doesnt-narrow-down---id-glob-pattern-if-ambiguous-bug)
   - [19. `--ls` doesn't display timestamps **(FEATURE)**](#19---ls-doesnt-display-timestamps-feature)
   - [20. `-n` and `-d` doesn't work with `--id` **(NOT-A-BUG)** ***(WILL-NOT-IMPLEMENT)***](#20--n-and--d-doesnt-work-with---id-not-a-bug-will-not-implement)
   - [21. Need a way to state speaker when grepping **(FEATURE)**](#21-need-a-way-to-state-speaker-when-grepping-feature)
-  - [22. `--project` should be able to take just the project name as well](#22---project-should-be-able-to-take-just-the-project-name-as-well)
+  - [22. `--project` should be able to take just the project name as well **(FEATURE)**](#22---project-should-be-able-to-take-just-the-project-name-as-well-feature)
   - [23. `--id <title-substr>` doesn't work for Codex **(BUG)** ***(RESOLVED)***](#23---id-title-substr-doesnt-work-for-codex-bug-resolved)
 - [Questions](#questions)
 - [Bugs resolved](#bugs-resolved)
@@ -1027,10 +1027,10 @@ long line).  Will look like:
 If there are nested structures, then they should be appropriately indented.
 Must be used with `--records` switch as this is for diagnostics.
 
-### 17. `-A`, `-B` and `-C` switches don't span over records **(BUG)**
+### 17. `-A`, `-B` and `-C` switches don't span over records **(FEATURE)**
 
 These need to be able to show context, so if there is no line in the record
-around where it's looking, it should look in the surrounding records.
+around where it's looking, it should look in the surrounding records.  Maybe add a `-x` switch (cross record boundary) to turn this ability on.
 
 ### 18. `--since`/`--until` doesn't narrow down `--id` glob pattern if ambiguous **(BUG)**
 
@@ -1053,7 +1053,7 @@ Grep needs to have a prefix like `U:` for user and `A:` for AI.  It should
 always be there.  If colour is enabled, I think yellow is probably a good
 choice.
 
-### 22. `--project` should be able to take just the project name as well
+### 22. `--project` should be able to take just the project name as well **(FEATURE)**
 
 From the help:
 
