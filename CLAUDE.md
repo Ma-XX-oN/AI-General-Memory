@@ -339,6 +339,19 @@ See [ahk.md](ahk.md) for full notes. Critical reminders:
 - [Workflow guidance (TTD/tests/commit workflow)](workflow.md)
 - [Build issue triage playbook](build_issues.md)
 
+## Transcript search
+
+When asked to search Claude or Codex transcripts or sessions, use
+`~/.claude/scripts/AI-transcript.py`.  Prefer this over manually grepping
+session directories.
+
+```bash
+python ~/.claude/scripts/AI-transcript.py [--claude|--codex|--both-AIs] \
+  [--ls | --id GLOB_OR_UUID | --grep TEXT | --grep-re PATTERN] [output.md]
+```
+
+Key flags: `--all-projects`, `-A/-B/-C` (context lines), `--words-only`, `--color`.
+
 ## Time tracking (every prompt)
 
 For **every** prompt — questions, coding tasks, research, all of them:
