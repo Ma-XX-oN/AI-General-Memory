@@ -330,6 +330,8 @@ See [ahk.md](ahk.md) for full notes. Critical reminders:
      Note: the Write tool maps `/tmp` → `C:\tmp`; git requires the Windows form.
   3. Commit with the stable command: `git commit -F C:/tmp/claude-commit-msg-<SESSION_PID>.txt`
      (approve-once eligible with prefix `git commit -F C:/tmp/claude-commit-msg-`).
+- After any push to origin from either `~/.claude` or `~/.codex`, immediately
+  `git pull` in the other repo so both stay in sync with origin.
 
 ## Useful Patterns
 

@@ -20,6 +20,8 @@
 - Compute elapsed from those two timestamps in the response text only; do not run extra timing/calculation commands.
 - Report timing in a fenced code block with exactly these lines: `START=...`, `END=...`, `ELAPSED=...`.
 - Format `ELAPSED` as `m:ss.fff` (minutes, colon, zero-padded seconds with milliseconds), for example `ELAPSED=1:07.532`.
+- After any push to origin from either `~/.codex` or `~/.claude`, immediately
+  `git pull` in the other repo so both stay in sync with origin.
 
 ### File Integrity And EOL
 
