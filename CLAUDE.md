@@ -80,6 +80,10 @@ explicit direction ("go ahead", "do it", "update it") before acting.
 This applies even when you know exactly what the fix is.  Proposing a change
 and immediately making it in the same response is a violation of this rule.
 
+Before acting on any instruction, also check whether the requested action
+conflicts with an existing rule or has already been done.  If so, flag it and
+ask rather than proceeding blindly.
+
 ### Question things that don't seem right
 
 Do NOT assume the user knows everything or that their suggestions are always
@@ -304,6 +308,18 @@ out the complete formula once with consistent variable names before computing
 any numbers.  Apply it mechanically to each point.  Do not re-derive from
 scratch mid-stream — re-derivation under pressure introduces errors and causes
 spiraling.
+
+### A single-word reply to a multi-option question is ambiguous — always ask
+
+When the user replies with "Yes", "No", "Sure", or similar to a question that
+offered multiple distinct options, that answer does not identify which option
+they chose.  Ask which option they mean before taking any action.
+
+### Ask before changing approach mid-task
+
+When a better approach surfaces mid-task that involves a judgment call the user
+should make (e.g. amend vs. new commit, merge vs. rebase, overwrite vs.
+backup), stop and ask.  Do not assume and proceed.
 
 ## AutoHotkey v2
 
