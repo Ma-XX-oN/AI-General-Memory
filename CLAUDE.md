@@ -321,6 +321,14 @@ When a better approach surfaces mid-task that involves a judgment call the user
 should make (e.g. amend vs. new commit, merge vs. rebase, overwrite vs.
 backup), stop and ask.  Do not assume and proceed.
 
+### Update the ahk-test Change Log when adding a fixture
+
+When adding a new fixture to `scripts/ahk-test/test-paste-md-fixtures.ahk`,
+always add a corresponding entry to the `## Change Log` section in
+`scripts/ahk-test/README.md` in the same commit.  Include: commit hash, fixture
+filename, description of the bug, relevant before/after HTML and markdown.
+Never skip this step — it has been forgotten twice.
+
 ## AutoHotkey v2
 
 See [ahk.md](ahk.md) for full notes. Critical reminders:

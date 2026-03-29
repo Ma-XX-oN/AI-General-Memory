@@ -190,7 +190,45 @@ Lists what commits relate to what `PasteAsMd_*.expected.md` entries.  This will
 allow being able to track if a fix was good, or could have been done better for
 possible future cleanup passes.
 
-### TBD fix(paste-md): strip trailing empty list items for non-bare-li fragments
+### da886b5 fix(htmlnorm): handle ChatGPT section-element turn containers
+
+PasteAsMd_ChatGPT-SectionTurns.expected.md
+
+ChatGPT changed their renderer so conversation turns are now wrapped in
+`<section data-turn="...">` instead of `<article data-turn="...">`.
+`_InjectPosterPlaceholders` only matched `<article>`, so `## User` /
+`## ChatGPT` headings were not injected for any ChatGPT clipboard paste.
+
+Updated all three patterns to match `(?:article|section)` so both old
+and new clipboard captures work.
+
+From stage 2. cfHtml (raw full payload) (Simplified)
+
+```html
+<section ... data-turn="assistant" ...>...</section>
+<section ... data-turn="user" ...>...</section>
+<section ... data-turn="assistant" ...>...</section>
+```
+
+**Fix applied here.**
+
+From stage 6. FINAL md (pasted)
+
+```md
+## ChatGPT
+
+> Ems tbsdp ddtfbbj gqd oppbn ...
+
+## User
+
+> Ugzuj axml g rihc zg iraaes ...
+
+## ChatGPT
+
+> Wsj. Zre p owao. Ylhn'p htq ...
+```
+
+### 7bf4898 fix(paste-md): strip trailing empty list items for non-bare-li fragments
 
 PasteAsMd_ChatGPT-TrailingEmptyBullet.expected.md
 
@@ -252,14 +290,14 @@ The fixture harness now validates canonical logs directly:
 - each section boundary must be followed by the one canonical CRLF separator block or EOF
 - the stored CF\_HTML offsets are used as-is against the canonical payload
 
-### 694e5e3 fix(paste-md): add edited-file fixture and monaco diff normalization
+### c7cdd78 fix(paste-md): add edited-file fixture and monaco diff normalization
 
 PasteAsMd_Codex-EditedFile.expected.md
 
 Added the ability to convert Codex's diff representation to an actual diff
 fenced code block.
 
-### 7b61d4f fix(paste-md): fixed inappropriate numbering of an unordered list
+### df73bc2 fix(paste-md): fixed inappropriate numbering of an unordered list
 
 PasteAsMd_Codex-OrderedList-Parent.expected.md
 
@@ -309,7 +347,7 @@ From 5. md (after CleanMarkdown)
 3.  ¶
 ```
 
-### 5fc3318 fix(paste-md): handle nested unordered list selection
+### 469b843 fix(paste-md): handle nested unordered list selection
 
 PasteAsMd_Codex-OrderedList-Nested.expected.md
 
@@ -378,7 +416,7 @@ From 5. md (after CleanMarkdown)
 2.  ¶
 ```
 
-### 096551c fix(paste-md): preserve unordered intent for parent-list fragments
+### 81bd5f6 fix(paste-md): preserve unordered intent for parent-list fragments
 
 PasteAsMd_Codex-OrderedList-Parent.expected.md  
 PasteAsMd_Codex-OrderedList-Nested.expected.md
