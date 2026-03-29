@@ -228,6 +228,31 @@ From stage 6. FINAL md (pasted)
 > Wsj. Zre p owao. Ylhn'p htq ...
 ```
 
+### 38e74b8 fix(cliphelper): keep CF_HTML offsets as UTF-8 byte positions
+
+Affected runtime/files:
+
+- `ClipHelper.ahk`
+- `test-paste-md-fixtures.ahk`
+
+`CF_HTML` offsets are defined in UTF-8 bytes, so the runtime and fixtures must
+preserve that payload model exactly. Character-count slicing is not sufficient
+once the clipboard HTML contains non-ASCII text.
+
+The runtime fix keeps the existing numeric headers and applies them correctly:
+
+- `ClipboardWaiter.GetHtml()` decodes the clipboard payload as UTF-8 text.
+- `ClipboardWaiter.SelectHtmlSection()` re-encodes that text as UTF-8 and slices
+  the requested byte range directly from the stored offsets.
+- `PasteMd` consumers that inspect the pre-fragment context now use the same
+  UTF-8 byte-range slicing helper instead of character-based substring logic.
+
+The fixture harness now validates canonical logs directly:
+
+- section payload length must match the declared `len=...`
+- each section boundary must be followed by the one canonical CRLF separator block or EOF
+- the stored CF\_HTML offsets are used as-is against the canonical payload
+
 ### 7bf4898 fix(paste-md): strip trailing empty list items for non-bare-li fragments
 
 PasteAsMd_ChatGPT-TrailingEmptyBullet.expected.md
@@ -265,43 +290,13 @@ From stage 6. FINAL md (pasted)
 > Right now the document looks like it is trying to cover:
 ```
 
-### TBD fix(cliphelper): keep CF_HTML offsets as UTF-8 byte positions
-
-Affected runtime/files:
-
-- `ClipHelper.ahk`
-- `test-paste-md-fixtures.ahk`
-
-`CF_HTML` offsets are defined in UTF-8 bytes, so the runtime and fixtures must
-preserve that payload model exactly. Character-count slicing is not sufficient
-once the clipboard HTML contains non-ASCII text.
-
-The runtime fix keeps the existing numeric headers and applies them correctly:
-
-- `ClipboardWaiter.GetHtml()` decodes the clipboard payload as UTF-8 text.
-- `ClipboardWaiter.SelectHtmlSection()` re-encodes that text as UTF-8 and slices
-  the requested byte range directly from the stored offsets.
-- `PasteMd` consumers that inspect the pre-fragment context now use the same
-  UTF-8 byte-range slicing helper instead of character-based substring logic.
-
-The fixture harness now validates canonical logs directly:
-
-- section payload length must match the declared `len=...`
-- each section boundary must be followed by the one canonical CRLF separator block or EOF
-- the stored CF\_HTML offsets are used as-is against the canonical payload
-
-### c7cdd78 fix(paste-md): add edited-file fixture and monaco diff normalization
-
-PasteAsMd_Codex-EditedFile.expected.md
-
-Added the ability to convert Codex's diff representation to an actual diff
-fenced code block.
-
-### df73bc2 fix(paste-md): fixed inappropriate numbering of an unordered list
+### 81bd5f6 fix(paste-md): preserve unordered intent for parent-list fragments
 
 PasteAsMd_Codex-OrderedList-Parent.expected.md
+PasteAsMd_Codex-OrderedList-Nested.expected.md
 
-Fixes unordered lists being rendered as ordered (numbered).
+Moves incidental list correction from markdown patching to structural HTML
+normalization before pandoc.
 
 From stage 2. cfHtml (raw full payload) (Simplified)
 
@@ -309,9 +304,8 @@ From stage 2. cfHtml (raw full payload) (Simplified)
 <html>
 <body>
 <!--StartFragment-->
-<li><p>...top flange width...</p></li>
-<li><p>...rib height...</p></li>
-<li><p></p></li>
+<li>...</li>
+<li>...</li>
 <!--EndFragment-->
 </body>
 </html>
@@ -321,30 +315,25 @@ From stage 3. htmlPrep (after _PreprocessHtml) (Simplified)
 
 ```html
 <ol>
-  <li><p>wt = top flange width (total or per side)</p></li>
-  <li><p><math>h_r</math>hr = rib height (web height)</p></li>
-  <li><p></p></li>
+  <li>...</li>
+  <li>...</li>
 </ol>
-```
-
-From stage 4. mdRaw (pandoc output)
-
-```md
-1.  wt​ = top flange width (total or per side)¶
-¶
-2.  $`h_r`$hr​ = rib height (web height)¶
-¶
-3.  ¶
 ```
 
 **Fix applied here.**
 
+From stage 4. mdRaw (pandoc output)
+
+```md
+- item A
+- item B
+```
+
 From 5. md (after CleanMarkdown)
 
 ```md
-1.  wt​ = top flange width (total or per side)¶
-2.  $`h_r`$hr​ = rib height (web height)¶
-3.  ¶
+- item A
+- item B
 ```
 
 ### 469b843 fix(paste-md): handle nested unordered list selection
@@ -416,13 +405,11 @@ From 5. md (after CleanMarkdown)
 2.  ¶
 ```
 
-### 81bd5f6 fix(paste-md): preserve unordered intent for parent-list fragments
+### df73bc2 fix(paste-md): fixed inappropriate numbering of an unordered list
 
-PasteAsMd_Codex-OrderedList-Parent.expected.md  
-PasteAsMd_Codex-OrderedList-Nested.expected.md
+PasteAsMd_Codex-OrderedList-Parent.expected.md
 
-Moves incidental list correction from markdown patching to structural HTML
-normalization before pandoc.
+Fixes unordered lists being rendered as ordered (numbered).
 
 From stage 2. cfHtml (raw full payload) (Simplified)
 
@@ -430,8 +417,9 @@ From stage 2. cfHtml (raw full payload) (Simplified)
 <html>
 <body>
 <!--StartFragment-->
-<li>...</li>
-<li>...</li>
+<li><p>...top flange width...</p></li>
+<li><p>...rib height...</p></li>
+<li><p></p></li>
 <!--EndFragment-->
 </body>
 </html>
@@ -441,23 +429,35 @@ From stage 3. htmlPrep (after _PreprocessHtml) (Simplified)
 
 ```html
 <ol>
-  <li>...</li>
-  <li>...</li>
+  <li><p>wt = top flange width (total or per side)</p></li>
+  <li><p><math>h_r</math>hr = rib height (web height)</p></li>
+  <li><p></p></li>
 </ol>
 ```
-
-**Fix applied here.**
 
 From stage 4. mdRaw (pandoc output)
 
 ```md
-- item A
-- item B
+1.  wt​ = top flange width (total or per side)¶
+¶
+2.  $`h_r`$hr​ = rib height (web height)¶
+¶
+3.  ¶
 ```
+
+**Fix applied here.**
 
 From 5. md (after CleanMarkdown)
 
 ```md
-- item A
-- item B
+1.  wt​ = top flange width (total or per side)¶
+2.  $`h_r`$hr​ = rib height (web height)¶
+3.  ¶
 ```
+
+### c7cdd78 fix(paste-md): add edited-file fixture and monaco diff normalization
+
+PasteAsMd_Codex-EditedFile.expected.md
+
+Added the ability to convert Codex's diff representation to an actual diff
+fenced code block.
