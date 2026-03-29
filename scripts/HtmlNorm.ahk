@@ -36,8 +36,8 @@ DetectSource(cfHtml) {
     ; Claude Web (browser): no extensionId in header; detect from HTML content.
     if InStr(cfHtml, "font-claude-response") || InStr(cfHtml, "data-is-streaming") || InStr(cfHtml, "code-block__code")
         return "claudeweb"
-    ; ChatGPT web: no extensionId.  Full-turn copies have data-turn-id on <article>;
-    ; sub-selection copies omit the article but keep CodeMirror overflow-visible! <pre>.
+    ; ChatGPT web: no extensionId.  Full-turn copies have data-turn-id on <section> (or legacy
+    ; <article>); sub-selection copies omit the container but keep CodeMirror overflow-visible! <pre>.
     if InStr(cfHtml, "data-turn-id=") || InStr(cfHtml, "overflow-visible!")
         return "chatgpt"
     return "unknown"
@@ -250,12 +250,12 @@ class HtmlNorm {
             html := RegExReplace(html, "i)(<div\b[^>]*\bdata-testid=`"user-message`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
         } else if (source = "chatgpt") {
             ; AI turn: prefer data-turn="assistant"; fall back to legacy data-turn-id="request-WEB:..." prefix.
-            ; Both patterns may match the same article in older captures — the duplicate dedup in
+            ; Both patterns may match the same turn container in older captures — the duplicate dedup in
             ; PasteMarkdown collapses consecutive same-type markers, so double injection is harmless.
-            html := RegExReplace(html, "i)(<article\b[^>]*\bdata-turn=`"assistant`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
-            html := RegExReplace(html, "i)(<article\b[^>]*\bdata-turn-id=`"request-WEB:[^`"]*`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
+            html := RegExReplace(html, "i)(<(?:article|section)\b[^>]*\bdata-turn=`"assistant`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
+            html := RegExReplace(html, "i)(<(?:article|section)\b[^>]*\bdata-turn-id=`"request-WEB:[^`"]*`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
             ; User turn: prefer data-turn="user"; fall back to legacy plain-UUID data-turn-id.
-            html := RegExReplace(html, "i)(<article\b[^>]*\bdata-turn=`"user`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
+            html := RegExReplace(html, "i)(<(?:article|section)\b[^>]*\bdata-turn=`"user`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
         }
         return html
     }
