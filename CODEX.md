@@ -69,6 +69,9 @@
 ### Testing And Build Workflow
 
 - For refactor or new development, agree expected behavior and the test plan before coding; if expectations change, re-agree before updating tests/fixtures.
+- Tests must reflect semantics, not just code coverage. When a bug reveals that a type, API, boundary, or test shape is semantically wrong, prefer the clean semantic fix over the smallest local patch, even if the patch is quicker.
+- For exactness-sensitive code, do not rely only on numerically friendly inputs such as powers of two, symmetric cases, or clean boundary values. Treat friendly cases as smoke tests, not proof, and include adversarial, odd, prime, or otherwise non-dyadic inputs early enough to expose representation and rounding problems.
+- If correctness depends on exact identity, preserve exact provenance until the last possible moment, prefer exact-by-construction implementation paths over recomputation plus comparison, keep exact-identity and approximate-geometric APIs semantically separate, and do not collapse tests that appear textually similar until you confirm they are proving the same semantic claim.
 - IMPORTANT! For global default TTD/testing/approval-friction workflow details (applies to all projects unless overridden locally), follow `~/.codex/workflow.md`.
 - For CMake builds/tests in workspace repos, check `.vscode/settings.json` and `CMakePresets.json`/`CMakeUserPresets.json` first and mirror those settings; use manual command lines only when those sources are absent or the user explicitly overrides them.
 - For CMake workflows, never run configure and build concurrently; run them sequentially (`cmake -S/-B` then `cmake --build`) to avoid regenerate/build race conditions.
