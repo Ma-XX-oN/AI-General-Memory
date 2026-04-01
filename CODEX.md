@@ -44,6 +44,15 @@
 - Back implementation claims with verifiable outputs (counts/diff/line references), not assertions alone.
 - Do not change code unless the user explicitly asks for code changes.
 - In debugging/explanations, state the single minimal root cause first (one sentence), then show the exact line-level behavior causing it before any secondary context.
+- When introducing an alternate formalism, start with the user's primary operational model first, prove the mapping with trusted anchor cases, and label the formalism explicitly as a derived helper rather than the primary definition.
+- Do not replace a user's working mental model with a mathematically equivalent abstraction until the correspondence is concrete and visible. Avoid overloaded terms like `weights` when the primary semantics are indexing, layout, or topology.
+- For explanation-heavy restatements, use this checklist:
+  1. State the primary model in the user's own terms.
+  2. Show 2-3 anchor cases that force the mapping.
+  3. Introduce any alternate notation only as a derived form.
+  4. Say exactly what problem the alternate notation solves.
+  5. Give one worked conversion both directions.
+  6. Keep proof-oriented notation in the section where it is needed instead of promoting it to the whole system.
 
 ### Commands And Preflight
 
