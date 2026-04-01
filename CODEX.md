@@ -59,7 +59,7 @@
 - For file and text reads, always use `rg`
 - Do not use custom script workflows when an approved command set can do the job.
 - Never use custom file-read utilities when `rg` can be used.
-- When asked to search Codex or Claude transcripts/sessions, use `~/.codex/scripts/AI-transcript.py` first instead of grepping raw transcript/session files directly.
+- When asked to search Codex or Claude transcripts/sessions, use the global Codex-home tool `~/.codex/scripts/AI-transcript.py` first instead of grepping raw transcript/session files directly. Treat it as a shared tool, not a project-local file, and do not search the current repo for it before using it.
 - When a loaded memory/reference file points to another file (for example `~/.codex/...` or a relative Markdown link), resolve that path to an absolute path immediately using the referenced file's own base directory/home alias; do not reinterpret it relative to the current working directory.
 - For simple checks, use only `rg` or already-approved command prefixes; avoid ad-hoc command strings that trigger approval prompts.
 - For any command execution, prefer already-approved command prefixes; if a required action is not covered, request scoped escalation first instead of running an ad-hoc variant.
