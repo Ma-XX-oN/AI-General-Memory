@@ -114,6 +114,28 @@
 ### Documentation And Diagrams
 
 - In general documentation, avoid non-essential temporal/status phrasing such as "now", "currently", "before", or "previously"; state the invariant directly unless timeline context is the point (for example in a changelog).
+- For evolving document sets, start with one authoritative document. Split into multiple documents only when distinct roles emerge, then make the set traversable with one visible `MAIN-*` or index document that links them all.
+- When a document set splits, keep roles explicit and stable. Typical roles are:
+  - plan: phases, current position, next step
+  - contract/spec: accepted definitions and invariants
+  - formal: extracted mathematical definition
+  - design/realiser: implementation-facing derivation
+  - main/index: navigation, status, and historical orientation
+- After a decision is accepted in conversation, update the authoritative document first and verify the file reflects it before describing the decision as settled.
+- When introducing a helper formalism, baseline construction, or naming cleanup, state what problem it is trying to solve before presenting it. It is fine to introduce, but label it as a helper, baseline, or cleanup unless the user has agreed to promote it to the primary definition.
+- Use status tags as navigation aids for phased or evolving document sets:
+  1. Keep the vocabulary small and fixed.
+  2. Use this default cross-project set unless a real semantic gap requires more:
+     - `DONE`
+     - `WIP`
+     - `READY`
+     - `PEND`
+     - `LEGACY`
+     - `BLOCKED`
+  3. Define the legend once in the main/index document.
+  4. Use the same tags consistently in titles, document maps, and major phase or section headers.
+  5. Make tags visually scannable but lightweight.
+  6. Avoid synonym drift such as mixing alternate labels like `PENDING`, `NEXT`, and `IN PROGRESS` with the default tag set unless there is a real semantic distinction.
 - For OpenSCAD JS documentation, require JSDoc on public symbols and use `@slot`/`@deref` plus full `@type` docs for slot-based constants/typedefs.
 - For GitHub markdown docs, avoid raw `<svg>` tags and sanitize punctuation-heavy anchors when generating intra-doc links.
 - For GitHub markdown diagrams that must align, prefer plain ASCII (`+`, `-`, `|`) over Unicode box-drawing characters because GitHub monospace rendering can drift.
