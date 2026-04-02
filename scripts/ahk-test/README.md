@@ -201,7 +201,7 @@ Lists what commits relate to what `PasteAsMd_*.expected.md` entries.  This will
 allow being able to track if a fix was good, or could have been done better for
 possible future cleanup passes.
 
-### (pending) fix(htmlnorm): preserve Codex inline function-reference button text
+### d665140 fix(htmlnorm): preserve Codex inline function-reference button text
 
 PasteAsMd_Codex-ButtonLinks.expected.md
 
