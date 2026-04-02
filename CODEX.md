@@ -70,6 +70,8 @@
 
 - For refactor or new development, agree expected behavior and the test plan before coding; if expectations change, re-agree before updating tests/fixtures.
 - Tests must reflect semantics, not just code coverage. When a bug reveals that a type, API, boundary, or test shape is semantically wrong, prefer the clean semantic fix over the smallest local patch, even if the patch is quicker.
+- For core semantic modules, freeze a short local contract before refactoring: identity, input-domain meaning, and mapping semantics. If any of the three is unsettled, stop and resolve it first.
+- Before refactoring, cleanup, or optimization in a core semantic module, add or update at least one test that proves the intended semantic behavior, not just implementation self-consistency.
 - For exactness-sensitive code, do not rely only on numerically friendly inputs such as powers of two, symmetric cases, or clean boundary values. Treat friendly cases as smoke tests, not proof, and include adversarial, odd, prime, or otherwise non-dyadic inputs early enough to expose representation and rounding problems.
 - If correctness depends on exact identity, preserve exact provenance until the last possible moment, prefer exact-by-construction implementation paths over recomputation plus comparison, keep exact-identity and approximate-geometric APIs semantically separate, and do not collapse tests that appear textually similar until you confirm they are proving the same semantic claim.
 - IMPORTANT! For global default TTD/testing/approval-friction workflow details (applies to all projects unless overridden locally), follow `~/.codex/workflow.md`.
@@ -117,6 +119,8 @@
 ### Documentation And Diagrams
 
 - In general documentation, avoid non-essential temporal/status phrasing such as "now", "currently", "before", or "previously"; state the invariant directly unless timeline context is the point (for example in a changelog).
+- For public API files, choose one recognized documentation standard before broad docstring work and use it while implementing, not as a later cleanup pass.
+- If parameter meanings cannot be documented cleanly in the chosen standard, treat that as an unresolved API or semantic smell and stop to surface it before coding further.
 - For evolving document sets, start with one authoritative document. Split into multiple documents only when distinct roles emerge, then make the set traversable with one visible `MAIN-*` or index document that links them all.
 - When a document set splits, keep roles explicit and stable. Typical roles are:
   - plan: phases, current position, next step
