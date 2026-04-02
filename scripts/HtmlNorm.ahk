@@ -112,6 +112,12 @@ class HtmlNorm {
         html := RegExReplace(html
             , "is)<button\b(?=[^>]*\bbehavior-btn\b)(?=[^>]*\bentity-underline\b)[^>]*>(.*?)</button>"
             , "<u>$1</u>")
+        ; Preserve inline link-style buttons (e.g. Codex function references with
+        ; text-token-text-link-foreground): keep their text content, strip only the wrapper.
+        ; The <span> tags left inside are removed by the residual span stripper in step 13.
+        html := RegExReplace(html
+            , "is)<button\b(?=[^>]*\btext-token-text-link-foreground\b)[^>]*>(.*?)</button>"
+            , "$1")
         html := RegExReplace(html, "is)<button\b[^>]*>.*?</button>", "")
 
         ; 5. ChatGPT: normalize CodeMirror code blocks before any span stripping.

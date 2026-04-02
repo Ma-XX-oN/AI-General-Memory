@@ -84,20 +84,31 @@ match both filename forms.
 
 1. Pin a runtime debug log from the menu.
 2. Copy it into `ahk-test/` and rename it to `PasteAsMd_<NAME>.log`.
-3. Ensure it includes at least these sections:
+3. Anonymise text: run `sanitize-fixture-log.py --input <file> --output <file>` to
+   scramble visible text in sections `1` and `2` while preserving byte lengths.
+   The script automatically strips sections `2b` and `3`–`6` (not used by the
+   harness; may contain unsanitised derived text).
+   - **Codex fixtures**: the sanitiser scrambles `extensionId=openai.chatgpt` inside
+     the `SourceURL:` header, breaking source detection.  After sanitising, restore
+     the original `extensionId=openai.chatgpt` bytes at their known offset within the
+     URL value (offset 188 in the standard Codex webview URL).
+4. Ensure it includes at least these sections:
    - `0. source`
    - `1. plain (canonical text capture)`
    - `2. cfHtml (raw full payload)`
-4. Add expected markdown:
+5. Add expected markdown:
    - default: `PasteAsMd_<NAME>.expected.md`
    - scenario case: `PasteAsMd_<NAME>.<CASE>.expected.md`
-5. If you want a replay log, copy the canonical source log to `PasteAsMd_<NAME>.fixture.log`; sections after `2` are optional and ignored by the harness.
+6. If you want a replay log, copy the canonical source log to `PasteAsMd_<NAME>.fixture.log`; sections after `2` are optional and ignored by the harness.
 
 Canonical fixture note:
 
 - The harness expects canonical `PasteAsMd` logs only: UTF-8 with BOM, CRLF section framing, no visible EOL markers.
 - Section `1` is a canonical text capture, not a raw UTF-16 byte dump.
 - Section `2` is preserved exactly as CF\_HTML text; its `StartHTML` / `EndHTML` / `StartFragment` / `EndFragment` headers remain UTF-8 byte offsets and must already match the stored payload.
+- **Do not run `normalize-eol.pl` on fixture log files.** Fixture logs must stay in
+  their original CRLF format as produced by the runtime. Using `show-eol.pl` for
+  inspection is safe; using `normalize-eol.pl` to rewrite the file is not.
 
 ## Fixture Harness CLI
 
@@ -189,6 +200,47 @@ See also: [Fixture-Logging-Reference.md](Fixture-Logging-Reference.md).
 Lists what commits relate to what `PasteAsMd_*.expected.md` entries.  This will
 allow being able to track if a fix was good, or could have been done better for
 possible future cleanup passes.
+
+### (pending) fix(htmlnorm): preserve Codex inline function-reference button text
+
+PasteAsMd_Codex-ButtonLinks.expected.md
+
+Codex renders inline function/file references as `<button class="...
+text-token-text-link-foreground hover:underline">` elements.  The generic
+button-strip rule (`<button\b[^>]*>.*?</button>` → empty) removed these along
+with UI buttons (copy, thumbs, etc.), silently dropping the text content.
+
+Added a targeted preserve pass before the generic strip that matches the
+`text-token-text-link-foreground` class and replaces the button with its inner
+content (`$1`).  Residual `<span>` wrappers left by the pass are cleaned up by
+the existing span-stripping step (step 13).
+
+From stage 2. cfHtml (raw full payload) (Simplified)
+
+```html
+<button class="... text-token-text-link-foreground hover:underline" ...>
+  <span ...>SphericalFaceLattice.post_init() (line 260)</span>
+</button>
+```
+
+**Fix applied here** (step 4 in `HtmlNorm.Normalize`).
+
+From stage 6. FINAL md (pasted) — before fix
+
+```md
+> 2.  Lattice construction still recomputes...in a row.
+>      builds each row by calling `geometry.unit_point(...)` for every `(u,v)`.
+>      For interior nodes,  and  recompute...
+```
+
+From stage 6. FINAL md (pasted) — after fix
+
+```md
+> 2.  Lattice construction still recomputes...in a row.
+>      SphericalFaceLattice.post_init() (line 260) builds each row by calling
+>      `geometry.unit_point(...)` for every `(u,v)`. For interior nodes,
+>      discrete_unit_point() (line 238) and discrete_unit_point() (line 239) recompute...
+```
 
 ### da886b5 fix(htmlnorm): handle ChatGPT section-element turn containers
 

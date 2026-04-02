@@ -209,6 +209,15 @@ def sanitize_fixture(text: str, rnd: random.Random) -> str:
             raise ValueError(f"Sanitized section {label!r} changed UTF-8 byte length.")
         out.append(sanitized)
         cursor = content_end
+        if label.startswith("2. cfHtml "):
+            # Sections 3+ (2b, htmlPrep, mdRaw, etc.) are not used by the fixture
+            # harness and may contain unsanitised text derived from the original
+            # clipboard HTML.  Strip them, keeping only the trailing separator so
+            # the canonical CRLF framing ends cleanly.
+            sep = "\r\n\r\n"
+            if text[cursor:cursor + 4] == sep:
+                out.append(sep)
+            return "".join(out)
     out.append(text[cursor:])
     return "".join(out)
 
