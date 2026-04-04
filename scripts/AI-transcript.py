@@ -215,6 +215,59 @@ def _grep_context(text, *, plain=None, rx=None, before=0, after=0, ignore_case=F
   ]
 
 
+def _grep_context_tagged(tagged_lines, *, plain=None, rx=None, before=0, after=0,
+                         ignore_case=False):
+  """Find matches in a flat list of ``(line_text, rec_no, ts_str)`` tuples.
+
+  Used for cross-record context (``-x`` / ``--cross-record``), where the
+  caller has already flattened all searchable lines across record boundaries
+  into a single sequence.
+
+  Returns a list of hunks; each hunk is a list of
+  ``(is_match, line_text, spans, rec_no, ts_str)`` tuples.
+  """
+  if not tagged_lines:
+    return []
+
+  match_info = {}  # idx -> [(start, end), ...]
+  for i, (line, _rec_no, _ts_str) in enumerate(tagged_lines):
+    if plain is not None:
+      spans, pos = [], 0
+      haystack = line.lower() if ignore_case else line
+      needle   = plain.lower() if ignore_case else plain
+      while True:
+        idx = haystack.find(needle, pos)
+        if idx < 0:
+          break
+        spans.append((idx, idx + len(needle)))
+        pos = idx + 1
+      if spans:
+        match_info[i] = spans
+    elif rx is not None:
+      spans = [(m.start(), m.end()) for m in rx.finditer(line)]
+      if spans:
+        match_info[i] = spans
+
+  if not match_info:
+    return []
+
+  n = len(tagged_lines)
+  ranges = []
+  for m in sorted(match_info):
+    lo, hi = max(0, m - before), min(n - 1, m + after)
+    if ranges and lo <= ranges[-1][1] + 1:
+      ranges[-1][1] = max(ranges[-1][1], hi)
+    else:
+      ranges.append([lo, hi])
+
+  return [
+    [(i in match_info, tagged_lines[i][0], match_info.get(i, []),
+      tagged_lines[i][1], tagged_lines[i][2])
+     for i in range(lo, hi + 1)]
+    for lo, hi in ranges
+  ]
+
+
 # ── Session dataclass ─────────────────────────────────────────────────────────
 
 @dataclass
@@ -304,17 +357,20 @@ class SessionStore(ABC):
   def grep(self, session: "Session", *, plain: "str | None" = None,
            rx: "re.Pattern | None" = None, before: int = 0, after: int = 0,
            first_only: bool = False, ignore_case: bool = False,
-           rec_filter: "RecordFilter | None" = None) -> "list[tuple]":
+           rec_filter: "RecordFilter | None" = None,
+           cross_record: bool = False) -> "list[list[tuple]]":
     """Return context hunks for all matches in *session*.
 
-    Each element of the returned list is a ``(rec_no, ts_str, hunk_lines)``
-    tuple where *rec_no* is the 1-based JSONL record number, *ts_str* is the
-    raw timestamp string (or ``None``), and *hunk_lines* is a list of
-    ``(is_match, line_text, [(start, end), ...])`` tuples.
+    Each element of the returned list is a hunk: a list of
+    ``(is_match, line_text, [(start, end), ...], rec_no, ts_str)`` tuples
+    where *rec_no* is the 1-based JSONL record number and *ts_str* is the
+    raw timestamp string (or ``None``).
 
     When *first_only* is True, return as soon as any match is found (used
-    for fast AND membership checks).
+    for fast AND membership checks).  *first_only* always uses per-record
+    mode regardless of *cross_record*.
     If *rec_filter* is given, only records passing the filter are searched.
+    When *cross_record* is True, context lines may span record boundaries.
     """
 
   @abstractmethod
@@ -450,20 +506,23 @@ def _cl_session_meta(path):
 
 
 def _cl_session_grep(path, *, plain=None, rx=None, before=0, after=0, first_only=False,
-           ignore_case=False, rec_filter=None):
+           ignore_case=False, rec_filter=None, cross_record=False):
   """Return context hunks from matching content in the Claude session at *path*.
 
-  Each element of the returned list is a ``(rec_no, ts_str, hunk_lines)`` tuple
-  where *rec_no* is the 1-based JSONL line number, *ts_str* is the raw timestamp
-  string from the record (or ``None``), and *hunk_lines* is a list of
-  ``(is_match, line_text, spans)`` tuples.
+  Each element of the returned list is a hunk: a list of
+  ``(is_match, line_text, spans, rec_no, ts_str)`` tuples where *rec_no* is the
+  1-based JSONL line number and *ts_str* is the raw timestamp string (or
+  ``None``).
 
   When *first_only* is True, return as soon as any match is found (used for
-  the AND membership check in :func:`_session_display_hunks`).
+  the AND membership check in :func:`_session_display_hunks`).  *first_only*
+  always uses per-record mode regardless of *cross_record*.
   If *rec_filter* is given, only records passing the filter are searched.
+  When *cross_record* is True, context lines may come from neighbouring records.
   """
   result = []
   rec_no = 0
+  tagged = [] if (cross_record and not first_only) else None
   try:
     with open(path, encoding="utf-8") as f:
       for raw in f:
@@ -538,16 +597,25 @@ def _cl_session_grep(path, *, plain=None, rx=None, before=0, after=0, first_only
                 cmd = inp.get("command", "")
                 if cmd:
                   texts.append(f"$ {cmd}")
-        for text in texts:
-          for hunk_lines in _grep_context(
-            text, plain=plain, rx=rx, before=before, after=after,
-            ignore_case=ignore_case,
-          ):
-            result.append((rec_no, ts_str, hunk_lines))
-          if first_only and result:
-            return result
+        if tagged is not None:
+          for text in texts:
+            for line in text.splitlines():
+              tagged.append((line, rec_no, ts_str))
+        else:
+          for text in texts:
+            for hunk_lines in _grep_context(
+              text, plain=plain, rx=rx, before=before, after=after,
+              ignore_case=ignore_case,
+            ):
+              result.append([(im, l, s, rec_no, ts_str) for im, l, s in hunk_lines])
+            if first_only and result:
+              return result
   except Exception:
     pass
+  if tagged is not None:
+    return _grep_context_tagged(
+      tagged, plain=plain, rx=rx, before=before, after=after, ignore_case=ignore_case,
+    )
   return result
 
 
@@ -674,10 +742,11 @@ class ClaudeSessionStore(SessionStore):
     return None, all_matches
 
   def grep(self, session, *, plain=None, rx=None, before=0, after=0, first_only=False,
-       ignore_case=False, rec_filter=None):
+       ignore_case=False, rec_filter=None, cross_record=False):
     return _cl_session_grep(
       str(session.path), plain=plain, rx=rx, before=before, after=after,
       first_only=first_only, ignore_case=ignore_case, rec_filter=rec_filter,
+      cross_record=cross_record,
     )
 
   def transcript(self, session, rec_filter=None, use_color=False,
@@ -995,19 +1064,22 @@ def _cx_uuid7_ctime(sid):
 
 
 def _cx_session_grep(path, *, plain=None, rx=None, before=0, after=0, first_only=False,
-           ignore_case=False, rec_filter=None):
+           ignore_case=False, rec_filter=None, cross_record=False):
   """Return context hunks from matching messages in the Codex session at *path*.
 
-  Each element of the returned list is a ``(rec_no, ts_str, hunk_lines)`` tuple
-  where *rec_no* is the 1-based JSONL line number, *ts_str* is the raw timestamp
-  string from the record (or ``None``), and *hunk_lines* is a list of
-  ``(is_match, line_text, spans)`` tuples.
+  Each element of the returned list is a hunk: a list of
+  ``(is_match, line_text, spans, rec_no, ts_str)`` tuples where *rec_no* is the
+  1-based JSONL line number and *ts_str* is the raw timestamp string (or
+  ``None``).
 
-  When *first_only* is True, return as soon as any match is found.
+  When *first_only* is True, return as soon as any match is found.  *first_only*
+  always uses per-record mode regardless of *cross_record*.
   If *rec_filter* is given, only records passing the filter are searched.
+  When *cross_record* is True, context lines may come from neighbouring records.
   """
   result = []
   rec_no = 0
+  tagged = [] if (cross_record and not first_only) else None
   try:
     with open(path, encoding="utf-8") as f:
       for raw in f:
@@ -1026,30 +1098,36 @@ def _cx_session_grep(path, *, plain=None, rx=None, before=0, after=0, first_only
           continue
         rtype = rec.get("type")
         payload = rec.get("payload", {})
+        texts = []
         if rtype == "event_msg":
           if payload.get("type") not in ("user_message", "agent_message"):
             continue
           text = payload.get("message", "")
           if text:
+            texts.append(text)
+        elif rtype == "response_item" and payload.get("type") == "custom_tool_call":
+          inp = payload.get("input", "")
+          if inp:
+            texts.append(inp)
+        if tagged is not None:
+          for text in texts:
+            for line in text.splitlines():
+              tagged.append((line, rec_no, ts_str))
+        else:
+          for text in texts:
             for hunk_lines in _grep_context(
               text, plain=plain, rx=rx, before=before, after=after,
               ignore_case=ignore_case,
             ):
-              result.append((rec_no, ts_str, hunk_lines))
-            if first_only and result:
-              return result
-        elif rtype == "response_item" and payload.get("type") == "custom_tool_call":
-          inp = payload.get("input", "")
-          if inp:
-            for hunk_lines in _grep_context(
-              inp, plain=plain, rx=rx, before=before, after=after,
-              ignore_case=ignore_case,
-            ):
-              result.append((rec_no, ts_str, hunk_lines))
+              result.append([(im, l, s, rec_no, ts_str) for im, l, s in hunk_lines])
             if first_only and result:
               return result
   except Exception:
     pass
+  if tagged is not None:
+    return _grep_context_tagged(
+      tagged, plain=plain, rx=rx, before=before, after=after, ignore_case=ignore_case,
+    )
   return result
 
 
@@ -1258,10 +1336,11 @@ class CodexSessionStore(SessionStore):
     return None, all_matches
 
   def grep(self, session, *, plain=None, rx=None, before=0, after=0, first_only=False,
-       ignore_case=False, rec_filter=None):
+       ignore_case=False, rec_filter=None, cross_record=False):
     return _cx_session_grep(
       str(session.path), plain=plain, rx=rx, before=before, after=after,
       first_only=first_only, ignore_case=ignore_case, rec_filter=rec_filter,
+      cross_record=cross_record,
     )
 
   def transcript(self, session, rec_filter=None, use_color=False,
@@ -1656,7 +1735,7 @@ def _build_hunk_prefix(rec_no, ts_str, *, show_date=False, record_number=False,
 # ── Multi-pattern grep helper ─────────────────────────────────────────────────
 
 def _session_display_hunks(store, session, patterns_kw, before, after, *,
-                           ignore_case=False, rec_filter=None):
+                           ignore_case=False, rec_filter=None, cross_record=False):
   """Return display hunks if *session* matches ALL patterns (AND), else None.
 
   When multiple patterns are given:
@@ -1672,7 +1751,7 @@ def _session_display_hunks(store, session, patterns_kw, before, after, *,
   if len(patterns_kw) == 1:
     hunks = store.grep(
       session, before=before, after=after, ignore_case=ignore_case,
-      rec_filter=rec_filter, **patterns_kw[0]
+      rec_filter=rec_filter, cross_record=cross_record, **patterns_kw[0]
     )
     return hunks if hunks else None
 
@@ -1692,7 +1771,8 @@ def _session_display_hunks(store, session, patterns_kw, before, after, *,
   flags = re.IGNORECASE if ignore_case else 0
   combined_rx = re.compile("|".join(f"(?:{p})" for p in parts), flags)
   return store.grep(session, rx=combined_rx, before=before, after=after,
-                    ignore_case=ignore_case, rec_filter=rec_filter)
+                    ignore_case=ignore_case, rec_filter=rec_filter,
+                    cross_record=cross_record)
 
 
 # ── Session resolution helper ─────────────────────────────────────────────────
@@ -1917,6 +1997,15 @@ def main():
     metavar="N", type=int, default=None,
     help="Print N lines of context before and after each match.",
   )
+  ap.add_argument(
+    "-x", "--cross-record",
+    action="store_true", default=False, dest="cross_record",
+    help=(
+      "Allow -A/-B/-C context to span across JSONL record boundaries. "
+      "Without this flag, context is confined to the record that contains "
+      "the match."
+    ),
+  )
 
   # Color
   ap.add_argument(
@@ -2102,7 +2191,7 @@ def main():
       store = stores[session.source]
       hunks = _session_display_hunks(
         store, session, patterns_kw, before, after, ignore_case=args.ignore_case,
-        rec_filter=_resolve_rec_filter(session),
+        rec_filter=_resolve_rec_filter(session), cross_record=args.cross_record,
       )
       if hunks is not None:
         matched.append((session, hunks))
@@ -2122,16 +2211,16 @@ def main():
           print()
         print_session_header(session, use_color=use_color)
         rec_width = len(str(session.rc))
-        for hunk_idx, (rec_no, ts_str, hunk_lines) in enumerate(hunks):
+        for hunk_idx, hunk_lines in enumerate(hunks):
           if hunk_idx > 0:
             print("--")
-          prefix = _build_hunk_prefix(rec_no, ts_str,
-                                      show_date=args.show_date,
-                                      record_number=args.record_number,
-                                      rec_width=rec_width,
-                                      tz=_display_tz,
-                                      use_color=use_color)
-          for _is_match, line, spans in hunk_lines:
+          for _is_match, line, spans, rec_no, ts_str in hunk_lines:
+            prefix = _build_hunk_prefix(rec_no, ts_str,
+                                        show_date=args.show_date,
+                                        record_number=args.record_number,
+                                        rec_width=rec_width,
+                                        tz=_display_tz,
+                                        use_color=use_color)
             print(prefix + _colorize(line, spans, active=use_color))
     sys.exit(0)
 
