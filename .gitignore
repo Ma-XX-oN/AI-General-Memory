@@ -36,6 +36,7 @@
 !scripts/AI-transcript.py
 !scripts/AI-transcript-plan.md
 !scripts/AI-transcript-tests.sh
+!scripts/CLAUDE.md
 !scripts/ahk-test
 !scripts/ahk-test/**
 scripts/ahk-test/*.actual.md
