@@ -50,13 +50,15 @@
   - [14. mtime should be taken from records **(BUG?/FEATURE?)**](#14-mtime-should-be-taken-from-records-bugfeature)
   - [15. Colourise the User/AI headings **(FEATURE)**](#15-colourise-the-userai-headings-feature)
   - [16. Add a `--raw` flag **(FEATURE)**](#16-add-a---raw-flag-feature)
-  - [17. `-A`, `-B` and `-C` switches don't span over records **(FEATURE)**](#17--a--b-and--c-switches-dont-span-over-records-feature)
+  - [17. `-A`, `-B` and `-C` switches don't span over records **(FEATURE)** ***(DONE)***](#17--a--b-and--c-switches-dont-span-over-records-feature-done)
   - [18. `--since`/`--until` doesn't narrow down `--id` glob pattern if ambiguous **(BUG)**](#18---since--until-doesnt-narrow-down---id-glob-pattern-if-ambiguous-bug)
   - [19. `--ls` doesn't display timestamps **(FEATURE)**](#19---ls-doesnt-display-timestamps-feature)
   - [20. `-n` and `-d` doesn't work with `--id` **(NOT-A-BUG)** ***(WILL-NOT-IMPLEMENT)***](#20--n-and--d-doesnt-work-with---id-not-a-bug-will-not-implement)
   - [21. Need a way to state speaker when grepping **(FEATURE)**](#21-need-a-way-to-state-speaker-when-grepping-feature)
   - [22. `--project` should be able to take just the project name as well **(FEATURE)**](#22---project-should-be-able-to-take-just-the-project-name-as-well-feature)
   - [23. `--id <title-substr>` doesn't work for Codex **(BUG)** ***(RESOLVED)***](#23---id-title-substr-doesnt-work-for-codex-bug-resolved)
+  - [24. Questions aren't in transcript **(BUG)**](#24-questions-arent-in-transcript-bug)
+  - [24. Plan isn't in transcript **(BUG)**](#24-plan-isnt-in-transcript-bug)
 - [Questions](#questions)
 - [Bugs resolved](#bugs-resolved)
   - [Bug verification matrix](#bug-verification-matrix)
@@ -1027,10 +1029,14 @@ long line).  Will look like:
 If there are nested structures, then they should be appropriately indented.
 Must be used with `--records` switch as this is for diagnostics.
 
-### 17. `-A`, `-B` and `-C` switches don't span over records **(FEATURE)**
+### 17. `-A`, `-B` and `-C` switches don't span over records **(FEATURE)** ***(DONE)***
 
 These need to be able to show context, so if there is no line in the record
-around where it's looking, it should look in the surrounding records.  Maybe add a `-x` switch (cross record boundary) to turn this ability on.
+around where it's looking, it should look in the surrounding records.  Added
+`-x` / `--cross-record` flag: when set, context lines may span JSONL record
+boundaries by flattening all searchable lines into a single tagged sequence
+before matching.  Each output line carries its own `rec_no`/`ts_str` so `-n`
+and `-d` continue to work correctly across record boundaries.
 
 ### 18. `--since`/`--until` doesn't narrow down `--id` glob pattern if ambiguous **(BUG)**
 
@@ -1082,6 +1088,20 @@ uses this as the title for unindexed sessions.  `CodexSessionStore.find()`
 falls back to scanning all session files not in the index when the indexed
 title-glob returns nothing, matching against that synthetic title.
 Test: `--codex --id "I want you to" --ls` → finds session `019d1acc`.
+
+### 24. Questions aren't in transcript **(BUG)**
+
+In claude, when it presents questions, it isn't reflected in the transcript.  I've not verified if this is also the case in codex.
+
+Claude test: `--claude --id a7546a0a --all-projects -nd --records 805:808` → The questions should be between records 805 and 808.
+
+Codex test: Need to generate a test/
+
+### 24. Plan isn't in transcript **(BUG)**
+
+In claude, when it presents a plan, it isn't reflected in the transcript.  I've not verified if this is also the case in codex.
+
+Claude test: `--claude --id a7546a0a --all-projects -nd --records 823:827` → The plan should be between records 823 and 827.
 
 ## Questions
 
