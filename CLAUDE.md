@@ -329,6 +329,22 @@ always add a corresponding entry to the `## Change Log` section in
 filename, description of the bug, relevant before/after HTML and markdown.
 Never skip this step — it has been forgotten twice.
 
+### Use parallel reads instead of the Explore agent for known constructs
+
+When the task targets known constructs (specific function names, flag
+definitions, a display loop), skip the Explore agent and go directly to
+parallel `Read` calls on the relevant file sections in a single message.
+The Explore agent adds subprocess overhead (~60 s) and still requires
+follow-up targeted reads for editing — it only pays off when the search is
+genuinely open-ended and the locations are unpredictable.
+
+### Batch all pre-edit reads into one parallel message
+
+Before making any edits to a file, identify every section that needs reading
+and issue all `Read` calls in a single message.  Sequential reads — one per
+response — multiply round-trip latency unnecessarily.  Gather the complete
+picture first, then edit.
+
 ## AutoHotkey v2
 
 See [ahk.md](ahk.md) for full notes. Critical reminders:
