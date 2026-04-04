@@ -345,6 +345,25 @@ and issue all `Read` calls in a single message.  Sequential reads — one per
 response — multiply round-trip latency unnecessarily.  Gather the complete
 picture first, then edit.
 
+### Don't run `wc -l` reflexively
+
+`wc -l` is only useful when the line count is directly decision-relevant
+(e.g. choosing a pagination strategy, verifying a file is non-empty).  Running
+it as a reflex before reading a file adds a round-trip with no benefit — the
+file size is not needed to identify which sections to read.
+
+### Don't write todos before reading the code
+
+Creating a todo list before reading any code produces guesses, not a plan.
+Read the relevant sections first; only then write todos if the task genuinely
+needs tracking.
+
+### Don't re-derive design already agreed in conversation
+
+Before implementing, scan back through the conversation to confirm what was
+already decided.  Re-deriving settled conclusions in a thinking block wastes
+tokens and delays the first edit.  Trust the conversation record.
+
 ## AutoHotkey v2
 
 See [ahk.md](ahk.md) for full notes. Critical reminders:
@@ -380,6 +399,7 @@ See [ahk.md](ahk.md) for full notes. Critical reminders:
 - [Testing guidelines](testing.md)
 - [Workflow guidance (TTD/tests/commit workflow)](workflow.md)
 - [Build issue triage playbook](build_issues.md)
+- [AI-transcript.py architecture and key locations](scripts/CLAUDE.md)
 
 ## Transcript search
 
