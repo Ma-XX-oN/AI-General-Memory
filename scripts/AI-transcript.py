@@ -390,6 +390,15 @@ class SessionStore(ABC):
     """
 
 
+def _md_quote(text):
+  """Wrap *text* as a markdown blockquote.
+
+  Every non-empty line is prefixed with ``> ``; empty lines become bare ``>``
+  to maintain blockquote continuity across paragraph breaks.
+  """
+  return "\n".join(f"> {line}" if line else ">" for line in text.splitlines())
+
+
 # ── Claude-specific helpers ───────────────────────────────────────────────────
 
 def _cl_dir():
@@ -550,6 +559,14 @@ def _cl_session_grep(path, *, plain=None, rx=None, before=0, after=0, first_only
           for block in content:
             if block.get("type") == "text":
               texts.append(_cl_strip_system(block.get("text", "")))
+            elif block.get("type") == "tool_result":
+              c = block.get("content", "")
+              if isinstance(c, str) and c:
+                texts.append(c)
+              elif isinstance(c, list):
+                for item in c:
+                  if item.get("type") == "text" and item.get("text"):
+                    texts.append(item["text"])
         elif rtype == "assistant":
           msg = rec.get("message", {})
           if msg.get("model") == "<synthetic>":
@@ -597,6 +614,22 @@ def _cl_session_grep(path, *, plain=None, rx=None, before=0, after=0, first_only
                 cmd = inp.get("command", "")
                 if cmd:
                   texts.append(f"$ {cmd}")
+              elif name == "AskUserQuestion":
+                for q in inp.get("questions", []):
+                  q_text = q.get("question", "")
+                  if q_text:
+                    texts.append(q_text)
+                  for opt in q.get("options", []):
+                    label = opt.get("label", "")
+                    desc = opt.get("description", "")
+                    if label:
+                      texts.append(label)
+                    if desc:
+                      texts.append(desc)
+              elif name == "ExitPlanMode":
+                plan = inp.get("plan", "")
+                if plan:
+                  texts.append(plan)
         if tagged is not None:
           for text in texts:
             for line in text.splitlines():
@@ -776,6 +809,19 @@ class ClaudeSessionStore(SessionStore):
     line1, line2 = _format_session_lines(session, use_color=use_color)
     out = [f"{line1}\n{line2}\n"]
 
+    # Build tool_use_id → tool_name map for look-up in user turn
+    id_to_tool: dict = {}
+    for _r in records:
+      if _r.get("type") == "assistant":
+        for _b in _r.get("message", {}).get("content", []):
+          if _b.get("type") == "tool_use":
+            id_to_tool[_b.get("id", "")] = _b.get("name", "")
+
+    # Tools whose tool_result responses are meaningful user text
+    # (ExitPlanMode excluded: its tool_result is a system confirmation that
+    # redundantly repeats the plan already shown in the Claude turn above)
+    _DISPLAY_TOOL_RESULTS = {"AskUserQuestion"}
+
     last_user_text = None  # deduplicate retried user messages
     for rec_no, rec in zip(rec_nos, records):
       if rec.get("isSidechain"):
@@ -797,11 +843,26 @@ class ClaudeSessionStore(SessionStore):
         if not isinstance(content, list):
           continue
         if all(isinstance(b, dict) and b.get("type") == "tool_result" for b in content):
-          continue
-        text = _cl_user_text(content)
+          # Include tool results from tools whose responses are meaningful text
+          display_texts = []
+          for b in content:
+            tid = b.get("tool_use_id", "")
+            if id_to_tool.get(tid, "") in _DISPLAY_TOOL_RESULTS:
+              c = b.get("content", "")
+              if isinstance(c, str) and c:
+                display_texts.append(c)
+              elif isinstance(c, list):
+                for item in c:
+                  if item.get("type") == "text" and item.get("text"):
+                    display_texts.append(item["text"])
+          if not display_texts:
+            continue
+          text = "\n\n".join(display_texts)
+        else:
+          text = _cl_user_text(content)
         if text and text != last_user_text:
           last_user_text = text
-          out.append(f"## User{suffix}\n\n{text}\n")
+          out.append(f"## User{suffix}\n\n{_md_quote(text)}\n")
 
       # ── Assistant turn ─────────────────────────────────────────────
       elif rtype == "assistant":
@@ -833,21 +894,34 @@ class ClaudeSessionStore(SessionStore):
           b for b in content
           if b.get("type") == "tool_use" and b.get("name") == "TodoWrite"
         ]
+        ask_ops = [
+          b for b in content
+          if b.get("type") == "tool_use" and b.get("name") == "AskUserQuestion"
+        ]
+        enter_plan_ops = [
+          b for b in content
+          if b.get("type") == "tool_use" and b.get("name") == "EnterPlanMode"
+        ]
+        exit_plan_ops = [
+          b for b in content
+          if b.get("type") == "tool_use" and b.get("name") == "ExitPlanMode"
+        ]
 
-        if not thinking and not texts and not file_ops and not bash_ops and not todo_ops:
+        if not (thinking or texts or file_ops or bash_ops or todo_ops
+                or ask_ops or enter_plan_ops or exit_plan_ops):
           continue
 
         block = f"## Claude{suffix}"
 
         if thinking:
-          inner = "\n\n>\n\n".join(thinking)
+          inner = "\n\n".join(_md_quote(t) for t in thinking)
           block += (
             f"\n\n<details>\n<summary>Thinking</summary>\n\n"
             f"{inner}\n\n</details>"
           )
 
         if texts:
-          block += "\n\n" + "\n\n".join(texts)
+          block += "\n\n" + "\n\n".join(_md_quote(t) for t in texts)
 
         if file_ops:
           n = len(file_ops)
@@ -870,8 +944,8 @@ class ClaudeSessionStore(SessionStore):
             elif name == "NotebookEdit":
               ops_md += f"\n**NotebookEdit** `{fp}`\n"
           block += (
-            f"\n\n<details>\n<summary>{label}</summary>\n"
-            f"{ops_md}\n</details>"
+            f"\n\n<details>\n<summary>{label}</summary>\n\n"
+            f"{_md_quote(ops_md.strip())}\n\n</details>"
           )
 
         if bash_ops:
@@ -884,8 +958,8 @@ class ClaudeSessionStore(SessionStore):
             cmd = inp.get("command", "")
             cmds_md += f"\n**{desc}**\n```bash\n{cmd}\n```\n"
           block += (
-            f"\n\n<details>\n<summary>{label}</summary>\n"
-            f"{cmds_md}\n</details>"
+            f"\n\n<details>\n<summary>{label}</summary>\n\n"
+            f"{_md_quote(cmds_md.strip())}\n\n</details>"
           )
 
         if todo_ops:
@@ -904,9 +978,39 @@ class ClaudeSessionStore(SessionStore):
               else:
                 items_md += f"\n{j}. {text}"
             block += (
-              f"\n\n<details>\n<summary>Todos</summary>\n"
-              f"{items_md}\n\n</details>"
+              f"\n\n<details>\n<summary>Todos</summary>\n\n"
+              f"{_md_quote(items_md.strip())}\n\n</details>"
             )
+
+        if ask_ops:
+          for op in ask_ops:
+            questions = op.get("input", {}).get("questions", [])
+            if not questions:
+              continue
+            for qi, q in enumerate(questions, 1):
+              q_text = q.get("question", "")
+              options = q.get("options", [])
+              q_md = f"**{q_text}**"
+              for opt in options:
+                opt_label = opt.get("label", "")
+                opt_desc = opt.get("description", "")
+                if opt_desc:
+                  q_md += f"\n- {opt_label} — {opt_desc}"
+                else:
+                  q_md += f"\n- {opt_label}"
+              block += f"\n\n### Question {qi}\n\n{_md_quote(q_md)}"
+
+        if enter_plan_ops:
+          block += "\n\n> *(entering plan mode)*"
+
+        if exit_plan_ops:
+          for op in exit_plan_ops:
+            plan = op.get("input", {}).get("plan", "")
+            if plan:
+              block += (
+                f"\n\n<details>\n<summary>Plan</summary>\n\n"
+                f"{_md_quote(plan)}\n\n</details>"
+              )
 
         out.append(block + "\n")
 
@@ -1100,15 +1204,46 @@ def _cx_session_grep(path, *, plain=None, rx=None, before=0, after=0, first_only
         payload = rec.get("payload", {})
         texts = []
         if rtype == "event_msg":
-          if payload.get("type") not in ("user_message", "agent_message"):
+          et = payload.get("type")
+          if et in ("user_message", "agent_message"):
+            text = payload.get("message", "")
+          elif et == "agent_reasoning":
+            text = payload.get("text", "")
+          else:
             continue
-          text = payload.get("message", "")
           if text:
             texts.append(text)
         elif rtype == "response_item" and payload.get("type") == "custom_tool_call":
           inp = payload.get("input", "")
           if inp:
             texts.append(inp)
+        elif rtype == "response_item" and payload.get("type") == "function_call":
+          if payload.get("name") == "request_user_input":
+            try:
+              args = json.loads(payload.get("arguments", "{}"))
+            except Exception:
+              args = {}
+            for q in args.get("questions", []):
+              q_text = q.get("question", "")
+              if q_text:
+                texts.append(q_text)
+              for opt in q.get("options", []):
+                label = opt.get("label", "")
+                desc = opt.get("description", "")
+                if label:
+                  texts.append(label)
+                if desc:
+                  texts.append(desc)
+        elif rtype == "response_item" and payload.get("type") == "function_call_output":
+          try:
+            output = json.loads(payload.get("output", "{}"))
+          except Exception:
+            output = {}
+          for q_id, a_data in output.get("answers", {}).items():
+            if isinstance(a_data, dict):
+              for answer in a_data.get("answers", []):
+                if answer:
+                  texts.append(answer)
         if tagged is not None:
           for text in texts:
             for line in text.splitlines():
@@ -1367,26 +1502,58 @@ class CodexSessionStore(SessionStore):
     # First pass: collect messages in order
     rec_width = len(str(session.rc))
     msgs = []
+    _cx_pending_questions: dict = {}  # call_id → questions list
     for idx, l in enumerate(lines):
-      if l.get("type") != "event_msg":
-        continue
-      et = l["payload"].get("type")
       rec_no = l.get("_rec_no", idx + 1)
-      if et == "user_message":
-        text = l["payload"].get("message", "")
-        m = re.search(r"## My request for Codex:\n(.+)", text, re.DOTALL)
-        if m:
-          text = m.group(1).strip()
-        images = _cx_get_images_before(lines, idx)
-        msgs.append({"role": "user", "text": text, "images": images, "idx": idx,
-                     "rec_no": rec_no, "ts": l.get("timestamp")})
-      elif et == "agent_message":
-        phase = l["payload"].get("phase", "")
-        text = l["payload"].get("message", "")
-        msgs.append(
-          {"role": "codex", "phase": phase, "text": text, "idx": idx,
-           "patches": [], "rec_no": rec_no, "ts": l.get("timestamp")}
-        )
+      if l.get("type") == "event_msg":
+        et = l["payload"].get("type")
+        if et == "user_message":
+          text = l["payload"].get("message", "")
+          m = re.search(r"## My request for Codex:\n(.+)", text, re.DOTALL)
+          if m:
+            text = m.group(1).strip()
+          images = _cx_get_images_before(lines, idx)
+          msgs.append({"role": "user", "text": text, "images": images, "idx": idx,
+                       "rec_no": rec_no, "ts": l.get("timestamp")})
+        elif et == "agent_message":
+          phase = l["payload"].get("phase", "")
+          text = l["payload"].get("message", "")
+          msgs.append(
+            {"role": "codex", "phase": phase, "text": text, "idx": idx,
+             "patches": [], "rec_no": rec_no, "ts": l.get("timestamp")}
+          )
+        elif et == "agent_reasoning":
+          text = l["payload"].get("text", "")
+          if text:
+            msgs.append({"role": "codex_reasoning", "text": text, "idx": idx,
+                         "rec_no": rec_no, "ts": l.get("timestamp")})
+      elif l.get("type") == "response_item":
+        pt = l.get("payload", {}).get("type", "")
+        if pt == "function_call" and l["payload"].get("name") == "request_user_input":
+          try:
+            args = json.loads(l["payload"].get("arguments", "{}"))
+          except Exception:
+            args = {}
+          questions = args.get("questions", [])
+          if questions:
+            call_id = l["payload"].get("call_id", "")
+            _cx_pending_questions[call_id] = questions
+            msgs.append({"role": "codex_question", "questions": questions,
+                         "call_id": call_id, "idx": idx,
+                         "rec_no": rec_no, "ts": l.get("timestamp")})
+        elif pt == "function_call_output":
+          call_id = l["payload"].get("call_id", "")
+          if call_id in _cx_pending_questions:
+            try:
+              output = json.loads(l["payload"].get("output", "{}"))
+            except Exception:
+              output = {}
+            answers = output.get("answers", {})
+            if answers:
+              msgs.append({"role": "codex_answer",
+                           "questions": _cx_pending_questions[call_id],
+                           "answers": answers, "idx": idx,
+                           "rec_no": rec_no, "ts": l.get("timestamp")})
 
     # Second pass: attach patches to each final Codex message
     prev_idx = 0
@@ -1413,23 +1580,61 @@ class CodexSessionStore(SessionStore):
           if s:
             suffix = " " + s
         img_md = "\n".join(f'![image]({url})' for url in msg["images"])
-        block = f'## User{suffix}\n\n{msg["text"]}'
+        block = f'## User{suffix}\n\n{_md_quote(msg["text"])}'
         if img_md:
           block += f"\n\n{img_md}"
         out.append(block + "\n")
         i += 1
 
-      else:  # codex turn
+      elif msg["role"] == "codex_answer":
+        # User's answers to a Codex request_user_input question
+        suffix = ""
+        if show_date or record_number:
+          s = _build_hunk_prefix(msg["rec_no"], msg["ts"],
+                                 show_date=show_date, record_number=record_number,
+                                 rec_width=rec_width, tz=display_tz,
+                                 use_color=use_color).rstrip()
+          if s:
+            suffix = " " + s
+        questions = msg["questions"]
+        answers = msg["answers"]
+        parts = []
+        for q in questions:
+          q_text = q.get("question", "")
+          q_id = q.get("id", "")
+          a_data = answers.get(q_id, {})
+          selected = a_data.get("answers", []) if isinstance(a_data, dict) else []
+          if q_text and selected:
+            answer_str = ", ".join(f'"{a}"' for a in selected)
+            parts.append(f'**{q_text}** → {answer_str}')
+        if parts:
+          out.append(f"## User{suffix}\n\n" + _md_quote("\n\n".join(parts)) + "\n")
+        i += 1
+
+      else:  # codex turn (codex, codex_reasoning, codex_question)
         codex_rec_no = msgs[i]["rec_no"]
         codex_ts = msgs[i]["ts"]
-        commentary_items = []
-        while i < len(msgs) and msgs[i]["role"] == "codex" and msgs[i]["phase"] == "commentary":
-          commentary_items.append(msgs[i]["text"])
-          i += 1
+        thinking_items = []
+        while i < len(msgs) and msgs[i]["role"] in ("codex", "codex_reasoning"):
+          m = msgs[i]
+          if m["role"] == "codex_reasoning":
+            thinking_items.append(m["text"])
+            i += 1
+          elif m["role"] == "codex" and m["phase"] == "commentary":
+            thinking_items.append(m["text"])
+            i += 1
+          else:
+            break  # non-commentary codex message — stop
 
         final_msg = None
         if i < len(msgs) and msgs[i]["role"] == "codex" and msgs[i]["phase"] != "commentary":
           final_msg = msgs[i]
+          i += 1
+
+        # Check for an inline question (request_user_input) from Codex
+        question_block = None
+        if i < len(msgs) and msgs[i]["role"] == "codex_question":
+          question_block = msgs[i]
           i += 1
 
         suffix = ""
@@ -1441,11 +1646,11 @@ class CodexSessionStore(SessionStore):
           if s:
             suffix = " " + s
         block = f"## Codex{suffix}"
-        if commentary_items:
-          inner = "\n\n>\n\n".join(commentary_items)
+        if thinking_items:
+          inner = "\n\n".join(_md_quote(t) for t in thinking_items)
           block += f"\n\n<details>\n<summary>Thoughts</summary>\n\n{inner}\n\n</details>"
         if final_msg:
-          block += f"\n\n{final_msg['text']}"
+          block += f"\n\n{_md_quote(final_msg['text'])}"
           if final_msg["patches"]:
             n = len(final_msg["patches"])
             label = f"{n} file change{'s' if n != 1 else ''}"
@@ -1454,8 +1659,22 @@ class CodexSessionStore(SessionStore):
             )
             block += (
               f"\n\n<details>\n<summary>{label}</summary>\n\n"
-              f"{patches_md}\n\n</details>"
+              f"{_md_quote(patches_md)}\n\n</details>"
             )
+        if question_block:
+          questions = question_block["questions"]
+          for qi, q in enumerate(questions, 1):
+            q_text = q.get("question", "")
+            options = q.get("options", [])
+            q_md = f"**{q_text}**"
+            for opt in options:
+              opt_label = opt.get("label", "")
+              opt_desc = opt.get("description", "")
+              if opt_desc:
+                q_md += f"\n- {opt_label} — {opt_desc}"
+              else:
+                q_md += f"\n- {opt_label}"
+            block += f"\n\n### Question {qi}\n\n{_md_quote(q_md)}"
         out.append(block + "\n")
 
     return "\n".join(out)
