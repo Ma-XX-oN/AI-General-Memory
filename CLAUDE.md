@@ -399,7 +399,7 @@ See [ahk.md](ahk.md) for full notes. Critical reminders:
 - [Testing guidelines](testing.md)
 - [Workflow guidance (TTD/tests/commit workflow)](workflow.md)
 - [Build issue triage playbook](build_issues.md)
-- [AI-transcript.py architecture and key locations](scripts/CLAUDE.md)
+- [AI-transcript.py architecture and key locations](scripts/AI-transcript-arch.md)
 
 ## Transcript search
 
