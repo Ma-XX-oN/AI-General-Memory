@@ -56,9 +56,11 @@
   - [20. `-n` and `-d` doesn't work with `--id` **(NOT-A-BUG)** ***(WILL-NOT-IMPLEMENT)***](#20--n-and--d-doesnt-work-with---id-not-a-bug-will-not-implement)
   - [21. Need a way to state speaker when grepping **(FEATURE)**](#21-need-a-way-to-state-speaker-when-grepping-feature)
   - [22. `--project` should be able to take just the project name as well **(FEATURE)**](#22---project-should-be-able-to-take-just-the-project-name-as-well-feature)
-  - [23. `--id <title-substr>` doesn't work for Codex **(BUG)** ***(RESOLVED)***](#23---id-title-substr-doesnt-work-for-codex-bug-resolved)
-  - [24. Questions aren't in transcript **(BUG)**](#24-questions-arent-in-transcript-bug)
-  - [24. Plan isn't in transcript **(BUG)**](#24-plan-isnt-in-transcript-bug)
+  - [23. `--id <title-substr>` doesn't work for Codex **(BUG)** ***(DONE)***](#23---id-title-substr-doesnt-work-for-codex-bug-done)
+  - [24. Questions aren't in transcript **(BUG)** ***(DONE)***](#24-questions-arent-in-transcript-bug-done)
+  - [25. Plan isn't in transcript **(BUG)** ***(DONE)***](#25-plan-isnt-in-transcript-bug-done)
+  - [26. Text not quoted **(BUG)** ***(DONE)***](#26-text-not-quoted-bug-done)
+  - [27.  Codex separates thoughts by a space, Claude by a header. **(BUG)**](#27--codex-separates-thoughts-by-a-space-claude-by-a-header-bug)
 - [Questions](#questions)
 - [Bugs resolved](#bugs-resolved)
   - [Bug verification matrix](#bug-verification-matrix)
@@ -1071,7 +1073,7 @@ States path, but just the last name should be sufficient in most cases.  If not
 should show the paths with a number prefixed to them like an ordered list.  User
 can use the same `:N` notation to disambiguate.
 
-### 23. `--id <title-substr>` doesn't work for Codex **(BUG)** ***(RESOLVED)***
+### 23. `--id <title-substr>` doesn't work for Codex **(BUG)** ***(DONE)***
 
 When using the `--id` switch, it doesn't find the conversation with that title.
 
@@ -1089,19 +1091,145 @@ falls back to scanning all session files not in the index when the indexed
 title-glob returns nothing, matching against that synthetic title.
 Test: `--codex --id "I want you to" --ls` → finds session `019d1acc`.
 
-### 24. Questions aren't in transcript **(BUG)**
+### 24. Questions aren't in transcript **(BUG)** ***(DONE)***
 
 In claude, when it presents questions, it isn't reflected in the transcript.  I've not verified if this is also the case in codex.
 
 Claude test: `--claude --id a7546a0a --all-projects -nd --records 805:808` → The questions should be between records 805 and 808.
 
-Codex test: Need to generate a test/
+Codex test: `--codex --id 019d4133 --records 8005:8015` → question at record 8010 should appear.
 
-### 24. Plan isn't in transcript **(BUG)**
+**Root cause (Claude):** `AskUserQuestion` tool_use blocks were silently skipped
+because the assistant-turn filter only tracked thinking/text/file/bash/todo ops.
+The corresponding `tool_result` user records were also skipped as "all tool
+results" with no allowlist.
+
+**Root cause (Codex):** `response_item/function_call` records with
+`name="request_user_input"` and their matching `function_call_output` answer
+records were not handled in either `_cx_session_grep` or `CodexSessionStore`.
+
+**Fix:** Added `AskUserQuestion` to the Claude assistant-turn display (rendered
+as `### Question N` headings with quoted options) and to `_cl_session_grep`.
+Added `_DISPLAY_TOOL_RESULTS = {"AskUserQuestion"}` allowlist so answer
+`tool_result` records appear as quoted user-turn text.  For Codex, added
+`request_user_input` function_call parsing (with `_cx_pending_questions` dict
+keyed by `call_id`) and `function_call_output` answer rendering as a quoted
+`## User` turn with Q → "answer" pairs; also added both to `_cx_session_grep`.
+
+### 25. Plan isn't in transcript **(BUG)** ***(DONE)***
 
 In claude, when it presents a plan, it isn't reflected in the transcript.  I've not verified if this is also the case in codex.
 
 Claude test: `--claude --id a7546a0a --all-projects -nd --records 823:827` → The plan should be between records 823 and 827.
+
+Codex test: Need to generate a test.  Codex has a plan mode (user-controlled),
+but does not expose Enter/ExitPlanMode tools — plan content is conveyed through
+regular agent messages and is therefore already captured as normal transcript.
+
+**Root cause:** `EnterPlanMode` and `ExitPlanMode` tool_use blocks were silently
+skipped by the same assistant-turn filter that missed `AskUserQuestion`.
+
+**Fix:** Added `EnterPlanMode` (renders as `> *(entering plan mode)*`) and
+`ExitPlanMode` (renders plan markdown inside a collapsible `<details><summary>Plan</summary>` block) to the Claude assistant-turn display and to
+`_cl_session_grep`.
+
+### 26. Text not quoted **(BUG)** ***(DONE)***
+
+Text that was stated/thought by the AI or User should be md quoted (prefixed
+with a `>`).
+
+**Root cause:** No blockquoting was applied to any transcript text — all content
+was rendered as bare markdown, making informational structure (headings,
+`<details>` labels) visually indistinguishable from actual transcript content.
+
+**Fix:** Added `_md_quote(text)` helper (prefixes every line with `> `, empty
+lines become bare `>`) and applied it to all non-informational transcript text
+in both `ClaudeSessionStore.transcript()` and `CodexSessionStore.transcript()`:
+user messages, AI response text, thinking/reasoning content, questions and
+options, answers, file-op diffs, bash commands, todo lists, and plan content.
+Headings (`## User`, `## Claude`, `## Codex`, `### Question N`) and
+`<details><summary>` labels remain unquoted as they are structural/informational.
+
+### 27.  Codex separates thoughts by a space, Claude by a header. **(BUG)**
+
+To be more precise, Claude separates each thought in it's own `<details>` tag.
+
+This is inconsistent behaviour.  However, both have uses.  We should have
+thoughts separated by a blank line by default and have a switch to show them as
+headers.  However, when showing as headers, it should put the consecutive
+thoughts in a single `<details>` tag.
+
+Need to determine what that switch will be and what name it should have.
+
+`AI-transcript.py --claude -dn --id "fix 24 and 25"  |head -30> /dev/clipboard `
+
+````markdown
+[claude] [2026-04-04 22:52]-[2026-04-05 04:37] [claude] records: 959
+(4c8216ff) fix 24 and 25
+
+## User [2026-04-04 18:52:45]:   4:
+
+> fix 24 and 25
+
+## Claude [2026-04-04 18:52:49]:   5:
+
+<details>
+<summary>Thinking</summary>
+
+> The user wants me to fix items 24 and 25. They have the file `AI-transcript-plan.md` open. Let me read that file to understand what items 24 and 25 are.
+
+</details>
+
+## Claude [2026-04-04 18:52:49]:   6:
+
+<details>
+<summary>1 command</summary>
+
+> ****
+> ```bash
+> date
+> ```
+
+</details>
+
+## Claude [2026-04-04 18:52:52]:   8:
+
+````
+
+`AI-transcript.py --codex -dn --id 019d4133 | head -30 > /dev/clipboard`
+
+````markdown
+[codex] [2026-03-30 20:03]-[2026-03-30 20:04] records: 17730
+(019d4133) Review lattice-representation.scad
+
+## User [2026-03-30 20:04:08]:     7:
+
+> What modifications were done to lattice-representation.scad? Use git and the AI-transcript.py script to help understand.
+
+## Codex [2026-03-30 20:04:13]:    10:
+
+<details>
+<summary>Thoughts</summary>
+
+> I’m going to inspect the repo instructions and local memory first, then I’ll trace the git history of `lattice-representation.scad` and use `AI-transcript.py` if it’s available to reconstruct what changed and why.
+
+> I found a project `CODEX.md`; the `CODEX_HOME` environment variable looks unset here, so I’m checking the local memory file and then I’ll move into git history plus the transcript helper.
+
+> I’ve loaded the global and project memory. The only project execution rule is for OpenSCAD runs via `..\openscad\build-Release-vscode\openscad.com`, which doesn’t apply to this git/transcript analysis, so I’m proceeding with plain `git` and transcript tooling.
+
+> Git history shows `lattice-representation.scad` has a long series of focused changes, and the file is also modified in the working tree right now. I’m checking the transcript helper next so I can connect the commit trail to the AI discussion that produced it.
+
+> I’ve got the commit trail and confirmed there are local edits on top of it. Next I’m pulling two views together: the working-tree diff itself, and the transcript/session hits that explain the intent behind the recent truss, seam, and shell changes.
+
+> The current uncommitted diff is substantial and very specific: it replaces the old `falloff`/`initial_truss_transition` model with a per-level signed `truss_transition` model throughout the file. I’m widening the transcript search to those exact terms so I can tie the code changes back to the design discussion instead of guessing from the diff alone.
+
+> I found the key causal thread in the transcript: the file first gained a separate `initial_truss_transition`, then that design was reconsidered because it let truss settings indirectly resize the comb. I’m doing one quick git pass to anchor that narrative in actual commits, then I’ll summarize the modifications cleanly.
+
+> I’ve got the full picture now: the recent committed history, the current uncommitted refactor, and the transcript discussion that explains the design pivot. I’m grabbing the end timestamp and then I’ll give you a concise summary of what changed and why.
+
+</details>
+
+````
 
 ## Questions
 
