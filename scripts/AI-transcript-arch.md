@@ -22,6 +22,7 @@ are intentionally omitted — use `grep "def SECTION_NAME"` instead.
 | `_grep_context_tagged` | `def _grep_context_tagged(` |
 | `SessionStore` ABC | `class SessionStore(` |
 | `_md_quote` | `def _md_quote(` |
+| `_md_code_fence` | `def _md_code_fence(` |
 | `_cl_session_grep` | `def _cl_session_grep(` |
 | `_cl_user_text` | `def _cl_user_text(` |
 | `_cl_group_turns` | `def _cl_group_turns(` |
@@ -97,21 +98,40 @@ Records to skip unconditionally: `isSidechain=true`, `model="<synthetic>"`,
 
 ## Transcript pipeline (Claude-specific)
 
+### `_md_code_fence(text, lang="")`
+
+Wraps `text` in a Markdown code fence using enough backticks to prevent
+premature closing.  Scans `text` for the longest run of consecutive backticks
+and uses `max(3, that_run + 1)` backticks for both the opening and closing
+fence lines.
+
 ### `_cl_group_turns(rec_nos, records)`
 
-Groups the flat record list into conversational turns.  Returns a list of:
+Groups the flat record list into conversational turns.  Returns
+`(items, plan_ids)` where `items` is a list of tuples:
 
 ```python
 ('user', rec_no, ts, rec)
-    # A real user message OR an AskUserQuestion answer.
-    # AskUserQuestion answers identified by pre-scanning for ask_ids.
+    # A real user message, an AskUserQuestion answer, or an ExitPlanMode
+    # plan-approval.  Both kinds of answer are identified by pre-scanning
+    # for break_ids = ask_ids | plan_ids.
 
 ('assistant_turn', display_rec_no, display_ts, sub_records, tr_map)
     # All consecutive assistant records between real user messages.
     # sub_records = [(rec_no, ts, rec), ...]
     # tr_map      = {tool_use_id: result_text}   absorbed tool-result records
-    # AskUserQuestion tool-result records BREAK the turn (not absorbed).
+    # AskUserQuestion and ExitPlanMode tool-result records BREAK the turn
+    # (not absorbed into tr_map).
+
+('notice', rec_no, ts, text)
+    # Synthetic assistant record (model="<synthetic>"), e.g. usage-limit
+    # notification.  Collected as pending_notices during the inner turn
+    # loop and appended to result AFTER the enclosing assistant_turn, so
+    # notices appear after their turn in the output.
 ```
+
+`plan_ids` is the set of ExitPlanMode tool-call IDs.  Callers use it to
+distinguish plan-approval `user` records from regular user messages.
 
 ### Inline vs. thought-group classification
 
@@ -135,9 +155,9 @@ The caller blockquotes the entire outer `<details>Thoughts</details>` block.
 
 | Content | Output |
 | --- | --- |
-| `thinking` block | plain text |
+| `thinking` block | plain text; `<` on lines starting with `>` is escaped to `&lt;` (outside fenced blocks) so HTML tags written as markdown examples don't corrupt rendering when `_md_quote` adds an outer `>`; uses `regex` module possessive quantifiers + backreference `\1` for fence detection |
 | `text` block | plain text |
-| `Bash` tool_use | `<details><summary>desc or cmd_first_line</summary>` + cmd in ` ```bash ` fence + output in ` ``` ` fence |
+| `Bash` tool_use | `<details><summary>desc or cmd_first_line</summary>` + cmd in ` ```bash ` fence + output in adaptive fence (via `_md_code_fence`) |
 | `Edit`/`Write`/`NotebookEdit` | `<details><summary>file change</summary>` + diff/path |
 | `TodoWrite` | `<details><summary>Todos</summary>` + numbered list |
 | `Read`/`Glob`/`Grep`/`Task`/others | silently skipped |
@@ -146,15 +166,36 @@ The caller blockquotes the entire outer `<details>Thoughts</details>` block.
 ### `_cl_render_inline_item(rec, tr_map, question_counter)`
 
 Renders inline records (text-only, AskUserQuestion, Enter/ExitPlanMode).
-Applies `_md_quote()` to text and plan-details content.
+Applies `_md_quote()` to text content.
 `question_counter` is a `[n]` one-element list for cross-call numbering.
+
+| Tool | Output |
+| --- | --- |
+| text-only record | `_md_quote(text)` |
+| `AskUserQuestion` | `### Question N` heading + blockquoted question text and option list |
+| `EnterPlanMode` | `> *(entering plan mode)*` |
+| `ExitPlanMode` | `> ### Plan` heading + doubly-blockquoted plan body |
 
 ### `ClaudeSessionStore.transcript()` main loop
 
-For each thought group: collect `_cl_render_thought_item()` results, join
-with blank lines, wrap in `<details>Thoughts</details>`, then apply
-`_md_quote()` to the **entire** outer block before appending to the turn.
-This ensures all `<details>` tags and their content are blockquoted uniformly.
+Calls `_cl_group_turns()` and unpacks `(turns, plan_ids)`.  For each item:
+
+- **`'user'`**: extracts text (or tool-result text for AskUserQuestion /
+  ExitPlanMode answers).  If `is_plan_approval` (tool_use_id in `plan_ids`),
+  scans for a `^#{0,6} *Approved Plan[: ]` heading; text before the heading
+  is shown normally, text from the heading onward is collapsed into a
+  `> <details><summary>Approved Plan</summary>` block.
+- **`'notice'`**: emits `> *(system: notice_text)*`.
+- **`'assistant_turn'`**: classifies each sub-record as inline or
+  thought-group (see below), builds the `## Claude{suffix}` block.
+  - Each thought group: collects `_cl_render_thought_item()` results, wraps
+    in `> <details>\n> <summary>Thoughts</summary>` with `_md_quote()` applied
+    to each item; in `-T` mode each item is prefixed with
+    `> ### Thought N [suffix]`.
+  - Each inline segment: calls `_cl_render_inline_item()`; in `-T` mode
+    prefixed with `> ## Claude{inner_suffix}` where `inner_suffix` is built
+    by `_build_hunk_prefix(sub_rec_no, sub_ts, ...)`.
+  - The completed block is appended directly to `out` (no outer quoting).
 
 ### `_format_thought_items` (Codex only)
 
