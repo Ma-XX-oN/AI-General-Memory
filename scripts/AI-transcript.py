@@ -893,7 +893,32 @@ def _cl_render_thought_item(rec, tr_map):
     btype = b.get("type", "")
 
     if btype == "thinking" and b.get("thinking"):
-      parts.append(b["thinking"])
+      # Escape bare < characters on blockquoted lines (lines starting with >)
+      # so that HTML tags in thinking content render as literal text after
+      # _md_quote wraps them in an outer >. Skip lines inside fenced blocks
+      # because the fence already protects its content.
+      #
+      # Uses the third-party `regex` module (possessive quantifiers prevent
+      # catastrophic backtracking).  Backreference \1 ensures each fence is
+      # closed by the same prefix+backtick sequence that opened it.
+      import regex as _regex
+      _fence_pat = _regex.compile(
+        r"^((?:> )*+`{3,}+).*+\n(?:(?!\1(?!`)).*+\n)*+\1(?!`)",
+        _regex.MULTILINE,
+      )
+      _bq_lt = _regex.compile(r"^(>.++)$", _regex.MULTILINE)
+      _thinking = b["thinking"]
+      _buf, _pos = [], 0
+      for _m in _fence_pat.finditer(_thinking):
+        _buf.append(_bq_lt.sub(
+          lambda m: m.group(1).replace("<", "&lt;"), _thinking[_pos:_m.start()]
+        ))
+        _buf.append(_m.group(0))
+        _pos = _m.end()
+      _buf.append(_bq_lt.sub(
+        lambda m: m.group(1).replace("<", "&lt;"), _thinking[_pos:]
+      ))
+      parts.append("".join(_buf))
 
     elif btype == "text" and b.get("text"):
       parts.append(b["text"])

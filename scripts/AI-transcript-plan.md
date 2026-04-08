@@ -60,7 +60,13 @@
   - [24. Questions aren't in transcript **(BUG)** ***(DONE)***](#24-questions-arent-in-transcript-bug-done)
   - [25. Plan isn't in transcript **(BUG)** ***(DONE)***](#25-plan-isnt-in-transcript-bug-done)
   - [26. Text not quoted **(BUG)** ***(DONE)***](#26-text-not-quoted-bug-done)
-  - [27.  Codex separates thoughts by a space, Claude by a header. **(BUG)**](#27--codex-separates-thoughts-by-a-space-claude-by-a-header-bug)
+  - [27.  Codex separates thoughts by a space, Claude by a header. **(BUG)** ***(DONE)***](#27--codex-separates-thoughts-by-a-space-claude-by-a-header-bug-done)
+  - [28. Bash output code fence leaks when output contains backticks. **(BUG)** ***(DONE)***](#28-bash-output-code-fence-leaks-when-output-contains-backticks-bug-done)
+  - [29. ExitPlanMode plan collapsed in `<details>` instead of shown expanded. **(BUG)** ***(DONE)***](#29-exitplanmode-plan-collapsed-in-details-instead-of-shown-expanded-bug-done)
+  - [30. ExitPlanMode tool_result (plan approval) silently discarded. **(BUG)** ***(DONE)***](#30-exitplanmode-tool_result-plan-approval-silently-discarded-bug-done)
+  - [31. Synthetic `model='<synthetic>'` records silently dropped. **(BUG)** ***(DONE)***](#31-synthetic-modelsynthetic-records-silently-dropped-bug-done)
+  - [32. No `## Claude` heading before inline segments in `-T` mode. **(BUG)** ***(DONE)***](#32-no--claude-heading-before-inline-segments-in--t-mode-bug-done)
+  - [33. Synthetic notice emitted before its turn instead of after. **(BUG)** ***(DONE)***](#33-synthetic-notice-emitted-before-its-turn-instead-of-after-bug-done)
 - [Questions](#questions)
 - [Bugs resolved](#bugs-resolved)
   - [Bug verification matrix](#bug-verification-matrix)
@@ -1150,7 +1156,7 @@ options, answers, file-op diffs, bash commands, todo lists, and plan content.
 Headings (`## User`, `## Claude`, `## Codex`, `### Question N`) and
 `<details><summary>` labels remain unquoted as they are structural/informational.
 
-### 27.  Codex separates thoughts by a space, Claude by a header. **(BUG)**
+### 27.  Codex separates thoughts by a space, Claude by a header. **(BUG)** ***(DONE)***
 
 To be more precise, Claude separates each thought in it's own `<details>` tag.
 
@@ -1160,6 +1166,127 @@ headers.  However, when showing as headers, it should put the consecutive
 thoughts in a single `<details>` tag.
 
 Need to determine what that switch will be and what name it should have.
+
+**Root cause:** Claude's API emits one record per content type — a single
+conversational turn consists of many consecutive `assistant` records (thinking,
+tool_use, text) separated by `user` tool-result records.  The old
+`_cl_group_records()` only folded thinking-only records into the next
+substantive one, so each tool_use or text-only record still got its own
+`## Claude` block.  The `-T` flag had no effect because `thought_items` was
+never > 1 after the single-thinking merge.
+
+**Fix:** Replaced `_cl_group_records()` with `_cl_group_turns()`, which groups
+**all** consecutive assistant records into one turn (absorbing interleaved
+`user` tool-result records into a `tr_map`; AskUserQuestion answers break the
+turn so they surface as `## User` blocks).  Added `_cl_render_thought_item()`
+to render each sub-record inside a `<details>Thoughts</details>` block (with
+Bash results paired from `tr_map`), and `_cl_render_inline_item()` for
+text-only records and AskUserQuestion/EnterPlanMode/ExitPlanMode, which display
+outside the details.  The `--separate-thoughts` / `-T` flag labels each
+sub-record in a thought group with `### Thought N [suffix]`; the counter
+continues across thought groups within the same turn.
+
+---
+
+### 28. Bash output code fence leaks when output contains backticks. **(BUG)** ***(DONE)***
+
+When a Bash command's output contains three-backtick sequences (` ``` `), the
+fixed `` ``` `` fence used to wrap it was prematurely closed, causing raw
+markdown to leak into the rendered output.
+
+**Root cause:** `_cl_render_thought_item` used a hardcoded `` ```bash `` / `` ``` ``
+fence.  Any output containing `` ``` `` would close the outer fence early.
+
+**Fix:** Added `_md_code_fence(text, lang="")` helper after `_md_quote`.  It
+scans `text` for the longest run of consecutive backticks and uses
+`max(3, run + 1)` backticks for the opening and closing fence, preventing any
+backtick sequence in the content from prematurely closing it.  Updated
+`_cl_render_thought_item` to use `_md_code_fence` for both the command and the
+output.
+
+---
+
+### 29. ExitPlanMode plan collapsed in `<details>` instead of shown expanded. **(BUG)** ***(DONE)***
+
+`_cl_render_inline_item` was wrapping the ExitPlanMode plan in a
+`<details><summary>Plan</summary>` block, hiding it from the reader.  The plan
+is user-directed content and should be visible.
+
+**Root cause:** The initial implementation of ExitPlanMode rendering used a
+`<details>` block by analogy with other tool outputs.
+
+**Fix:** Changed `_cl_render_inline_item` to render the plan under `> ### Plan`
+(a blockquoted `### Plan` heading) with the body double-quoted (`> > `) to
+prevent heading-depth conflicts with the surrounding Claude turn structure.
+
+---
+
+### 30. ExitPlanMode tool_result (plan approval) silently discarded. **(BUG)** ***(DONE)***
+
+When the user approved a plan, the tool_result record carrying the approval was
+absorbed into `tr_map` by `_cl_group_turns` and never surfaced as a `## User`
+block.
+
+**Root cause:** `_cl_group_turns` only broke the turn for `AskUserQuestion`
+answers; `ExitPlanMode` answers were absorbed like ordinary tool results.
+
+**Fix:** Added `plan_ids` set (IDs of ExitPlanMode tool calls) in
+`_cl_group_turns`, combined with `ask_ids` into `break_ids`, and updated both
+the outer and inner loop break conditions.  Changed return value to
+`(result, plan_ids)`.  In the rendering loop, ExitPlanMode user records are
+detected via `plan_ids` and rendered with the approval text visible and the
+echoed plan body collapsed under `<details><summary>Approved Plan</summary>`.
+
+---
+
+### 31. Synthetic `model='<synthetic>'` records silently dropped. **(BUG)** ***(DONE)***
+
+Assistant records with `model='<synthetic>'` (e.g. usage-limit notifications)
+were silently skipped in `_cl_group_turns`, so the user never saw them in the
+transcript.
+
+**Root cause:** The `<synthetic>` skip block had no rendering path; it just
+incremented the index and continued.
+
+**Fix:** `<synthetic>` records now emit `('notice', rec_no, ts, text)` tuples.
+The rendering loop handles them as `> *(system: <text>)*` — a blockquoted italic
+system annotation.
+
+---
+
+### 32. No `## Claude` heading before inline segments in `-T` mode. **(BUG)** ***(DONE)***
+
+In `-T` (separate-thoughts) mode, user-facing text that followed a Thoughts
+block appeared without a heading, making it hard to distinguish from thought
+content at a glance.
+
+**Root cause:** The inline segment handler appended `inline_md` directly to
+`block` without an additional heading in `-T` mode.
+
+**Fix:** When `separate_thoughts=True`, the inline segment handler now prepends
+`> ## Claude\n>\n` before `inline_md`, giving each user-facing response its own
+visible heading within the blockquote structure.
+
+---
+
+### 33. Synthetic notice emitted before its turn instead of after. **(BUG)** ***(DONE)***
+
+When a `model='<synthetic>'` record appeared inside an assistant turn (e.g. at
+record 100, mid-way through the session's first long turn), the notice was
+appended to `result` immediately — before the `('assistant_turn', ...)` tuple
+for that turn was appended.  This caused the notice to render between the
+preceding user message and Claude's first response.
+
+**Root cause:** `_cl_group_turns` inner turn loop called `result.append(('notice',
+...))` directly on encountering a synthetic record, before the turn's
+`sub_records` list was complete and before `result.append(('assistant_turn',
+...))` ran at the end of the loop.
+
+**Fix:** Collect notices into a `pending_notices` list during the inner turn
+loop; call `result.extend(pending_notices)` after the turn tuple is appended,
+so notices always follow their enclosing turn in the output.
+
+---
 
 `AI-transcript.py --claude -dn --id "fix 24 and 25"  |head -30> /dev/clipboard `
 

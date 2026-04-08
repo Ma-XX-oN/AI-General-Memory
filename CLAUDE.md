@@ -52,6 +52,23 @@ When writing code that is *part of* the library, calling its private functions
 is fine and often preferred — they exist to bypass checks/evaluation that only
 the public API needs to perform for external callers.
 
+### Use enough backticks when fencing content that may contain backticks
+
+When wrapping arbitrary text in a Markdown code fence, scan the content for
+the longest run of consecutive backticks it contains and use at least that
+many **plus one** for the outer fence.  A fixed ` ``` ` (3-backtick) fence
+will be prematurely closed by any triple-backtick sequence in the content,
+causing everything after it to render as live Markdown instead of code.
+
+### Ask when confused — never guess and implement
+
+If there is **any** confusion about what to implement, what the requirements
+mean, or how the pieces fit together, **stop and ask before writing a single
+line of code**.  Do not guess at the intent, implement something plausible, and
+then backtrack when it turns out to be wrong — that wastes time and can make
+the situation worse than doing nothing.  Asking is always cheaper than
+undoing.
+
 ### Ask for help when stuck
 
 When a fix isn't working after 2-3 attempts, STOP and tell the user:
@@ -68,6 +85,22 @@ like to bounce some ideas off you to possibly get to a solution faster."
 
 Also: when the user says STOP, stop immediately and answer their question
 directly.  Do not continue analyzing or coding.
+
+### Committing is never part of completing a task
+
+"Finishing work" and "committing" are two completely separate acts.  A commit
+is never the natural last step of completing a task — it always requires its
+own explicit instruction.  "Continue", "go ahead", "implement it", "fix it",
+"do it", and all similar phrases authorize **work only**.  They never authorize
+a commit.
+
+Stop when the work is done.  Wait for an explicit commit instruction — words
+like "commit it", "go ahead and commit", or equivalent.  When in doubt, ask:
+"Ready to commit?"
+
+This is doubly strict when the user has said "don't commit until I verify":
+wait for (1) explicit verification and (2) a separate explicit commit
+instruction before touching git at all.
 
 ### Answer questions before taking action
 
@@ -363,6 +396,20 @@ needs tracking.
 Before implementing, scan back through the conversation to confirm what was
 already decided.  Re-deriving settled conclusions in a thinking block wastes
 tokens and delays the first edit.  Trust the conversation record.
+
+### Verify no regressions after every rendering change
+
+After any change to output-rendering code, spot-check the generated output for
+ALL previously confirmed features before declaring the work done.  Do not assume
+unchanged code paths are still intact.  At minimum check:
+
+- Thought headings include date and record number when `-dn` flags are used.
+- Output is wrapped in blockquotes (each line prefixed `>`) where expected.
+- Code fences use enough backticks for their content.
+- Section headings, prefixes, and suffixes match prior verified output.
+
+If a feature disappears, treat it as a regression and fix it immediately, even
+if the feature was not the target of the current change.
 
 ## AutoHotkey v2
 
