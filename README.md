@@ -73,7 +73,7 @@ Most of these files are used by the AIs. A few are used directly by the user.
 | [`scripts/AI-transcript.py`](scripts/AI-transcript.py) | All | Unified transcript and session search for both Claude and Codex.<ul><li>Usage: `python scripts/AI-transcript.py [--claude\|--codex\|--both-AIs] [--ls\|--id GLOB_OR_UUID\|--grep TEXT\|--grep-re PATTERN] [output.md]`</li><li>Lists sessions, generates Markdown transcripts, and greps session content across both AIs.</li><li>Supports `--all-projects`, context lines `-A/-B/-C/-x`, `--words-only`, and `--color`.</li></ul> |
 | [`scripts/AI-transcript-arch.md`](scripts/AI-transcript-arch.md) | Claude | Architecture reference for `AI-transcript.py`: JSONL schema, transcript pipeline, hunk data structure, grep pipeline threading pattern. |
 | [`scripts/cont-claude-prompt.bat`](scripts/cont-claude-prompt.bat) | User | Resume a Claude Code session with a `continue` prompt immediately or deferred to a future date/time via Windows Task Scheduler.  Usage: `cont-claude-prompt.bat [-t hh:mm] [-d date] [--wd dir] [-D] UUID` |
-| [`scripts/prettify-jsonl.py`](scripts/prettify-jsonl.py) | All | Pretty-print selected records from a JSONL file (e.g. Claude/Codex session files).  Usage: `python scripts/prettify-jsonl.py [-s START] [-e END] [file]` |
+| [`scripts/prettify-jsonl.py`](scripts/prettify-jsonl.py) | User | Pretty-print selected records from a JSONL file (e.g. Claude/Codex session files).  Usage: `python scripts/prettify-jsonl.py [-s START] [-e END] [file]` |
 
 ### User Files
 
