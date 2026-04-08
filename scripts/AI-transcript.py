@@ -399,6 +399,21 @@ def _md_quote(text):
   return "\n".join(f"> {line}" if line else ">" for line in text.splitlines())
 
 
+def _md_code_fence(text, lang=""):
+  """Wrap *text* in a Markdown code fence using enough backticks.
+
+  Scans *text* for the longest run of consecutive backticks and uses
+  ``max(3, that_run + 1)`` backticks for the opening and closing fence
+  lines, so any backtick sequences inside *text* cannot prematurely close
+  the fence.
+  """
+  import re
+  runs = re.findall(r"`+", text)
+  max_run = max((len(r) for r in runs), default=0)
+  fence = "`" * max(3, max_run + 1)
+  return f"{fence}{lang}\n{text}\n{fence}"
+
+
 # ── Claude-specific helpers ───────────────────────────────────────────────────
 
 def _cl_dir():
@@ -676,6 +691,326 @@ def _cl_user_text(content):
   return "\n\n".join(parts)
 
 
+def _cl_group_turns(rec_nos, records):
+  """Group JSONL records into conversational turns.
+
+  Returns ``(items, plan_ids)`` where *items* is a list of tuples:
+
+  - ``('user', rec_no, ts, rec)`` — real user message, AskUserQuestion
+    answer, or ExitPlanMode approval (tool-result whose ID matches an
+    AskUserQuestion or ExitPlanMode call)
+  - ``('assistant_turn', display_rec_no, display_ts, sub_records, tr_map)``
+  - ``('notice', rec_no, ts, text)`` — synthetic assistant record text
+    (e.g. usage-limit notification)
+
+  *sub_records* is ``[(rec_no, ts, rec), ...]`` for every assistant record in
+  the turn.  *tr_map* is ``{tool_use_id: result_text}`` for tool-result
+  records absorbed from interleaved ``user`` records (AskUserQuestion and
+  ExitPlanMode answers are *not* absorbed — they end the turn instead).
+
+  *plan_ids* is the set of ExitPlanMode tool-call IDs, so callers can
+  distinguish plan-approval user records from regular ones.
+  """
+  # Pre-compute IDs of AskUserQuestion and ExitPlanMode tool calls so their
+  # answers surface as visible ## User blocks instead of being absorbed.
+  ask_ids = {
+    b.get("id", "")
+    for rec in records
+    if rec.get("type") == "assistant"
+    for b in rec.get("message", {}).get("content", [])
+    if b.get("type") == "tool_use" and b.get("name") == "AskUserQuestion"
+  }
+  plan_ids = {
+    b.get("id", "")
+    for rec in records
+    if rec.get("type") == "assistant"
+    for b in rec.get("message", {}).get("content", [])
+    if b.get("type") == "tool_use" and b.get("name") == "ExitPlanMode"
+  }
+  break_ids = ask_ids | plan_ids
+
+  result = []
+  i = 0
+  n = len(rec_nos)
+
+  while i < n:
+    rec_no = rec_nos[i]
+    rec = records[i]
+
+    if rec.get("isSidechain"):
+      i += 1
+      continue
+
+    rtype = rec.get("type", "")
+
+    if rtype == "queue-operation":
+      i += 1
+      continue
+
+    if rtype == "user":
+      content = rec.get("message", {}).get("content", [])
+      if not isinstance(content, list):
+        i += 1
+        continue
+      all_tr = bool(content) and all(
+        isinstance(b, dict) and b.get("type") == "tool_result"
+        for b in content
+      )
+      if all_tr:
+        # Only emit as a user record if it carries an AskUserQuestion or
+        # ExitPlanMode answer.
+        if any(isinstance(b, dict) and b.get("tool_use_id", "") in break_ids
+               for b in content):
+          result.append(('user', rec_no, rec.get("timestamp"), rec))
+        i += 1
+        continue
+      result.append(('user', rec_no, rec.get("timestamp"), rec))
+      i += 1
+      continue
+
+    if rtype == "assistant":
+      turn_start_rec_no = None
+      turn_start_ts = None
+      sub_records = []
+      tr_map: dict = {}
+      pending_notices: list = []
+
+      while i < n:
+        sub_rec_no = rec_nos[i]
+        sub_rec = records[i]
+        sub_rtype = sub_rec.get("type", "")
+
+        if sub_rec.get("isSidechain"):
+          i += 1
+          continue
+
+        if sub_rtype == "queue-operation":
+          i += 1
+          continue
+
+        if sub_rtype == "assistant":
+          sub_msg = sub_rec.get("message", {})
+          if sub_msg.get("model") == "<synthetic>":
+            for b in sub_msg.get("content", []):
+              if b.get("type") == "text" and b.get("text"):
+                pending_notices.append(('notice', sub_rec_no,
+                                        sub_rec.get("timestamp"), b["text"]))
+            i += 1
+            continue
+          if turn_start_rec_no is None:
+            turn_start_rec_no = sub_rec_no
+            turn_start_ts = sub_rec.get("timestamp")
+          sub_records.append((sub_rec_no, sub_rec.get("timestamp"), sub_rec))
+          i += 1
+
+        elif sub_rtype == "user":
+          sub_content = sub_rec.get("message", {}).get("content", [])
+          if not isinstance(sub_content, list):
+            break
+          all_tr = bool(sub_content) and all(
+            isinstance(b, dict) and b.get("type") == "tool_result"
+            for b in sub_content
+          )
+          if not all_tr:
+            break  # Real user message ends the turn
+          if any(isinstance(b, dict) and b.get("tool_use_id", "") in break_ids
+                 for b in sub_content):
+            break  # AskUserQuestion or ExitPlanMode answer ends this turn
+          # Absorb other tool results into tr_map
+          for b in sub_content:
+            if not isinstance(b, dict):
+              continue
+            tid = b.get("tool_use_id", "")
+            if not tid:
+              continue
+            c = b.get("content", "")
+            if isinstance(c, str):
+              tr_map[tid] = c
+            elif isinstance(c, list):
+              tr_map[tid] = "\n".join(
+                itm.get("text", "")
+                for itm in c
+                if isinstance(itm, dict) and itm.get("type") == "text"
+              )
+          i += 1
+
+        else:
+          i += 1  # Skip other record types
+
+      if sub_records:
+        result.append(
+          ('assistant_turn', turn_start_rec_no, turn_start_ts, sub_records, tr_map)
+        )
+      result.extend(pending_notices)
+
+    else:
+      i += 1
+
+  return result, plan_ids
+
+
+def _format_thought_items(thought_items, *, separate_thoughts=False,
+                          show_date=False, record_number=False,
+                          rec_width=1, display_tz=None, use_color=False):
+  """Format a list of ``(rec_no, ts, text)`` thought tuples as the inner
+  markdown for a ``<details>`` block.
+
+  When *separate_thoughts* is ``True`` and there are 2+ items, each thought is
+  preceded by an unquoted ``### Thought N`` heading (with optional rec_no/ts
+  suffix).  Otherwise items are separated by blank lines.
+  """
+  if separate_thoughts and len(thought_items) > 1:
+    parts = []
+    for qi, (t_rec_no, t_ts, t_text) in enumerate(thought_items, 1):
+      t_suffix = ""
+      if show_date or record_number:
+        t_s = _build_hunk_prefix(
+          t_rec_no, t_ts,
+          show_date=show_date, record_number=record_number,
+          rec_width=rec_width, tz=display_tz, use_color=use_color,
+        ).rstrip()
+        if t_s:
+          t_suffix = " " + t_s
+      parts.append(f"### Thought {qi}{t_suffix}\n\n{_md_quote(t_text)}")
+    return "\n\n".join(parts)
+  return "\n\n".join(_md_quote(t) for _, _, t in thought_items)
+
+
+def _cl_render_thought_item(rec, tr_map):
+  """Render one assistant *rec*'s content for the inside of a Thoughts block.
+
+  Returns **raw** (unblockquoted) markdown.  The caller wraps the entire
+  ``<details>Thoughts</details>`` block in ``_md_quote()``, so no per-item
+  quoting is done here.  Tool calls get their own ``<details>`` block; the
+  matching tool result is shown in a code fence.  Read, Glob, Grep, Task, and
+  other non-display tools are silently skipped.  AskUserQuestion,
+  EnterPlanMode, and ExitPlanMode are handled by ``_cl_render_inline_item``.
+  """
+  content = rec.get("message", {}).get("content", [])
+  parts = []
+
+  for b in content:
+    btype = b.get("type", "")
+
+    if btype == "thinking" and b.get("thinking"):
+      parts.append(b["thinking"])
+
+    elif btype == "text" and b.get("text"):
+      parts.append(b["text"])
+
+    elif btype == "tool_use":
+      tool_name = b.get("name", "")
+      tool_id = b.get("id", "")
+      tool_inp = b.get("input", {})
+      result_text = tr_map.get(tool_id, "")
+
+      if tool_name == "Bash":
+        desc = tool_inp.get("description", "")
+        cmd = tool_inp.get("command", "")
+        if desc:
+          summary = desc
+        else:
+          first_line = cmd.splitlines()[0] if cmd else ""
+          summary = first_line[:60] + ("..." if len(first_line) > 60 else "")
+        inner = _md_code_fence(cmd, "bash")
+        if result_text:
+          inner += f"\n\n**OUT**\n\n{_md_code_fence(result_text)}"
+        parts.append(
+          f"<details>\n<summary>{summary}</summary>\n\n{inner}\n\n</details>"
+        )
+
+      elif tool_name in ("Edit", "Write", "NotebookEdit"):
+        fp = tool_inp.get("file_path") or tool_inp.get("notebook_path", "")
+        if tool_name == "Edit":
+          old = tool_inp.get("old_string", "")
+          new_s = tool_inp.get("new_string", "")
+          diff = (
+            "".join(f"- {ln}\n" for ln in old.splitlines())
+            + "".join(f"+ {ln}\n" for ln in new_s.splitlines())
+          )
+          ops_md = f"**Edit** `{fp}`\n```diff\n{diff}```"
+        elif tool_name == "Write":
+          ops_md = f"**Write** `{fp}` *(new file)*"
+        else:
+          ops_md = f"**NotebookEdit** `{fp}`"
+        parts.append(
+          f"<details>\n<summary>file change</summary>\n\n"
+          f"{ops_md}\n\n</details>"
+        )
+
+      elif tool_name == "TodoWrite":
+        todos = tool_inp.get("todos", [])
+        if todos:
+          items_md = ""
+          for j, todo in enumerate(todos, 1):
+            text_s = todo.get("content", "")
+            status = todo.get("status", "pending")
+            if status == "completed":
+              items_md += f"\n{j}. ~~{text_s}~~"
+            elif status == "in_progress":
+              items_md += f"\n{j}. **{text_s}**"
+            else:
+              items_md += f"\n{j}. {text_s}"
+          parts.append(f"**Todos:**\n\n{items_md.strip()}")
+
+      # AskUserQuestion/EnterPlanMode/ExitPlanMode → handled in inline rendering.
+      # Read, Glob, Grep, Task, etc. → silently skipped.
+
+  return "\n\n".join(p for p in parts if p)
+
+
+def _cl_render_inline_item(rec, tr_map, question_counter):
+  """Render an inline (non-thought-group) assistant *rec*.
+
+  Handles text-only records, AskUserQuestion, EnterPlanMode, and ExitPlanMode.
+  *question_counter* is a one-element list ``[n]`` used as a mutable int
+  counter shared across calls within one Claude turn.
+  Returns a markdown string (empty if nothing to display).
+  """
+  content = rec.get("message", {}).get("content", [])
+  parts = []
+
+  for b in content:
+    btype = b.get("type", "")
+
+    if btype == "text" and b.get("text"):
+      parts.append(_md_quote(b["text"]))
+
+    elif btype == "tool_use":
+      tool_name = b.get("name", "")
+      tool_inp = b.get("input", {})
+      tool_id = b.get("id", "")
+
+      if tool_name == "AskUserQuestion":
+        for q in tool_inp.get("questions", []):
+          question_counter[0] += 1
+          q_text = q.get("question", "")
+          options = q.get("options", [])
+          q_md = f"**{q_text}**"
+          for opt in options:
+            opt_label = opt.get("label", "")
+            opt_desc = opt.get("description", "")
+            if opt_desc:
+              q_md += f"\n- {opt_label} — {opt_desc}"
+            else:
+              q_md += f"\n- {opt_label}"
+          parts.append(
+            f"### Question {question_counter[0]}\n\n{_md_quote(q_md)}"
+          )
+
+      elif tool_name == "EnterPlanMode":
+        parts.append(_md_quote("*(entering plan mode)*"))
+
+      elif tool_name == "ExitPlanMode":
+        plan = tool_inp.get("plan", "")
+        if plan:
+          heading = _md_quote("### Plan")
+          body    = _md_quote(_md_quote(plan))
+          parts.append(f"{heading}\n>\n{body}")
+
+  return "\n\n".join(p for p in parts if p)
+
+
 # ── ClaudeSessionStore ────────────────────────────────────────────────────────
 
 class ClaudeSessionStore(SessionStore):
@@ -783,7 +1118,8 @@ class ClaudeSessionStore(SessionStore):
     )
 
   def transcript(self, session, rec_filter=None, use_color=False,
-                 show_date=False, record_number=False, display_tz=None):
+                 show_date=False, record_number=False, display_tz=None,
+                 separate_thoughts=False):
     """Return the full Markdown transcript for *session*."""
     path = str(session.path)
     with open(path, encoding="utf-8") as f:
@@ -809,208 +1145,197 @@ class ClaudeSessionStore(SessionStore):
     line1, line2 = _format_session_lines(session, use_color=use_color)
     out = [f"{line1}\n{line2}\n"]
 
-    # Build tool_use_id → tool_name map for look-up in user turn
-    id_to_tool: dict = {}
-    for _r in records:
-      if _r.get("type") == "assistant":
-        for _b in _r.get("message", {}).get("content", []):
-          if _b.get("type") == "tool_use":
-            id_to_tool[_b.get("id", "")] = _b.get("name", "")
-
-    # Tools whose tool_result responses are meaningful user text
-    # (ExitPlanMode excluded: its tool_result is a system confirmation that
-    # redundantly repeats the plan already shown in the Claude turn above)
-    _DISPLAY_TOOL_RESULTS = {"AskUserQuestion"}
-
     last_user_text = None  # deduplicate retried user messages
-    for rec_no, rec in zip(rec_nos, records):
-      if rec.get("isSidechain"):
-        continue
-
-      rtype = rec.get("type")
-      suffix = ""
-      if show_date or record_number:
-        s = _build_hunk_prefix(rec_no, rec.get("timestamp"),
-                               show_date=show_date, record_number=record_number,
-                               rec_width=rec_width, tz=display_tz,
-                               use_color=use_color).rstrip()
-        if s:
-          suffix = " " + s
+    turns, plan_ids = _cl_group_turns(rec_nos, records)
+    for turn_item in turns:
+      item_type = turn_item[0]
 
       # ── User turn ──────────────────────────────────────────────────
-      if rtype == "user":
+      if item_type == 'user':
+        _, rec_no, ts, rec = turn_item
+        suffix = ""
+        if show_date or record_number:
+          s = _build_hunk_prefix(
+            rec_no, ts,
+            show_date=show_date, record_number=record_number,
+            rec_width=rec_width, tz=display_tz, use_color=use_color,
+          ).rstrip()
+          if s:
+            suffix = " " + s
         content = rec.get("message", {}).get("content", [])
         if not isinstance(content, list):
           continue
-        if all(isinstance(b, dict) and b.get("type") == "tool_result" for b in content):
-          # Include tool results from tools whose responses are meaningful text
-          display_texts = []
+        is_plan_approval = any(
+          isinstance(b, dict) and b.get("tool_use_id", "") in plan_ids
+          for b in content
+        )
+        text = _cl_user_text(content)
+        if not text and all(
+          isinstance(b, dict) and b.get("type") == "tool_result"
+          for b in content
+        ):
+          # AskUserQuestion / ExitPlanMode answer carried as a tool-result record
+          texts = []
           for b in content:
-            tid = b.get("tool_use_id", "")
-            if id_to_tool.get(tid, "") in _DISPLAY_TOOL_RESULTS:
-              c = b.get("content", "")
-              if isinstance(c, str) and c:
-                display_texts.append(c)
-              elif isinstance(c, list):
-                for item in c:
-                  if item.get("type") == "text" and item.get("text"):
-                    display_texts.append(item["text"])
-          if not display_texts:
-            continue
-          text = "\n\n".join(display_texts)
-        else:
-          text = _cl_user_text(content)
+            if not isinstance(b, dict):
+              continue
+            c = b.get("content", "")
+            if isinstance(c, str) and c:
+              texts.append(c)
+            elif isinstance(c, list):
+              for itm in c:
+                if isinstance(itm, dict) and itm.get("type") == "text":
+                  texts.append(itm["text"])
+          text = "\n\n".join(t for t in texts if t)
         if text and text != last_user_text:
           last_user_text = text
-          out.append(f"## User{suffix}\n\n{_md_quote(text)}\n")
+          if is_plan_approval:
+            m = re.search(r"(?m)^#{0,6} *Approved Plan[: ]", text)
+            if m:
+              pre = text[:m.start()].rstrip()
+              post = text[m.start():]
+              details = (
+                f"> <details>\n> <summary>Approved Plan</summary>\n>\n"
+                f"{_md_quote(post)}\n>\n> </details>"
+              )
+              if pre:
+                out.append(
+                  f"## User{suffix}\n\n{_md_quote(pre)}\n\n{details}\n"
+                )
+              else:
+                out.append(f"## User{suffix}\n\n{details}\n")
+            else:
+              out.append(f"## User{suffix}\n\n{_md_quote(text)}\n")
+          else:
+            out.append(f"## User{suffix}\n\n{_md_quote(text)}\n")
+
+      # ── System notice (synthetic assistant record) ─────────────────
+      elif item_type == 'notice':
+        _, rec_no, ts, notice_text = turn_item
+        out.append(f"> *(system: {notice_text})*\n")
 
       # ── Assistant turn ─────────────────────────────────────────────
-      elif rtype == "assistant":
-        msg = rec.get("message", {})
-        if msg.get("model") == "<synthetic>":
-          continue
+      elif item_type == 'assistant_turn':
+        _, display_rec_no, display_ts, sub_records, tr_map = turn_item
+        suffix = ""
+        if show_date or record_number:
+          s = _build_hunk_prefix(
+            display_rec_no, display_ts,
+            show_date=show_date, record_number=record_number,
+            rec_width=rec_width, tz=display_tz, use_color=use_color,
+          ).rstrip()
+          if s:
+            suffix = " " + s
 
-        content = msg.get("content", [])
-        thinking = [
-          b.get("thinking", "")
-          for b in content
-          if b.get("type") == "thinking" and b.get("thinking")
-        ]
-        texts = [
-          b.get("text", "")
-          for b in content
-          if b.get("type") == "text" and b.get("text")
-        ]
-        file_ops = [
-          b for b in content
-          if b.get("type") == "tool_use"
-          and b.get("name") in ("Edit", "Write", "NotebookEdit")
-        ]
-        bash_ops = [
-          b for b in content
-          if b.get("type") == "tool_use" and b.get("name") == "Bash"
-        ]
-        todo_ops = [
-          b for b in content
-          if b.get("type") == "tool_use" and b.get("name") == "TodoWrite"
-        ]
-        ask_ops = [
-          b for b in content
-          if b.get("type") == "tool_use" and b.get("name") == "AskUserQuestion"
-        ]
-        enter_plan_ops = [
-          b for b in content
-          if b.get("type") == "tool_use" and b.get("name") == "EnterPlanMode"
-        ]
-        exit_plan_ops = [
-          b for b in content
-          if b.get("type") == "tool_use" and b.get("name") == "ExitPlanMode"
-        ]
+        # Split sub_records into segments: thought groups and inline items.
+        #
+        # State-machine classification:
+        # - AskUserQuestion / EnterPlanMode / ExitPlanMode always go inline
+        #   (they are explicit user-directed interactions).
+        # - Text-only records (no tool_use) that appear AFTER the last
+        #   tool_use record in the turn are user-directed output (inline).
+        # Classification rules (deterministic, no position heuristics):
+        # - AskUserQuestion / EnterPlanMode / ExitPlanMode → always inline.
+        # - Records whose content is text-only (no tool_use, no thinking) →
+        #   always inline; text blocks are always directed at the user.
+        # - Everything else (thinking, tool_use, mixed) → thought group.
 
-        if not (thinking or texts or file_ops or bash_ops or todo_ops
-                or ask_ops or enter_plan_ops or exit_plan_ops):
+        segments = []
+        current_thoughts: list = []
+
+        for sub_rec_no, sub_ts, sub_rec in sub_records:
+          sub_content = sub_rec.get("message", {}).get("content", [])
+          has_ask = any(
+            b.get("type") == "tool_use" and b.get("name") == "AskUserQuestion"
+            for b in sub_content
+          )
+          has_plan_op = any(
+            b.get("type") == "tool_use"
+            and b.get("name") in ("EnterPlanMode", "ExitPlanMode")
+            for b in sub_content
+          )
+          has_tool_use = any(b.get("type") == "tool_use" for b in sub_content)
+          has_text = any(
+            b.get("type") == "text" and b.get("text") for b in sub_content
+          )
+          is_inline = (
+            has_ask or has_plan_op
+            or (has_text and not has_tool_use)
+          )
+
+          if is_inline:
+            if current_thoughts:
+              segments.append(('thoughts', current_thoughts[:]))
+              current_thoughts = []
+            segments.append(('inline', sub_rec_no, sub_ts, sub_rec))
+          else:
+            current_thoughts.append((sub_rec_no, sub_ts, sub_rec))
+
+        if current_thoughts:
+          segments.append(('thoughts', current_thoughts))
+
+        if not segments:
           continue
 
         block = f"## Claude{suffix}"
+        thought_counter = 0
+        question_counter = [0]
 
-        if thinking:
-          inner = "\n\n".join(_md_quote(t) for t in thinking)
-          block += (
-            f"\n\n<details>\n<summary>Thinking</summary>\n\n"
-            f"{inner}\n\n</details>"
-          )
-
-        if texts:
-          block += "\n\n" + "\n\n".join(_md_quote(t) for t in texts)
-
-        if file_ops:
-          n = len(file_ops)
-          label = f"{n} file change{'s' if n != 1 else ''}"
-          ops_md = ""
-          for op in file_ops:
-            name = op.get("name")
-            inp = op.get("input", {})
-            fp = inp.get("file_path") or inp.get("notebook_path", "")
-            if name == "Edit":
-              old = inp.get("old_string", "")
-              new = inp.get("new_string", "")
-              diff = (
-                "".join(f"- {l}\n" for l in old.splitlines())
-                + "".join(f"+ {l}\n" for l in new.splitlines())
-              )
-              ops_md += f"\n**Edit** `{fp}`\n```diff\n{diff}```\n"
-            elif name == "Write":
-              ops_md += f"\n**Write** `{fp}` *(new file)*\n"
-            elif name == "NotebookEdit":
-              ops_md += f"\n**NotebookEdit** `{fp}`\n"
-          block += (
-            f"\n\n<details>\n<summary>{label}</summary>\n\n"
-            f"{_md_quote(ops_md.strip())}\n\n</details>"
-          )
-
-        if bash_ops:
-          n = len(bash_ops)
-          label = f"{n} command{'s' if n != 1 else ''}"
-          cmds_md = ""
-          for op in bash_ops:
-            inp = op.get("input", {})
-            desc = inp.get("description", "")
-            cmd = inp.get("command", "")
-            cmds_md += f"\n**{desc}**\n```bash\n{cmd}\n```\n"
-          block += (
-            f"\n\n<details>\n<summary>{label}</summary>\n\n"
-            f"{_md_quote(cmds_md.strip())}\n\n</details>"
-          )
-
-        if todo_ops:
-          for op in todo_ops:
-            todos = op.get("input", {}).get("todos", [])
-            if not todos:
-              continue
-            items_md = ""
-            for j, item in enumerate(todos, 1):
-              text = item.get("content", "")
-              status = item.get("status", "pending")
-              if status == "completed":
-                items_md += f"\n{j}. ~~{text}~~"
-              elif status == "in_progress":
-                items_md += f"\n{j}. **{text}**"
+        for seg in segments:
+          if seg[0] == 'thoughts':
+            _, thought_group = seg
+            inner_parts = []
+            for t_rec_no, t_ts, t_rec in thought_group:
+              item_md = _cl_render_thought_item(t_rec, tr_map)
+              if not item_md:
+                continue
+              thought_counter += 1
+              if separate_thoughts:
+                t_suffix = ""
+                if show_date or record_number:
+                  t_s = _build_hunk_prefix(
+                    t_rec_no, t_ts,
+                    show_date=show_date, record_number=record_number,
+                    rec_width=rec_width, tz=display_tz, use_color=use_color,
+                  ).rstrip()
+                  if t_s:
+                    t_suffix = " " + t_s
+                inner_parts.append(
+                  f"> ### Thought {thought_counter}{t_suffix}\n>\n"
+                  f"{_md_quote(item_md)}"
+                )
               else:
-                items_md += f"\n{j}. {text}"
-            block += (
-              f"\n\n<details>\n<summary>Todos</summary>\n\n"
-              f"{_md_quote(items_md.strip())}\n\n</details>"
-            )
-
-        if ask_ops:
-          for op in ask_ops:
-            questions = op.get("input", {}).get("questions", [])
-            if not questions:
-              continue
-            for qi, q in enumerate(questions, 1):
-              q_text = q.get("question", "")
-              options = q.get("options", [])
-              q_md = f"**{q_text}**"
-              for opt in options:
-                opt_label = opt.get("label", "")
-                opt_desc = opt.get("description", "")
-                if opt_desc:
-                  q_md += f"\n- {opt_label} — {opt_desc}"
-                else:
-                  q_md += f"\n- {opt_label}"
-              block += f"\n\n### Question {qi}\n\n{_md_quote(q_md)}"
-
-        if enter_plan_ops:
-          block += "\n\n> *(entering plan mode)*"
-
-        if exit_plan_ops:
-          for op in exit_plan_ops:
-            plan = op.get("input", {}).get("plan", "")
-            if plan:
+                inner_parts.append(_md_quote(item_md))
+            if inner_parts:
+              # Use "\n>\n" separator to keep blockquote context continuous.
+              # Outer <details> tags are explicitly blockquoted; per-item
+              # _md_quote() handles the content so ### Thought N stays unquoted.
+              inner = "\n>\n".join(inner_parts)
               block += (
-                f"\n\n<details>\n<summary>Plan</summary>\n\n"
-                f"{_md_quote(plan)}\n\n</details>"
+                f"\n\n> <details>\n> <summary>Thoughts</summary>\n>\n"
+                f"{inner}\n>\n> </details>"
               )
+
+          elif seg[0] == 'inline':
+            _, sub_rec_no, sub_ts, sub_rec = seg
+            inline_md = _cl_render_inline_item(sub_rec, tr_map, question_counter)
+            if inline_md:
+              if separate_thoughts:
+                inner_suffix = ""
+                if show_date or record_number:
+                  s = _build_hunk_prefix(
+                    sub_rec_no, sub_ts,
+                    show_date=show_date, record_number=record_number,
+                    rec_width=rec_width, tz=display_tz, use_color=use_color,
+                  ).rstrip()
+                  if s:
+                    inner_suffix = " " + s
+                block += f"\n\n> ## Claude{inner_suffix}\n>\n{inline_md}"
+              else:
+                block += f"\n\n{inline_md}"
+
+        if block == f"## Claude{suffix}":
+          continue
 
         out.append(block + "\n")
 
@@ -1479,7 +1804,8 @@ class CodexSessionStore(SessionStore):
     )
 
   def transcript(self, session, rec_filter=None, use_color=False,
-                 show_date=False, record_number=False, display_tz=None):
+                 show_date=False, record_number=False, display_tz=None,
+                 separate_thoughts=False):
     """Return the full Markdown transcript for *session*."""
     path = str(session.path)
     with open(path, encoding="utf-8") as f:
@@ -1614,14 +1940,14 @@ class CodexSessionStore(SessionStore):
       else:  # codex turn (codex, codex_reasoning, codex_question)
         codex_rec_no = msgs[i]["rec_no"]
         codex_ts = msgs[i]["ts"]
-        thinking_items = []
+        thinking_items = []  # [(rec_no, ts, text), ...]
         while i < len(msgs) and msgs[i]["role"] in ("codex", "codex_reasoning"):
           m = msgs[i]
           if m["role"] == "codex_reasoning":
-            thinking_items.append(m["text"])
+            thinking_items.append((m["rec_no"], m["ts"], m["text"]))
             i += 1
           elif m["role"] == "codex" and m["phase"] == "commentary":
-            thinking_items.append(m["text"])
+            thinking_items.append((m["rec_no"], m["ts"], m["text"]))
             i += 1
           else:
             break  # non-commentary codex message — stop
@@ -1647,7 +1973,12 @@ class CodexSessionStore(SessionStore):
             suffix = " " + s
         block = f"## Codex{suffix}"
         if thinking_items:
-          inner = "\n\n".join(_md_quote(t) for t in thinking_items)
+          inner = _format_thought_items(
+            thinking_items,
+            separate_thoughts=separate_thoughts,
+            show_date=show_date, record_number=record_number,
+            rec_width=rec_width, display_tz=display_tz, use_color=use_color,
+          )
           block += f"\n\n<details>\n<summary>Thoughts</summary>\n\n{inner}\n\n</details>"
         if final_msg:
           block += f"\n\n{_md_quote(final_msg['text'])}"
@@ -2164,6 +2495,15 @@ def main():
     help="With --grep: prefix each output line with the record timestamp.",
   )
   ap.add_argument(
+    "-T", "--separate-thoughts",
+    action="store_true", dest="separate_thoughts",
+    help=(
+      "In transcript mode: label each individual thought record with a "
+      "numbered '### Thought N' heading (with -d/-n suffix if set) inside "
+      "the collapsible Thinking/Thoughts block."
+    ),
+  )
+  ap.add_argument(
     "--tz",
     metavar="ZONE", dest="tz", default=None,
     help=(
@@ -2457,7 +2797,8 @@ def main():
                                         use_color=use_color,
                                         show_date=args.show_date,
                                         record_number=args.record_number,
-                                        display_tz=_display_tz)
+                                        display_tz=_display_tz,
+                                        separate_thoughts=args.separate_thoughts)
 
     if args.output:
       with open(args.output, "w", encoding="utf-8") as fh:
