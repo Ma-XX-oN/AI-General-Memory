@@ -1,0 +1,4 @@
+{"type":"user","isSidechain":false,"timestamp":"2026-01-01T00:00:01.000Z","message":{"role":"user","content":[{"type":"text","text":"Please plan this task."}]}}
+{"type":"assistant","isSidechain":false,"timestamp":"2026-01-01T00:00:02.000Z","message":{"model":"claude-test","role":"assistant","content":[{"type":"tool_use","id":"toolu_plan_01","name":"ExitPlanMode","input":{}}]}}
+{"type":"user","isSidechain":false,"timestamp":"2026-01-01T00:00:03.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_plan_01","content":"I approve this.\n\n# Approved Plan: Implement the feature\n\nStep 1: Do this.\nStep 2: Do that."}]}}
+{"type":"assistant","isSidechain":false,"timestamp":"2026-01-01T00:00:04.000Z","message":{"model":"claude-test","role":"assistant","content":[{"type":"text","text":"Starting implementation."}]}}

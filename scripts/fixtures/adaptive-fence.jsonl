@@ -1,0 +1,4 @@
+{"type":"user","isSidechain":false,"timestamp":"2026-01-01T00:00:01.000Z","message":{"role":"user","content":[{"type":"text","text":"Run the command."}]}}
+{"type":"assistant","isSidechain":false,"timestamp":"2026-01-01T00:00:02.000Z","message":{"model":"claude-test","role":"assistant","content":[{"type":"tool_use","id":"toolu_bash_01","name":"Bash","input":{"command":"echo hello","description":"Print hello"}}]}}
+{"type":"user","isSidechain":false,"timestamp":"2026-01-01T00:00:03.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_bash_01","content":"Output with ```triple backticks``` inside the result."}]}}
+{"type":"assistant","isSidechain":false,"timestamp":"2026-01-01T00:00:04.000Z","message":{"model":"claude-test","role":"assistant","content":[{"type":"text","text":"Done."}]}}

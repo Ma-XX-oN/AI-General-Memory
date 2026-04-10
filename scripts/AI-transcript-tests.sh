@@ -302,6 +302,31 @@ check "codex transcript no flags: no bracket in User"     0  "^## User \["      
 check "claude transcript -d: User heading has timestamp"   0  "^## User \[20"   ""  $SCRIPT --claude --all-projects --id a321be7c -d
 check "claude transcript -d: Claude heading has timestamp" 0  "^## Claude \[20" ""  $SCRIPT --claude --all-projects --id a321be7c -d
 
+# ── Fixture-based rendering tests ────────────────────────────────────────────
+echo
+echo "-- Fixture-based rendering tests (--file)"
+# Ensure regex is available for the thinking-escape tests.
+$PYTHON -m pip install regex -q
+
+# thinking-lt-escape: <details> and <span> escaped outside fence; <code> inside fence NOT escaped
+check "thinking-escape: <details> outside fence escaped"  0 '&lt;details'  ""  $SCRIPT --claude --file scripts/fixtures/thinking-lt-escape.jsonl
+check "thinking-escape: <span> outside fence escaped"     0 '&lt;span'     ""  $SCRIPT --claude --file scripts/fixtures/thinking-lt-escape.jsonl
+check "thinking-escape: <code> inside fence NOT escaped"  0 '&lt;code'     "!" $SCRIPT --claude --file scripts/fixtures/thinking-lt-escape.jsonl
+
+# t-mode: without -T no inner Claude headings; with -T -d inner headings appear for each inline segment
+check "t-mode: without -T no inner > ## Claude"  0 '> ## Claude'       "!" $SCRIPT --claude --file scripts/fixtures/t-mode.jsonl
+check "t-mode: with -T -d inner heading present" 0 '> ## Claude \[20'  ""  $SCRIPT --claude --file scripts/fixtures/t-mode.jsonl -T -d
+
+# adaptive-fence: Bash output containing ``` triggers 4-backtick outer fence
+check "adaptive-fence: 4-backtick fence present" 0 '````' "" $SCRIPT --claude --file scripts/fixtures/adaptive-fence.jsonl
+
+# exit-plan-mode: Approved Plan section collapsed into <details>
+check "exit-plan-mode: Approved Plan in output" 0 'Approved Plan'  ""  $SCRIPT --claude --file scripts/fixtures/exit-plan-mode.jsonl
+check "exit-plan-mode: <details> block present" 0 '<details>'      ""  $SCRIPT --claude --file scripts/fixtures/exit-plan-mode.jsonl
+
+# notice: synthetic <synthetic> record rendered as *(system: ...)*
+check "notice: *(system: ...) rendered" 0 '\*\(system:' "" $SCRIPT --claude --file scripts/fixtures/notice.jsonl
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo
 TOTAL=$((PASS + FAIL))

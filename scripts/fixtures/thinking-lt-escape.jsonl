@@ -1,0 +1,2 @@
+{"type":"user","isSidechain":false,"timestamp":"2026-01-01T00:00:01.000Z","message":{"role":"user","content":[{"type":"text","text":"Explain HTML tags."}]}}
+{"type":"assistant","isSidechain":false,"timestamp":"2026-01-01T00:00:02.000Z","message":{"model":"claude-test","role":"assistant","content":[{"type":"thinking","thinking":"Normal line - fine.\n> <details>Outside fence - should be escaped.\n\nHere is a code example:\n```\n> <code>Inside fence - should NOT be escaped.\n```\n\nAfter the fence:\n> <span>After fence - should also be escaped.</span>"}]}}

@@ -2459,6 +2459,16 @@ def main():
     ),
   )
 
+  ap.add_argument(
+    "--file",
+    metavar="PATH",
+    help=(
+      "Read directly from PATH (a JSONL file) instead of discovering sessions "
+      "from the store.  Requires --claude or --codex.  Useful for fixture-based "
+      "testing and one-off debugging."
+    ),
+  )
+
   # Search
   ap.add_argument(
     "--grep",
@@ -2632,8 +2642,16 @@ def main():
     _warn(f"--id given {len(id_args)} times; using last value '{id_args[-1]}'")
   id_val = id_args[-1] if id_args else None
 
-  if args.output and not id_val:
-    ap.error("output file requires --id")
+  if args.output and not id_val and not args.file:
+    ap.error("output file requires --id or --file")
+
+  if args.file:
+    if not (args.claude or args.codex):
+      ap.error("--file requires --claude or --codex to select the rendering path")
+    if id_val:
+      ap.error("--file and --id are mutually exclusive")
+    if args.ls:
+      ap.error("--file cannot be combined with --ls")
 
   # ── Timezone resolution ─────────────────────────────────────────────────────
 
@@ -2697,12 +2715,12 @@ def main():
 
   stores = {}  # ordered: "claude" before "codex"
   if args.codex:
-    if not codex_store.is_available():
+    if not args.file and not codex_store.is_available():
       _error("Codex is not installed (~/.codex/sessions/ not found)")
       sys.exit(1)
     stores["codex"] = codex_store
   elif args.claude:
-    if not claude_store.is_available():
+    if not args.file and not claude_store.is_available():
       _error("Claude is not installed (~/.claude/projects/ not found)")
       sys.exit(1)
     stores["claude"] = claude_store
@@ -2715,6 +2733,38 @@ def main():
     if not stores:
       _error("Neither Claude nor Codex is installed")
       sys.exit(1)
+
+  # ── --file shortcut: read a specific JSONL directly (debug/test mode) ──────
+
+  if args.file and not (args.grep or args.grep_re):
+    _fpath = os.path.abspath(args.file)
+    if not os.path.isfile(_fpath):
+      _error(f"--file: not found: {args.file}")
+      sys.exit(1)
+    if args.claude:
+      _file_session = claude_store._make_session(
+        _fpath, os.path.getmtime(_fpath), os.path.dirname(_fpath))
+      _file_store = claude_store
+    else:  # args.codex
+      _file_session = codex_store._make_session_from_path(_fpath, [])
+      _file_store = codex_store
+    _info(f"Session: {_file_session.path}")
+    transcript_text = _file_store.transcript(
+      _file_session,
+      rec_filter=_resolve_rec_filter(_file_session),
+      use_color=use_color,
+      show_date=args.show_date,
+      record_number=args.record_number,
+      display_tz=_display_tz,
+      separate_thoughts=args.separate_thoughts,
+    )
+    if args.output:
+      with open(args.output, "w", encoding="utf-8") as fh:
+        fh.write(transcript_text)
+      _info(f"Written to: {args.output}")
+    else:
+      print(transcript_text)
+    sys.exit(0)
 
   # ── Build grep patterns ────────────────────────────────────────────────────
 
@@ -2759,7 +2809,22 @@ def main():
 
   # Branch 1: --grep / --grep-re (primary: search)
   if args.grep or args.grep_re:
-    if id_val:
+    if args.file:
+      # --file scopes search to a single explicit JSONL file
+      _fpath = os.path.abspath(args.file)
+      if not os.path.isfile(_fpath):
+        _error(f"--file: not found: {args.file}")
+        sys.exit(1)
+      if args.claude:
+        _file_session = claude_store._make_session(
+          _fpath, os.path.getmtime(_fpath), os.path.dirname(_fpath))
+      else:  # args.codex
+        _file_session = codex_store._make_session_from_path(_fpath, [])
+        if _file_session is None:
+          _error(f"--file: could not read session from: {args.file}")
+          sys.exit(1)
+      candidates = [_file_session]
+    elif id_val:
       # --id scopes search to a single session
       session = _resolve_single_session(stores, id_val, args.all_projects)
       candidates = [session]

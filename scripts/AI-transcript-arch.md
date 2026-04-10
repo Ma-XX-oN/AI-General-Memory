@@ -247,3 +247,47 @@ When `cross_record=True`, both grep functions skip the per-record
 
 `first_only=True` always uses the per-record path regardless of
 `cross_record` (the AND membership check needs no context).
+
+## Test fixtures (`scripts/fixtures/`)
+
+Minimal JSONL files used with `--file` for repeatable rendering tests.
+Run as: `python AI-transcript.py --claude --file scripts/fixtures/<name>.jsonl`
+
+| File | Records | What it exercises | Key assertions |
+| --- | --- | --- | --- |
+| `thinking-lt-escape.jsonl` | user + assistant (thinking) | `<` escaping in thinking blocks: escaped on blockquoted lines outside a fence, left alone inside a ` ``` ` fence | `&lt;details` present; `&lt;span` present; `&lt;code` absent |
+| `t-mode.jsonl` | user + 2× assistant (text) | `-T` mode inner headings: two consecutive inline sub-records each get `> ## Claude{suffix}` | without `-T`: `> ## Claude` absent; with `-T -d`: `> ## Claude \[20` present (twice) |
+| `adaptive-fence.jsonl` | user + assistant (Bash tool_use) + user (tool_result with ` ``` `) + assistant (text) | `_md_code_fence` adaptive fencing: output containing triple backticks triggers a 4-backtick outer fence | ```````` present in output |
+| `exit-plan-mode.jsonl` | user + assistant (ExitPlanMode tool_use) + user (tool_result with `# Approved Plan:`) + assistant (text) | ExitPlanMode plan-approval collapsing: text from `# Approved Plan:` onward is wrapped in `<details>` | `Approved Plan` present; `<details>` present |
+| `notice.jsonl` | user + assistant (text) + assistant (`model="<synthetic>"`) + user | Synthetic notice rendering: `('notice', ...)` tuple emitted as `> *(system: ...)*` | `*(system:` present |
+
+### Writing new fixtures
+
+Each line in a fixture file is one JSON object. Minimum required fields:
+
+**User record** (real human message):
+
+```json
+{"type":"user","isSidechain":false,"timestamp":"2026-01-01T00:00:01.000Z","message":{"role":"user","content":[{"type":"text","text":"..."}]}}
+```
+
+**Assistant record** (normal AI output):
+
+```json
+{"type":"assistant","isSidechain":false,"timestamp":"2026-01-01T00:00:02.000Z","message":{"model":"claude-test","role":"assistant","content":[...]}}
+```
+
+**Assistant record** (synthetic notice — emitted as `> *(system: ...)*`):
+
+```json
+{"type":"assistant","isSidechain":false,"timestamp":"...","message":{"model":"<synthetic>","role":"assistant","content":[{"type":"text","text":"..."}]}}
+```
+
+Key rules:
+
+- `isSidechain` must be `false` (truthy value causes the record to be skipped entirely).
+- `model` on assistant records must be a non-empty string other than `"<synthetic>"` for normal records; use `"<synthetic>"` only for notice records.
+- `timestamp` is optional but useful for `-d` / `-T -d` tests; use ISO-8601 UTC format.
+- `tool_use_id` in a user `tool_result` block must match the `id` of a prior assistant `tool_use` block for the tool result to be absorbed into the turn (and thus rendered).
+- `ExitPlanMode` tool-call IDs are collected into `plan_ids` by pre-scanning all records, so the `ExitPlanMode` `tool_use` must appear in the same file as its `tool_result`.
+- Register each new fixture in `.gitignore` (`!scripts/fixtures/<name>.jsonl`), add a row to the table above, and add `check` calls to `AI-transcript-tests.sh`.
