@@ -327,6 +327,10 @@ check "exit-plan-mode: <details> block present" 0 '<details>'      ""  $SCRIPT -
 # notice: synthetic <synthetic> record rendered as *(system: ...)*
 check "notice: *(system: ...) rendered" 0 '\*\(system:' "" $SCRIPT --claude --file scripts/fixtures/notice.jsonl
 
+# codex-orphan-patch: apply_patch with no final agent_message shows file-change block (item 34)
+check "codex-orphan-patch: file change block present"   0 '1 file change'   ""  $SCRIPT --codex --file scripts/fixtures/codex-orphan-patch.jsonl
+check "codex-orphan-patch: patch content present"       0 'foo\.py'         ""  $SCRIPT --codex --file scripts/fixtures/codex-orphan-patch.jsonl
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo
 TOTAL=$((PASS + FAIL))

@@ -251,7 +251,7 @@ When `cross_record=True`, both grep functions skip the per-record
 ## Test fixtures (`scripts/fixtures/`)
 
 Minimal JSONL files used with `--file` for repeatable rendering tests.
-Run as: `python AI-transcript.py --claude --file scripts/fixtures/<name>.jsonl`
+Run as: `python AI-transcript.py --claude --file scripts/fixtures/<name>.jsonl` (use `--codex` for Codex fixtures)
 
 | File | Records | What it exercises | Key assertions |
 | --- | --- | --- | --- |
@@ -260,6 +260,7 @@ Run as: `python AI-transcript.py --claude --file scripts/fixtures/<name>.jsonl`
 | `adaptive-fence.jsonl` | user + assistant (Bash tool_use) + user (tool_result with ` ``` `) + assistant (text) | `_md_code_fence` adaptive fencing: output containing triple backticks triggers a 4-backtick outer fence | ```````` present in output |
 | `exit-plan-mode.jsonl` | user + assistant (ExitPlanMode tool_use) + user (tool_result with `# Approved Plan:`) + assistant (text) | ExitPlanMode plan-approval collapsing: text from `# Approved Plan:` onward is wrapped in `<details>` | `Approved Plan` present; `<details>` present |
 | `notice.jsonl` | user + assistant (text) + assistant (`model="<synthetic>"`) + user | Synthetic notice rendering: `('notice', ...)` tuple emitted as `> *(system: ...)*` | `*(system:` present |
+| `codex-orphan-patch.jsonl` | Codex: user + commentary agent_message + apply_patch + task_complete | Orphan-patch rendering (item 34): `apply_patch` with no final non-commentary agent_message still shows a file-change block | `1 file change` present; `foo.py` present |
 
 ### Writing new fixtures
 

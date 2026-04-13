@@ -67,6 +67,7 @@
   - [31. Synthetic `model='<synthetic>'` records silently dropped. **(BUG)** ***(DONE)***](#31-synthetic-modelsynthetic-records-silently-dropped-bug-done)
   - [32. No `## Claude` heading before inline segments in `-T` mode. **(BUG)** ***(DONE)***](#32-no--claude-heading-before-inline-segments-in--t-mode-bug-done)
   - [33. Synthetic notice emitted before its turn instead of after. **(BUG)** ***(DONE)***](#33-synthetic-notice-emitted-before-its-turn-instead-of-after-bug-done)
+  - [34. Codex `apply_patch` calls silently dropped when turn ends without a final agent message. **(BUG)** ***(DONE)***](#34-codex-apply_patch-calls-silently-dropped-when-turn-ends-without-a-final-agent-message-bug-done)
 - [Questions](#questions)
 - [Bugs resolved](#bugs-resolved)
   - [Bug verification matrix](#bug-verification-matrix)
@@ -1285,6 +1286,31 @@ preceding user message and Claude's first response.
 **Fix:** Collect notices into a `pending_notices` list during the inner turn
 loop; call `result.extend(pending_notices)` after the turn tuple is appended,
 so notices always follow their enclosing turn in the output.
+
+---
+
+### 34. Codex `apply_patch` calls silently dropped when turn ends without a final agent message. **(BUG)** ***(DONE)***
+
+When a Codex turn consists entirely of commentary-phase `agent_message` records
+(shown as thought items) with no non-commentary final message, any `apply_patch`
+calls in that turn are silently dropped.
+
+**Reproducer:** session `019d6b90` (rollout), records 10406–10448.  Records
+10406 and 10442 are both `agent_message` with `phase='commentary'`; `apply_patch`
+calls sit at records 10408 and 10444; the session ends at record 10448
+(`task_complete`) with no final text response.
+
+**Root cause:** The second pass in `CodexSessionStore.transcript()` only attaches
+`apply_patch` diffs to non-commentary codex messages.  When no such message
+exists in the turn, `final_msg` is `None` and the diff-rendering block is never
+reached, so the patches are silently lost.
+
+**Fix:** Track the last user-message line index (`prev_msg_idx`) in the render
+loop.  After collecting `thinking_items` and determining that `final_msg is
+None`, call `_cx_get_patches_between(lines, prev_msg_idx, end_idx)` where
+`end_idx` is the next user message's line index (or `len(lines)` if none).  If
+any patches are found, append the same `<details><summary>N file changes
+</summary>…</details>` block that the `final_msg` path would have produced.
 
 ---
 

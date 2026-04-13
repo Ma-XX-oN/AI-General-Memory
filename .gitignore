@@ -39,6 +39,7 @@
 !scripts/AI-transcript-arch.md
 !scripts/cont-claude-prompt.bat
 !scripts/prettify-jsonl.py
+!scripts/filter-jsonl.py
 !scripts/fixtures/
 !scripts/fixtures/*.jsonl
 !scripts/ahk-test

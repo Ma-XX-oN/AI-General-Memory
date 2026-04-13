@@ -74,6 +74,7 @@ Most of these files are used by the AIs. A few are used directly by the user.
 | [`scripts/AI-transcript-arch.md`](scripts/AI-transcript-arch.md) | All | Architecture reference for `AI-transcript.py`: JSONL schema, transcript pipeline, hunk data structure, grep pipeline threading pattern. |
 | [`scripts/cont-claude-prompt.bat`](scripts/cont-claude-prompt.bat) | User | Resume a Claude Code session with a `continue` prompt immediately or deferred to a future date/time via Windows Task Scheduler.  Usage: `cont-claude-prompt.bat [-t hh:mm] [-d date] [--wd dir] [-D] UUID` |
 | [`scripts/prettify-jsonl.py`](scripts/prettify-jsonl.py) | User | Pretty-print selected records from a JSONL file (e.g. Claude/Codex session files).  Usage: `python scripts/prettify-jsonl.py [-s START] [-e END] [file]` |
+| [`scripts/filter-jsonl.py`](scripts/filter-jsonl.py) | All | Extract dot-path fields from JSONL records and emit CSV.  Usage: `cat file.jsonl \| python scripts/filter-jsonl.py --show FIELD [--show FIELD ...]` |
 | [`scripts/fixtures/`](scripts/fixtures/) | All | Minimal JSONL fixture files for `AI-transcript.py` regression tests (used with `--file`).  See `AI-transcript-arch.md` for descriptions. |
 
 ### User Files

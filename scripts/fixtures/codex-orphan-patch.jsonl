@@ -1,0 +1,4 @@
+{"type":"event_msg","timestamp":"2026-01-01T00:00:01.000Z","payload":{"type":"user_message","message":"Fix the corners order."}}
+{"type":"event_msg","timestamp":"2026-01-01T00:00:02.000Z","payload":{"type":"agent_message","phase":"commentary","message":"I found the ordering bug in corners()."}}
+{"type":"response_item","timestamp":"2026-01-01T00:00:03.000Z","payload":{"type":"custom_tool_call","name":"apply_patch","input":"*** Begin Patch\n*** Update File: foo.py\n@@\n-old_line\n+new_line\n*** End Patch"}}
+{"type":"event_msg","timestamp":"2026-01-01T00:00:04.000Z","payload":{"type":"task_complete"}}

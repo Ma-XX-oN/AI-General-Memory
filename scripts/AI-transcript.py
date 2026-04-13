@@ -1918,6 +1918,7 @@ class CodexSessionStore(SessionStore):
     out = [f"{line1}\n{line2}\n"]
 
     i = 0
+    prev_msg_idx = 0  # Line index of last user/codex_answer msg (for orphan patch collection)
     while i < len(msgs):
       msg = msgs[i]
 
@@ -1935,6 +1936,7 @@ class CodexSessionStore(SessionStore):
         if img_md:
           block += f"\n\n{img_md}"
         out.append(block + "\n")
+        prev_msg_idx = msg["idx"]
         i += 1
 
       elif msg["role"] == "codex_answer":
@@ -1960,6 +1962,7 @@ class CodexSessionStore(SessionStore):
             parts.append(f'**{q_text}** → {answer_str}')
         if parts:
           out.append(f"## User{suffix}\n\n" + _md_quote("\n\n".join(parts)) + "\n")
+        prev_msg_idx = msg["idx"]
         i += 1
 
       else:  # codex turn (codex, codex_reasoning, codex_question)
@@ -2012,6 +2015,21 @@ class CodexSessionStore(SessionStore):
             label = f"{n} file change{'s' if n != 1 else ''}"
             patches_md = "\n\n".join(
               f"```diff\n{p}\n```" for p in final_msg["patches"]
+            )
+            block += (
+              f"\n\n<details>\n<summary>{label}</summary>\n\n"
+              f"{_md_quote(patches_md)}\n\n</details>"
+            )
+        else:
+          # No final text response — collect any apply_patch calls that have
+          # no non-commentary agent_message to attach to (item 34).
+          end_idx = msgs[i]["idx"] if i < len(msgs) else len(lines)
+          orphan_patches = _cx_get_patches_between(lines, prev_msg_idx, end_idx)
+          if orphan_patches:
+            n = len(orphan_patches)
+            label = f"{n} file change{'s' if n != 1 else ''}"
+            patches_md = "\n\n".join(
+              f"```diff\n{p}\n```" for p in orphan_patches
             )
             block += (
               f"\n\n<details>\n<summary>{label}</summary>\n\n"
