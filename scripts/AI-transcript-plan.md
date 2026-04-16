@@ -34,40 +34,43 @@
   - [Matrix 3 — `--grep` / `--grep-re` modes](#matrix-3----grep----grep-re-modes)
   - [Matrix 4 — Format/header consistency](#matrix-4--formatheader-consistency)
 - [Future work (post-MVP)](#future-work-post-mvp)
-  - [1. `-n` — record number prefix **(FEATURE)** ***(DONE)***](#1--n--record-number-prefix-feature-done)
-  - [2. `-d` — timestamp prefix **(FEATURE)** ***(DONE)***](#2--d--timestamp-prefix-feature-done)
-  - [3. Combined `-n -d` prefix order **(FEATURE)** ***(DONE)***](#3-combined--n--d-prefix-order-feature-done)
-  - [4. Ignore case flag `-i` **(FEATURE)** ***(DONE)***](#4-ignore-case-flag--i-feature-done)
-  - [5. Record/timestamp range filtering **(FEATURE)** ***(DONE)***](#5-recordtimestamp-range-filtering-feature-done)
-  - [6. Consolidate consecutive Claude turns into one heading **(BUG/FEATURE)**](#6-consolidate-consecutive-claude-turns-into-one-heading-bugfeature)
-  - [7. `--project` flag semantics hardening **(BUG/FEATURE)**](#7---project-flag-semantics-hardening-bugfeature)
-  - [8. User-facing documentation **(FEATURE)**](#8-user-facing-documentation-feature)
-  - [9. Timestamp each user/AI header marker **(FEATURE)** ***(DONE)***](#9-timestamp-each-userai-header-marker-feature-done)
-  - [10. `--tz` — timezone display for `-d` timestamps. **(FEATURE)** ***(DONE)***](#10---tz--timezone-display-for--d-timestamps-feature-done)
-  - [11. Colored diagnostic prefixes and grep/header elements **(FEATURE)** ***(DONE)***](#11-colored-diagnostic-prefixes-and-grepheader-elements-feature-done)
-  - [12. `--ts-fmt` — timestamp format string for `-d` output **(FEATURE)**](#12---ts-fmt--timestamp-format-string-for--d-output-feature)
-  - [13. `.AI-transcript.rc` — per-user config file for default flags **(FEATURE)**](#13-ai-transcriptrc--per-user-config-file-for-default-flags-feature)
-  - [14. mtime should be taken from records **(BUG?/FEATURE?)**](#14-mtime-should-be-taken-from-records-bugfeature)
-  - [15. Colourise the User/AI headings **(FEATURE)**](#15-colourise-the-userai-headings-feature)
-  - [16. Add a `--raw` flag **(FEATURE)**](#16-add-a---raw-flag-feature)
-  - [17. `-A`, `-B` and `-C` switches don't span over records **(FEATURE)** ***(DONE)***](#17--a--b-and--c-switches-dont-span-over-records-feature-done)
-  - [18. `--since`/`--until` doesn't narrow down `--id` glob pattern if ambiguous **(BUG)**](#18---since--until-doesnt-narrow-down---id-glob-pattern-if-ambiguous-bug)
-  - [19. `--ls` doesn't display timestamps **(FEATURE)**](#19---ls-doesnt-display-timestamps-feature)
-  - [20. `-n` and `-d` doesn't work with `--id` **(NOT-A-BUG)** ***(WILL-NOT-IMPLEMENT)***](#20--n-and--d-doesnt-work-with---id-not-a-bug-will-not-implement)
-  - [21. Need a way to state speaker when grepping **(FEATURE)**](#21-need-a-way-to-state-speaker-when-grepping-feature)
-  - [22. `--project` should be able to take just the project name as well **(FEATURE)**](#22---project-should-be-able-to-take-just-the-project-name-as-well-feature)
-  - [23. `--id <title-substr>` doesn't work for Codex **(BUG)** ***(DONE)***](#23---id-title-substr-doesnt-work-for-codex-bug-done)
-  - [24. Questions aren't in transcript **(BUG)** ***(DONE)***](#24-questions-arent-in-transcript-bug-done)
-  - [25. Plan isn't in transcript **(BUG)** ***(DONE)***](#25-plan-isnt-in-transcript-bug-done)
-  - [26. Text not quoted **(BUG)** ***(DONE)***](#26-text-not-quoted-bug-done)
-  - [27.  Codex separates thoughts by a space, Claude by a header. **(BUG)** ***(DONE)***](#27--codex-separates-thoughts-by-a-space-claude-by-a-header-bug-done)
-  - [28. Bash output code fence leaks when output contains backticks. **(BUG)** ***(DONE)***](#28-bash-output-code-fence-leaks-when-output-contains-backticks-bug-done)
-  - [29. ExitPlanMode plan collapsed in `<details>` instead of shown expanded. **(BUG)** ***(DONE)***](#29-exitplanmode-plan-collapsed-in-details-instead-of-shown-expanded-bug-done)
-  - [30. ExitPlanMode tool_result (plan approval) silently discarded. **(BUG)** ***(DONE)***](#30-exitplanmode-tool_result-plan-approval-silently-discarded-bug-done)
-  - [31. Synthetic `model='<synthetic>'` records silently dropped. **(BUG)** ***(DONE)***](#31-synthetic-modelsynthetic-records-silently-dropped-bug-done)
-  - [32. No `## Claude` heading before inline segments in `-T` mode. **(BUG)** ***(DONE)***](#32-no--claude-heading-before-inline-segments-in--t-mode-bug-done)
-  - [33. Synthetic notice emitted before its turn instead of after. **(BUG)** ***(DONE)***](#33-synthetic-notice-emitted-before-its-turn-instead-of-after-bug-done)
-  - [34. Codex `apply_patch` calls silently dropped when turn ends without a final agent message. **(BUG)** ***(DONE)***](#34-codex-apply_patch-calls-silently-dropped-when-turn-ends-without-a-final-agent-message-bug-done)
+  - [Legend: ☐ - Open, ☑ - Done, ☒ - Will not implement, 💡 - Feature, 🪲 - Bug, 🎯 - Working correctly](#legend----open----done----will-not-implement----feature----bug----working-correctly)
+  - [☑💡 1. `-n` — record number prefix](#-1--n--record-number-prefix)
+  - [☑💡 2. `-d` — timestamp prefix](#-2--d--timestamp-prefix)
+  - [☑💡 3. Combined `-n -d` prefix order](#-3-combined--n--d-prefix-order)
+  - [☑💡 4. Ignore case flag `-i`](#-4-ignore-case-flag--i)
+  - [☑💡 5. Record/timestamp range filtering](#-5-recordtimestamp-range-filtering)
+  - [☒🪲 6. Consolidate consecutive Claude turns into one heading](#-6-consolidate-consecutive-claude-turns-into-one-heading)
+  - [☐💡 7. `--project` flag semantics hardening](#-7---project-flag-semantics-hardening)
+  - [☐💡 8. User-facing documentation](#-8-user-facing-documentation)
+  - [☑💡 9. Timestamp each user/AI header marker](#-9-timestamp-each-userai-header-marker)
+  - [☑💡 10. `--tz` — timezone display for `-d` timestamps.](#-10---tz--timezone-display-for--d-timestamps)
+  - [☑💡 11. Colored diagnostic prefixes and grep/header elements](#-11-colored-diagnostic-prefixes-and-grepheader-elements)
+  - [☐💡 12. `--ts-fmt` — timestamp format string for `-d` output](#-12---ts-fmt--timestamp-format-string-for--d-output)
+  - [☐💡 13. `.AI-transcript.rc` — per-user config file for default flags](#-13-ai-transcriptrc--per-user-config-file-for-default-flags)
+  - [☐🪲 14. mtime should be taken from records](#-14-mtime-should-be-taken-from-records)
+  - [☐💡 15. Colourise the User/AI headings](#-15-colourise-the-userai-headings)
+  - [☐💡 16. Add a `--raw` flag](#-16-add-a---raw-flag)
+  - [☑💡 17. `-A`, `-B` and `-C` switches don't span over records](#-17--a--b-and--c-switches-dont-span-over-records)
+  - [☐🪲 18. `--since`/`--until` doesn't narrow down `--id` glob pattern if ambiguous](#-18---since--until-doesnt-narrow-down---id-glob-pattern-if-ambiguous)
+  - [☐💡 19. `--ls` doesn't display timestamps](#-19---ls-doesnt-display-timestamps)
+  - [☒🎯 20. `-n` and `-d` doesn't work with `--id`](#-20--n-and--d-doesnt-work-with---id)
+  - [☐💡 21. Need a way to state speaker when grepping](#-21-need-a-way-to-state-speaker-when-grepping)
+  - [☐💡 22. `--project` should be able to take just the project name as well](#-22---project-should-be-able-to-take-just-the-project-name-as-well)
+  - [☑🪲 23. `--id <title-substr>` doesn't work for Codex](#-23---id-title-substr-doesnt-work-for-codex)
+  - [☑🪲 24. Questions aren't in transcript](#-24-questions-arent-in-transcript)
+  - [☑🪲 25. Plan isn't in transcript](#-25-plan-isnt-in-transcript)
+  - [☑🪲 26. Text not quoted](#-26-text-not-quoted)
+  - [☑🪲 27.  Codex separates thoughts by a space, Claude by a header.](#-27--codex-separates-thoughts-by-a-space-claude-by-a-header)
+  - [☑🪲 28. Bash output code fence leaks when output contains backticks.](#-28-bash-output-code-fence-leaks-when-output-contains-backticks)
+  - [☑🪲 29. ExitPlanMode plan collapsed in `<details>` instead of shown expanded.](#-29-exitplanmode-plan-collapsed-in-details-instead-of-shown-expanded)
+  - [☑🪲 30. ExitPlanMode tool\_result (plan approval) silently discarded.](#-30-exitplanmode-tool_result-plan-approval-silently-discarded)
+  - [☑🪲 31. Synthetic `model='<synthetic>'` records silently dropped.](#-31-synthetic-modelsynthetic-records-silently-dropped)
+  - [☑🪲 32. No `## Claude` heading before inline segments in `-T` mode.](#-32-no--claude-heading-before-inline-segments-in--t-mode)
+  - [☑🪲 33. Synthetic notice emitted before its turn instead of after.](#-33-synthetic-notice-emitted-before-its-turn-instead-of-after)
+  - [☑🪲 34. Codex `apply_patch` calls silently dropped when turn ends without a final agent message.](#-34-codex-apply_patch-calls-silently-dropped-when-turn-ends-without-a-final-agent-message)
+  - [☑💡 35. Thoughts block: separate un-labelled thoughts with `***`](#-35-thoughts-block-separate-un-labelled-thoughts-with-)
+  - [☑💡 36. Thoughts block: show thought count in `<summary>`](#-36-thoughts-block-show-thought-count-in-summary)
 - [Questions](#questions)
 - [Bugs resolved](#bugs-resolved)
   - [Bug verification matrix](#bug-verification-matrix)
@@ -838,7 +841,9 @@ Run each command and compare the header lines visually.
 
 ## Future work (post-MVP)
 
-### 1. `-n` — record number prefix **(FEATURE)** ***(DONE)***
+### Legend: ☐ - Open, ☑ - Done, ☒ - Will not implement, 💡 - Feature, 🪲 - Bug, 🎯 - Working correctly
+
+### ☑💡 1. `-n` — record number prefix
 
 - Prepend the 1-based line number within the `.jsonl` file to each matched grep
   line, right-justified to the digit-width of the total record count (which is
@@ -850,7 +855,7 @@ Run each command and compare the header lines visually.
  23: matched text
 ```
 
-### 2. `-d` — timestamp prefix **(FEATURE)** ***(DONE)***
+### ☑💡 2. `-d` — timestamp prefix
 
 - Prepend `[<timestamp>]:` (followed by a space) to each matched grep line.
   Timestamp source per AI:
@@ -858,7 +863,7 @@ Run each command and compare the header lines visually.
   - Codex: decode from the UUID v7 embedded timestamp (first 48 bits →
     milliseconds since epoch).
 
-### 3. Combined `-n -d` prefix order **(FEATURE)** ***(DONE)***
+### ☑💡 3. Combined `-n -d` prefix order
 
 When both flags are active, timestamp comes first and the right-justified line
 number follows, so the number column stays vertically aligned regardless of
@@ -868,11 +873,11 @@ timestamp width:
 [<timestamp>]: 23: matched text
 ```
 
-### 4. Ignore case flag `-i` **(FEATURE)** ***(DONE)***
+### ☑💡 4. Ignore case flag `-i`
 
 Should be case-sensitive unless `-i` is passed.
 
-### 5. Record/timestamp range filtering **(FEATURE)** ***(DONE)***
+### ☑💡 5. Record/timestamp range filtering
 
 Allow the user to restrict output to a sub-range of a session, useful for long
 sessions.  Two flavours:
@@ -898,7 +903,7 @@ sessions.  Two flavours:
   Negative record indices (`--records=-N:`) require the `=` form to avoid
   argparse treating the value as a flag.
 
-### 6. Consolidate consecutive Claude turns into one heading **(BUG/FEATURE)**
+### ☒🪲 6. Consolidate consecutive Claude turns into one heading
 
 Each API round-trip creates a separate JSONL record; when Claude uses a tool
 the sequence is `assistant` (text + tool_use) → `user` (tool_results) →
@@ -906,7 +911,11 @@ the sequence is `assistant` (text + tool_use) → `user` (tool_results) →
 next consecutive `## Claude` heading isn't needed — it would be implied by
 the `<details><summary>Thinking...</summary></details>` block preceding it.
 
-### 7. `--project` flag semantics hardening **(BUG/FEATURE)**
+**Will not implement:** Markdown does not support collapsing or merging
+headings across separate blocks, so there is no clean way to suppress the
+intermediate `## Claude` headings without breaking the rendered structure.
+
+### ☐💡 7. `--project` flag semantics hardening
 
 `--project PATH` is Claude-only; it should imply `--claude` and produce errors
 in the following states:
@@ -921,7 +930,7 @@ in the following states:
 - `--all-projects --both-AIs` (or no source flag) → valid: all Claude
   sessions from all projects plus all Codex sessions.
 
-### 8. User-facing documentation **(FEATURE)**
+### ☐💡 8. User-facing documentation
 
 Accessible from the `--help` switch; use `--help --verbose` for extra detail
 if the standard help is too long.
@@ -933,13 +942,13 @@ if the standard help is too long.
   thinking or response text that references them.  The generated transcript
   will therefore be missing those user turns.
 
-### 9. Timestamp each user/AI header marker **(FEATURE)** ***(DONE)***
+### ☑💡 9. Timestamp each user/AI header marker
 
 If `-d` and `-n` are used with transcript output, then after each
 `## User/Claude/Codex` should have `[<timestamp>]` and `<rec_no>` placed after
 it like how it's done when prefixing with grepping.  Should use same code.
 
-### 10. `--tz` — timezone display for `-d` timestamps. **(FEATURE)** ***(DONE)***
+### ☑💡 10. `--tz` — timezone display for `-d` timestamps.
 
 By default `-d` should show timestamps converted to the local system timezone
 rather than raw UTC.  A `--tz ZONE` flag overrides the target zone; `ZONE`
@@ -955,7 +964,7 @@ installed on Windows), emit a `WARNING:` to stderr explaining the issue and
 suggesting `pip install tzdata`, then fall back to local time and continue.
 `--tz` automatically implies `-d`.
 
-### 11. Colored diagnostic prefixes and grep/header elements **(FEATURE)** ***(DONE)***
+### ☑💡 11. Colored diagnostic prefixes and grep/header elements
 
 All colorisable output now goes through named `_C_*` constants in the colorama
 block for easy tuning.  Colors applied when colorama is installed and the
@@ -980,7 +989,7 @@ relevant stream is a TTY; plain text otherwise.
 - `records: N` — `_C_RECORDS` (`Style.DIM`)
 - Match highlights — `_C_MATCH` (`Style.BRIGHT + Fore.RED`)
 
-### 12. `--ts-fmt` — timestamp format string for `-d` output **(FEATURE)**
+### ☐💡 12. `--ts-fmt` — timestamp format string for `-d` output
 
 Allows the user to override the default `strftime` format used when displaying
 timestamps with `-d`.  Default format: `%Y-%m-%d %H:%M:%S` (matches current
@@ -990,7 +999,7 @@ time only.
 - Not sure if this will be a thing: Should also be settable via the
   `AI_TRANSCRIPT_TS_FMT` environment variable (CLI flag takes precedence).
 
-### 13. `.AI-transcript.rc` — per-user config file for default flags **(FEATURE)**
+### ☐💡 13. `.AI-transcript.rc` — per-user config file for default flags
 
 A simple config file (TOML or `key = value` format) read from
 `~/.AI-transcript.rc` (or `~/.config/AI-transcript.rc`) at startup before
@@ -999,16 +1008,16 @@ argument parsing.  Allows persistent defaults for any flag (e.g.
 always take precedence over rc file values.  Unknown keys produce a `WARNING:`
 to stderr; a missing file is silently ignored.
 
-### 14. mtime should be taken from records **(BUG?/FEATURE?)**
+### ☐🪲 14. mtime should be taken from records
 
 Currently, mtime is taken from the file, but it should prolly be taken from
 the last record instead as it's more stable.  Agree or disagree?
 
-### 15. Colourise the User/AI headings **(FEATURE)**
+### ☐💡 15. Colourise the User/AI headings
 
 If colouring is enabled, the headings should get some colour as well.
 
-### 16. Add a `--raw` flag **(FEATURE)**
+### ☐💡 16. Add a `--raw` flag
 
 That flag will output the specified record range as formatted json (not as one
 long line).  Will look like:
@@ -1038,7 +1047,7 @@ long line).  Will look like:
 If there are nested structures, then they should be appropriately indented.
 Must be used with `--records` switch as this is for diagnostics.
 
-### 17. `-A`, `-B` and `-C` switches don't span over records **(FEATURE)** ***(DONE)***
+### ☑💡 17. `-A`, `-B` and `-C` switches don't span over records
 
 These need to be able to show context, so if there is no line in the record
 around where it's looking, it should look in the surrounding records.  Added
@@ -1047,28 +1056,28 @@ boundaries by flattening all searchable lines into a single tagged sequence
 before matching.  Each output line carries its own `rec_no`/`ts_str` so `-n`
 and `-d` continue to work correctly across record boundaries.
 
-### 18. `--since`/`--until` doesn't narrow down `--id` glob pattern if ambiguous **(BUG)**
+### ☐🪲 18. `--since`/`--until` doesn't narrow down `--id` glob pattern if ambiguous
 
 I was looking for something that occurred at a time, but I couldn't because the
 filter didn't filter.
 
-### 19. `--ls` doesn't display timestamps **(FEATURE)**
+### ☐💡 19. `--ls` doesn't display timestamps
 
 I can't even determine when a conversation occurred.  Maybe add `-d` to modify
 default listing to show ctime and mtime.
 
-### 20. `-n` and `-d` doesn't work with `--id` **(NOT-A-BUG)** ***(WILL-NOT-IMPLEMENT)***
+### ☒🎯 20. `-n` and `-d` doesn't work with `--id`
 
 `--id` is for transcript generation.  `-n` and `-d` will be implemented in item
 \9.  Workaround is to use `--grep-re '^'`.
 
-### 21. Need a way to state speaker when grepping **(FEATURE)**
+### ☐💡 21. Need a way to state speaker when grepping
 
 Grep needs to have a prefix like `U:` for user and `A:` for AI.  It should
 always be there.  If colour is enabled, I think yellow is probably a good
 choice.
 
-### 22. `--project` should be able to take just the project name as well **(FEATURE)**
+### ☐💡 22. `--project` should be able to take just the project name as well
 
 From the help:
 
@@ -1080,7 +1089,7 @@ States path, but just the last name should be sufficient in most cases.  If not
 should show the paths with a number prefixed to them like an ordered list.  User
 can use the same `:N` notation to disambiguate.
 
-### 23. `--id <title-substr>` doesn't work for Codex **(BUG)** ***(DONE)***
+### ☑🪲 23. `--id <title-substr>` doesn't work for Codex
 
 When using the `--id` switch, it doesn't find the conversation with that title.
 
@@ -1098,7 +1107,7 @@ falls back to scanning all session files not in the index when the indexed
 title-glob returns nothing, matching against that synthetic title.
 Test: `--codex --id "I want you to" --ls` → finds session `019d1acc`.
 
-### 24. Questions aren't in transcript **(BUG)** ***(DONE)***
+### ☑🪲 24. Questions aren't in transcript
 
 In claude, when it presents questions, it isn't reflected in the transcript.  I've not verified if this is also the case in codex.
 
@@ -1123,7 +1132,7 @@ Added `_DISPLAY_TOOL_RESULTS = {"AskUserQuestion"}` allowlist so answer
 keyed by `call_id`) and `function_call_output` answer rendering as a quoted
 `## User` turn with Q → "answer" pairs; also added both to `_cx_session_grep`.
 
-### 25. Plan isn't in transcript **(BUG)** ***(DONE)***
+### ☑🪲 25. Plan isn't in transcript
 
 In claude, when it presents a plan, it isn't reflected in the transcript.  I've not verified if this is also the case in codex.
 
@@ -1140,7 +1149,7 @@ skipped by the same assistant-turn filter that missed `AskUserQuestion`.
 `ExitPlanMode` (renders plan markdown inside a collapsible `<details><summary>Plan</summary>` block) to the Claude assistant-turn display and to
 `_cl_session_grep`.
 
-### 26. Text not quoted **(BUG)** ***(DONE)***
+### ☑🪲 26. Text not quoted
 
 Text that was stated/thought by the AI or User should be md quoted (prefixed
 with a `>`).
@@ -1157,7 +1166,7 @@ options, answers, file-op diffs, bash commands, todo lists, and plan content.
 Headings (`## User`, `## Claude`, `## Codex`, `### Question N`) and
 `<details><summary>` labels remain unquoted as they are structural/informational.
 
-### 27.  Codex separates thoughts by a space, Claude by a header. **(BUG)** ***(DONE)***
+### ☑🪲 27.  Codex separates thoughts by a space, Claude by a header.
 
 To be more precise, Claude separates each thought in it's own `<details>` tag.
 
@@ -1189,7 +1198,7 @@ continues across thought groups within the same turn.
 
 ---
 
-### 28. Bash output code fence leaks when output contains backticks. **(BUG)** ***(DONE)***
+### ☑🪲 28. Bash output code fence leaks when output contains backticks.
 
 When a Bash command's output contains three-backtick sequences (` ``` `), the
 fixed `` ``` `` fence used to wrap it was prematurely closed, causing raw
@@ -1207,7 +1216,7 @@ output.
 
 ---
 
-### 29. ExitPlanMode plan collapsed in `<details>` instead of shown expanded. **(BUG)** ***(DONE)***
+### ☑🪲 29. ExitPlanMode plan collapsed in `<details>` instead of shown expanded.
 
 `_cl_render_inline_item` was wrapping the ExitPlanMode plan in a
 `<details><summary>Plan</summary>` block, hiding it from the reader.  The plan
@@ -1222,7 +1231,7 @@ prevent heading-depth conflicts with the surrounding Claude turn structure.
 
 ---
 
-### 30. ExitPlanMode tool_result (plan approval) silently discarded. **(BUG)** ***(DONE)***
+### ☑🪲 30. ExitPlanMode tool_result (plan approval) silently discarded.
 
 When the user approved a plan, the tool_result record carrying the approval was
 absorbed into `tr_map` by `_cl_group_turns` and never surfaced as a `## User`
@@ -1240,7 +1249,7 @@ echoed plan body collapsed under `<details><summary>Approved Plan</summary>`.
 
 ---
 
-### 31. Synthetic `model='<synthetic>'` records silently dropped. **(BUG)** ***(DONE)***
+### ☑🪲 31. Synthetic `model='<synthetic>'` records silently dropped.
 
 Assistant records with `model='<synthetic>'` (e.g. usage-limit notifications)
 were silently skipped in `_cl_group_turns`, so the user never saw them in the
@@ -1255,7 +1264,7 @@ system annotation.
 
 ---
 
-### 32. No `## Claude` heading before inline segments in `-T` mode. **(BUG)** ***(DONE)***
+### ☑🪲 32. No `## Claude` heading before inline segments in `-T` mode.
 
 In `-T` (separate-thoughts) mode, user-facing text that followed a Thoughts
 block appeared without a heading, making it hard to distinguish from thought
@@ -1270,7 +1279,7 @@ visible heading within the blockquote structure.
 
 ---
 
-### 33. Synthetic notice emitted before its turn instead of after. **(BUG)** ***(DONE)***
+### ☑🪲 33. Synthetic notice emitted before its turn instead of after.
 
 When a `model='<synthetic>'` record appeared inside an assistant turn (e.g. at
 record 100, mid-way through the session's first long turn), the notice was
@@ -1289,7 +1298,7 @@ so notices always follow their enclosing turn in the output.
 
 ---
 
-### 34. Codex `apply_patch` calls silently dropped when turn ends without a final agent message. **(BUG)** ***(DONE)***
+### ☑🪲 34. Codex `apply_patch` calls silently dropped when turn ends without a final agent message.
 
 When a Codex turn consists entirely of commentary-phase `agent_message` records
 (shown as thought items) with no non-commentary final message, any `apply_patch`
@@ -1311,6 +1320,21 @@ None`, call `_cx_get_patches_between(lines, prev_msg_idx, end_idx)` where
 `end_idx` is the next user message's line index (or `len(lines)` if none).  If
 any patches are found, append the same `<details><summary>N file changes
 </summary>…</details>` block that the `final_msg` path would have produced.
+
+---
+
+### ☑💡 35. Thoughts block: separate un-labelled thoughts with `***`
+
+When `-T` is not set, adjacent thoughts inside a `<details>` block were separated
+by a blank blockquote line.  Replace with `> ***` so the boundary is visually
+distinct without requiring `-T`.
+
+---
+
+### ☑💡 36. Thoughts block: show thought count in `<summary>`
+
+Change `<summary>Thoughts</summary>` to `<summary>Thoughts (N)</summary>` where
+N is the number of thought items in the block.
 
 ---
 

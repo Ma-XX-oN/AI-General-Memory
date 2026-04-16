@@ -871,9 +871,10 @@ def _format_thought_items(thought_items, *, separate_thoughts=False,
         ).rstrip()
         if t_s:
           t_suffix = " " + t_s
-      parts.append(f"### Thought {qi}{t_suffix}\n\n{_md_quote(t_text)}")
-    return "\n\n".join(parts)
-  return "\n\n".join(_md_quote(t) for _, _, t in thought_items)
+      parts.append(f"> ### Thought {qi}{t_suffix}\n>\n{_md_quote(t_text)}")
+    return "\n>\n".join(parts)
+  sep = "\n>\n> ***\n>\n" if len(thought_items) > 1 else "\n>\n"
+  return sep.join(_md_quote(t) for _, _, t in thought_items)
 
 
 def _cl_render_thought_item(rec, tr_map):
@@ -1335,9 +1336,10 @@ class ClaudeSessionStore(SessionStore):
               # Use "\n>\n" separator to keep blockquote context continuous.
               # Outer <details> tags are explicitly blockquoted; per-item
               # _md_quote() handles the content so ### Thought N stays unquoted.
-              inner = "\n>\n".join(inner_parts)
+              sep = "\n>\n> ***\n>\n" if len(inner_parts) > 1 else "\n>\n"
+              inner = sep.join(inner_parts)
               block += (
-                f"\n\n> <details>\n> <summary>Thoughts</summary>\n>\n"
+                f"\n\n> <details>\n> <summary>Thoughts ({len(inner_parts)})</summary>\n>\n"
                 f"{inner}\n>\n> </details>"
               )
 
@@ -2007,7 +2009,10 @@ class CodexSessionStore(SessionStore):
             show_date=show_date, record_number=record_number,
             rec_width=rec_width, display_tz=display_tz, use_color=use_color,
           )
-          block += f"\n\n<details>\n<summary>Thoughts</summary>\n\n{inner}\n\n</details>"
+          block += (
+            f"\n\n> <details>\n> <summary>Thoughts ({len(thinking_items)})</summary>\n>\n"
+            f"{inner}\n>\n> </details>"
+          )
         if final_msg:
           block += f"\n\n{_md_quote(final_msg['text'])}"
           if final_msg["patches"]:
