@@ -49,7 +49,7 @@
   - [☐💡 12. `--ts-fmt` — timestamp format string for `-d` output](#-12---ts-fmt--timestamp-format-string-for--d-output)
   - [☐💡 13. `.AI-transcript.rc` — per-user config file for default flags](#-13-ai-transcriptrc--per-user-config-file-for-default-flags)
   - [☐🪲 14. mtime should be taken from records](#-14-mtime-should-be-taken-from-records)
-  - [☐💡 15. Colourise the User/AI headings](#-15-colourise-the-userai-headings)
+  - [☑💡 15. Colourise the User/AI headings](#-15-colourise-the-userai-headings)
   - [☐💡 16. Add a `--raw` flag](#-16-add-a---raw-flag)
   - [☑💡 17. `-A`, `-B` and `-C` switches don't span over records](#-17--a--b-and--c-switches-dont-span-over-records)
   - [☐🪲 18. `--since`/`--until` doesn't narrow down `--id` glob pattern if ambiguous](#-18---since--until-doesnt-narrow-down---id-glob-pattern-if-ambiguous)
@@ -71,6 +71,7 @@
   - [☑🪲 34. Codex `apply_patch` calls silently dropped when turn ends without a final agent message.](#-34-codex-apply_patch-calls-silently-dropped-when-turn-ends-without-a-final-agent-message)
   - [☑💡 35. Thoughts block: separate un-labelled thoughts with `***`](#-35-thoughts-block-separate-un-labelled-thoughts-with-)
   - [☑💡 36. Thoughts block: show thought count in `<summary>`](#-36-thoughts-block-show-thought-count-in-summary)
+  - [☐💡 37. Centralize display policy](#-37-centralize-display-policy)
 - [Questions](#questions)
 - [Bugs resolved](#bugs-resolved)
   - [Bug verification matrix](#bug-verification-matrix)
@@ -200,9 +201,11 @@ Each one informs a specific requirement on the new design.
   (no project concept).  A single `print_session_header` / `print_session_list_row`
   pair operating on `Session` objects ensures this can never drift.
 
-- **ANSI codes:** cyan = date bracket, yellow = project label, bold = uuid +
-  title.  No color in the transcript body.  Color is always off for the
-  transcript header (it's written to a file or piped).
+- **ANSI codes** (when `--color` is active): cyan = date brackets; green =
+  source/project label, `## Claude`/`## Codex` headings; bold = uuid + title;
+  dim = record counts; bright red = grep match; yellow = `## User` heading;
+  magenta = `### Thought N` heading.  Stderr: blue = INFO, yellow = WARNING,
+  red = ERROR.
 
 ---
 
@@ -1013,7 +1016,7 @@ to stderr; a missing file is silently ignored.
 Currently, mtime is taken from the file, but it should prolly be taken from
 the last record instead as it's more stable.  Agree or disagree?
 
-### ☐💡 15. Colourise the User/AI headings
+### ☑💡 15. Colourise the User/AI headings
 
 If colouring is enabled, the headings should get some colour as well.
 
@@ -1335,6 +1338,26 @@ distinct without requiring `-T`.
 
 Change `<summary>Thoughts</summary>` to `<summary>Thoughts (N)</summary>` where
 N is the number of thought items in the block.
+
+### ☐💡 37. Centralize display policy
+
+Display controls are currently threaded piecemeal through formatting helpers and
+transcript renderers.  Refactor them into one explicit display-policy bundle so
+rendering behaviour has one authoritative source instead of a loose set of
+parallel parameters.
+
+The display policy should own presentation-only settings such as:
+
+- render color
+- diagnostic color
+- show date
+- record number
+- display timezone
+- separate thoughts
+
+Selection and filtering inputs such as `rec_filter`, `--grep`, `--id`,
+`--since`, and `--until` should remain outside the display policy because they
+change *what* is selected, not *how* it is rendered.
 
 ---
 

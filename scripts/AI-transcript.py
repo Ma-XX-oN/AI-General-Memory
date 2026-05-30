@@ -61,22 +61,26 @@ try:
   # ── Diagnostic prefix colors — edit these to taste ──────────────────────
   # Fore: RED  GREEN  YELLOW  BLUE  CYAN  MAGENTA  WHITE
   # Style: BRIGHT  DIM   — combine with +, e.g. _cm.Fore.BLUE + _cm.Style.DIM
-  _C_RESET    = _cm.Style.RESET_ALL
-  _C_MATCH    = _cm.Style.BRIGHT + _cm.Fore.RED
-  _C_DATE     = _cm.Fore.CYAN
-  _C_PROJECT  = _cm.Fore.GREEN
-  _C_TITLE    = _cm.Style.BRIGHT
-  _C_RECDATE  = _cm.Fore.CYAN              # -d timestamp prefix
-  _C_RECNO    = _cm.Style.DIM              # -n record-number prefix
-  _C_RECORDS  = _cm.Style.DIM              # "records: N" in session header
-  _C_INFO     = _cm.Fore.BLUE                   # INFO:    messages
-  _C_WARN     = _cm.Fore.YELLOW                 # WARNING: messages
-  _C_ERROR    = _cm.Fore.RED                    # ERROR:   messages
+  _C_RESET        = _cm.Style.RESET_ALL
+  _C_MATCH        = _cm.Style.BRIGHT + _cm.Fore.RED
+  _C_DATE         = _cm.Fore.CYAN
+  _C_PROJECT      = _cm.Fore.GREEN
+  _C_TITLE        = _cm.Style.BRIGHT
+  _C_RECDATE      = _cm.Fore.CYAN              # -d timestamp prefix
+  _C_RECNO        = _cm.Style.DIM              # -n record-number prefix
+  _C_RECORDS      = _cm.Style.DIM              # "records: N" in session header
+  _C_INFO         = _cm.Fore.BLUE              # INFO:    messages
+  _C_WARN         = _cm.Fore.YELLOW            # WARNING: messages
+  _C_ERROR        = _cm.Fore.RED               # ERROR:   messages
+  _C_ROLE_USER    = _cm.Fore.YELLOW            # ## User heading
+  _C_ROLE_AI      = _cm.Fore.GREEN             # ## Claude / ## Codex heading
+  _C_ROLE_THOUGHT = _cm.Fore.MAGENTA           # ### Thought N heading
   _COLORAMA_OK = True
 except ImportError:
   _C_RESET = _C_MATCH = _C_DATE = _C_PROJECT = _C_TITLE = ""
   _C_RECDATE = _C_RECNO = _C_RECORDS = ""
   _C_INFO  = _C_WARN  = _C_ERROR = ""
+  _C_ROLE_USER = _C_ROLE_AI = _C_ROLE_THOUGHT = ""
   _COLORAMA_OK = False
 
 # Configure stdout for UTF-8 after colorama has had a chance to wrap it.
@@ -130,6 +134,31 @@ def _count_records(path):
 def _ansi(s, color, *, active):
   """Wrap *s* in *color* ANSI escape when *active* and color is non-empty."""
   return f"{color}{s}{_C_RESET}" if (active and color) else s
+
+
+def _user_hdg(*, use_color=False):
+  """Return the ``## User`` transcript heading."""
+  return _ansi("## User", _C_ROLE_USER, active=use_color)
+
+
+def _claude_hdg(*, use_color=False):
+  """Return the ``## Claude`` transcript heading."""
+  return _ansi("## Claude", _C_ROLE_AI, active=use_color)
+
+
+def _codex_hdg(*, use_color=False):
+  """Return the ``## Codex`` transcript heading."""
+  return _ansi("## Codex", _C_ROLE_AI, active=use_color)
+
+
+def _thought_hdg(n, *, use_color=False):
+  """Return the ``### Thought N`` transcript heading."""
+  return _ansi(f"### Thought {n}", _C_ROLE_THOUGHT, active=use_color)
+
+
+def _question_hdg(n):
+  """Return the ``### Question N`` transcript heading."""
+  return f"### Question {n}"
 
 
 def _colorize(line, spans, *, active):
@@ -871,7 +900,7 @@ def _format_thought_items(thought_items, *, separate_thoughts=False,
         ).rstrip()
         if t_s:
           t_suffix = " " + t_s
-      parts.append(f"> ### Thought {qi}{t_suffix}\n>\n{_md_quote(t_text)}")
+      parts.append(f"> {_thought_hdg(qi, use_color=use_color)}{t_suffix}\n>\n{_md_quote(t_text)}")
     return "\n>\n".join(parts)
   sep = "\n>\n> ***\n>\n" if len(thought_items) > 1 else "\n>\n"
   return sep.join(_md_quote(t) for _, _, t in thought_items)
@@ -1021,7 +1050,7 @@ def _cl_render_inline_item(rec, tr_map, question_counter):
             else:
               q_md += f"\n- {opt_label}"
           parts.append(
-            f"### Question {question_counter[0]}\n\n{_md_quote(q_md)}"
+            f"{_question_hdg(question_counter[0])}\n\n{_md_quote(q_md)}"
           )
 
       elif tool_name == "EnterPlanMode":
@@ -1170,6 +1199,8 @@ class ClaudeSessionStore(SessionStore):
     rec_width = len(str(session.rc))
     line1, line2 = _format_session_lines(session, use_color=use_color)
     out = [f"{line1}\n{line2}\n"]
+    _u_hdg = _user_hdg(use_color=use_color)
+    _cl_hdg = _claude_hdg(use_color=use_color)
 
     last_user_text = None  # deduplicate retried user messages
     turns, plan_ids = _cl_group_turns(rec_nos, records)
@@ -1226,14 +1257,14 @@ class ClaudeSessionStore(SessionStore):
               )
               if pre:
                 out.append(
-                  f"## User{suffix}\n\n{_md_quote(pre)}\n\n{details}\n"
+                  f"{_u_hdg}{suffix}\n\n{_md_quote(pre)}\n\n{details}\n"
                 )
               else:
-                out.append(f"## User{suffix}\n\n{details}\n")
+                out.append(f"{_u_hdg}{suffix}\n\n{details}\n")
             else:
-              out.append(f"## User{suffix}\n\n{_md_quote(text)}\n")
+              out.append(f"{_u_hdg}{suffix}\n\n{_md_quote(text)}\n")
           else:
-            out.append(f"## User{suffix}\n\n{_md_quote(text)}\n")
+            out.append(f"{_u_hdg}{suffix}\n\n{_md_quote(text)}\n")
 
       # ── System notice (synthetic assistant record) ─────────────────
       elif item_type == 'notice':
@@ -1303,7 +1334,7 @@ class ClaudeSessionStore(SessionStore):
         if not segments:
           continue
 
-        block = f"## Claude{suffix}"
+        block = f"{_cl_hdg}{suffix}"
         thought_counter = 0
         question_counter = [0]
 
@@ -1327,7 +1358,7 @@ class ClaudeSessionStore(SessionStore):
                   if t_s:
                     t_suffix = " " + t_s
                 inner_parts.append(
-                  f"> ### Thought {thought_counter}{t_suffix}\n>\n"
+                  f"> {_thought_hdg(thought_counter, use_color=use_color)}{t_suffix}\n>\n"
                   f"{_md_quote(item_md)}"
                 )
               else:
@@ -1357,11 +1388,11 @@ class ClaudeSessionStore(SessionStore):
                   ).rstrip()
                   if s:
                     inner_suffix = " " + s
-                block += f"\n\n> ## Claude{inner_suffix}\n>\n{inline_md}"
+                block += f"\n\n> {_cl_hdg}{inner_suffix}\n>\n{inline_md}"
               else:
                 block += f"\n\n{inline_md}"
 
-        if block == f"## Claude{suffix}":
+        if block == f"{_cl_hdg}{suffix}":
           continue
 
         out.append(block + "\n")
@@ -1918,6 +1949,8 @@ class CodexSessionStore(SessionStore):
 
     line1, line2 = _format_session_lines(session, use_color=use_color)
     out = [f"{line1}\n{line2}\n"]
+    _u_hdg = _user_hdg(use_color=use_color)
+    _co_hdg = _codex_hdg(use_color=use_color)
 
     i = 0
     prev_msg_idx = 0  # Line index of last user/codex_answer msg (for orphan patch collection)
@@ -1934,7 +1967,7 @@ class CodexSessionStore(SessionStore):
           if s:
             suffix = " " + s
         img_md = "\n".join(f'![image]({url})' for url in msg["images"])
-        block = f'## User{suffix}\n\n{_md_quote(msg["text"])}'
+        block = f"{_u_hdg}{suffix}\n\n{_md_quote(msg['text'])}"
         if img_md:
           block += f"\n\n{img_md}"
         out.append(block + "\n")
@@ -1963,7 +1996,7 @@ class CodexSessionStore(SessionStore):
             answer_str = ", ".join(f'"{a}"' for a in selected)
             parts.append(f'**{q_text}** → {answer_str}')
         if parts:
-          out.append(f"## User{suffix}\n\n" + _md_quote("\n\n".join(parts)) + "\n")
+          out.append(f"{_u_hdg}{suffix}\n\n" + _md_quote("\n\n".join(parts)) + "\n")
         prev_msg_idx = msg["idx"]
         i += 1
 
@@ -2001,7 +2034,7 @@ class CodexSessionStore(SessionStore):
                                  use_color=use_color).rstrip()
           if s:
             suffix = " " + s
-        block = f"## Codex{suffix}"
+        block = f"{_co_hdg}{suffix}"
         if thinking_items:
           inner = _format_thought_items(
             thinking_items,
@@ -2053,7 +2086,7 @@ class CodexSessionStore(SessionStore):
                 q_md += f"\n- {opt_label} — {opt_desc}"
               else:
                 q_md += f"\n- {opt_label}"
-            block += f"\n\n### Question {qi}\n\n{_md_quote(q_md)}"
+            block += f"\n\n{_question_hdg(qi)}\n\n{_md_quote(q_md)}"
         out.append(block + "\n")
 
     return "\n".join(out)
