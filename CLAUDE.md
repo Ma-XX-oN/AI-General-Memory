@@ -429,12 +429,16 @@ See [ahk.md](ahk.md) for full notes. Critical reminders:
   escape-related character loss.
 - Use a stable `git commit -F` command so it can be pre-approved once per
   session.  Workflow:
-  1. Source (not execute) `. ~/.claude/scripts/session-pid.sh` once to get the session PID.
-     If it fails, use `/tmp/claude-commit-msg.txt` as a fixed fallback path.
-  2. Write the commit message to `/tmp/claude-commit-msg-<SESSION_PID>.txt`
+  1. Run (source) `. ~/.claude/scripts/session-pid.sh` once.  The script
+     **prints** the PID to stdout — it does NOT set a `SESSION_PID` shell
+     variable.  Read the printed PID from the Bash tool output (e.g. `11032`)
+     and use it literally in the steps below.  Never try to reference
+     `$SESSION_PID` — it will always be empty.
+     If the script fails, use `/tmp/claude-commit-msg.txt` as a fixed fallback path.
+  2. Write the commit message to `/tmp/claude-commit-msg-<PID>.txt`
      using the Write tool (no approval needed).
      Note: the Write tool maps `/tmp` → `C:\tmp`; git requires the Windows form.
-  3. Commit with the stable command: `git commit -F C:/tmp/claude-commit-msg-<SESSION_PID>.txt`
+  3. Commit with the stable command: `git commit -F C:/tmp/claude-commit-msg-<PID>.txt`
      (approve-once eligible with prefix `git commit -F C:/tmp/claude-commit-msg-`).
 - After any push to origin from either `~/.claude` or `~/.codex`, immediately
   `git pull` in the other repo so both stay in sync with origin.
