@@ -185,9 +185,9 @@ Each one informs a specific requirement on the new design.
 
 ### Display invariants
 
-- **`use_color` must be computed before the first `--ls` branch**, not inside
-  the `--grep` block.  The `--ls` standalone path and `--id --ls` path both
-  need it.
+- **`DISPLAY_POLICY` and `HEADINGS` must be initialized before the first
+  display/diagnostic branch.**  `--ls`, `--grep`, `--id`, transcript output,
+  and diagnostic helpers all read the same process-wide display state.
 
 - **Identical 2-line format across all three output contexts:**
 
@@ -479,17 +479,17 @@ Constructor: `CodexSessionStore()`
 ### Shared display functions
 
 ```python
-def print_session_header(session: Session, *, use_color: bool = False) -> None:
+def print_session_header(session: Session) -> None:
     """Print the 2-line header used by --grep and --id transcript."""
 
-def print_session_list_row(i: int, session: Session, *,
-                           use_color: bool = False) -> None:
+def print_session_list_row(i: int, session: Session) -> None:
     """Print the N. [ctime]-[mtime] [project] / indent (uuid8) title row."""
 ```
 
-Both functions format dates as `"%Y-%m-%d %H:%M"`.  Both call `_ansi`.
-The only difference: `print_session_list_row` prefixes `{i:3}. ` and indents
-line 2 by `len(prefix)` spaces.
+Both functions format dates as `"%Y-%m-%d %H:%M"` and read
+`DISPLAY_POLICY.render_color` via `_format_session_lines()`.  The only
+difference: `print_session_list_row` prefixes `{i:3}. ` and indents line 2 by
+`len(prefix)` spaces.
 
 ### Shared grep utilities
 
@@ -651,8 +651,9 @@ invocation; sessions must contain both, and any matching line is highlighted.
 
 ```
 parse args
+resolve timezone / implied -d
+initialize DISPLAY_POLICY + HEADINGS
 determine stores = [ClaudeSessionStore, CodexSessionStore] per flags
-compute use_color (BEFORE any branch)
 
 if --grep / --grep-re:
     if --id:
@@ -1339,14 +1340,12 @@ distinct without requiring `-T`.
 Change `<summary>Thoughts</summary>` to `<summary>Thoughts (N)</summary>` where
 N is the number of thought items in the block.
 
-### ☐💡 37. Centralize display policy
+### ☑💡 37. Centralize display policy
 
-Display controls are currently threaded piecemeal through formatting helpers and
-transcript renderers.  Refactor them into one explicit display-policy bundle so
-rendering behaviour has one authoritative source instead of a loose set of
-parallel parameters.
+Implemented with one module-global `DISPLAY_POLICY` plus a derived `HEADINGS`
+cache initialized once in `main()`.
 
-The display policy should own presentation-only settings such as:
+`DISPLAY_POLICY` owns the presentation-only settings:
 
 - render color
 - diagnostic color
@@ -1355,9 +1354,12 @@ The display policy should own presentation-only settings such as:
 - display timezone
 - separate thoughts
 
+`HEADINGS` caches `user`, `claude`, and `codex` headings once per run and
+generates numbered `question(n)` / `thought(n)` headings on demand.
+
 Selection and filtering inputs such as `rec_filter`, `--grep`, `--id`,
-`--since`, and `--until` should remain outside the display policy because they
-change *what* is selected, not *how* it is rendered.
+`--since`, and `--until` remain outside the display policy because they change
+*what* is selected, not *how* it is rendered.
 
 ---
 
@@ -1441,9 +1443,9 @@ change *what* is selected, not *how* it is rendered.
   - How do they differ?  Need to document.
   - **Claude IDs are UUID v4** (random, e.g. `f4b19167-d8a7-4a10-81c5-d03920efd017`).  **Codex IDs are UUID v7** (timestamp-embedded, e.g. `019cf2fa-…`); recent Codex IDs always start with `019`.  In practice the namespaces rarely overlap, but `main()` handles it: when a prefix resolves in both stores the candidates from both are combined and reported as ambiguous — the user must qualify with `--claude` or `--codex`.
 
-- > Looking back at the plan, the transcript output includes its own header in the same format as what `print_session_header()` produces, but since transcripts are written to files or piped to stdout, colors are always disabled for that header. So `transcript()` will format the header without ANSI color codes, while `print_session_header()` handles the colored version for terminal display in other contexts like `--grep` or `--id --ls`. Building the transcript function...
+- > Looking back at the plan, the transcript output includes its own header in the same format as what `print_session_header()` produces. The important part is that this stays a single implementation and does not fork into separate "colored" and "plain" header builders.
   - This is a single central function, right?  What you are describing here sounds like you either have 2 implementations or are passing different arguments to the same function.  Neither of which should happen.
-  - **Resolved — Bug #10.**  `_format_session_lines(session, use_color)` is the single implementation.  `print_session_header()` calls it with `use_color=use_color`; `transcript()` calls it with `use_color=False`.  No duplication.
+  - **Resolved — Bug #10 / Item 37 follow-up.**  `_format_session_lines(session)` remains the single implementation, and its colouring now comes from `DISPLAY_POLICY.render_color` instead of threaded `use_color` arguments.
 
 - > so it counts all non-empty lines regardless of whether we skip the JSON parsing.
   - Why would there be empty lines?  Make the assumption that there aren't any.
@@ -1529,9 +1531,9 @@ All 11 bugs below are verified by `AI-transcript-tests.sh` (39/39 passing).
   `ClaudeSessionStore.transcript()` and `CodexSessionStore.transcript()` build
   the two-line header as inline f-strings rather than calling `_format_session_lines`.
   This means any future change to the header format must be made in three places
-  and will silently diverge.  Fix: add a `use_color=False` parameter to
-  `transcript()` (or strip the header from `transcript()` entirely and have the
-  caller emit it via `print_session_header`).
+  and will silently diverge.  Fixed by routing both transcript paths through
+  `_format_session_lines(session)` and later removing the old threaded
+  `use_color` parameter in favour of `DISPLAY_POLICY`.
 
 - **`_count_records` needlessly skips blank lines.**  The `if line.strip()` guard
   is defensive — Claude Code JSONL files do not contain blank lines.  Simplify to

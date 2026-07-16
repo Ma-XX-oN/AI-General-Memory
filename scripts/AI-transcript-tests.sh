@@ -33,14 +33,38 @@ test_selected() {
 #   WANT_EXIT  expected exit code
 #   PATTERN    grep -E pattern to match in combined stdout+stderr ("" = skip)
 #   INVERT     "!" = pattern must NOT be present; "" = must be present
+run_capture() {
+  CAPTURE_STDOUT="$(mktemp)"
+  CAPTURE_STDERR="$(mktemp)"
+  "$@" >"$CAPTURE_STDOUT" 2>"$CAPTURE_STDERR"
+  CAPTURE_RC=$?
+}
+
+cleanup_capture() {
+  rm -f "$CAPTURE_STDOUT" "$CAPTURE_STDERR"
+}
+
+capture_stream_path() {
+  case "$1" in
+    stdout) printf '%s\n' "$CAPTURE_STDOUT" ;;
+    stderr) printf '%s\n' "$CAPTURE_STDERR" ;;
+    *) echo "invalid stream: $1" >&2; return 1 ;;
+  esac
+}
+
+capture_preview() {
+  { head -2 "$CAPTURE_STDOUT"; head -2 "$CAPTURE_STDERR"; } | tr '\n' '|'
+}
+
 check() {
   local desc="$1" want_rc="$2" pattern="$3" invert="$4"
   shift 4
 
   if test_selected $TEST; then 
   local out rc
-  out=$("$@" 2>&1)
-  rc=$?
+  run_capture "$@"
+  out="$(cat "$CAPTURE_STDOUT" "$CAPTURE_STDERR")"
+  rc=$CAPTURE_RC
 
   local ok=1
   [[ $rc -ne $want_rc ]] && ok=0
@@ -56,32 +80,76 @@ check() {
     printf '%d. %sPASS%s  %s\n' $TEST "$GREEN" "$RESET" "$desc"
     ((PASS++))
   else
-    printf '%d. %sFAIL%s  %s\n' $TEST "$RED" "$RESET" "$desc"
+  printf '%d. %sFAIL%s  %s\n' $TEST "$RED" "$RESET" "$desc"
     [[ $rc -ne $want_rc ]] && printf '      exit: got %d, want %d\n' "$rc" "$want_rc"
     if [[ -n "$pattern" ]]; then
     [[ "$invert" == "!" ]] \
       && printf '      output unexpectedly contains: %s\n' "$pattern" \
       || printf '      output missing: %s\n' "$pattern"
     fi
-    printf '      output: %s\n' "$(echo "$out" | head -2 | tr '\n' '|')"
+    printf '      output: %s\n' "$(capture_preview)"
     ((FAIL++))
   fi
+  cleanup_capture
   else
   printf '%d. %sSKIPPED%s  %s\n' $TEST "$YELLOW" "$RESET" "$desc"
   fi
   ((TEST++))
 }
 
-# ANSI check: grep -P '\x1b' detects ESC byte in output
+# check_stream DESCRIPTION STREAM WANT_EXIT PATTERN INVERT CMD...
+#   STREAM     stdout | stderr
+check_stream() {
+  local desc="$1" stream="$2" want_rc="$3" pattern="$4" invert="$5"
+  shift 5
+
+  if test_selected $TEST; then
+  local rc ok=1 stream_file
+  run_capture "$@"
+  rc=$CAPTURE_RC
+  stream_file="$(capture_stream_path "$stream")"
+
+  [[ $rc -ne $want_rc ]] && ok=0
+  if [[ -n "$pattern" ]]; then
+    if grep -qE "$pattern" "$stream_file"; then
+    [[ "$invert" == "!" ]] && ok=0
+    else
+    [[ "$invert" != "!" ]] && ok=0
+    fi
+  fi
+
+  if [[ $ok -eq 1 ]]; then
+    printf '%d. %sPASS%s  %s\n' $TEST "$GREEN" "$RESET" "$desc"
+    ((PASS++))
+  else
+    printf '%d. %sFAIL%s  %s\n' $TEST "$RED" "$RESET" "$desc"
+    [[ $rc -ne $want_rc ]] && printf '      exit: got %d, want %d\n' "$rc" "$want_rc"
+    if [[ -n "$pattern" ]]; then
+    [[ "$invert" == "!" ]] \
+      && printf '      %s unexpectedly contains: %s\n' "$stream" "$pattern" \
+      || printf '      %s missing: %s\n' "$stream" "$pattern"
+    fi
+    printf '      output: %s\n' "$(capture_preview)"
+    ((FAIL++))
+  fi
+  cleanup_capture
+  else
+  printf '%d. %sSKIPPED%s  %s\n' $TEST "$YELLOW" "$RESET" "$desc"
+  fi
+  ((TEST++))
+}
+
+# ANSI check on a specific stream: look for a literal ESC byte
 check_ansi() {
-  local desc="$1" want_present="$2"   # want_present: "yes" or "no"
-  shift 2
+  local desc="$1" stream="$2" want_present="$3"   # want_present: "yes" or "no"
+  shift 3
 
   if test_selected $TEST; then 
-  local out rc
-  out=$("$@" 2>&1); rc=$?
-  local found=0
-  echo "$out" | grep -qP '\x1b' && found=1
+  local rc found=0 stream_file
+  run_capture "$@"
+  rc=$CAPTURE_RC
+  stream_file="$(capture_stream_path "$stream")"
+  LC_ALL=C grep -q $'\033' "$stream_file" && found=1
 
   local ok=1
   [[ $rc -ne 0 ]] && ok=0
@@ -94,10 +162,12 @@ check_ansi() {
   else
     printf '%d. %sFAIL%s  %s\n' $TEST "$RED" "$RESET" "$desc"
     [[ $rc -ne 0 ]] && printf '      exit: got %d, want 0\n' "$rc"
-    [[ "$want_present" == "yes" && $found -eq 0 ]] && printf '      no ANSI codes in output\n'
-    [[ "$want_present" == "no"  && $found -eq 1 ]] && printf '      ANSI codes present (should be absent)\n'
+    [[ "$want_present" == "yes" && $found -eq 0 ]] && printf '      no ANSI codes in %s\n' "$stream"
+    [[ "$want_present" == "no"  && $found -eq 1 ]] && printf '      ANSI codes present in %s (should be absent)\n' "$stream"
+    printf '      output: %s\n' "$(capture_preview)"
     ((FAIL++))
   fi
+  cleanup_capture
   else
   printf '%d. %sSKIPPED%s  %s\n' $TEST "$YELLOW" "$RESET" "$desc"
   fi
@@ -141,13 +211,13 @@ _colorama_was_installed=false
 $PYTHON -c "import colorama" 2>/dev/null && _colorama_was_installed=true
 ! $_colorama_was_installed && $PYTHON -m pip install colorama -q  #2>/dev/null
 $PYTHON -c "import colorama" 2>/dev/null || { echo "didn't install colorama"; exit 1; }
-check_ansi "--color always: ANSI codes present"          yes  $SCRIPT --color always --ls
-check_ansi "--color never: ANSI codes absent"            no   $SCRIPT --color never  --ls
-check_ansi "--color auto in pipe: ANSI codes absent"     no   $SCRIPT --color auto   --ls
+check_ansi "--color always: stdout has ANSI"             stdout yes  $SCRIPT --color always --ls
+check_ansi "--color never: stdout has no ANSI"           stdout no   $SCRIPT --color never  --ls
+check_ansi "--color auto in pipe: stdout has no ANSI"    stdout no   $SCRIPT --color auto   --ls
 $PYTHON -m pip uninstall -y colorama -q #2>/dev/null
 $PYTHON -c "import colorama" 2>/dev/null && { echo "colorama is still installed"; exit 1; }
-check_ansi "--color always without colorama: no ANSI"    no   $SCRIPT --color always --ls
-check     "warning printed when colorama absent"          0   "colorama not installed"  ""  $SCRIPT --color always --ls
+check_ansi "--color always without colorama: stdout has no ANSI" stdout no $SCRIPT --color always --ls
+check_stream "warning printed on stderr when colorama absent" stderr 0 "colorama not installed" "" $SCRIPT --color always --ls
 check     "--color never without colorama: exits 0"       0   ""  ""   $SCRIPT --color never --ls
 $_colorama_was_installed && { $PYTHON -m pip install colorama -q #2>/dev/null;
   echo "  (colorama restored)"; }
@@ -299,8 +369,8 @@ check "codex transcript -n: User heading has rec no"      0  "^## User  *[0-9]" 
 check "codex transcript no flags: User heading plain"     0  "^## User$"        ""  $SCRIPT --codex --id 019cf2fa
 check "codex transcript no flags: no bracket in User"     0  "^## User \["      "!" $SCRIPT --codex --id 019cf2fa
 # Claude: -d stamps headings with [YYYY-
-check "claude transcript -d: User heading has timestamp"   0  "^## User \[20"   ""  $SCRIPT --claude --all-projects --id a321be7c -d
-check "claude transcript -d: Claude heading has timestamp" 0  "^## Claude \[20" ""  $SCRIPT --claude --all-projects --id a321be7c -d
+check "claude transcript -d: User heading has timestamp"   0  "^## User \[20"   ""  $SCRIPT --claude --file scripts/fixtures/t-mode.jsonl -d
+check "claude transcript -d: Claude heading has timestamp" 0  "^## Claude \[20" ""  $SCRIPT --claude --file scripts/fixtures/t-mode.jsonl -d
 
 # ── Fixture-based rendering tests ────────────────────────────────────────────
 echo

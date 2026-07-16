@@ -20,6 +20,7 @@ are intentionally omitted — use `grep "def SECTION_NAME"` instead.
 | --- | --- |
 | `_grep_context` | `def _grep_context(` |
 | `_grep_context_tagged` | `def _grep_context_tagged(` |
+| `DisplayPolicy` / `HEADINGS` | `class DisplayPolicy` |
 | `SessionStore` ABC | `class SessionStore(` |
 | `_md_quote` | `def _md_quote(` |
 | `_md_code_fence` | `def _md_code_fence(` |
@@ -38,6 +39,25 @@ are intentionally omitted — use `grep "def SECTION_NAME"` instead.
 | `_build_hunk_prefix` | `def _build_hunk_prefix(` |
 | `_session_display_hunks` | `def _session_display_hunks(` |
 | `main()` | `def main(` |
+
+## Display policy and heading cache
+
+Presentation-only settings live in one module-global `DISPLAY_POLICY`,
+initialized once in `main()`.  It owns:
+
+- `render_color`
+- `diag_color`
+- `show_date`
+- `record_number`
+- `display_tz`
+- `separate_thoughts`
+
+Static role headings are cached once in the module-global `HEADINGS` object as
+`user`, `claude`, and `codex`.  Numbered headings are produced on demand via
+`HEADINGS.question(n)` and `HEADINGS.thought(n)`.
+
+Selection/filtering inputs such as `rec_filter`, `--grep`, `--id`, `--since`,
+and `--until` are intentionally not part of `DISPLAY_POLICY`.
 
 ## Claude JSONL record schema
 

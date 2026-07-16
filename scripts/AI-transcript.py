@@ -94,12 +94,49 @@ except AttributeError:
     _underlying.reconfigure(encoding="utf-8")
 
 
+# ── Display policy ────────────────────────────────────────────────────────────
+
+@dataclass
+class DisplayPolicy:
+  """Resolved presentation-only settings for one script invocation."""
+  render_color: bool
+  diag_color: bool
+  show_date: bool
+  record_number: bool
+  display_tz: "datetime.timezone | None"
+  separate_thoughts: bool
+
+
+DISPLAY_POLICY: "DisplayPolicy | None" = None
+HEADINGS = None
+
+
+def _display_policy():
+  """Return the initialized display policy for the current process."""
+  if DISPLAY_POLICY is None:
+    raise RuntimeError("DISPLAY_POLICY has not been initialized")
+  return DISPLAY_POLICY
+
+
+def _headings():
+  """Return the initialized heading cache for the current process."""
+  if HEADINGS is None:
+    raise RuntimeError("HEADINGS has not been initialized")
+  return HEADINGS
+
+
+def _set_display_policy(policy):
+  """Install the process-wide display policy and derived heading cache."""
+  global DISPLAY_POLICY, HEADINGS
+  DISPLAY_POLICY = policy
+  HEADINGS = HeadingCache(render_color=policy.render_color)
+
+
 # ── Diagnostic helpers ────────────────────────────────────────────────────────
 
 def _diag(color, label, msg):
   """Print a prefixed diagnostic line to stderr, with colour when available."""
-  use_color = _COLORAMA_OK and sys.stderr.isatty()
-  if use_color:
+  if _display_policy().diag_color:
     print(f"{color}{label}{_C_RESET} {msg}", file=sys.stderr)
   else:
     print(f"{label} {msg}", file=sys.stderr)
@@ -136,34 +173,31 @@ def _ansi(s, color, *, active):
   return f"{color}{s}{_C_RESET}" if (active and color) else s
 
 
-def _user_hdg(*, use_color=False):
-  """Return the ``## User`` transcript heading."""
-  return _ansi("## User", _C_ROLE_USER, active=use_color)
+@dataclass
+class HeadingCache:
+  """Cached heading strings derived from the current render policy."""
+  render_color: bool
+  user: str = ""
+  claude: str = ""
+  codex: str = ""
+
+  def __post_init__(self):
+    self.user = _ansi("## User", _C_ROLE_USER, active=self.render_color)
+    self.claude = _ansi("## Claude", _C_ROLE_AI, active=self.render_color)
+    self.codex = _ansi("## Codex", _C_ROLE_AI, active=self.render_color)
+
+  def question(self, n):
+    """Return the ``### Question N`` transcript heading."""
+    return f"### Question {n}"
+
+  def thought(self, n):
+    """Return the ``### Thought N`` transcript heading."""
+    return _ansi(f"### Thought {n}", _C_ROLE_THOUGHT, active=self.render_color)
 
 
-def _claude_hdg(*, use_color=False):
-  """Return the ``## Claude`` transcript heading."""
-  return _ansi("## Claude", _C_ROLE_AI, active=use_color)
-
-
-def _codex_hdg(*, use_color=False):
-  """Return the ``## Codex`` transcript heading."""
-  return _ansi("## Codex", _C_ROLE_AI, active=use_color)
-
-
-def _thought_hdg(n, *, use_color=False):
-  """Return the ``### Thought N`` transcript heading."""
-  return _ansi(f"### Thought {n}", _C_ROLE_THOUGHT, active=use_color)
-
-
-def _question_hdg(n):
-  """Return the ``### Question N`` transcript heading."""
-  return f"### Question {n}"
-
-
-def _colorize(line, spans, *, active):
-  """Highlight match *spans* within *line* using ANSI codes when *active*."""
-  if not active or not spans or not _C_MATCH:
+def _colorize(line, spans):
+  """Highlight match *spans* within *line* using the active render policy."""
+  if not _display_policy().render_color or not spans or not _C_MATCH:
     return line
   out, prev = [], 0
   for start, end in sorted(spans):
@@ -404,18 +438,11 @@ class SessionStore(ABC):
 
   @abstractmethod
   def transcript(self, session: "Session",
-                 rec_filter: "RecordFilter | None" = None,
-                 use_color: bool = False,
-                 show_date: bool = False,
-                 record_number: bool = False,
-                 display_tz: "datetime.timezone | None" = None) -> str:
+                 rec_filter: "RecordFilter | None" = None) -> str:
     """Return the full Markdown transcript string for *session*.
 
     If *rec_filter* is given, only records passing the filter are included.
-    If *use_color* is True, ANSI colour codes are included in the header.
-    If *show_date* is True, a formatted [timestamp] label is appended to
-    each role heading.  If *record_number* is True, the JSONL record number
-    is appended.  *display_tz* selects the timezone for timestamp display.
+    Presentation-only behaviour comes from the process-wide ``DISPLAY_POLICY``.
     """
 
 
@@ -878,29 +905,25 @@ def _cl_group_turns(rec_nos, records):
   return result, plan_ids
 
 
-def _format_thought_items(thought_items, *, separate_thoughts=False,
-                          show_date=False, record_number=False,
-                          rec_width=1, display_tz=None, use_color=False):
+def _format_thought_items(thought_items, *, rec_width=1):
   """Format a list of ``(rec_no, ts, text)`` thought tuples as the inner
   markdown for a ``<details>`` block.
 
-  When *separate_thoughts* is ``True`` and there are 2+ items, each thought is
-  preceded by an unquoted ``### Thought N`` heading (with optional rec_no/ts
-  suffix).  Otherwise items are separated by blank lines.
+  When ``DISPLAY_POLICY.separate_thoughts`` is true and there are 2+ items,
+  each thought is preceded by an unquoted ``### Thought N`` heading (with
+  optional rec_no/ts suffix). Otherwise items are separated by blank lines.
   """
-  if separate_thoughts and len(thought_items) > 1:
+  policy = _display_policy()
+  headings = _headings()
+  if policy.separate_thoughts and len(thought_items) > 1:
     parts = []
     for qi, (t_rec_no, t_ts, t_text) in enumerate(thought_items, 1):
       t_suffix = ""
-      if show_date or record_number:
-        t_s = _build_hunk_prefix(
-          t_rec_no, t_ts,
-          show_date=show_date, record_number=record_number,
-          rec_width=rec_width, tz=display_tz, use_color=use_color,
-        ).rstrip()
+      if policy.show_date or policy.record_number:
+        t_s = _build_hunk_prefix(t_rec_no, t_ts, rec_width=rec_width).rstrip()
         if t_s:
           t_suffix = " " + t_s
-      parts.append(f"> {_thought_hdg(qi, use_color=use_color)}{t_suffix}\n>\n{_md_quote(t_text)}")
+      parts.append(f"> {headings.thought(qi)}{t_suffix}\n>\n{_md_quote(t_text)}")
     return "\n>\n".join(parts)
   sep = "\n>\n> ***\n>\n" if len(thought_items) > 1 else "\n>\n"
   return sep.join(_md_quote(t) for _, _, t in thought_items)
@@ -1024,6 +1047,7 @@ def _cl_render_inline_item(rec, tr_map, question_counter):
   """
   content = rec.get("message", {}).get("content", [])
   parts = []
+  headings = _headings()
 
   for b in content:
     btype = b.get("type", "")
@@ -1050,7 +1074,7 @@ def _cl_render_inline_item(rec, tr_map, question_counter):
             else:
               q_md += f"\n- {opt_label}"
           parts.append(
-            f"{_question_hdg(question_counter[0])}\n\n{_md_quote(q_md)}"
+            f"{headings.question(question_counter[0])}\n\n{_md_quote(q_md)}"
           )
 
       elif tool_name == "EnterPlanMode":
@@ -1172,9 +1196,7 @@ class ClaudeSessionStore(SessionStore):
       cross_record=cross_record,
     )
 
-  def transcript(self, session, rec_filter=None, use_color=False,
-                 show_date=False, record_number=False, display_tz=None,
-                 separate_thoughts=False):
+  def transcript(self, session, rec_filter=None):
     """Return the full Markdown transcript for *session*."""
     path = str(session.path)
     with open(path, encoding="utf-8") as f:
@@ -1196,11 +1218,11 @@ class ClaudeSessionStore(SessionStore):
         records = [json.loads(l) for l in f if l.strip()]
         rec_nos = list(range(1, len(records) + 1))
 
+    policy = _display_policy()
+    headings = _headings()
     rec_width = len(str(session.rc))
-    line1, line2 = _format_session_lines(session, use_color=use_color)
+    line1, line2 = _format_session_lines(session)
     out = [f"{line1}\n{line2}\n"]
-    _u_hdg = _user_hdg(use_color=use_color)
-    _cl_hdg = _claude_hdg(use_color=use_color)
 
     last_user_text = None  # deduplicate retried user messages
     turns, plan_ids = _cl_group_turns(rec_nos, records)
@@ -1211,12 +1233,8 @@ class ClaudeSessionStore(SessionStore):
       if item_type == 'user':
         _, rec_no, ts, rec = turn_item
         suffix = ""
-        if show_date or record_number:
-          s = _build_hunk_prefix(
-            rec_no, ts,
-            show_date=show_date, record_number=record_number,
-            rec_width=rec_width, tz=display_tz, use_color=use_color,
-          ).rstrip()
+        if policy.show_date or policy.record_number:
+          s = _build_hunk_prefix(rec_no, ts, rec_width=rec_width).rstrip()
           if s:
             suffix = " " + s
         content = rec.get("message", {}).get("content", [])
@@ -1257,14 +1275,14 @@ class ClaudeSessionStore(SessionStore):
               )
               if pre:
                 out.append(
-                  f"{_u_hdg}{suffix}\n\n{_md_quote(pre)}\n\n{details}\n"
+                  f"{headings.user}{suffix}\n\n{_md_quote(pre)}\n\n{details}\n"
                 )
               else:
-                out.append(f"{_u_hdg}{suffix}\n\n{details}\n")
+                out.append(f"{headings.user}{suffix}\n\n{details}\n")
             else:
-              out.append(f"{_u_hdg}{suffix}\n\n{_md_quote(text)}\n")
+              out.append(f"{headings.user}{suffix}\n\n{_md_quote(text)}\n")
           else:
-            out.append(f"{_u_hdg}{suffix}\n\n{_md_quote(text)}\n")
+            out.append(f"{headings.user}{suffix}\n\n{_md_quote(text)}\n")
 
       # ── System notice (synthetic assistant record) ─────────────────
       elif item_type == 'notice':
@@ -1275,11 +1293,9 @@ class ClaudeSessionStore(SessionStore):
       elif item_type == 'assistant_turn':
         _, display_rec_no, display_ts, sub_records, tr_map = turn_item
         suffix = ""
-        if show_date or record_number:
+        if policy.show_date or policy.record_number:
           s = _build_hunk_prefix(
-            display_rec_no, display_ts,
-            show_date=show_date, record_number=record_number,
-            rec_width=rec_width, tz=display_tz, use_color=use_color,
+            display_rec_no, display_ts, rec_width=rec_width
           ).rstrip()
           if s:
             suffix = " " + s
@@ -1334,7 +1350,7 @@ class ClaudeSessionStore(SessionStore):
         if not segments:
           continue
 
-        block = f"{_cl_hdg}{suffix}"
+        block = f"{headings.claude}{suffix}"
         thought_counter = 0
         question_counter = [0]
 
@@ -1347,18 +1363,14 @@ class ClaudeSessionStore(SessionStore):
               if not item_md:
                 continue
               thought_counter += 1
-              if separate_thoughts:
+              if policy.separate_thoughts:
                 t_suffix = ""
-                if show_date or record_number:
-                  t_s = _build_hunk_prefix(
-                    t_rec_no, t_ts,
-                    show_date=show_date, record_number=record_number,
-                    rec_width=rec_width, tz=display_tz, use_color=use_color,
-                  ).rstrip()
+                if policy.show_date or policy.record_number:
+                  t_s = _build_hunk_prefix(t_rec_no, t_ts, rec_width=rec_width).rstrip()
                   if t_s:
                     t_suffix = " " + t_s
                 inner_parts.append(
-                  f"> {_thought_hdg(thought_counter, use_color=use_color)}{t_suffix}\n>\n"
+                  f"> {headings.thought(thought_counter)}{t_suffix}\n>\n"
                   f"{_md_quote(item_md)}"
                 )
               else:
@@ -1378,21 +1390,17 @@ class ClaudeSessionStore(SessionStore):
             _, sub_rec_no, sub_ts, sub_rec = seg
             inline_md = _cl_render_inline_item(sub_rec, tr_map, question_counter)
             if inline_md:
-              if separate_thoughts:
+              if policy.separate_thoughts:
                 inner_suffix = ""
-                if show_date or record_number:
-                  s = _build_hunk_prefix(
-                    sub_rec_no, sub_ts,
-                    show_date=show_date, record_number=record_number,
-                    rec_width=rec_width, tz=display_tz, use_color=use_color,
-                  ).rstrip()
+                if policy.show_date or policy.record_number:
+                  s = _build_hunk_prefix(sub_rec_no, sub_ts, rec_width=rec_width).rstrip()
                   if s:
                     inner_suffix = " " + s
-                block += f"\n\n> {_cl_hdg}{inner_suffix}\n>\n{inline_md}"
+                block += f"\n\n> {headings.claude}{inner_suffix}\n>\n{inline_md}"
               else:
                 block += f"\n\n{inline_md}"
 
-        if block == f"{_cl_hdg}{suffix}":
+        if block == f"{headings.claude}{suffix}":
           continue
 
         out.append(block + "\n")
@@ -1861,9 +1869,7 @@ class CodexSessionStore(SessionStore):
       cross_record=cross_record,
     )
 
-  def transcript(self, session, rec_filter=None, use_color=False,
-                 show_date=False, record_number=False, display_tz=None,
-                 separate_thoughts=False):
+  def transcript(self, session, rec_filter=None):
     """Return the full Markdown transcript for *session*."""
     path = str(session.path)
     with open(path, encoding="utf-8") as f:
@@ -1884,6 +1890,8 @@ class CodexSessionStore(SessionStore):
         lines = [json.loads(l) for l in f if l.strip()]
 
     # First pass: collect messages in order
+    policy = _display_policy()
+    headings = _headings()
     rec_width = len(str(session.rc))
     msgs = []
     _cx_pending_questions: dict = {}  # call_id → questions list
@@ -1947,10 +1955,8 @@ class CodexSessionStore(SessionStore):
       if msg["role"] == "user":
         prev_idx = msg["idx"]
 
-    line1, line2 = _format_session_lines(session, use_color=use_color)
+    line1, line2 = _format_session_lines(session)
     out = [f"{line1}\n{line2}\n"]
-    _u_hdg = _user_hdg(use_color=use_color)
-    _co_hdg = _codex_hdg(use_color=use_color)
 
     i = 0
     prev_msg_idx = 0  # Line index of last user/codex_answer msg (for orphan patch collection)
@@ -1959,15 +1965,14 @@ class CodexSessionStore(SessionStore):
 
       if msg["role"] == "user":
         suffix = ""
-        if show_date or record_number:
-          s = _build_hunk_prefix(msg["rec_no"], msg["ts"],
-                                 show_date=show_date, record_number=record_number,
-                                 rec_width=rec_width, tz=display_tz,
-                                 use_color=use_color).rstrip()
+        if policy.show_date or policy.record_number:
+          s = _build_hunk_prefix(
+            msg["rec_no"], msg["ts"], rec_width=rec_width
+          ).rstrip()
           if s:
             suffix = " " + s
         img_md = "\n".join(f'![image]({url})' for url in msg["images"])
-        block = f"{_u_hdg}{suffix}\n\n{_md_quote(msg['text'])}"
+        block = f"{headings.user}{suffix}\n\n{_md_quote(msg['text'])}"
         if img_md:
           block += f"\n\n{img_md}"
         out.append(block + "\n")
@@ -1977,11 +1982,10 @@ class CodexSessionStore(SessionStore):
       elif msg["role"] == "codex_answer":
         # User's answers to a Codex request_user_input question
         suffix = ""
-        if show_date or record_number:
-          s = _build_hunk_prefix(msg["rec_no"], msg["ts"],
-                                 show_date=show_date, record_number=record_number,
-                                 rec_width=rec_width, tz=display_tz,
-                                 use_color=use_color).rstrip()
+        if policy.show_date or policy.record_number:
+          s = _build_hunk_prefix(
+            msg["rec_no"], msg["ts"], rec_width=rec_width
+          ).rstrip()
           if s:
             suffix = " " + s
         questions = msg["questions"]
@@ -1996,7 +2000,7 @@ class CodexSessionStore(SessionStore):
             answer_str = ", ".join(f'"{a}"' for a in selected)
             parts.append(f'**{q_text}** → {answer_str}')
         if parts:
-          out.append(f"{_u_hdg}{suffix}\n\n" + _md_quote("\n\n".join(parts)) + "\n")
+          out.append(f"{headings.user}{suffix}\n\n" + _md_quote("\n\n".join(parts)) + "\n")
         prev_msg_idx = msg["idx"]
         i += 1
 
@@ -2027,21 +2031,15 @@ class CodexSessionStore(SessionStore):
           i += 1
 
         suffix = ""
-        if show_date or record_number:
-          s = _build_hunk_prefix(codex_rec_no, codex_ts,
-                                 show_date=show_date, record_number=record_number,
-                                 rec_width=rec_width, tz=display_tz,
-                                 use_color=use_color).rstrip()
+        if policy.show_date or policy.record_number:
+          s = _build_hunk_prefix(
+            codex_rec_no, codex_ts, rec_width=rec_width
+          ).rstrip()
           if s:
             suffix = " " + s
-        block = f"{_co_hdg}{suffix}"
+        block = f"{headings.codex}{suffix}"
         if thinking_items:
-          inner = _format_thought_items(
-            thinking_items,
-            separate_thoughts=separate_thoughts,
-            show_date=show_date, record_number=record_number,
-            rec_width=rec_width, display_tz=display_tz, use_color=use_color,
-          )
+          inner = _format_thought_items(thinking_items, rec_width=rec_width)
           block += (
             f"\n\n> <details>\n> <summary>Thoughts ({len(thinking_items)})</summary>\n>\n"
             f"{inner}\n>\n> </details>"
@@ -2086,7 +2084,7 @@ class CodexSessionStore(SessionStore):
                 q_md += f"\n- {opt_label} — {opt_desc}"
               else:
                 q_md += f"\n- {opt_label}"
-            block += f"\n\n{_question_hdg(qi)}\n\n{_md_quote(q_md)}"
+            block += f"\n\n{headings.question(qi)}\n\n{_md_quote(q_md)}"
         out.append(block + "\n")
 
     return "\n".join(out)
@@ -2094,36 +2092,37 @@ class CodexSessionStore(SessionStore):
 
 # ── Shared display functions ──────────────────────────────────────────────────
 
-def _format_session_lines(session, *, use_color=False):
+def _format_session_lines(session):
   """Return ``(line1, line2)`` strings for a session header.
 
   Line 1: ``[source] [ctime]-[mtime] [project] records: N``
   Line 2: ``(uuid8) title``
   """
+  render_color = _display_policy().render_color
   ctime_str = session.ctime.strftime("%Y-%m-%d %H:%M")
   mtime_str = session.mtime.strftime("%Y-%m-%d %H:%M")
-  ai_part   = _ansi(f"[{session.source}]", _C_PROJECT, active=use_color)
-  date_part = _ansi(f"[{ctime_str}]-[{mtime_str}]", _C_DATE, active=use_color)
+  ai_part   = _ansi(f"[{session.source}]", _C_PROJECT, active=render_color)
+  date_part = _ansi(f"[{ctime_str}]-[{mtime_str}]", _C_DATE, active=render_color)
   proj_part = (
-    _ansi(f" [{session.project}]", _C_PROJECT, active=use_color)
+    _ansi(f" [{session.project}]", _C_PROJECT, active=render_color)
     if session.project else ""
   )
-  rec_part = _ansi(f"records: {session.rc}", _C_RECORDS, active=use_color)
+  rec_part = _ansi(f"records: {session.rc}", _C_RECORDS, active=render_color)
   line1 = f"{ai_part} {date_part}{proj_part} {rec_part}"
-  line2 = _ansi(f"({session.id[:8]}) {session.title}", _C_TITLE, active=use_color)
+  line2 = _ansi(f"({session.id[:8]}) {session.title}", _C_TITLE, active=render_color)
   return line1, line2
 
 
-def print_session_header(session, *, use_color=False):
+def print_session_header(session):
   """Print the 2-line header used by --grep output and --id transcript display."""
-  line1, line2 = _format_session_lines(session, use_color=use_color)
+  line1, line2 = _format_session_lines(session)
   print(line1)
   print(line2)
 
 
-def print_session_list_row(i, session, *, use_color=False):
+def print_session_list_row(i, session):
   """Print the ``N. line1 / indent line2`` row used by --ls output."""
-  line1, line2 = _format_session_lines(session, use_color=use_color)
+  line1, line2 = _format_session_lines(session)
   prefix = f"{i:3}. "
   indent = " " * len(prefix)
   print(f"{prefix}{line1}")
@@ -2336,8 +2335,7 @@ def _parse_datetime_filter(s, ref_tz=None, anchor_dt=None):
   raise ValueError(f"Cannot parse datetime: {s!r}")
 
 
-def _build_hunk_prefix(rec_no, ts_str, *, show_date=False, record_number=False,
-                       rec_width=1, tz=None, use_color=False):
+def _build_hunk_prefix(rec_no, ts_str, *, rec_width=1):
   """Return the prefix string to prepend to every line of a grep hunk.
 
   *rec_width* is the field width for right-justifying the record number,
@@ -2348,15 +2346,16 @@ def _build_hunk_prefix(rec_no, ts_str, *, show_date=False, record_number=False,
   Format (record number only):      ``{rec_no:>w}: ``
   Format (neither):                 ``""``
   """
+  policy = _display_policy()
   prefix = ""
-  if show_date:
-    ts_display = _parse_ts(ts_str, tz)
-    if use_color:
+  if policy.show_date:
+    ts_display = _parse_ts(ts_str, policy.display_tz)
+    if policy.render_color:
       prefix += f"{_C_RECDATE}[{ts_display}]:{_C_RESET} "
     else:
       prefix += f"[{ts_display}]: "
-  if record_number:
-    if use_color:
+  if policy.record_number:
+    if policy.render_color:
       prefix += f"{_C_RECNO}{rec_no:{rec_width}}:{_C_RESET} "
     else:
       prefix += f"{rec_no:{rec_width}}: "
@@ -2694,8 +2693,9 @@ def main():
     ap.error("output file cannot be used with --grep/--grep-re (transcript mode only)")
 
   id_args = args.id or []
+  id_warn = None
   if len(id_args) > 1:
-    _warn(f"--id given {len(id_args)} times; using last value '{id_args[-1]}'")
+    id_warn = f"--id given {len(id_args)} times; using last value '{id_args[-1]}'"
   id_val = id_args[-1] if id_args else None
 
   if args.output and not id_val and not args.file:
@@ -2712,12 +2712,34 @@ def main():
   # ── Timezone resolution ─────────────────────────────────────────────────────
 
   _display_tz = None  # None → local system time via dt.astimezone()
+  _tz_warn = None
   if args.tz:
     args.show_date = True  # --tz implies -d
     _display_tz, _tz_warn = _resolve_tz(args.tz)
-    if _tz_warn:
-      _warn(_tz_warn)
-      _display_tz = None  # fall back to local time
+
+  # ── Display policy setup ────────────────────────────────────────────────────
+
+  render_color_requested = (
+    args.color == "always"
+    or (args.color == "auto" and sys.__stdout__ is not None and sys.__stdout__.isatty())
+  )
+  render_color = render_color_requested and _COLORAMA_OK
+  diag_color = _COLORAMA_OK and sys.__stderr__ is not None and sys.__stderr__.isatty()
+  _set_display_policy(DisplayPolicy(
+    render_color=render_color,
+    diag_color=diag_color,
+    show_date=args.show_date,
+    record_number=args.record_number,
+    display_tz=_display_tz,
+    separate_thoughts=args.separate_thoughts,
+  ))
+  if id_warn:
+    _warn(id_warn)
+  if render_color_requested and not _COLORAMA_OK:
+    _warn("colorama not installed; color output disabled. pip install colorama")
+  if _tz_warn:
+    _warn(_tz_warn)
+    _display_tz = None  # fall back to local time
 
   # ── Record filter ──────────────────────────────────────────────────────────
 
@@ -2753,16 +2775,6 @@ def main():
       ts_lo=_rec_filter.ts_lo if _rec_filter else None,
       ts_hi=_rec_filter.ts_hi if _rec_filter else None,
     )
-
-  # ── Color setup ────────────────────────────────────────────────────────────
-
-  use_color = (
-    args.color == "always"
-    or (args.color == "auto" and sys.__stdout__ is not None and sys.__stdout__.isatty())
-  )
-  if use_color and not _COLORAMA_OK:
-    _warn("colorama not installed; color output disabled. pip install colorama")
-    use_color = False
 
   # ── Store setup ────────────────────────────────────────────────────────────
 
@@ -2808,11 +2820,6 @@ def main():
     transcript_text = _file_store.transcript(
       _file_session,
       rec_filter=_resolve_rec_filter(_file_session),
-      use_color=use_color,
-      show_date=args.show_date,
-      record_number=args.record_number,
-      display_tz=_display_tz,
-      separate_thoughts=args.separate_thoughts,
     )
     if args.output:
       with open(args.output, "w", encoding="utf-8") as fh:
@@ -2909,24 +2916,19 @@ def main():
         if session.title == "(no title)" and not args.show_empty:
           continue
         i += 1
-        print_session_list_row(i, session, use_color=use_color)
+        print_session_list_row(i, session)
     else:
       for sess_idx, (session, hunks) in enumerate(matched):
         if sess_idx > 0:
           print()
-        print_session_header(session, use_color=use_color)
+        print_session_header(session)
         rec_width = len(str(session.rc))
         for hunk_idx, hunk_lines in enumerate(hunks):
           if hunk_idx > 0:
             print("--")
           for _is_match, line, spans, rec_no, ts_str in hunk_lines:
-            prefix = _build_hunk_prefix(rec_no, ts_str,
-                                        show_date=args.show_date,
-                                        record_number=args.record_number,
-                                        rec_width=rec_width,
-                                        tz=_display_tz,
-                                        use_color=use_color)
-            print(prefix + _colorize(line, spans, active=use_color))
+            prefix = _build_hunk_prefix(rec_no, ts_str, rec_width=rec_width)
+            print(prefix + _colorize(line, spans))
     sys.exit(0)
 
   # Branch 2: --id without --grep (primary: transcript / list row)
@@ -2934,17 +2936,15 @@ def main():
     session = _resolve_single_session(stores, id_val, args.all_projects)
 
     if args.ls:
-      print_session_list_row(1, session, use_color=use_color)
+      print_session_list_row(1, session)
       sys.exit(0)
 
     _info(f"Session: {session.path}")
     store = stores[session.source]
-    transcript_text = store.transcript(session, rec_filter=_resolve_rec_filter(session),
-                                        use_color=use_color,
-                                        show_date=args.show_date,
-                                        record_number=args.record_number,
-                                        display_tz=_display_tz,
-                                        separate_thoughts=args.separate_thoughts)
+    transcript_text = store.transcript(
+      session,
+      rec_filter=_resolve_rec_filter(session),
+    )
 
     if args.output:
       with open(args.output, "w", encoding="utf-8") as fh:
@@ -2969,7 +2969,7 @@ def main():
         if session.title == "(no title)" and not args.show_empty:
           continue
         i += 1
-        print_session_list_row(i, session, use_color=use_color)
+        print_session_list_row(i, session)
     sys.exit(0)
 
   # No primary operation given
