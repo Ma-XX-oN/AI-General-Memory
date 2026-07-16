@@ -25,6 +25,7 @@
 
 ### File Integrity And EOL
 
+- Always use `apply_patch` for manual file edits when that tool is available. Needing user approval does not change the editing method; ask for approval when required, but still prefer `apply_patch` over shell-based file writes. Use shell-based writing only when `apply_patch` truly cannot perform the edit.
 - Preserve each file's existing line endings (CRLF/LF) when editing; do not change line endings unless explicitly requested.
 - Before editing any file, check its line-ending status; if mixed, notify before editing and abort; if non-mixed, keep all edits consistent with the original style.
 - For any non-mixed file, after editing, every line must still use that original line ending style; if that cannot be guaranteed, normalize to the original style and report.
@@ -37,6 +38,11 @@
 
 ### Semantics, Scope, And Explanations
 
+- Before adding machinery, indirection, or a preparatory workaround, run a simplification preflight: ask whether the planned extra step only exists to solve a problem that a more direct change would remove outright, and prefer the simpler fix when it preserves the actual design intent instead of solving side effects of your own added complexity.
+- Prefer direct, representation-driven implementations over speculative policy or planning layers. Keep decision points close to the behavior they control, and introduce abstract classification frameworks only when repeated real cases prove they are needed.
+- Reuse the real behavior-producing code paths instead of hand-reconstructing equivalent output when the representation already supports direct emission.
+- Do not repeat checks for invariants already established by earlier control flow; keep the remaining path tight and obvious.
+- Never add a silent no-op branch to a command-style or state-mutating function unless the contract explicitly defines a meaningful no-op case; if such a function receives invalid or degenerate input that would make it do nothing, treat that as a caller bug and reject/fail fast instead of quietly returning.
 - In docs, specs, and checklists, restatement may emphasize an invariant but must not later weaken it (for example by calling a requirement optional); remove redundant wording that adds doubt without adding information.
 - In commit messages, status notes, and TODOs, write for the future reader's decision-making: record current state, actionable next steps, or real risk; do not explain how the assistant created the situation unless that history materially changes action or meaning.
 - Encode invariants in code (for example, matching open/close tags with backreferences) rather than relying on assumptions.
@@ -78,6 +84,13 @@
 - For CMake builds/tests in workspace repos, check `.vscode/settings.json` and `CMakePresets.json`/`CMakeUserPresets.json` first and mirror those settings; use manual command lines only when those sources are absent or the user explicitly overrides them.
 - For CMake workflows, never run configure and build concurrently; run them sequentially (`cmake -S/-B` then `cmake --build`) to avoid regenerate/build race conditions.
 - For build/linker mismatch triage, follow `~/.codex/build_issues.md` before ad-hoc fixes.
+- In C++ tests and examples, prefer declaring variables immediately before first use rather than hoisting declarations to the top of the scope.
+- In multi-stage C++ tests and examples, add short local comments that label setup or intent blocks so readers do not have to scan to the final assertion to understand the scenario.
+- When extending a test area that already has a readable exemplar file, mirror that file's readability conventions for structure, local comments, and declaration placement unless the user asks for a different style.
+- In constexpr-heavy C++ tests, prefer named `constexpr bool` scenario blocks with inline setup/intent comments over bare piles of `static_assert`s so each compile-time proof is readable without reconstructing the scenario from the final predicate.
+- For every new test file, give each `constexpr` scenario block and each `TEST(...)` block a short local comment that states exactly what behavior it is proving before the assertions.
+- Do not rely on helper names, test names, or long setup/helper sections alone to communicate test intent; the reader should not have to reconstruct the purpose from the assertions.
+- When a new test file has substantial helper/setup code, add section comments that separate fixture-building helpers from the actual scenarios under test.
 
 ### Editing And Read Conventions
 
@@ -93,11 +106,17 @@
 - Use definitive language when facts are certain; if uncertain, state uncertainty explicitly.
 - For timing output in chat responses, always use a fenced code block (not inline/backtick list items) to prevent webview auto-link artifacts.
 - Before sending any response, run a definitiveness pass to remove unjustified hedging and use direct language for confirmed facts.
+- For design and architecture questions, run a design-clarity preflight before answering: when the README or other design documents are clear, state the documented model directly and do not introduce hypothetical branches, alternate architectures, or conditional framing. Use conditional language only when the design documents are genuinely ambiguous, incomplete, or conflicting.
+- Think before speaking: before answering, consider the user's actual runtime, operational constraints, and stated intent so you do not blurt out generic or context-blind conclusions.
 - Ground recommendations in function/data semantics first; treat naming/style concerns as secondary unless the semantics are already settled.
+- When a function or method parameter is intentionally unused, omit the parameter name in the declaration/definition instead of naming it and then silencing it with `(void)param;` or equivalent.
+- For C++ code, run this unused-entity preflight before leaving a suppression in place: omit the parameter name when it is always unused, use `[[maybe_unused]]` when a parameter or local is only unused on some compile-time paths or in non-assert builds, and do not use `(void)x;` for unused-parameter suppression.
 - In technical answers, explicitly separate confirmed facts from preferences/inference, and include the strongest counterargument before the final recommendation.
 - If a recommendation changes, state the concrete new fact that caused the change.
+- Once a direct question asks what something is and that answer is established, do not pad the reply with a follow-on list of what it is not unless the user explicitly asks for disambiguation.
 - In Markdown text, when you DO NOT intend the literal sequence `>=`, write it with whitespace as `> =` to prevent auto-conversion to `≥`.
 - For clickable local file references in chat responses on Windows, use Markdown links with a leading slash before the drive path, for example `[label](/c:/absolute/path/to/file.ext#L12)`.
+- Before sending any Windows local file link, run a link-target preflight: the target must be the real absolute filesystem path (for example `/c:/...`), never the placeholder segment `/abs/path/`, and line anchors must use `#L12` form rather than `:12`.
 
 ### Troubleshooting And Guardrails
 
@@ -111,6 +130,10 @@
 - If a fix is not working after 2-3 attempts, stop and summarize: goal, attempts tried, blocker, and ask the user to collaborate on next steps.
 - If the user says STOP, stop immediately, answer the question directly, and do not retry the blocked action in any form (including variants or reworded permission prompts) unless the user explicitly asks to resume.
 - If the user denies an authorization request and gives a reason, do not repeat the same request or a semantic variant; change approach to directly address the stated reason first.
+- If a user reports a breakage, build failure, or behavior change and the evidence indicates it was not caused by the assistant's recent edits, say that explicitly, push back, and ask before modifying unrelated files or widening scope.
+- Do not EVER touch the user's stuff without ASKING ABOUT IT FIRST. Always ask before touching their code, adjacent work, or active WIP beyond the exact scope they requested.
+- Before making any edit outside the exact requested scope, stop and ask permission first. State the exact extra edit you want to make and why you think it is needed. Do not perform that extra edit unless the user explicitly approves it.
+- If the apparent fix would require violating good coding practices or a clean architectural boundary, stop, tell the user exactly what the pressure is, and hash out a clean solution instead of implementing the bad shortcut.
 - Question assumptions that appear incorrect or unclear before implementing them.
 - For long-running commands (builds/tests), capture output to a log once, then inspect the log instead of rerunning only to view different sections.
 - When maintaining files under `~/.codex/`, read `~/.codex/README.md` first and keep related index/reference entries consistent.
@@ -118,9 +141,38 @@
 
 ### Documentation And Diagrams
 
+- Never remove existing documentation or code comments without the user's explicit authorization. Documentation is preserve-by-default across all codebases.
+- If an existing comment appears wrong, redundant, stale, or worth rewriting, preserve it first and ask before deleting, shortening, or replacing it with less detail.
+- Before broad documentation or comment edits in an existing file, do a preflight comment audit against the current file so preserved documentation is not removed accidentally.
 - In general documentation, avoid non-essential temporal/status phrasing such as "now", "currently", "before", or "previously"; state the invariant directly unless timeline context is the point (for example in a changelog).
+- When closing a named namespace in code, write the closing comment in the form `// namespace Name`.
 - For public API files, choose one recognized documentation standard before broad docstring work and use it while implementing, not as a later cleanup pass.
+- HARD REQUIREMENT: for any code in a language that has a standard function documentation convention, every function and method must have a standard documentation block/docstring.  Here's a list of predefined docstring styles:
+  - Python: NumPy-style
+  - C/C++: doxygen
+  - JavaScript: JsDoc
+  - OpenSCAD: JsDoc variant. If unsure, ASK!
+  - Other: Use prevailing standard.  If unsure, ASK!
+- In Doxygen comments, when an `@brief` line wraps, indent continuation lines by two spaces after `*` (for example `*   continuation`), and align later paragraphs/tags back with the `@` column.
+- In Doxygen comments, prefer real Doxygen cross-reference tags such as `@see`, `@sa`, and `@ref` over plain prose like "see ..." when you are pointing the reader at related APIs, types, or headers.
 - If parameter meanings cannot be documented cleanly in the chosen standard, treat that as an unresolved API or semantic smell and stop to surface it before coding further.
+- For API explanations and usage-oriented documentation, explain from the user's perspective first: start with what the user creates, names, and calls, then delay internal implementation details until later.
+- Before editing or writing usage, operator, API, or README reference documentation, run a documentation preflight: classify the doc type first, then reject origin stories, personal motivation, historical background, refactor history, meta commentary, and phrases such as "what was known at the time" unless the user explicitly asked for history.
+- For usage, operator, API, and README reference documentation, the opening must answer only the reader-first essentials: what this tool/file is, how to invoke or use it, what files or interfaces it reads/writes, and what the reader must know first. Do not let the opening drift into narrative background.
+- For top-of-file file documentation and header overviews, write reader-first mini-reference docs: state what the file defines or owns first, then separate usage guidance from mechanics, use explicit section labels when they improve scanning (for example `Overview` and `Call shape`), and keep the content local to the file's actual responsibility instead of refactor history or meta commentary.
+- For API explanations, prefer this structure when it fits the material: `Setup`, `Entry Point`, `Usage`, then `Explanation`, but treat it as a guide rather than a rigid template.
+- In API explanations, introduce involved types and objects before later examples use them, and show the declaration, construction, or signature of the entry point before discussing implications.
+- For simple APIs, collapse or omit explanation sections when the full structure adds ceremony without improving clarity, and merge `Entry Point` with `Usage` when separate sections would only repeat the same lesson.
+- Prefer small complete examples over isolated fragments in API explanations, and explain relationships between objects through usage before describing internal mechanisms.
+- Delay implementation details until after usage in reference-style explanations; for static tutorials where internal mechanism matters early, add a short `Note` or `See also` instead of letting the main flow become implementation-first.
+- For APIs with multiple entry points or distinct modes, explain each variant separately instead of mixing unrelated cases together.
+- In explanatory material, increase detail progressively: setup first, then basic usage, then more advanced usage, and only then internal mechanism.
+- Choose example names at the right level of abstraction: keep reusable or generic components generic to the abstraction, and use domain names when the API itself is domain-specific.
+- In component documentation, describe purpose, behavior, guarantees, and usage first; prefer positive descriptions of what the component does over long lists of unrelated things it does not do.
+- Use design labels such as `intrusive`, `lock-free`, or `cache-friendly` only when they communicate a meaningful distinction; explain the concrete property directly instead of relying on the label alone.
+- Treat versioned filenames such as `_v2` or `_v3` as tooling artifacts unless the code or docs establish a real semantic difference; do not infer design distinctions from the suffix alone.
+- In documentation examples, prefer readability over compression; keep simple statements split when that makes structure and intent easier to scan.
+- For reusable containers and structural helpers, document structure, operations, and invariants, not higher-level policy from a particular application.
 - For evolving document sets, start with one authoritative document. Split into multiple documents only when distinct roles emerge, then make the set traversable with one visible `MAIN-*` or index document that links them all.
 - When a document set splits, keep roles explicit and stable. Typical roles are:
   - plan: phases, current position, next step
@@ -129,6 +181,7 @@
   - design/realiser: implementation-facing derivation
   - main/index: navigation, status, and historical orientation
 - After a decision is accepted in conversation, update the authoritative document first and verify the file reflects it before describing the decision as settled.
+- Before sending a response that describes documentation changes, run the same documentation preflight again against the final wording so banned narrative content does not re-enter through the explanation or closeout.
 - When introducing a helper formalism, baseline construction, or naming cleanup, state what problem it is trying to solve before presenting it. It is fine to introduce, but label it as a helper, baseline, or cleanup unless the user has agreed to promote it to the primary definition.
 - Use status tags as navigation aids for phased or evolving document sets:
   1. Keep the vocabulary small and fixed.
@@ -165,6 +218,9 @@
 
 ## Design Lessons
 
+- When an existing abstraction is intended to be the foundation, extend or fix that abstraction first; do not build a parallel implementation layer just because it is easier to ship locally.
+- If an intended use of an API feels awkward or requires duplicated machinery, treat that as evidence the API needs improvement and surface or implement that improvement instead of bypassing the API.
+- Never violate core system constraints such as real-time no-allocation or streaming requirements for implementation convenience; if the foundational abstraction is awkward, fix it instead of staging whole payloads, allocating intermediate buffers, or building a parallel transport path.
 - Generalize before optimizing: extract domain-specific parsing into a reusable spec API.
 - Put shape in data, not code: declare parameters/defaults once, reuse everywhere.
 - Keep semantics separate from structure: helper normalizes shape; caller validates meaning/types.
