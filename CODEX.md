@@ -119,6 +119,7 @@
 ### Documentation And Diagrams
 
 - In general documentation, avoid non-essential temporal/status phrasing such as "now", "currently", "before", or "previously"; state the invariant directly unless timeline context is the point (for example in a changelog).
+- For C++ file-level doc comments, follow [file-doc-style.md](file-doc-style.md).
 - For public API files, choose one recognized documentation standard before broad docstring work and use it while implementing, not as a later cleanup pass.
 - If parameter meanings cannot be documented cleanly in the chosen standard, treat that as an unresolved API or semantic smell and stop to surface it before coding further.
 - For evolving document sets, start with one authoritative document. Split into multiple documents only when distinct roles emerge, then make the set traversable with one visible `MAIN-*` or index document that links them all.
