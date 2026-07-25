@@ -125,6 +125,10 @@ correct.  If something in the user's design doesn't feel right or make sense
 mechanism), speak up and ask about it rather than silently including it.
 The user would rather be questioned than have wrong assumptions baked in.
 
+### File header documentation style
+
+See [file-doc-style.md](file-doc-style.md) for the full specification.
+
 ### Document all public symbols
 
 All functions, modules, values and types must have JSDoc-style documentation
@@ -200,6 +204,14 @@ Never chain commands with `&&`, `;`, or `|` unless the whole pipeline was
 already approved as a unit.  Chaining changes the command string into a new
 unapproved shape even if each individual part was previously approved,
 forcing the user to re-approve what should have been a prompt-free operation.
+
+### Put inline comments at the end of shell commands
+
+When adding a descriptive comment to a shell command, place it as a trailing
+inline comment (`command args # description`), never on a preceding line.
+Allow-list patterns like `Bash(grep:*)` match the full command string from the
+start; a leading `# comment\n` prefix breaks the match and forces an
+unnecessary approval prompt.
 
 ### Order transforms carefully
 
@@ -397,6 +409,98 @@ Before implementing, scan back through the conversation to confirm what was
 already decided.  Re-deriving settled conclusions in a thinking block wastes
 tokens and delays the first edit.  Trust the conversation record.
 
+### Read and implement the spec exactly; never invent prohibitions
+
+Before implementing any feature, read the relevant spec text carefully and
+implement exactly what it says — no more, no less.  Do not fill gaps with
+assumptions and do not invent restrictions the spec does not state.
+
+The failure mode to avoid: you have an implementation gap, you cannot easily
+fill it, so you claim "the spec doesn't allow this" to justify leaving it out.
+This is wrong even when the claim sounds plausible — it replaces a known gap
+with a false assertion.  The correct framing for an unimplemented feature is
+"not yet implemented" or "the spec doesn't cover this — should I leave it for
+later?"
+
+Reading the spec carefully in the first place prevents getting into the
+position of having to defend an erroneous claim.
+
+### Never present a gap-filling guess as a deliberate design choice
+
+When you encounter a requirement gap and fill it with a guess, label it as a
+guess.  Do not implement the guess silently and then, when challenged, defend
+it as if it were a reasoned design decision.
+
+The correct behaviour:
+1. Notice the gap.
+2. State it explicitly: "The spec doesn't cover X.  I'm assuming Y — is that right?"
+3. If you must proceed without confirmation, mark the assumption in code (a
+   `// TODO: assumed — verify` comment is fine) and flag it in your response.
+
+Defending a guess as a design choice wastes the user's time twice: once when
+they have to undo the wrong implementation, and again when they have to
+re-explain what they actually wanted.  This extends the "Ask when confused"
+rule to the specific failure mode of *post-hoc justification*.
+
+### When a test fails, diagnose before splitting a single rule
+
+When a clean, universal rule causes a test failure, the right response is to
+understand *why* the test failed — not to immediately split the rule into
+per-type special cases.  Special cases are usually a symptom of a wrong
+diagnosis, not the fix.
+
+Prefer one rule that works correctly for all cases over two rules that each
+work for a subset.  A single universal rule is simpler, faster, and less likely
+to have gaps.  If you find yourself splitting a rule mid-refactor, stop and
+verify: is the original rule actually wrong, or did you misdiagnose the
+failure?
+
+### Only stage files you personally edited in the current session
+
+When committing, only `git add` files that were modified in the current
+conversation.  Pre-existing uncommitted changes from prior sessions belong in
+their own separate commit.  Before staging, cross-check the file list against
+what was actually touched — do not rely on memory alone.
+
+### Read available resources before asserting any behaviour
+
+Before stating how a library, API, compiler, or tool behaves, check what is
+actually available on the system: read the relevant header, source file, man
+page, or documentation.  "I don't know" is not a stopping point — look it up.
+Asserting behaviour from recall alone when the authoritative source is one
+tool call away is not acceptable.
+
+### Don't store what you can derive; read the hierarchy before adding state
+
+Before adding a new field to a type, check two things: (1) is the value
+already reachable through existing fields or computable from them? (2) does
+the existing type hierarchy already have a place for this state, and would
+adding it at the base level duplicate something that belongs in a derived or
+composed type?
+
+Adding redundant storage creates consistency hazards.  Adding state at the
+wrong level (e.g., parallel arrays in a base class when the design calls for
+per-element bundles in a tuple of specialised types) breaks the design
+invariants of the whole hierarchy.  Both mistakes share the same root:
+proposing a change before reading what is already there.
+
+### Design documents are as authoritative as code; surface contradictions
+
+When a project has both a design document (README, spec, etc.) and
+implementation code, treat them as equally authoritative sources.  If they
+contradict each other, surface the conflict and ask which is correct — do not
+silently resolve it by picking one side.  An answer is always in one of the two
+sources; inference without reading both is not an answer.
+
+### Don't carry qualifiers across a design change without re-deriving them
+
+When porting state ownership from one type to another, the const (or volatile,
+or other qualifier) model of the old type does not automatically transfer.
+Reason from scratch: does any consumer of this type need to mutate its state?
+If yes, `const` on the container's `item_type` (or similar) is wrong.  Copying
+qualifiers blindly from the old design creates a cascade of build errors that
+only surfaces after implementation — it is always cheaper to ask first.
+
 ### Verify no regressions after every rendering change
 
 After any change to output-rendering code, spot-check the generated output for
@@ -410,6 +514,147 @@ unchanged code paths are still intact.  At minimum check:
 
 If a feature disappears, treat it as a regression and fix it immediately, even
 if the feature was not the target of the current change.
+
+## API Explanations
+
+When explaining APIs or writing API documentation, follow this structure and rules.
+
+### Structure
+
+Every API explanation follows four parts, in order:
+
+1. **Setup** — Introduce the types and objects involved.
+2. **Entry Point** — Show the declaration or construction; state what it represents and when it is used.
+3. **Usage** — Show a complete, minimal runnable example.
+4. **Explanation** — Describe the resulting behavior and any important implications.
+
+These are a guide, not a rigid template.  For simple APIs, collapse or omit sections where doing so makes the explanation clearer.  Entry Point and Usage can be merged when showing the declaration separately would just repeat the usage example.
+
+### Rules
+
+- **Explain from the user's perspective** — Start from what the user creates and calls, not from internal implementation.
+- **Show complete examples** — Prefer small, runnable examples over isolated fragments.
+- **Explain relationships through usage** — Show how objects interact rather than describing internal mechanisms first.
+- **Delay implementation details** — Explain how the API is used before explaining how it works internally.  For static tutorials where the mechanism is the point, add a `See also` or `Note` rather than burying internals at the end.
+- **Explain multiple variants independently** — For APIs with several entry points or modes, explain each one separately.  Avoid mixing unrelated concepts.
+- **Name things at the right level of abstraction** — Use generic names (`DataClass`, `DataList`) for generic concepts; use domain names (`Order`, `Connection`) for domain-specific APIs.  Match the name to the audience's frame of reference.
+- **Introduce types before using them** — Never assume the reader knows what a variable represents.  Show construction before use in later examples.
+- **Explain through increasing levels of detail** — Setup → basic usage → advanced usage → internal mechanism.  The internal mechanism comes last.
+
+## C++
+
+### Use `static_cast<T>(-1)` for all-bits-set unsigned values
+
+When initializing an unsigned type to all-bits-set, prefer:
+
+```cpp
+std::numeric_limits<T>::max()
+```
+
+over the noisier `static_cast<T>(~T{})` and non-AUTOSAR compliant
+`static_cast<T>(-1)`.  All are correct
+
+- `static_cast` uses copy-initialization which permits narrowing
+- `-1` is shorter and conveys the intent without extra ceremony
+- but using `numeric_limits` prevents implicit sign changing.
+
+Applies equally to default member initializers, local variables, and return
+expressions.
+
+### Prefer iterator interface over pointer arithmetic for standard library types
+
+When working with standard library types that provide iterators, use the
+iterator interface — not manual pointer arithmetic — for begin/end positions:
+
+- `container.begin()` / `container.end()` — not `container.data()` /
+  `container.data() + container.size()`
+
+These are equivalent at runtime but the iterator forms are idiomatic C++ and
+express intent more clearly.  Mixing both forms in the same codebase is wrong.
+
+### EBO-via-inheritance breaks C++17 standard-layout
+
+A class is **not** standard-layout in C++17 if both a base class and the
+derived class have non-static data members (C++17 [class.prop]/3.5).  This is
+the failure mode of EBO-via-private-inheritance: the base holds a size or
+extent member, the derived holds a data pointer, and the derived type fails
+`is_standard_layout_v<T>`.
+
+Before storing a type as a member of a type that requires standard-layout
+(intrusive containers, `static_assert(is_standard_layout_v<...>)`, etc.), check
+whether the candidate type uses this EBO inheritance pattern.  Discover this
+before the build, not after.
+
+The portable C++17 fix is partial specialization: the static-extent primary
+template holds only `m_data` and returns `Extent` from `size()`; the
+dynamic-extent specialization holds both `m_data` and `m_size` as direct
+members of the same class.  No attributes needed.
+
+### Verify a fix fits the project's language standard
+
+Before writing a fix that uses any attribute, keyword, or library feature,
+check whether it is available in the project's language standard.
+`[[no_unique_address]]` is C++20; MSVC additionally requires its own
+`[[msvc::no_unique_address]]` variant.  If the project targets C++17, the
+partial-specialization approach (see above) is the portable alternative.
+
+### C++17 TMP: three patterns worth knowing
+
+**Heterogeneous tuple type from a compile-time array, using `decltype`:**
+```cpp
+template<std::size_t... Is>
+auto make_tuple_impl(std::index_sequence<Is...>)
+  -> std::tuple<ElementType<array[Is].policy>...>;  // declared, never defined
+
+using MyTuple = decltype(make_tuple_impl(std::make_index_sequence<N>{}));
+```
+`decltype` only needs the return type, so the function body is never needed.
+
+**Bool-parameterised EBO for conditional per-element state:**
+```cpp
+template<bool> struct State;
+template<> struct State<true>  { T data; };
+template<> struct State<false> {};  // empty — EBO-eligible when inherited
+```
+Inheriting from `State<condition>` includes the field at zero cost when
+`condition` is false.
+
+GCC and Clang apply EBO automatically for multiple empty bases.  MSVC only
+applies it unless the struct is annotated with `__declspec(empty_bases)`.  Use a
+portability macro:
+
+```cpp
+#ifdef _MSC_VER
+  #define EMPTY_BASES __declspec(empty_bases)
+#else
+  #define EMPTY_BASES
+#endif
+
+struct EMPTY_BASES MyState : Base1<cond1>, Base2<cond2>, Base3<cond3> { ... };
+```
+
+`EMPTY_BASES` is placed between `struct`/`class` and the type name.  On MSVC it
+instructs the compiler to collapse all empty bases; on other compilers it
+expands to nothing.
+
+**Namespace-wrapped unscoped enum as `std::get<>` index:**
+```cpp
+namespace eKind_ns { enum eKind : std::size_t { A = 0, B = 1 }; }
+using eKind = eKind_ns::eKind;
+// std::get<eKind::A>(variant)  — no static_cast: unscoped enum converts implicitly
+```
+A scoped `enum class` would require an explicit `static_cast<std::size_t>` at
+every call site.  The namespace wrapper gives scoping without losing the
+implicit integer conversion.
+
+### User direction
+
+When pointing out something to the user, USE LINKS so that they doin't have to
+go hunting for the file and line, like this:
+
+```markdown
+[file.ext:line](c:\full\path\to\file.ext#Lline)
+```
 
 ## AutoHotkey v2
 
@@ -429,12 +674,16 @@ See [ahk.md](ahk.md) for full notes. Critical reminders:
   escape-related character loss.
 - Use a stable `git commit -F` command so it can be pre-approved once per
   session.  Workflow:
-  1. Source (not execute) `. ~/.claude/scripts/session-pid.sh` once to get the session PID.
-     If it fails, use `/tmp/claude-commit-msg.txt` as a fixed fallback path.
-  2. Write the commit message to `/tmp/claude-commit-msg-<SESSION_PID>.txt`
+  1. Run (source) `. ~/.claude/scripts/session-pid.sh` once.  The script
+     **prints** the PID to stdout — it does NOT set a `SESSION_PID` shell
+     variable.  Read the printed PID from the Bash tool output (e.g. `11032`)
+     and use it literally in the steps below.  Never try to reference
+     `$SESSION_PID` — it will always be empty.
+     If the script fails, use `/tmp/claude-commit-msg.txt` as a fixed fallback path.
+  2. Write the commit message to `/tmp/claude-commit-msg-<PID>.txt`
      using the Write tool (no approval needed).
      Note: the Write tool maps `/tmp` → `C:\tmp`; git requires the Windows form.
-  3. Commit with the stable command: `git commit -F C:/tmp/claude-commit-msg-<SESSION_PID>.txt`
+  3. Commit with the stable command: `git commit -F C:/tmp/claude-commit-msg-<PID>.txt`
      (approve-once eligible with prefix `git commit -F C:/tmp/claude-commit-msg-`).
 - After any push to origin from either `~/.claude` or `~/.codex`, immediately
   `git pull` in the other repo so both stay in sync with origin.

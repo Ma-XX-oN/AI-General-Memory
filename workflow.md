@@ -48,15 +48,21 @@ file so the `git commit -F` command string is stable and approve-once eligible.
    . ~/.claude/scripts/session-pid.sh
    ```
 
+   The script **prints** the PID to stdout (e.g. `11032`).  It does **not**
+   set a `SESSION_PID` shell variable — `$SESSION_PID` will always be empty.
+   Read the printed number from the Bash tool output and substitute it
+   literally into the steps below.
+
    If PowerShell is unavailable the script exits 1 with an error message —
    fall back to a fixed path (`/tmp/claude-commit-msg.txt`) in that case.
 4. **Write the commit message** using the Write tool (no approval needed):
-   - Write tool path: `/tmp/claude-commit-msg-<SESSION_PID>.txt`
+   - Write tool path: `/tmp/claude-commit-msg-<PID>.txt`
+     (where `<PID>` is the number printed in step 3)
    - The Write tool maps `/tmp` → `C:\tmp`; git requires the Windows form.
 5. **Stable commit command** (approve-once eligible with prefix `git commit -F C:/tmp/claude-commit-msg-`):
 
    ```bash
-   git commit -F C:/tmp/claude-commit-msg-<SESSION_PID>.txt
+   git commit -F C:/tmp/claude-commit-msg-<PID>.txt
    ```
 
 6. Do not store transient commit message files in repos.

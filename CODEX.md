@@ -163,6 +163,7 @@
 - If an existing comment appears wrong, redundant, stale, or worth rewriting, preserve it first and ask before deleting, shortening, or replacing it with less detail.
 - Before broad documentation or comment edits in an existing file, do a preflight comment audit against the current file so preserved documentation is not removed accidentally.
 - In general documentation, avoid non-essential temporal/status phrasing such as "now", "currently", "before", or "previously"; state the invariant directly unless timeline context is the point (for example in a changelog).
+- For C++ file-level doc comments, follow [file-doc-style.md](file-doc-style.md).
 - When closing a named namespace in code, write the closing comment in the form `// namespace Name`.
 - For public API files, choose one recognized documentation standard before broad docstring work and use it while implementing, not as a later cleanup pass.
 - HARD REQUIREMENT: for any code in a language that has a standard function documentation convention, every function and method must have a standard documentation block/docstring.  Here's a list of predefined docstring styles:
