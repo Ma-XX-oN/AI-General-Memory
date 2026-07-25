@@ -62,6 +62,23 @@
 
 ### Commands And Preflight
 
+### Checklist Discipline
+
+- Before changing code for any non-trivial task, first write down the active non-superseded requirements, review comments, and promises already made in the thread.
+- Convert those active requirements into a concrete task checklist before editing. Do not rely on memory for this.
+- Keep the checklist updated whenever a requirement is completed, corrected, superseded, or explicitly dropped.
+- Before claiming a checklist item is done, run a direct sweep for stale names, dead helpers, forbidden patterns, compatibility scaffolding, or partial old designs that contradict that item.
+- Before claiming the task is complete, run a final preflight that checks:
+  1. the implemented code still matches the current plan and latest user corrections,
+  2. touched APIs, comments, and docs match the final behavior,
+  3. includes and declarations are present where needed,
+  4. removed paths are actually gone repo-wide,
+  5. the rebuilt binaries include the latest edits,
+  6. the targeted tests were run against that rebuilt output.
+- Do not report completion from intent or partial inspection. Report completion only after the checklist and final preflight have both been satisfied.
+- If a future response compacts context, re-read the stored checklist discipline and recreate the task checklist before continuing.
+
+
 - For file and text reads, always use `rg`
 - Do not use custom script workflows when an approved command set can do the job.
 - Never use custom file-read utilities when `rg` can be used.
@@ -108,6 +125,7 @@
 - Before sending any response, run a definitiveness pass to remove unjustified hedging and use direct language for confirmed facts.
 - For design and architecture questions, run a design-clarity preflight before answering: when the README or other design documents are clear, state the documented model directly and do not introduce hypothetical branches, alternate architectures, or conditional framing. Use conditional language only when the design documents are genuinely ambiguous, incomplete, or conflicting.
 - Think before speaking: before answering, consider the user's actual runtime, operational constraints, and stated intent so you do not blurt out generic or context-blind conclusions.
+- When responding to review comments or quoted diff comments, format each response item as: 1. a clickable local file link to the relevant line, 2. the user's comment quoted verbatim, 3. the direct response. Reuse that format on later review-response turns unless the user asks for a different one.
 - Ground recommendations in function/data semantics first; treat naming/style concerns as secondary unless the semantics are already settled.
 - When a function or method parameter is intentionally unused, omit the parameter name in the declaration/definition instead of naming it and then silencing it with `(void)param;` or equivalent.
 - For C++ code, run this unused-entity preflight before leaving a suppression in place: omit the parameter name when it is always unused, use `[[maybe_unused]]` when a parameter or local is only unused on some compile-time paths or in non-assert builds, and do not use `(void)x;` for unused-parameter suppression.
@@ -232,3 +250,4 @@
 - Treat documentation and examples as part of correctness, not optional polish.
 - Verify incrementally with build/tests during refactors to preserve behavior.
 - Never run build and tests concurrently; always complete build first, then run tests.
+
