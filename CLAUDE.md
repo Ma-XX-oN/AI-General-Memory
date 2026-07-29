@@ -515,6 +515,49 @@ unchanged code paths are still intact.  At minimum check:
 If a feature disappears, treat it as a regression and fix it immediately, even
 if the feature was not the target of the current change.
 
+### Verify every symbol name in a doc block against the implementation
+
+Before adding any function name, type name, or template signature to a doc
+block (`## Overview` bullet, synopsis paragraph, `@see` reference), verify
+it actually exists in the file's implementation via `grep` or `Read`.
+
+Common failure modes:
+
+- **Wrong function name**: e.g. documenting `validate_argument_pack` when
+  the real name is `validate_arguments`.
+- **Nonexistent symbol**: e.g. documenting `drain_all()` or `make_span()`
+  when no such function exists in the file.
+- **Symbol from the wrong file**: e.g. listing `EnumSettings` in
+  `enum_core.hpp` when it is defined in `enum_builder.hpp`.
+- **Wrong template parameters**: e.g. `Foo<Capacity, Type>` when the real
+  signature has three parameters with different names.
+
+After writing or editing a doc block, always do a verification pass: grep
+for each claimed symbol in the implementation.  Zero matches means the
+name is wrong or the symbol belongs to a different file.  See
+[file-doc-style.md](file-doc-style.md) for the full verification checklist.
+
+### Subagents only see committed files — stage to a branch first
+
+Subagents (background or foreground) operate from git HEAD, not the local
+working tree.  If uncommitted changes exist when a subagent is spawned, the
+agent will silently work on stale HEAD content and produce wrong results —
+burning tokens with nothing to show for it.
+
+**Before spawning any subagent that needs working-tree content:**
+
+1. Create a temporary branch: `git checkout -b tmp/agent-work`
+2. Stage and commit the relevant files:
+   `git add <files> && git commit -m "chore: stage working tree for agent"`
+3. Spawn the subagent; it will now see the committed content.
+4. When the subagent finishes, copy its output back to the working tree if
+   needed (e.g. if it ran in a worktree or remote environment).
+5. Return to the original branch and discard the temp branch if desired.
+
+If the agent is producing wrong results because it can't see the local files,
+**stop it immediately** — do not let it finish, as it is burning tokens on
+stale data.
+
 ## API Explanations
 
 When explaining APIs or writing API documentation, follow this structure and rules.
