@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AI-transcript.py — Unified transcript and session search for Claude and Codex.
+AI-transcript.py - Unified transcript and session search for Claude and Codex.
 
 Usage:
   python AI-transcript.py --ls                        list sessions (both AIs)
@@ -59,9 +59,9 @@ try:
   # strip=True when stdout is not a TTY, which breaks piped/captured output).
   _cm.init(strip=False, autoreset=False)
 
-  # ── Diagnostic prefix colors — edit these to taste ──────────────────────
+  # ── Diagnostic prefix colors - edit these to taste ──────────────────────
   # Fore: RED  GREEN  YELLOW  BLUE  CYAN  MAGENTA  WHITE
-  # Style: BRIGHT  DIM   — combine with +, e.g. _cm.Fore.BLUE + _cm.Style.DIM
+  # Style: BRIGHT  DIM   - combine with +, e.g. _cm.Fore.BLUE + _cm.Style.DIM
   _C_RESET        = _cm.Style.RESET_ALL
   _C_MATCH        = _cm.Style.BRIGHT + _cm.Fore.RED
   _C_DATE         = _cm.Fore.CYAN
@@ -355,8 +355,8 @@ class Session:
   id:      str                # canonical UUID (never a rollout stem)
   path:    Path               # JSONL file path (may be a rollout file for Codex)
   title:   str                # first user message or thread_name
-  ctime:   datetime.datetime  # creation time — local naive datetime
-  mtime:   datetime.datetime  # last-modified time — local naive datetime
+  ctime:   datetime.datetime  # creation time - local naive datetime
+  mtime:   datetime.datetime  # last-modified time - local naive datetime
   project: "str | None"       # short project label (claude) or None (codex)
   rc:      int                # number of JSON records in the .jsonl file
 
@@ -388,7 +388,7 @@ class RecordFilter:
     return True
 
   def past_hi(self, rec_no: int) -> bool:
-    """True when rec_no exceeds the upper bound — safe to break early."""
+    """True when rec_no exceeds the upper bound - safe to break early."""
     return self.rec_hi is not None and rec_no > self.rec_hi
 
   def allows_ts(self, ts_str: "str | None") -> bool:
@@ -424,7 +424,7 @@ class SessionStore(ABC):
   def find(self, id_or_glob: str, *, all_projects: bool = False) -> "tuple[Session | None, list[Session]]":
     """Resolve UUID prefix/full UUID/title glob.
 
-    *:N suffix is NOT handled here — strip it before calling.*
+    *:N suffix is NOT handled here - strip it before calling.*
 
     Returns ``(session, [])`` on unambiguous match.
     Returns ``(None, [candidates])`` when ambiguous.
@@ -546,11 +546,11 @@ def _cl_session_meta(path):
 
   Reads the file once, extracting all three values in a single pass:
 
-  * *title* — first real user text (stripped of system tags), falling back
+  * *title* - first real user text (stripped of system tags), falling back
     to the first non-synthetic assistant text, then ``"(no title)"``.
-  * *ctime* — ``datetime`` from the first record with a *timestamp* field,
+  * *ctime* - ``datetime`` from the first record with a *timestamp* field,
     or ``None`` if absent.
-  * *rc*    — total number of non-blank lines (= JSON record count).
+  * *rc*    - total number of non-blank lines (= JSON record count).
   """
   title = "(no title)"
   ctime = None
@@ -767,21 +767,21 @@ def _cl_group_turns(rec_nos, records):
 
   Returns ``(items, plan_ids)`` where *items* is a list of tuples:
 
-  - ``('user', rec_no, ts, rec)`` — real user message, AskUserQuestion
+  - ``('user', rec_no, ts, rec)`` - real user message, AskUserQuestion
     answer, or ExitPlanMode approval (tool-result whose ID matches an
     AskUserQuestion or ExitPlanMode call)
-  - ``('queued_command', rec_no, ts, rec)`` — Claude queued-command prompt
+  - ``('queued_command', rec_no, ts, rec)`` - Claude queued-command prompt
     attachment emitted between assistant turns
   - ``('assistant_turn', display_rec_no, display_ts, sub_records, tr_map)``
-  - ``('notice', rec_no, ts, text)`` — synthetic assistant record text
+  - ``('notice', rec_no, ts, text)`` - synthetic assistant record text
     (e.g. usage-limit notification)
-  - ``('subagent_notification', rec_no, ts, rec)`` — completed child-agent
+  - ``('subagent_notification', rec_no, ts, rec)`` - completed child-agent
     task notification emitted by Claude's background-agent queue
 
   *sub_records* is ``[(rec_no, ts, rec), ...]`` for every assistant record in
   the turn.  *tr_map* is ``{tool_use_id: result_text}`` for tool-result
   records absorbed from interleaved ``user`` records (AskUserQuestion and
-  ExitPlanMode answers are *not* absorbed — they end the turn instead).
+  ExitPlanMode answers are *not* absorbed - they end the turn instead).
 
   *plan_ids* is the set of ExitPlanMode tool-call IDs, so callers can
   distinguish plan-approval user records from regular ones.
@@ -1222,6 +1222,11 @@ def _format_thought_items(thought_items, *, rec_width=1):
   return sep.join(rendered)
 
 
+def _thought_summary(count):
+  """Return human-readable summary text for a thought-group details block."""
+  return "Having a thought" if count == 1 else f"Having {count} thoughts"
+
+
 def _cl_render_thought_item(rec, tr_map):
   """Render one assistant *rec*'s content for the inside of a Thoughts block.
 
@@ -1364,7 +1369,7 @@ def _cl_render_inline_item(rec, tr_map, question_counter):
             opt_label = opt.get("label", "")
             opt_desc = opt.get("description", "")
             if opt_desc:
-              q_md += f"\n- {opt_label} — {opt_desc}"
+              q_md += f"\n- {opt_label} - {opt_desc}"
             else:
               q_md += f"\n- {opt_label}"
           parts.append(
@@ -1453,7 +1458,7 @@ class ClaudeSessionStore(SessionStore):
         if stem == id_or_glob:
           return self._make_session(path, mtime_f, pd), []
 
-      # UUID prefix match — valid hex+dash string, allows 8-char short prefix.
+      # UUID prefix match - valid hex+dash string, allows 8-char short prefix.
       # Only skip title glob when prefix actually matched something; otherwise
       # fall through so e.g. "FEA" (all hex digits) still does a title search.
       if re.match(r"^[0-9a-f-]+$", id_or_glob, re.IGNORECASE):
@@ -1464,7 +1469,7 @@ class ClaudeSessionStore(SessionStore):
             prefix_found.append(self._make_session(path, mtime_f, pd))
         if prefix_found:
           all_matches.extend(prefix_found)
-          continue  # skip title glob — UUID prefix took priority
+          continue  # skip title glob - UUID prefix took priority
 
       # Title glob (bare words get implicit wildcard wrapping)
       glob_pat = (
@@ -1701,7 +1706,7 @@ class ClaudeSessionStore(SessionStore):
               sep = "\n>\n> ***\n>\n" if len(inner_parts) > 1 else "\n>\n"
               inner = sep.join(inner_parts)
               block += (
-                f"\n\n> <details>\n> <summary>Thoughts ({len(inner_parts)})</summary>\n>\n"
+                f"\n\n> <details>\n> <summary>{_thought_summary(len(inner_parts))}</summary>\n>\n"
                 f"{inner}\n>\n> </details>"
               )
 
@@ -2103,7 +2108,7 @@ class CodexSessionStore(SessionStore):
   def sessions(self, *, all_projects=False):
     """Return all Codex sessions, sorted newest-first.
 
-    *all_projects* is accepted for API compatibility but is a no-op — Codex
+    *all_projects* is accepted for API compatibility but is a no-op - Codex
     has no project partitioning, so all sessions are always returned.
     """
     entries = _cx_read_session_index()
@@ -2149,7 +2154,7 @@ class CodexSessionStore(SessionStore):
         all_matches = [s for s in map(self._make_session, prefix_matches) if s]
         # Fall through to resolution below
       else:
-        # No index match — try direct file lookup (full UUID not yet indexed)
+        # No index match - try direct file lookup (full UUID not yet indexed)
         try:
           path = _cx_find_session_file(id_or_glob)
           sess = self._make_session_from_path(path, entries)
@@ -2356,7 +2361,7 @@ class CodexSessionStore(SessionStore):
             thinking_items.append((m["rec_no"], m["ts"], m["text"]))
             i += 1
           else:
-            break  # non-commentary codex message — stop
+            break  # non-commentary codex message - stop
 
         final_msg = None
         if i < len(msgs) and msgs[i]["role"] == "codex" and msgs[i]["phase"] != "commentary":
@@ -2380,7 +2385,7 @@ class CodexSessionStore(SessionStore):
         if thinking_items:
           inner = _format_thought_items(thinking_items, rec_width=rec_width)
           block += (
-            f"\n\n> <details>\n> <summary>Thoughts ({len(thinking_items)})</summary>\n>\n"
+            f"\n\n> <details>\n> <summary>{_thought_summary(len(thinking_items))}</summary>\n>\n"
             f"{inner}\n>\n> </details>"
           )
         if final_msg:
@@ -2399,7 +2404,7 @@ class CodexSessionStore(SessionStore):
               f"{_md_quote(patches_md)}\n\n</details>"
             )
         else:
-          # No final text response — collect any apply_patch calls that have
+          # No final text response - collect any apply_patch calls that have
           # no non-commentary agent_message to attach to (item 34).
           end_idx = msgs[i]["idx"] if i < len(msgs) else len(lines)
           orphan_patches = _cx_get_patches_between(lines, prev_msg_idx, end_idx)
@@ -2426,7 +2431,7 @@ class CodexSessionStore(SessionStore):
               opt_label = opt.get("label", "")
               opt_desc = opt.get("description", "")
               if opt_desc:
-                q_md += f"\n- {opt_label} — {opt_desc}"
+                q_md += f"\n- {opt_label} - {opt_desc}"
               else:
                 q_md += f"\n- {opt_label}"
             block += f"\n\n{headings.question(qi)}\n\n{_md_quote(q_md)}"
@@ -2518,9 +2523,9 @@ def _resolve_tz(tz_str):
 
   Accepts:
 
-  - ``±HH:MM`` fixed offset (e.g. ``-04:00``, ``+05:30``) — resolved as a
+  - ``±HH:MM`` fixed offset (e.g. ``-04:00``, ``+05:30``) - resolved as a
     ``datetime.timezone``; no external dependencies.
-  - IANA name (e.g. ``America/New_York``, ``UTC``) — resolved via
+  - IANA name (e.g. ``America/New_York``, ``UTC``) - resolved via
     ``zoneinfo`` (Python 3.9 stdlib).  Requires the ``tzdata`` package on
     platforms that do not ship a system timezone database (e.g. Windows).
 
@@ -2605,16 +2610,16 @@ def _parse_datetime_filter(s, ref_tz=None, anchor_dt=None):
 
   Absolute (no prefix):
 
-  - ``yyyy-MM-dd [hh:mm[:ss]]`` — full date; time defaults to midnight
-  - ``MM-dd [hh:mm[:ss]]`` — current year assumed; wraps to prev year if future
-  - ``dd hh:mm[:ss]`` — current month assumed; wraps to prev month if future
-  - ``hh:mm[:ss]`` — today assumed; wraps to yesterday if future
+  - ``yyyy-MM-dd [hh:mm[:ss]]`` - full date; time defaults to midnight
+  - ``MM-dd [hh:mm[:ss]]`` - current year assumed; wraps to prev year if future
+  - ``dd hh:mm[:ss]`` - current month assumed; wraps to prev month if future
+  - ``hh:mm[:ss]`` - today assumed; wraps to yesterday if future
 
   Relative (``-`` prefix, for ``--since``): offset from now:
   ``-mm``, ``-[dd ]hh:mm[:ss]``
 
   Relative (``+`` prefix, for ``--until``; requires *anchor_dt*):
-  ``+mm``, ``+[dd ]hh:mm[:ss]`` — offset added to *anchor_dt*.
+  ``+mm``, ``+[dd ]hh:mm[:ss]`` - offset added to *anchor_dt*.
 
   Sub-leading components are normalised (``-100:90`` → ``−101:30``).
   Year/month components in relative form are not yet supported.
@@ -2730,13 +2735,13 @@ def _session_display_hunks(store, session, patterns_kw, before, after, *,
     )
     return hunks if hunks else None
 
-  # Multiple patterns: AND check — stop scanning as soon as first match found
+  # Multiple patterns: AND check - stop scanning as soon as first match found
   for kw in patterns_kw:
     if not store.grep(session, before=0, after=0, first_only=True,
                       ignore_case=ignore_case, rec_filter=rec_filter, **kw):
       return None
 
-  # All patterns match — build combined OR regex for display
+  # All patterns match - build combined OR regex for display
   parts = []
   for kw in patterns_kw:
     if "plain" in kw:
