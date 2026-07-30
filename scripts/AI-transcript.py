@@ -30,6 +30,7 @@ import json
 import os
 import re
 import sys
+import xml.etree.ElementTree as ET
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
@@ -103,6 +104,7 @@ class DisplayPolicy:
   diag_color: bool
   show_date: bool
   record_number: bool
+  debug_record_comment: bool
   display_tz: "datetime.timezone | None"
   separate_thoughts: bool
 
@@ -171,6 +173,19 @@ def _count_records(path):
 def _ansi(s, color, *, active):
   """Wrap *s* in *color* ANSI escape when *active* and color is non-empty."""
   return f"{color}{s}{_C_RESET}" if (active and color) else s
+
+
+def _record_comment(rec_no, *, quoted=False):
+  """Return a debug ``record: N`` HTML comment, or ``""`` when disabled."""
+  policy = _display_policy()
+  if not policy.debug_record_comment:
+    return ""
+  comment = _ansi(
+    f"<!-- record: {rec_no} -->",
+    _C_RECNO,
+    active=policy.render_color,
+  )
+  return _md_quote(comment) if quoted else comment
 
 
 @dataclass
@@ -755,9 +770,13 @@ def _cl_group_turns(rec_nos, records):
   - ``('user', rec_no, ts, rec)`` — real user message, AskUserQuestion
     answer, or ExitPlanMode approval (tool-result whose ID matches an
     AskUserQuestion or ExitPlanMode call)
+  - ``('queued_command', rec_no, ts, rec)`` — Claude queued-command prompt
+    attachment emitted between assistant turns
   - ``('assistant_turn', display_rec_no, display_ts, sub_records, tr_map)``
   - ``('notice', rec_no, ts, text)`` — synthetic assistant record text
     (e.g. usage-limit notification)
+  - ``('subagent_notification', rec_no, ts, rec)`` — completed child-agent
+    task notification emitted by Claude's background-agent queue
 
   *sub_records* is ``[(rec_no, ts, rec), ...]`` for every assistant record in
   the turn.  *tr_map* is ``{tool_use_id: result_text}`` for tool-result
@@ -799,7 +818,17 @@ def _cl_group_turns(rec_nos, records):
 
     rtype = rec.get("type", "")
 
+    if rtype == "attachment":
+      if _cl_queued_command_text(rec):
+        result.append(('queued_command', rec_no, rec.get("timestamp"), rec))
+      i += 1
+      continue
+
     if rtype == "queue-operation":
+      if _cl_task_notification(rec) is not None:
+        result.append((
+          'subagent_notification', rec_no, rec.get("timestamp"), rec
+        ))
       i += 1
       continue
 
@@ -829,7 +858,7 @@ def _cl_group_turns(rec_nos, records):
       turn_start_ts = None
       sub_records = []
       tr_map: dict = {}
-      pending_notices: list = []
+      pending_events: list = []
 
       while i < n:
         sub_rec_no = rec_nos[i]
@@ -840,7 +869,18 @@ def _cl_group_turns(rec_nos, records):
           i += 1
           continue
 
+        if sub_rtype == "attachment":
+          if _cl_queued_command_text(sub_rec):
+            break
+          i += 1
+          continue
+
         if sub_rtype == "queue-operation":
+          if _cl_task_notification(sub_rec) is not None:
+            pending_events.append((
+              'subagent_notification', sub_rec_no,
+              sub_rec.get("timestamp"), sub_rec
+            ))
           i += 1
           continue
 
@@ -849,8 +889,8 @@ def _cl_group_turns(rec_nos, records):
           if sub_msg.get("model") == "<synthetic>":
             for b in sub_msg.get("content", []):
               if b.get("type") == "text" and b.get("text"):
-                pending_notices.append(('notice', sub_rec_no,
-                                        sub_rec.get("timestamp"), b["text"]))
+                pending_events.append(('notice', sub_rec_no,
+                                       sub_rec.get("timestamp"), b["text"]))
             i += 1
             continue
           if turn_start_rec_no is None:
@@ -897,12 +937,254 @@ def _cl_group_turns(rec_nos, records):
         result.append(
           ('assistant_turn', turn_start_rec_no, turn_start_ts, sub_records, tr_map)
         )
-      result.extend(pending_notices)
+      result.extend(pending_events)
 
     else:
       i += 1
 
   return result, plan_ids
+
+
+def _cl_queued_command_text(rec):
+  """Return visible markdown from one Claude queued-command attachment."""
+  if rec.get("type") != "attachment":
+    return ""
+  attachment = rec.get("attachment", {})
+  if attachment.get("type") != "queued_command":
+    return ""
+
+  prompt = attachment.get("prompt", [])
+  if isinstance(prompt, str):
+    return _cl_strip_system(prompt).strip()
+  if not isinstance(prompt, list):
+    return ""
+
+  parts = []
+  for item in prompt:
+    if not isinstance(item, dict):
+      continue
+    item_type = item.get("type", "")
+    if item_type == "text":
+      text = _cl_strip_system(item.get("text", ""))
+      if text:
+        parts.append(text.strip("\n"))
+    elif item_type == "image":
+      src = item.get("source", {})
+      if src.get("type") == "base64":
+        mt = src.get("media_type", "image/png")
+        data = src.get("data", "")
+        parts.append(f"![image](data:{mt};base64,{data})")
+      elif src.get("type") == "url":
+        parts.append(f"![image]({src.get('url', '')})")
+  return "\n\n".join(part for part in parts if part).strip()
+
+
+def _cl_task_notification(rec):
+  """Return completed child-agent metadata from one queue notification.
+
+  Parameters
+  ----------
+  rec : dict
+      Claude JSONL record that may contain a ``<task-notification>`` payload.
+
+  Returns
+  -------
+  tuple[str, str, str] | None
+      ``(task_id, description, result_text)`` for completed child tasks, or
+      ``None`` when *rec* is not a completed task notification.
+  """
+  if rec.get("type") != "queue-operation" or rec.get("operation") != "enqueue":
+    return None
+  content = rec.get("content", "")
+  if not isinstance(content, str) or not content.strip():
+    return None
+  try:
+    root = ET.fromstring(content)
+  except ET.ParseError:
+    return None
+  if root.tag.rsplit("}", 1)[-1] != "task-notification":
+    return None
+
+  def value(name):
+    for child in root:
+      if child.tag.rsplit("}", 1)[-1] == name:
+        return "".join(child.itertext()).strip()
+    return ""
+
+  if value("status").lower() != "completed":
+    return None
+
+  task_id = value("task-id")
+  if not task_id:
+    return None
+
+  summary = value("summary")
+  description = summary
+  match = re.search(r'Agent\s+["“](.*?)["”]\s+came to rest', summary)
+  if match:
+    description = match.group(1).strip()
+
+  return task_id, description, value("result")
+
+
+def _cl_render_task_notification(rec_no, ts, rec, *, rec_width=1):
+  """Render one completed Claude child-agent task notification.
+
+  Parameters
+  ----------
+  rec_no : int
+      JSONL record number of the notification.
+  ts : str | None
+      Timestamp string carried by the record.
+  rec : dict
+      Queue-operation JSONL record.
+  rec_width : int, optional
+      Width used to align record-number prefixes.
+
+  Returns
+  -------
+  str
+      Markdown block for the completed child task, or ``""`` when *rec* does
+      not contain a renderable completed task notification.
+  """
+  notification = _cl_task_notification(rec)
+  if notification is None:
+    return ""
+
+  task_id, description, result_text = notification
+  suffix = ""
+  policy = _display_policy()
+  if policy.show_date or policy.record_number:
+    rendered_suffix = _build_hunk_prefix(rec_no, ts, rec_width=rec_width).rstrip()
+    if rendered_suffix:
+      suffix = " " + rendered_suffix
+
+  body = []
+  if description:
+    body.append(_md_quote(f"**{description}**"))
+  body.append(_md_quote(result_text if result_text else "*(completed without output)*"))
+  block = f"## Claude Sub-agent {task_id}{suffix}\n\n" + "\n\n".join(body)
+  comment = _record_comment(rec_no)
+  return f"{comment}\n{block}" if comment else block
+
+
+def _cl_render_queued_command(rec_no, ts, rec, *, rec_width=1):
+  """Render one Claude queued-command attachment as a visible user block."""
+  text = _cl_queued_command_text(rec)
+  if not text:
+    return ""
+
+  suffix = ""
+  policy = _display_policy()
+  if policy.show_date or policy.record_number:
+    rendered_suffix = _build_hunk_prefix(rec_no, ts, rec_width=rec_width).rstrip()
+    if rendered_suffix:
+      suffix = " " + rendered_suffix
+
+  block = f"{_headings().user}{suffix} *(queued command)*\n\n{text}"
+  comment = _record_comment(rec_no)
+  return f"{comment}\n{block}" if comment else block
+
+
+def _cl_subagent_result(result_text, tool_id):
+  """Return visible Claude Agent output with transport metadata removed.
+
+  Parameters
+  ----------
+  result_text : str
+      Raw tool-result text emitted for a Claude ``Agent`` tool call.
+  tool_id : str
+      Tool-use identifier, used as a fallback display ID.
+
+  Returns
+  -------
+  tuple[str, str]
+      ``(agent_id, visible_result)`` where ``visible_result`` excludes
+      bookkeeping lines such as ``agentId:``, worktree metadata, and usage
+      trailers.
+  """
+  text = result_text or ""
+  agent_id = ""
+  match = re.search(r"(?m)^agentId:\s*([^\s]+)", text)
+  if match:
+    agent_id = match.group(1).strip()
+  if not agent_id:
+    agent_id = tool_id or "unknown"
+
+  visible_lines = []
+  for line in text.splitlines():
+    stripped = line.strip()
+    if re.match(
+      r"^(?:agentId|worktreePath|worktreeBranch):\s*",
+      stripped,
+      re.IGNORECASE,
+    ):
+      continue
+    if stripped.startswith("<usage>") or stripped.endswith("</usage>"):
+      continue
+    if re.match(
+      r"^(?:subagent_tokens|tool_uses|duration_ms):\s*",
+      stripped,
+      re.IGNORECASE,
+    ):
+      continue
+    visible_lines.append(line)
+
+  return agent_id, "\n".join(visible_lines).strip()
+
+
+def _cl_render_subagents(sub_records, tr_map, *, rec_width=1):
+  """Render Claude ``Agent`` tool results as top-level sub-agent blocks.
+
+  Parameters
+  ----------
+  sub_records : list[tuple[int, str | None, dict]]
+      Assistant records that belong to one Claude turn.
+  tr_map : dict[str, str]
+      Mapping from tool-use ID to absorbed tool-result text.
+  rec_width : int, optional
+      Width used to align record-number prefixes.
+
+  Returns
+  -------
+  list[str]
+      Markdown blocks, one for each Claude ``Agent`` tool call found in
+      *sub_records*.
+  """
+  blocks = []
+  policy = _display_policy()
+  for rec_no, ts, rec in sub_records:
+    for item in rec.get("message", {}).get("content", []):
+      if not isinstance(item, dict):
+        continue
+      if item.get("type") != "tool_use" or item.get("name") != "Agent":
+        continue
+
+      tool_id = item.get("id", "")
+      tool_input = item.get("input", {})
+      description = str(tool_input.get("description", "")).strip()
+      result_text = tr_map.get(tool_id, "")
+      agent_id, visible_result = _cl_subagent_result(result_text, tool_id)
+
+      suffix = ""
+      if policy.show_date or policy.record_number:
+        rendered_suffix = _build_hunk_prefix(rec_no, ts, rec_width=rec_width).rstrip()
+        if rendered_suffix:
+          suffix = " " + rendered_suffix
+
+      body = []
+      if description:
+        body.append(_md_quote(f"**{description}**"))
+      if visible_result:
+        body.append(_md_quote(visible_result))
+      else:
+        body.append(_md_quote("*(running)*"))
+
+      block = f"## Claude Sub-agent {agent_id}{suffix}\n\n" + "\n\n".join(body)
+      comment = _record_comment(rec_no)
+      blocks.append(f"{comment}\n{block}" if comment else block)
+
+  return blocks
 
 
 def _format_thought_items(thought_items, *, rec_width=1):
@@ -923,10 +1205,21 @@ def _format_thought_items(thought_items, *, rec_width=1):
         t_s = _build_hunk_prefix(t_rec_no, t_ts, rec_width=rec_width).rstrip()
         if t_s:
           t_suffix = " " + t_s
-      parts.append(f"> {headings.thought(qi)}{t_suffix}\n>\n{_md_quote(t_text)}")
+      part = f"> {headings.thought(qi)}{t_suffix}\n>\n{_md_quote(t_text)}"
+      comment = _record_comment(t_rec_no, quoted=True)
+      if comment:
+        part = f"{comment}\n>\n{part}"
+      parts.append(part)
     return "\n>\n".join(parts)
   sep = "\n>\n> ***\n>\n" if len(thought_items) > 1 else "\n>\n"
-  return sep.join(_md_quote(t) for _, _, t in thought_items)
+  rendered = []
+  for t_rec_no, _, t_text in thought_items:
+    part = _md_quote(t_text)
+    comment = _record_comment(t_rec_no, quoted=True)
+    if comment:
+      part = f"{comment}\n>\n{part}"
+    rendered.append(part)
+  return sep.join(rendered)
 
 
 def _cl_render_thought_item(rec, tr_map):
@@ -936,7 +1229,8 @@ def _cl_render_thought_item(rec, tr_map):
   ``<details>Thoughts</details>`` block in ``_md_quote()``, so no per-item
   quoting is done here.  Tool calls get their own ``<details>`` block; the
   matching tool result is shown in a code fence.  Read, Glob, Grep, Task, and
-  other non-display tools are silently skipped.  AskUserQuestion,
+  other non-display tools are silently skipped. Claude ``Agent`` tool calls
+  are rendered later as top-level sub-agent sections.  AskUserQuestion,
   EnterPlanMode, and ExitPlanMode are handled by ``_cl_render_inline_item``.
   """
   content = rec.get("message", {}).get("content", [])
@@ -1264,6 +1558,7 @@ class ClaudeSessionStore(SessionStore):
           text = "\n\n".join(t for t in texts if t)
         if text and text != last_user_text:
           last_user_text = text
+          block = ""
           if is_plan_approval:
             m = re.search(r"(?m)^#{0,6} *Approved Plan[: ]", text)
             if m:
@@ -1274,20 +1569,40 @@ class ClaudeSessionStore(SessionStore):
                 f"{_md_quote(post)}\n>\n> </details>"
               )
               if pre:
-                out.append(
-                  f"{headings.user}{suffix}\n\n{_md_quote(pre)}\n\n{details}\n"
-                )
+                block = f"{headings.user}{suffix}\n\n{_md_quote(pre)}\n\n{details}\n"
               else:
-                out.append(f"{headings.user}{suffix}\n\n{details}\n")
+                block = f"{headings.user}{suffix}\n\n{details}\n"
             else:
-              out.append(f"{headings.user}{suffix}\n\n{_md_quote(text)}\n")
+              block = f"{headings.user}{suffix}\n\n{_md_quote(text)}\n"
           else:
-            out.append(f"{headings.user}{suffix}\n\n{_md_quote(text)}\n")
+            block = f"{headings.user}{suffix}\n\n{_md_quote(text)}\n"
+          if block:
+            comment = _record_comment(rec_no)
+            if comment:
+              out.append(comment)
+            out.append(block)
+
+      # ── Queued command attachment ──────────────────────────────────
+      elif item_type == 'queued_command':
+        _, rec_no, ts, rec = turn_item
+        block = _cl_render_queued_command(rec_no, ts, rec, rec_width=rec_width)
+        if block:
+          out.append(block + "\n")
 
       # ── System notice (synthetic assistant record) ─────────────────
       elif item_type == 'notice':
         _, rec_no, ts, notice_text = turn_item
+        comment = _record_comment(rec_no)
+        if comment:
+          out.append(comment)
         out.append(f"> *(system: {notice_text})*\n")
+
+      # ── Completed child-agent task notification ─────────────────────
+      elif item_type == 'subagent_notification':
+        _, rec_no, ts, rec = turn_item
+        block = _cl_render_task_notification(rec_no, ts, rec, rec_width=rec_width)
+        if block:
+          out.append(block + "\n")
 
       # ── Assistant turn ─────────────────────────────────────────────
       elif item_type == 'assistant_turn':
@@ -1363,18 +1678,22 @@ class ClaudeSessionStore(SessionStore):
               if not item_md:
                 continue
               thought_counter += 1
+              comment = _record_comment(t_rec_no, quoted=True)
               if policy.separate_thoughts:
                 t_suffix = ""
                 if policy.show_date or policy.record_number:
                   t_s = _build_hunk_prefix(t_rec_no, t_ts, rec_width=rec_width).rstrip()
                   if t_s:
                     t_suffix = " " + t_s
-                inner_parts.append(
+                part = (
                   f"> {headings.thought(thought_counter)}{t_suffix}\n>\n"
                   f"{_md_quote(item_md)}"
                 )
               else:
-                inner_parts.append(_md_quote(item_md))
+                part = _md_quote(item_md)
+              if comment:
+                part = f"{comment}\n>\n{part}"
+              inner_parts.append(part)
             if inner_parts:
               # Use "\n>\n" separator to keep blockquote context continuous.
               # Outer <details> tags are explicitly blockquoted; per-item
@@ -1390,20 +1709,34 @@ class ClaudeSessionStore(SessionStore):
             _, sub_rec_no, sub_ts, sub_rec = seg
             inline_md = _cl_render_inline_item(sub_rec, tr_map, question_counter)
             if inline_md:
+              comment = _record_comment(sub_rec_no)
               if policy.separate_thoughts:
                 inner_suffix = ""
                 if policy.show_date or policy.record_number:
                   s = _build_hunk_prefix(sub_rec_no, sub_ts, rec_width=rec_width).rstrip()
                   if s:
                     inner_suffix = " " + s
-                block += f"\n\n> {headings.claude}{inner_suffix}\n>\n{inline_md}"
+                inline_block = f"> {headings.claude}{inner_suffix}\n>\n{inline_md}"
+                if comment:
+                  inline_block = f"{comment}\n\n{inline_block}"
+                block += f"\n\n{inline_block}"
               else:
-                block += f"\n\n{inline_md}"
+                if comment:
+                  block += f"\n\n{comment}\n\n{inline_md}"
+                else:
+                  block += f"\n\n{inline_md}"
 
         if block == f"{headings.claude}{suffix}":
-          continue
+          block = ""
 
-        out.append(block + "\n")
+        if block:
+          out.append(block + "\n")
+        out.extend(
+          subagent_block + "\n"
+          for subagent_block in _cl_render_subagents(
+            sub_records, tr_map, rec_width=rec_width
+          )
+        )
 
     return "\n".join(out)
 
@@ -1975,6 +2308,9 @@ class CodexSessionStore(SessionStore):
         block = f"{headings.user}{suffix}\n\n{_md_quote(msg['text'])}"
         if img_md:
           block += f"\n\n{img_md}"
+        comment = _record_comment(msg["rec_no"])
+        if comment:
+          out.append(comment)
         out.append(block + "\n")
         prev_msg_idx = msg["idx"]
         i += 1
@@ -2000,6 +2336,9 @@ class CodexSessionStore(SessionStore):
             answer_str = ", ".join(f'"{a}"' for a in selected)
             parts.append(f'**{q_text}** → {answer_str}')
         if parts:
+          comment = _record_comment(msg["rec_no"])
+          if comment:
+            out.append(comment)
           out.append(f"{headings.user}{suffix}\n\n" + _md_quote("\n\n".join(parts)) + "\n")
         prev_msg_idx = msg["idx"]
         i += 1
@@ -2045,6 +2384,9 @@ class CodexSessionStore(SessionStore):
             f"{inner}\n>\n> </details>"
           )
         if final_msg:
+          comment = _record_comment(final_msg["rec_no"])
+          if comment:
+            block += f"\n\n{comment}"
           block += f"\n\n{_md_quote(final_msg['text'])}"
           if final_msg["patches"]:
             n = len(final_msg["patches"])
@@ -2072,6 +2414,9 @@ class CodexSessionStore(SessionStore):
               f"{_md_quote(patches_md)}\n\n</details>"
             )
         if question_block:
+          comment = _record_comment(question_block["rec_no"])
+          if comment:
+            block += f"\n\n{comment}"
           questions = question_block["questions"]
           for qi, q in enumerate(questions, 1):
             q_text = q.get("question", "")
@@ -2594,6 +2939,14 @@ def main():
     ),
   )
   ap.add_argument(
+    "-N",
+    action="store_true", dest="debug_record_comment",
+    help=(
+      "In transcript mode: emit a '<!-- record: N -->' comment before each "
+      "visible record block for debugging."
+    ),
+  )
+  ap.add_argument(
     "--tz",
     metavar="ZONE", dest="tz", default=None,
     help=(
@@ -2730,6 +3083,7 @@ def main():
     diag_color=diag_color,
     show_date=args.show_date,
     record_number=args.record_number,
+    debug_record_comment=args.debug_record_comment,
     display_tz=_display_tz,
     separate_thoughts=args.separate_thoughts,
   ))
