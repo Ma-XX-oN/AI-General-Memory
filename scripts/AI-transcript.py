@@ -4179,7 +4179,7 @@ class ChatGPTSessionStore(SessionStore):
       if not text and not pending_thoughts:
         return
       display_rec_no = rec_no if rec_no is not None else pending_thoughts[0][0]
-      display_ts = ts_str if ts_str is not None else pending_thoughts[0][1]
+      display_ts = ts_str if ts_str is not None else (pending_thoughts[0][1] if pending_thoughts else None)
       suffix = ""
       if policy.show_date or policy.record_number:
         stamp = _build_hunk_prefix(
