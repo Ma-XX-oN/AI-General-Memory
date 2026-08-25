@@ -691,7 +691,6 @@ def _cl_session_grep(path, *, plain=None, rx=None, before=0, after=0, first_only
   result = []
   rec_no = 0
   tagged = [] if (cross_record and not first_only) else None
-  file_ref_index = {}
   try:
     with open(path, encoding="utf-8") as f:
       for raw in f:
@@ -3920,6 +3919,7 @@ def _cg_session_grep(path, *, plain=None, rx=None, before=0, after=0, first_only
   result = []
   rec_no = 0
   tagged = [] if (cross_record and not first_only) else None
+  file_ref_index = {}
   try:
     with open(path, encoding="utf-8") as f:
       for raw in f:
