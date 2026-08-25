@@ -10,6 +10,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Fix timestamp-free assistant block
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/AI-transcript.py')
+          s=p.read_text(encoding='utf-8')
+          old='      display_ts = ts_str if ts_str is not None else pending_thoughts[0][1]\n'
+          new='      display_ts = ts_str if ts_str is not None else (pending_thoughts[0][1] if pending_thoughts else None)\n'
+          assert old in s
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+          PY
       - name: Verify interleaved UAPs
         run: |
           cat >/tmp/uap.jsonl <<'EOF'
@@ -21,15 +32,18 @@ jobs:
           python3 scripts/AI-transcript.py --chatgpt --file /tmp/uap.jsonl >/tmp/out.md
           python3 - <<'PY'
           text=open('/tmp/out.md',encoding='utf-8').read()
-          p=[text.index(x) for x in ('First multimodal question','First answer','Second question','Second answer')]
-          assert p == sorted(p), (p, text)
+          positions=[text.index(x) for x in ('First multimodal question','First answer','Second question','Second answer')]
+          assert positions == sorted(positions), (positions, text)
           PY
           python3 -m py_compile scripts/AI-transcript.py
-      - name: Remove workflow
+          python3 scripts/AI-transcript.py --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl >/tmp/direct.md
+          grep -q 'Find the screenshot-backed tool output and final answer' /tmp/direct.md
+      - name: Commit verified fix
         run: |
           rm .github/workflows/verify-chatgpt-uap-linking.yml
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add scripts/AI-transcript.py
           git add -u
-          git commit -m 'chore: remove one-time ChatGPT UAP verification [skip ci]'
+          git commit -m 'fix: handle timestamp-free ChatGPT UAP blocks [skip ci]'
           git push
