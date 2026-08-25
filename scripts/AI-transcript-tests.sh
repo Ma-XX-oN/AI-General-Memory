@@ -401,6 +401,23 @@ check "notice: *(system: ...) rendered" 0 '\*\(system:' "" $SCRIPT --claude --fi
 check "codex-orphan-patch: file change block present"   0 '1 file change'   ""  $SCRIPT --codex --file scripts/fixtures/codex-orphan-patch.jsonl
 check "codex-orphan-patch: patch content present"       0 'foo\.py'         ""  $SCRIPT --codex --file scripts/fixtures/codex-orphan-patch.jsonl
 
+# chatgpt-direct: auto-detected ChatGPT transcript renders commentary and tool details
+check "chatgpt-direct: auto-detect commentary heading"  0 '## ChatGPT Commentary' "" $SCRIPT --file scripts/fixtures/chatgpt-direct.jsonl
+check "chatgpt-direct: explicit flag renders tool output" 0 'hello from python' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
+check "chatgpt-direct: grouped cite block rendered"      0 '\*\*\(cite:' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
+check "chatgpt-direct: cite sources named"              0 'Python Docs.*Example|Example.*Python Docs' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
+check "chatgpt-direct: google favicon service used"     0 'google\.com/s2/favicons\?domain=https://docs\.python\.org&sz=32' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
+check "chatgpt-direct: cite favicon size fixed"         0 'width="15" height="15"' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
+check "chatgpt-direct: cite links kept together"        0 'display:inline-block;white-space:nowrap;' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
+check "chatgpt-direct: tooltip falls back by URL"       0 'title="Python note&#10;&#10;Supporting note for the transcript fixture\."' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
+check "chatgpt-direct: container exec inferred bash"    0 '```bash' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
+check "chatgpt-direct: alt text rendered"               0 'Morris Plotkin checked uploaded file' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
+check "chatgpt-direct: file cite rendered"              0 '`notes\.txt`' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
+check "chatgpt-direct: raw cite token removed"          0 'cite' "!" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
+check "chatgpt-direct: raw entity token removed"        0 'entity' "!" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
+check "chatgpt-direct: raw file token removed"          0 'filecite' "!" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
+check "chatgpt-direct: grep finds tool output"          0 'hello from python' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl --grep "hello from python"
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo
 TOTAL=$((PASS + FAIL))

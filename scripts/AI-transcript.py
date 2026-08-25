@@ -15,8 +15,12 @@ Usage:
   python AI-transcript.py --grep TEXT --id <id>       grep within one session
   python AI-transcript.py --grep-re PATTERN           regex search
   python AI-transcript.py --grep TEXT --grep OTHER    AND search (both required)
+  python AI-transcript.py --file path/to/file.jsonl   auto-detect direct JSONL source
+  python AI-transcript.py --chatgpt --file export.jsonl
+                                                  render or grep a ChatGPT JSONL file
 
-Source selector (mutually exclusive): --claude | --codex | --both-AIs (default)
+Source selector (mutually exclusive):
+  --claude | --codex | --chatgpt | --both-AIs (default)
 Session header format:
   [claude] [creation]-[modification] [project] records: N
   (uuid8) title
@@ -26,10 +30,13 @@ import argparse
 import datetime
 import fnmatch
 import glob as glob_mod
+import html
 import json
 import os
 import re
 import sys
+import textwrap
+import urllib.parse
 import xml.etree.ElementTree as ET
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -195,11 +202,17 @@ class HeadingCache:
   user: str = ""
   claude: str = ""
   codex: str = ""
+  chatgpt: str = ""
+  chatgpt_commentary: str = ""
 
   def __post_init__(self):
     self.user = _ansi("## User", _C_ROLE_USER, active=self.render_color)
     self.claude = _ansi("## Claude", _C_ROLE_AI, active=self.render_color)
     self.codex = _ansi("## Codex", _C_ROLE_AI, active=self.render_color)
+    self.chatgpt = _ansi("## ChatGPT", _C_ROLE_AI, active=self.render_color)
+    self.chatgpt_commentary = _ansi(
+      "## ChatGPT Commentary", _C_ROLE_AI, active=self.render_color
+    )
 
   def question(self, n):
     """Return the ``### Question N`` transcript heading."""
@@ -351,13 +364,13 @@ def _grep_context_tagged(tagged_lines, *, plain=None, rx=None, before=0, after=0
 @dataclass
 class Session:
   """A single AI session with all metadata pre-resolved by the store."""
-  source:  str                # "claude" | "codex"
+  source:  str                # "claude" | "codex" | "chatgpt"
   id:      str                # canonical UUID (never a rollout stem)
   path:    Path               # JSONL file path (may be a rollout file for Codex)
   title:   str                # first user message or thread_name
   ctime:   datetime.datetime  # creation time - local naive datetime
   mtime:   datetime.datetime  # last-modified time - local naive datetime
-  project: "str | None"       # short project label (claude) or None (codex)
+  project: "str | None"       # short project label (claude) or None (codex/chatgpt)
   rc:      int                # number of JSON records in the .jsonl file
 
 
@@ -483,6 +496,66 @@ def _md_code_fence(text, lang=""):
   max_run = max((len(r) for r in runs), default=0)
   fence = "`" * max(3, max_run + 1)
   return f"{fence}{lang}\n{text}\n{fence}"
+
+
+def _cg_map_code_language_token(token):
+  """Map an interpreter/launcher token to a Markdown fence language."""
+  if not isinstance(token, str):
+    return ""
+  token = token.strip().lower().rsplit("/", 1)[-1]
+  if token.endswith(".exe"):
+    token = token[:-4]
+  mapping = {
+    "bash": "bash",
+    "cmd": "bat",
+    "fish": "fish",
+    "node": "javascript",
+    "nodejs": "javascript",
+    "powershell": "powershell",
+    "pwsh": "powershell",
+    "py": "python",
+    "python": "python",
+    "python3": "python",
+    "sh": "sh",
+    "zsh": "zsh",
+  }
+  return mapping.get(token, "")
+
+
+def _cg_infer_code_language(rec, code, declared_language=""):
+  """Infer a stable Markdown fence language for ChatGPT code blocks."""
+  if isinstance(declared_language, str):
+    language = declared_language.strip().lower()
+    if language and language != "unknown":
+      return language
+
+  if not isinstance(code, str):
+    return ""
+
+  stripped = code.lstrip()
+  if not stripped:
+    return ""
+
+  shebang = re.match(r"^#!\s*(?:/usr/bin/env\s+)?([A-Za-z0-9_./+-]+)", stripped)
+  if shebang:
+    language = _cg_map_code_language_token(shebang.group(1))
+    if language:
+      return language
+
+  recipient = rec.get("recipient") if isinstance(rec, dict) else ""
+  recipient_map = {
+    "python": "python",
+    "python_user_visible": "python",
+  }
+  if recipient in recipient_map:
+    return recipient_map[recipient]
+
+  if recipient == "container.exec":
+    launcher = re.match(r"^([A-Za-z0-9_./+-]+)\b", stripped)
+    if launcher:
+      return _cg_map_code_language_token(launcher.group(1))
+
+  return ""
 
 
 # ── Claude-specific helpers ───────────────────────────────────────────────────
@@ -2440,6 +2513,995 @@ class CodexSessionStore(SessionStore):
     return "\n".join(out)
 
 
+# ── ChatGPT-specific helpers ──────────────────────────────────────────────────
+
+def _cg_float_ts_to_iso(ts):
+  """Return an ISO-8601 UTC timestamp string for a ChatGPT float timestamp."""
+  if ts is None:
+    return None
+  try:
+    dt = datetime.datetime.fromtimestamp(float(ts), datetime.timezone.utc)
+  except (TypeError, ValueError, OSError, OverflowError):
+    return None
+  return dt.isoformat().replace("+00:00", "Z")
+
+
+def _cg_float_ts_to_local(ts):
+  """Return a local naive datetime for a ChatGPT float timestamp, or None."""
+  ts_str = _cg_float_ts_to_iso(ts)
+  if not ts_str:
+    return None
+  dt = _parse_ts_to_dt(ts_str)
+  if dt is None:
+    return None
+  try:
+    return dt.astimezone().replace(tzinfo=None)
+  except OSError:
+    return None
+
+
+def _cg_record_ts(rec):
+  """Return the best available timestamp string for a ChatGPT record."""
+  ts_str = _cg_float_ts_to_iso(rec.get("create_time"))
+  if ts_str:
+    return ts_str
+  return _cg_float_ts_to_iso(rec.get("update_time"))
+
+
+def _cg_is_hidden(rec):
+  """True when a ChatGPT record is hidden from the visible conversation."""
+  metadata = rec.get("metadata", {})
+  return bool(metadata.get("is_visually_hidden_from_conversation"))
+
+
+def _cg_first_nonempty_line(text, *, max_chars=100):
+  """Return the first non-empty line of *text*, truncated to *max_chars*."""
+  if not text:
+    return ""
+  first_line = next((line.strip() for line in text.splitlines() if line.strip()), "")
+  return first_line[:max_chars]
+
+
+def _cg_text_parts(parts):
+  """Return non-empty text fragments from a ChatGPT ``parts`` list."""
+  texts = []
+  if not isinstance(parts, list):
+    return texts
+  for part in parts:
+    if isinstance(part, str):
+      if part.strip():
+        texts.append(part)
+    elif isinstance(part, dict):
+      for key in ("text", "content"):
+        value = part.get(key)
+        if isinstance(value, str) and value.strip():
+          texts.append(value)
+  return texts
+
+
+def _cg_html_text(text):
+  """Return *text* escaped for visible inline HTML.
+
+  Parameters
+  ----------
+  text : str
+      Visible text content.
+
+  Returns
+  -------
+  str
+      *text* escaped for placement in inline HTML text nodes.
+  """
+  return html.escape(text, quote=False)
+
+
+def _cg_html_attr(text):
+  """Return *text* escaped for an HTML attribute.
+
+  Parameters
+  ----------
+  text : str
+      Raw attribute content.
+
+  Returns
+  -------
+  str
+      Single-line HTML-safe attribute text.
+  """
+  return html.escape(" ".join(text.split()), quote=True)
+
+
+def _cg_html_title_attr(text):
+  """Return *text* escaped for a multiline HTML ``title`` attribute.
+
+  Parameters
+  ----------
+  text : str
+      Raw tooltip text that may contain embedded newlines.
+
+  Returns
+  -------
+  str
+      HTML-safe attribute text with line breaks preserved as ``&#10;``.
+  """
+  if not isinstance(text, str):
+    return ""
+  lines = []
+  last_blank = False
+  for line in text.splitlines():
+    cleaned = " ".join(line.split()).strip()
+    if cleaned:
+      lines.append(html.escape(cleaned, quote=True))
+      last_blank = False
+    elif lines and not last_blank:
+      lines.append("")
+      last_blank = True
+  while lines and lines[-1] == "":
+    lines.pop()
+  if not lines:
+    cleaned = " ".join(text.split()).strip()
+    return html.escape(cleaned, quote=True)
+  return "&#10;".join(lines)
+
+
+def _cg_citation_root(url):
+  """Return the scheme-and-host root for *url*.
+
+  Parameters
+  ----------
+  url : str
+      Citation target URL.
+
+  Returns
+  -------
+  str
+      ``scheme://host`` when *url* has a network location, else ``""``.
+  """
+  parts = urllib.parse.urlsplit(url)
+  if not parts.netloc:
+    return ""
+  scheme = parts.scheme or "https"
+  return urllib.parse.urlunsplit((scheme, parts.netloc, "", "", ""))
+
+
+def _cg_citation_hostname(url):
+  """Return a compact hostname label for *url*.
+
+  Parameters
+  ----------
+  url : str
+      Citation target URL.
+
+  Returns
+  -------
+  str
+      Hostname without a leading ``www.`` when available, else ``""``.
+  """
+  netloc = urllib.parse.urlsplit(url).netloc.strip().lower()
+  if netloc.startswith("www."):
+    netloc = netloc[4:]
+  return netloc
+
+
+def _cg_normalize_citation_url(url):
+  """Return a canonical URL key for citation metadata lookups.
+
+  Parameters
+  ----------
+  url : str
+      Citation URL to normalize.
+
+  Returns
+  -------
+  str
+      Lower-cased scheme/host URL with ``utm_source`` removed, or ``""`` when
+      *url* is not usable.
+  """
+  if not isinstance(url, str):
+    return ""
+  raw = url.strip()
+  if not raw:
+    return ""
+  parts = urllib.parse.urlsplit(raw)
+  if not parts.scheme or not parts.netloc:
+    return raw
+  filtered_query = urllib.parse.urlencode(
+    [
+      (key, value)
+      for key, value in urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
+      if key.lower() != "utm_source"
+    ],
+    doseq=True,
+  )
+  return urllib.parse.urlunsplit((
+    parts.scheme.lower(),
+    parts.netloc.lower(),
+    parts.path,
+    filtered_query,
+    "",
+  ))
+
+
+def _cg_search_result_url_index(rec):
+  """Return a URL-keyed metadata fallback index for one ChatGPT record.
+
+  Parameters
+  ----------
+  rec : dict
+      ChatGPT record whose metadata may contain ``search_result_groups``.
+
+  Returns
+  -------
+  dict[str, dict[str, str]]
+      Mapping of normalized URLs to best-effort ``title``, ``snippet``, and
+      ``attribution`` fields.
+  """
+  metadata = rec.get("metadata", {})
+  if not isinstance(metadata, dict):
+    return {}
+  groups = metadata.get("search_result_groups", [])
+  if not isinstance(groups, list):
+    return {}
+
+  result = {}
+  for group in groups:
+    if not isinstance(group, dict):
+      continue
+    entries = group.get("entries", [])
+    if not isinstance(entries, list):
+      continue
+    for entry in entries:
+      if not isinstance(entry, dict):
+        continue
+      key = _cg_normalize_citation_url(entry.get("url", ""))
+      if not key:
+        continue
+      merged = result.setdefault(key, {"title": "", "snippet": "", "attribution": ""})
+      for field in ("title", "snippet", "attribution"):
+        value = entry.get(field, "")
+        if not merged[field] and isinstance(value, str) and value.strip():
+          merged[field] = value.strip()
+  return result
+
+
+def _cg_shorten_inline_text(text, *, max_chars=200):
+  """Return *text* trimmed to *max_chars* without chopping mid-word."""
+  text = " ".join(text.split())
+  if len(text) <= max_chars:
+    return text
+  clipped = text[:max_chars - 1].rstrip()
+  if " " in clipped:
+    clipped = clipped.rsplit(" ", 1)[0]
+  return clipped.rstrip(" ,;:-") + "…"
+
+
+def _cg_wrap_tooltip_block(text, *, width=78, max_chars=520):
+  """Return one tooltip block wrapped to a readable line width.
+
+  Parameters
+  ----------
+  text : str
+      Raw block text to normalize and wrap.
+  width : int, optional
+      Maximum line width for wrapped output.
+  max_chars : int, optional
+      Maximum total characters to preserve before appending an ellipsis.
+
+  Returns
+  -------
+  str
+      Wrapped block text, or ``""`` when *text* is empty.
+  """
+  if not isinstance(text, str):
+    return ""
+  cleaned = " ".join(text.split()).strip()
+  if not cleaned:
+    return ""
+  shortened = _cg_shorten_inline_text(cleaned, max_chars=max_chars)
+  wrapped = textwrap.wrap(
+    shortened,
+    width=width,
+    break_long_words=False,
+    break_on_hyphens=False,
+  )
+  return "\n".join(wrapped) if wrapped else shortened
+
+
+def _cg_clean_citation_blurb(text):
+  """Return wrapped tooltip blocks for one citation blurb.
+
+  Parameters
+  ----------
+  text : str
+      Raw citation snippet text from a ChatGPT content reference.
+
+  Returns
+  -------
+  list[str]
+      Ordered wrapped tooltip blocks preserving more snippet detail.
+  """
+  if not isinstance(text, str) or not text.strip():
+    return []
+  text = " ".join(text.split())
+  text = re.sub(r"\s*Read more\.?$", "", text, flags=re.IGNORECASE)
+  text = re.sub(r"^Abstract\b[:.]?\s*", "", text, flags=re.IGNORECASE)
+  text = re.sub(r"\.\s*\.", ".", text)
+  text = re.sub(r"\s+\.", ".", text)
+
+  meta = ""
+  body = text
+  if "—" in text:
+    head, tail = text.split("—", 1)
+    head = head.strip(" -")
+    tail = tail.strip()
+    if tail and (
+      head.lower().startswith("by ")
+      or "cited by" in head.lower()
+      or re.fullmatch(r"[A-Z][a-z]{2,8}\.? \d{1,2}, \d{4}", head)
+    ):
+      meta = head
+      body = tail
+
+  body = re.sub(r"\s*[•·]\s*", " • ", body)
+  blocks = []
+  if meta:
+    blocks.append(_cg_wrap_tooltip_block(meta, width=78, max_chars=180))
+  wrapped_body = _cg_wrap_tooltip_block(body, width=78, max_chars=520)
+  if wrapped_body:
+    blocks.append(wrapped_body)
+  return blocks
+
+
+def _cg_citation_tooltip(node, *, url_info=None, fallback=""):
+  """Return tooltip text for one grouped-web citation source.
+
+  Parameters
+  ----------
+  node : dict
+      Citation source object from a ChatGPT ``content_references`` entry.
+  url_info : dict, optional
+      Supplemental metadata matched by normalized URL from the same ChatGPT
+      record's ``search_result_groups``.
+  fallback : str, optional
+      Text to use when the source has no title or snippet.
+
+  Returns
+  -------
+  str
+      Concise tooltip text suitable for a Markdown link title.
+  """
+  if url_info is None:
+    url_info = {}
+  title = node.get("title", "")
+  if not isinstance(title, str) or not title.strip():
+    title = url_info.get("title", "")
+  snippet = node.get("snippet", "")
+  if not isinstance(snippet, str) or not snippet.strip():
+    snippet = url_info.get("snippet", "")
+  parts = []
+  if isinstance(title, str) and title.strip():
+    wrapped_title = _cg_wrap_tooltip_block(title, width=78, max_chars=220)
+    if wrapped_title:
+      parts.append(wrapped_title)
+  if isinstance(snippet, str) and snippet.strip():
+    for block in _cg_clean_citation_blurb(snippet):
+      if block and block not in parts:
+        parts.append(block)
+  if parts:
+    return "\n\n".join(parts)
+  return _cg_wrap_tooltip_block(fallback, width=78, max_chars=220)
+
+
+def _cg_citation_favicon(url):
+  """Return a Google favicon-service URL for *url*.
+
+  Parameters
+  ----------
+  url : str
+      Citation target URL.
+
+  Returns
+  -------
+  str
+      Google ``s2/favicons`` URL for the citation domain, else ``""``.
+  """
+  root = _cg_citation_root(url)
+  if not root:
+    return ""
+  return f"https://www.google.com/s2/favicons?domain={root}&sz=32"
+
+
+def _cg_collect_web_citation_sources(ref, *, url_index=None):
+  """Flatten grouped-web citation metadata into ordered source entries.
+
+  Parameters
+  ----------
+  ref : dict
+      One ChatGPT ``content_references`` entry.
+  url_index : dict, optional
+      Normalized-URL fallback metadata collected from the same ChatGPT record.
+
+  Returns
+  -------
+  list[dict[str, str]]
+      Ordered unique source dictionaries with ``url``, ``label``, and
+      ``tooltip`` keys.
+  """
+  if url_index is None:
+    url_index = {}
+  sources = []
+  seen = set()
+
+  def append(url, label, tooltip):
+    if not isinstance(url, str):
+      return
+    cleaned = url.strip()
+    if not cleaned or cleaned in seen:
+      return
+    seen.add(cleaned)
+    shown = label.strip() if isinstance(label, str) and label.strip() else ""
+    if not shown:
+      shown = _cg_citation_hostname(cleaned) or "source"
+    sources.append({
+      "url": cleaned,
+      "label": shown,
+      "tooltip": tooltip.strip() if isinstance(tooltip, str) else "",
+    })
+
+  def visit(node, inherited_tooltip=""):
+    if not isinstance(node, dict):
+      return
+    url = node.get("url")
+    if isinstance(url, str) and url.strip():
+      url_info = url_index.get(_cg_normalize_citation_url(url), {})
+      label = node.get("attribution", "")
+      if (not isinstance(label, str) or not label.strip()) and url_info:
+        label = url_info.get("attribution", "")
+      if not isinstance(label, str) or not label.strip():
+        label = _cg_citation_hostname(url)
+      tooltip = _cg_citation_tooltip(
+        node,
+        url_info=url_info,
+        fallback=inherited_tooltip or label,
+      )
+      append(url, label, tooltip)
+      inherited_tooltip = tooltip
+    for key in ("items", "supporting_websites", "webpages", "sources"):
+      value = node.get(key)
+      if isinstance(value, list):
+        for item in value:
+          visit(item, inherited_tooltip)
+
+  visit(ref)
+  safe_urls = ref.get("safe_urls", [])
+  if not sources and isinstance(safe_urls, list):
+    for url in safe_urls:
+      append(url, _cg_citation_hostname(url), "")
+  return sources
+
+
+def _cg_render_web_citation(ref, *, url_index=None):
+  """Return one compact Markdown cite block for a grouped-web reference.
+
+  Parameters
+  ----------
+  ref : dict
+      One ChatGPT ``content_references`` entry of type
+      ``"grouped_webpages"``.
+  url_index : dict, optional
+      Normalized-URL fallback metadata collected from the same ChatGPT record.
+
+  Returns
+  -------
+  str
+      Bold Markdown cite block, or ``""`` when *ref* contains no usable web
+      sources.
+  """
+  links = []
+  for source in _cg_collect_web_citation_sources(ref, url_index=url_index):
+    favicon = _cg_citation_favicon(source["url"])
+    title_attr = ""
+    if source["tooltip"]:
+      title_attr = f' title="{_cg_html_title_attr(source["tooltip"])}"'
+    icon = ""
+    if favicon:
+      icon = (
+        f'<img alt="" src="{_cg_html_attr(favicon)}" width="15" height="15"{title_attr} '
+        f'style="width:0.97em;height:0.97em;vertical-align:-0.13em;'
+        f'margin-right:0.22em;border-radius:2px;">'
+      )
+    links.append(
+      f'<a href="{_cg_html_attr(source["url"])}"{title_attr} '
+      f'style="display:inline-block;white-space:nowrap;">'
+      f'{icon}{_cg_html_text(source["label"])}</a>'
+    )
+  if not links:
+    return ""
+  return f"**(cite: {', '.join(links)})**"
+
+
+def _cg_render_inline_reference(ref, *, url_index=None):
+  """Return one human-readable replacement for a ChatGPT inline reference."""
+  ref_type = ref.get("type")
+  if ref_type == "grouped_webpages":
+    return _cg_render_web_citation(ref, url_index=url_index)
+  if ref_type == "alt_text":
+    for key in ("alt", "prompt_text"):
+      value = ref.get(key, "")
+      if isinstance(value, str) and value.strip():
+        return value.strip()
+    return ""
+  if ref_type == "file":
+    name = ref.get("name", "")
+    if isinstance(name, str) and name.strip():
+      return f"`{name.strip().replace('`', '')}`"
+    return "`file`"
+  return ""
+
+
+def _cg_render_inline_references(text, rec):
+  """Replace inline ChatGPT citation/entity/file tokens in *text*.
+
+  Parameters
+  ----------
+  text : str
+      Visible assistant text that may contain inline ChatGPT reference tokens.
+  rec : dict
+      ChatGPT assistant record carrying ``metadata.content_references``.
+
+  Returns
+  -------
+  str
+      *text* with supported inline-reference tokens replaced by readable
+      transcript text.
+  """
+  if not text:
+    return text
+  metadata = rec.get("metadata", {})
+  if not isinstance(metadata, dict):
+    return text
+  refs = metadata.get("content_references", [])
+  if not isinstance(refs, list):
+    return text
+  url_index = _cg_search_result_url_index(rec)
+  rendered = text
+  for ref in refs:
+    if not isinstance(ref, dict):
+      continue
+    matched = ref.get("matched_text")
+    if not isinstance(matched, str) or not matched or matched not in rendered:
+      continue
+    replacement = _cg_render_inline_reference(ref, url_index=url_index)
+    if replacement:
+      rendered = rendered.replace(matched, replacement)
+  return rendered
+
+
+def _cg_visible_user_text(rec):
+  """Return visible user text from a ChatGPT record, or ``""``."""
+  if _cg_is_hidden(rec):
+    return ""
+  if rec.get("author", {}).get("role") != "user":
+    return ""
+  content = rec.get("content", {})
+  if content.get("content_type") != "text":
+    return ""
+  return "\n\n".join(_cg_text_parts(content.get("parts", []))).strip()
+
+
+def _cg_visible_assistant_text(rec):
+  """Return visible assistant text from a ChatGPT record, or ``""``."""
+  if _cg_is_hidden(rec):
+    return ""
+  if rec.get("author", {}).get("role") != "assistant":
+    return ""
+  content = rec.get("content", {})
+  if content.get("content_type") != "text":
+    return ""
+  return "\n\n".join(_cg_text_parts(content.get("parts", []))).strip()
+
+
+def _cg_visible_assistant_markdown(rec):
+  """Return visible assistant text with transcript-only cite formatting.
+
+  Parameters
+  ----------
+  rec : dict
+      ChatGPT assistant record.
+
+  Returns
+  -------
+  str
+      Visible assistant text with grouped-web citation tokens rendered as
+      compact Markdown cite blocks.
+  """
+  text = _cg_visible_assistant_text(rec)
+  return _cg_render_inline_references(text, rec)
+
+
+def _cg_record_search_texts(rec):
+  """Return searchable text fragments extracted from a ChatGPT record."""
+  if _cg_is_hidden(rec):
+    return []
+  role = rec.get("author", {}).get("role", "")
+  if role == "system":
+    return []
+
+  content = rec.get("content", {})
+  ctype = content.get("content_type", "")
+  texts = []
+
+  if ctype == "text":
+    texts.extend(_cg_text_parts(content.get("parts", [])))
+  elif ctype == "thoughts":
+    thoughts = content.get("thoughts", [])
+    if isinstance(thoughts, list):
+      for thought in thoughts:
+        if not isinstance(thought, dict):
+          continue
+        summary = thought.get("summary", "")
+        body = thought.get("content", "")
+        chunks = thought.get("chunks", [])
+        if isinstance(summary, str) and summary.strip():
+          texts.append(summary)
+        if isinstance(body, str) and body.strip():
+          texts.append(body)
+        elif isinstance(chunks, list):
+          for chunk in chunks:
+            if isinstance(chunk, str) and chunk.strip():
+              texts.append(chunk)
+  elif ctype in ("code", "execution_output"):
+    for key in ("text", "content"):
+      value = content.get(key)
+      if isinstance(value, str) and value.strip():
+        texts.append(value)
+  elif ctype == "reasoning_recap":
+    value = content.get("content", "")
+    if isinstance(value, str) and value.strip():
+      texts.append(value)
+  elif ctype == "model_editable_context":
+    for key in ("model_set_context", "repo_summary"):
+      value = content.get(key)
+      if isinstance(value, str) and value.strip():
+        texts.append(value)
+
+  return texts
+
+
+def _cg_render_detail(summary, body):
+  """Return a collapsible Markdown details block."""
+  if not body:
+    return ""
+  return f"<details>\n<summary>{summary}</summary>\n\n{body}\n\n</details>"
+
+
+def _cg_render_thought_item(rec):
+  """Render one non-inline ChatGPT record as Markdown inside Thoughts."""
+  role = rec.get("author", {}).get("role", "")
+  content = rec.get("content", {})
+  ctype = content.get("content_type", "")
+
+  if role == "assistant" and ctype == "thoughts":
+    blocks = []
+    thoughts = content.get("thoughts", [])
+    if not isinstance(thoughts, list):
+      return ""
+    for thought in thoughts:
+      if not isinstance(thought, dict):
+        continue
+      summary = thought.get("summary", "")
+      body = thought.get("content", "")
+      chunks = thought.get("chunks", [])
+      if isinstance(body, str) and body.strip():
+        if isinstance(summary, str) and summary.strip():
+          blocks.append(f"**{summary}**\n\n{body}")
+        else:
+          blocks.append(body)
+      elif isinstance(summary, str) and summary.strip():
+        blocks.append(summary)
+      elif isinstance(chunks, list):
+        chunk_text = "\n\n".join(
+          chunk for chunk in chunks if isinstance(chunk, str) and chunk.strip()
+        )
+        if chunk_text:
+          blocks.append(chunk_text)
+    return "\n\n".join(blocks)
+
+  if role == "assistant" and ctype == "reasoning_recap":
+    recap = content.get("content", "")
+    return recap.strip() if isinstance(recap, str) else ""
+
+  if role == "assistant" and ctype == "code":
+    code = content.get("text", "")
+    if not isinstance(code, str) or not code.strip():
+      return ""
+    language = _cg_infer_code_language(rec, code, content.get("language", ""))
+    recipient = rec.get("recipient") or "tool"
+    return _cg_render_detail(
+      f"{recipient} code",
+      _md_code_fence(code, language),
+    )
+
+  if role == "assistant" and ctype == "model_editable_context":
+    texts = _cg_record_search_texts(rec)
+    if texts:
+      return _cg_render_detail("editable context", _md_quote("\n\n".join(texts)))
+    return ""
+
+  if role == "tool":
+    texts = _cg_record_search_texts(rec)
+    if not texts:
+      return ""
+    name = rec.get("author", {}).get("name") or rec.get("recipient") or "tool"
+    return _cg_render_detail(f"{name} output", _md_code_fence("\n\n".join(texts)))
+
+  return ""
+
+
+def _cg_render_thought_block(items, *, rec_width=1):
+  """Render ChatGPT thought/tool items as one collapsible block."""
+  if not items:
+    return ""
+  policy = _display_policy()
+  headings = _headings()
+  rendered = []
+  thought_no = 0
+
+  for rec_no, ts_str, rec in items:
+    body = _cg_render_thought_item(rec)
+    if not body:
+      continue
+    if policy.separate_thoughts:
+      thought_no += 1
+      suffix = ""
+      if policy.show_date or policy.record_number:
+        stamp = _build_hunk_prefix(rec_no, ts_str, rec_width=rec_width).rstrip()
+        if stamp:
+          suffix = " " + stamp
+      body = f"{headings.thought(thought_no)}{suffix}\n\n{body}"
+    rendered.append(body)
+
+  if not rendered:
+    return ""
+
+  return (
+    "<details>\n"
+    "<summary>Thoughts</summary>\n\n"
+    + "\n\n".join(rendered)
+    + "\n\n</details>"
+  )
+
+
+def _cg_heading_for_channel(channel):
+  """Return the ChatGPT heading string for *channel*."""
+  headings = _headings()
+  if channel == "commentary":
+    return headings.chatgpt_commentary
+  return headings.chatgpt
+
+
+def _cg_session_meta(path):
+  """Return ``(title, ctime, mtime, rc)`` for a ChatGPT JSONL file."""
+  title = "(no title)"
+  ctime = None
+  mtime = None
+  rc = 0
+  asst_fallback = None
+
+  try:
+    with open(path, encoding="utf-8") as f:
+      for raw in f:
+        raw = raw.strip()
+        if not raw:
+          continue
+        rc += 1
+        rec = json.loads(raw)
+
+        create_dt = _cg_float_ts_to_local(rec.get("create_time"))
+        update_dt = _cg_float_ts_to_local(rec.get("update_time"))
+        for dt in (create_dt, update_dt):
+          if dt is None:
+            continue
+          if ctime is None or dt < ctime:
+            ctime = dt
+          if mtime is None or dt > mtime:
+            mtime = dt
+
+        if title == "(no title)":
+          text = _cg_visible_user_text(rec)
+          if text:
+            title = _cg_first_nonempty_line(text, max_chars=80) or "(no title)"
+        if asst_fallback is None:
+          text = _cg_visible_assistant_text(rec)
+          if text:
+            asst_fallback = _cg_first_nonempty_line(text, max_chars=80)
+  except Exception:
+    pass
+
+  if title == "(no title)" and asst_fallback:
+    title = asst_fallback
+  return title, ctime, mtime, rc
+
+
+def _cg_session_grep(path, *, plain=None, rx=None, before=0, after=0, first_only=False,
+           ignore_case=False, rec_filter=None, cross_record=False):
+  """Return context hunks from matching content in a ChatGPT session file."""
+  result = []
+  rec_no = 0
+  tagged = [] if (cross_record and not first_only) else None
+  try:
+    with open(path, encoding="utf-8") as f:
+      for raw in f:
+        raw = raw.strip()
+        if not raw:
+          continue
+        rec_no += 1
+        if rec_filter and not rec_filter.is_trivial():
+          if rec_filter.past_hi(rec_no):
+            break
+          if not rec_filter.allows_rec(rec_no):
+            continue
+        rec = json.loads(raw)
+        ts_str = _cg_record_ts(rec)
+        if rec_filter and not rec_filter.allows_ts(ts_str):
+          continue
+        texts = _cg_record_search_texts(rec)
+        if tagged is not None:
+          for text in texts:
+            for line in text.splitlines():
+              tagged.append((line, rec_no, ts_str))
+        else:
+          for text in texts:
+            for hunk_lines in _grep_context(
+                text, plain=plain, rx=rx, before=before, after=after,
+                ignore_case=ignore_case):
+              result.append([(im, l, s, rec_no, ts_str) for im, l, s in hunk_lines])
+            if first_only and result:
+              return result
+  except Exception:
+    pass
+
+  if tagged is not None:
+    return _grep_context_tagged(
+      tagged, plain=plain, rx=rx, before=before, after=after,
+      ignore_case=ignore_case,
+    )
+  return result
+
+
+class ChatGPTSessionStore(SessionStore):
+  """Direct-file session store for ChatGPT JSONL exports."""
+
+  def is_available(self):
+    return False
+
+  def sessions(self, *, all_projects=False):
+    return []
+
+  def find(self, id_or_glob, *, all_projects=False):
+    raise FileNotFoundError("ChatGPT sessions are only supported via --file")
+
+  def _make_session_from_path(self, path):
+    """Build a Session from a ChatGPT JSONL file path."""
+    path = str(path)
+    stem = os.path.splitext(os.path.basename(path))[0]
+    title, ctime, mtime, rc = _cg_session_meta(path)
+    try:
+      file_mtime = datetime.datetime.fromtimestamp(os.path.getmtime(path))
+    except Exception:
+      file_mtime = datetime.datetime.now()
+    if ctime is None:
+      ctime = file_mtime
+    if mtime is None:
+      mtime = file_mtime
+    return Session(
+      source="chatgpt",
+      id=stem,
+      path=Path(path),
+      title=title,
+      ctime=ctime,
+      mtime=mtime,
+      project=None,
+      rc=rc,
+    )
+
+  def grep(self, session, *, plain=None, rx=None, before=0, after=0, first_only=False,
+       ignore_case=False, rec_filter=None, cross_record=False):
+    return _cg_session_grep(
+      str(session.path), plain=plain, rx=rx, before=before, after=after,
+      first_only=first_only, ignore_case=ignore_case, rec_filter=rec_filter,
+      cross_record=cross_record,
+    )
+
+  def transcript(self, session, rec_filter=None):
+    """Return the full Markdown transcript for a ChatGPT JSONL file."""
+    path = str(session.path)
+    with open(path, encoding="utf-8") as f:
+      if rec_filter and not rec_filter.is_trivial():
+        lines = []
+        for i, raw in enumerate((l for l in f if l.strip()), start=1):
+          rec_no = i
+          if rec_filter.past_hi(rec_no):
+            break
+          if not rec_filter.allows_rec(rec_no):
+            continue
+          rec = json.loads(raw)
+          ts_str = _cg_record_ts(rec)
+          if not rec_filter.allows_ts(ts_str):
+            continue
+          rec["_rec_no"] = rec_no
+          lines.append(rec)
+      else:
+        lines = [json.loads(l) for l in f if l.strip()]
+
+    headings = _headings()
+    policy = _display_policy()
+    rec_width = len(str(session.rc))
+    line1, line2 = _format_session_lines(session)
+    out = [f"{line1}\n{line2}\n"]
+    pending_thoughts = []
+
+    def flush_assistant_block(text="", *, rec_no=None, ts_str=None, channel=None):
+      """Emit a ChatGPT assistant block from pending thought items plus *text*."""
+      nonlocal pending_thoughts
+      if not text and not pending_thoughts:
+        return
+      display_rec_no = rec_no if rec_no is not None else pending_thoughts[0][0]
+      display_ts = ts_str if ts_str is not None else pending_thoughts[0][1]
+      suffix = ""
+      if policy.show_date or policy.record_number:
+        stamp = _build_hunk_prefix(
+          display_rec_no, display_ts, rec_width=rec_width
+        ).rstrip()
+        if stamp:
+          suffix = " " + stamp
+      heading = _cg_heading_for_channel(channel)
+      parts = [f"{heading}{suffix}"]
+      thoughts_md = _cg_render_thought_block(pending_thoughts, rec_width=rec_width)
+      if thoughts_md:
+        parts.append(thoughts_md)
+      if text:
+        parts.append(_md_quote(text))
+      comment = _record_comment(display_rec_no)
+      if comment:
+        out.append(comment)
+      out.append("\n\n".join(parts) + "\n")
+      pending_thoughts = []
+
+    for idx, rec in enumerate(lines):
+      rec_no = rec.get("_rec_no", idx + 1)
+      ts_str = _cg_record_ts(rec)
+      user_text = _cg_visible_user_text(rec)
+      if user_text:
+        flush_assistant_block()
+        suffix = ""
+        if policy.show_date or policy.record_number:
+          stamp = _build_hunk_prefix(rec_no, ts_str, rec_width=rec_width).rstrip()
+          if stamp:
+            suffix = " " + stamp
+        comment = _record_comment(rec_no)
+        if comment:
+          out.append(comment)
+        out.append(f"{headings.user}{suffix}\n\n{_md_quote(user_text)}\n")
+        continue
+
+      asst_text = _cg_visible_assistant_markdown(rec)
+      if asst_text:
+        flush_assistant_block(
+          asst_text,
+          rec_no=rec_no,
+          ts_str=ts_str,
+          channel=rec.get("channel"),
+        )
+        continue
+
+      if _cg_render_thought_item(rec):
+        pending_thoughts.append((rec_no, ts_str, rec))
+
+    flush_assistant_block()
+    return "\n".join(out)
+
+
 # ── Shared display functions ──────────────────────────────────────────────────
 
 def _format_session_lines(session):
@@ -2810,11 +3872,37 @@ def _resolve_single_session(stores, id_val, all_projects):
   sys.exit(1)
 
 
+def _detect_file_source(path):
+  """Return the JSONL source type for *path*, or ``None`` when unknown."""
+  try:
+    with open(path, encoding="utf-8") as f:
+      for raw in f:
+        raw = raw.strip()
+        if not raw:
+          continue
+        rec = json.loads(raw)
+        if not isinstance(rec, dict):
+          return None
+        if "author" in rec and "content" in rec:
+          return "chatgpt"
+        if rec.get("type") in ("event_msg", "response_item") and "payload" in rec:
+          return "codex"
+        if rec.get("type") and "message" in rec:
+          return "claude"
+        return None
+  except Exception:
+    return None
+  return None
+
+
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 def main():
   ap = argparse.ArgumentParser(
-    description="Unified transcript and session search for Claude and Codex.",
+    description=(
+      "Unified transcript and session search for Claude and Codex, plus "
+      "direct-file ChatGPT JSONL support."
+    ),
     epilog=(
       "Examples:\n"
       "  %(prog)s --ls                            list all sessions (both AIs)\n"
@@ -2823,6 +3911,8 @@ def main():
       "  %(prog)s --id f4b19167                   Claude transcript by UUID prefix\n"
       "  %(prog)s --id latest --codex             latest Codex transcript\n"
       "  %(prog)s --id f4b19167 out.md            write transcript to file\n"
+      "  %(prog)s --file export.jsonl            auto-detect direct JSONL source\n"
+      "  %(prog)s --chatgpt --file export.jsonl  force ChatGPT direct-file rendering\n"
       "  %(prog)s --grep 'FEA' -C 3               show matching context\n"
       "  %(prog)s --grep 'FEA' --grep 'lattice'   AND search\n"
       "  %(prog)s --grep 'FEA' --id f4b19167      grep within one session\n"
@@ -2848,6 +3938,10 @@ def main():
     help="Codex sessions only.",
   )
   src_group.add_argument(
+    "--chatgpt", action="store_true",
+    help="ChatGPT JSONL files only (currently direct-file mode via --file).",
+  )
+  src_group.add_argument(
     "--both-AIs", action="store_true", dest="both_ais",
     help="Both AIs (default when no source flag given).",
   )
@@ -2869,8 +3963,8 @@ def main():
     metavar="PATH",
     help=(
       "Read directly from PATH (a JSONL file) instead of discovering sessions "
-      "from the store.  Requires --claude or --codex.  Useful for fixture-based "
-      "testing and one-off debugging."
+      "from the store.  Auto-detects Claude, Codex, or ChatGPT when no source "
+      "flag is given.  Useful for fixture-based testing and one-off debugging."
     ),
   )
 
@@ -3059,13 +4153,39 @@ def main():
   if args.output and not id_val and not args.file:
     ap.error("output file requires --id or --file")
 
+  if args.chatgpt and not args.file:
+    ap.error("--chatgpt currently requires --file")
+
+  explicit_file_source = None
+  if args.claude:
+    explicit_file_source = "claude"
+  elif args.codex:
+    explicit_file_source = "codex"
+  elif args.chatgpt:
+    explicit_file_source = "chatgpt"
+
+  file_source = None
   if args.file:
-    if not (args.claude or args.codex):
-      ap.error("--file requires --claude or --codex to select the rendering path")
     if id_val:
       ap.error("--file and --id are mutually exclusive")
     if args.ls:
       ap.error("--file cannot be combined with --ls")
+    _detect_path = os.path.abspath(args.file)
+    detected_source = (
+      _detect_file_source(_detect_path) if os.path.isfile(_detect_path) else None
+    )
+    if explicit_file_source:
+      if detected_source and detected_source != explicit_file_source:
+        ap.error(
+          f"--file looks like {detected_source}, not {explicit_file_source}"
+        )
+      file_source = explicit_file_source
+    else:
+      file_source = detected_source
+      if os.path.isfile(_detect_path) and file_source is None:
+        ap.error(
+          "--file source auto-detection failed; use --claude, --codex, or --chatgpt"
+        )
 
   # ── Timezone resolution ─────────────────────────────────────────────────────
 
@@ -3139,14 +4259,17 @@ def main():
 
   claude_store = ClaudeSessionStore(project=args.project)
   codex_store  = CodexSessionStore()
+  chatgpt_store = ChatGPTSessionStore()
 
   stores = {}  # ordered: "claude" before "codex"
-  if args.codex:
+  if args.file and file_source == "chatgpt":
+    stores["chatgpt"] = chatgpt_store
+  elif args.codex or (args.file and file_source == "codex"):
     if not args.file and not codex_store.is_available():
       _error("Codex is not installed (~/.codex/sessions/ not found)")
       sys.exit(1)
     stores["codex"] = codex_store
-  elif args.claude:
+  elif args.claude or (args.file and file_source == "claude"):
     if not args.file and not claude_store.is_available():
       _error("Claude is not installed (~/.claude/projects/ not found)")
       sys.exit(1)
@@ -3168,13 +4291,16 @@ def main():
     if not os.path.isfile(_fpath):
       _error(f"--file: not found: {args.file}")
       sys.exit(1)
-    if args.claude:
+    if file_source == "claude":
       _file_session = claude_store._make_session(
         _fpath, os.path.getmtime(_fpath), os.path.dirname(_fpath))
       _file_store = claude_store
-    else:  # args.codex
+    elif file_source == "codex":
       _file_session = codex_store._make_session_from_path(_fpath, [])
       _file_store = codex_store
+    else:
+      _file_session = chatgpt_store._make_session_from_path(_fpath)
+      _file_store = chatgpt_store
     _info(f"Session: {_file_session.path}")
     transcript_text = _file_store.transcript(
       _file_session,
@@ -3237,14 +4363,16 @@ def main():
       if not os.path.isfile(_fpath):
         _error(f"--file: not found: {args.file}")
         sys.exit(1)
-      if args.claude:
+      if file_source == "claude":
         _file_session = claude_store._make_session(
           _fpath, os.path.getmtime(_fpath), os.path.dirname(_fpath))
-      else:  # args.codex
+      elif file_source == "codex":
         _file_session = codex_store._make_session_from_path(_fpath, [])
         if _file_session is None:
           _error(f"--file: could not read session from: {args.file}")
           sys.exit(1)
+      else:
+        _file_session = chatgpt_store._make_session_from_path(_fpath)
       candidates = [_file_session]
     elif id_val:
       # --id scopes search to a single session
