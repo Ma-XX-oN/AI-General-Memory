@@ -12,39 +12,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Configure git
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-      - name: Fix issue 4 file-reference grep initialization
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path('scripts/AI-transcript.py')
-          text = path.read_text(encoding='utf-8')
-          cl_start = text.index('def _cl_session_grep(')
-          cl_end = text.index('\ndef ', cl_start + 1)
-          cl_block = text[cl_start:cl_end]
-          assert cl_block.count('  file_ref_index = {}\n') == 1
-          cl_block = cl_block.replace('  file_ref_index = {}\n', '', 1)
-          text = text[:cl_start] + cl_block + text[cl_end:]
-          cg_start = text.index('def _cg_session_grep(')
-          cg_end = text.index('\ndef _cg_order_records_by_uap', cg_start)
-          cg_block = text[cg_start:cg_end]
-          assert '  file_ref_index = {}\n' not in cg_block
-          needle = '  tagged = [] if (cross_record and not first_only) else None\n'
-          assert cg_block.count(needle) == 1
-          cg_block = cg_block.replace(needle, needle + '  file_ref_index = {}\n', 1)
-          text = text[:cg_start] + cg_block + text[cg_end:]
-          path.write_text(text, encoding='utf-8')
-          PY
-          python3 -m py_compile scripts/AI-transcript.py
-          python3 scripts/AI-transcript.py --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl --grep 'Waiting for sources' > /tmp/chatgpt-grep.txt
-          grep -q 'Waiting for sources' /tmp/chatgpt-grep.txt
-          git add scripts/AI-transcript.py
-          git commit -m 'fix: initialize ChatGPT grep file reference index [skip ci]'
-          git push origin master
-      - name: Restore chronological ChatGPT rendering for issue 3
+      - name: Restore chronological ChatGPT rendering
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -58,6 +26,16 @@ jobs:
           text = text.replace(call_block, '', 1)
           assert '_cg_order_records_by_uap' not in text
           path.write_text(text, encoding='utf-8')
+
+          tests = Path('scripts/AI-transcript-tests.sh')
+          test_text = tests.read_text(encoding='utf-8')
+          marker = 'check "chatgpt-direct: grep finds tool output"'
+          line_start = test_text.index(marker)
+          line_end = test_text.index('\n', line_start) + 1
+          check = 'check "chatgpt-direct: duplicate identity stays chronological" 0 \'Second answer\' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-chronological-duplicate-identity.jsonl\n'
+          if 'duplicate identity stays chronological' not in test_text:
+            test_text = test_text[:line_end] + check + test_text[line_end:]
+          tests.write_text(test_text, encoding='utf-8')
           PY
           cat > scripts/fixtures/chatgpt-chronological-duplicate-identity.jsonl <<'EOF'
           {"id":"u1","author":{"role":"user"},"content":{"content_type":"text","parts":["First question"]},"metadata":{"turn_exchange_id":"same-exchange","working_turn_id":"same-working"}}
@@ -74,15 +52,21 @@ jobs:
           assert positions == sorted(positions), positions
           PY
           python3 scripts/AI-transcript.py --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl > /tmp/chatgpt-render.txt
-          grep -q 'multimodal user' /tmp/chatgpt-render.txt
-          grep -q '(cite:' /tmp/chatgpt-render.txt
-          grep -q 'hidden-file.txt' /tmp/chatgpt-render.txt
+          grep -q 'Find the screenshot-backed tool output and final answer.' /tmp/chatgpt-render.txt
           grep -q '\[image missing\]' /tmp/chatgpt-render.txt
-          git add scripts/AI-transcript.py scripts/fixtures/chatgpt-chronological-duplicate-identity.jsonl
+          grep -q '(cite:' /tmp/chatgpt-render.txt
+          grep -q 'AI-transcript.py L1-L2' /tmp/chatgpt-render.txt
+          grep -q '(memory:' /tmp/chatgpt-render.txt
+          ! grep -q 'filecite' /tmp/chatgpt-render.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/AI-transcript.py scripts/AI-transcript-tests.sh scripts/fixtures/chatgpt-chronological-duplicate-identity.jsonl
           git commit -m 'fix: restore chronological ChatGPT transcript rendering [skip ci]'
           git push origin master
       - name: Remove temporary workflow
         run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git rm .github/workflows/repair-chatgpt-transcript.yml
           git commit -m 'Remove temporary AI-transcript repair workflow [skip ci]'
           git push origin master
