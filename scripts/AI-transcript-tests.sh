@@ -425,6 +425,7 @@ check "chatgpt-direct: raw entity token removed"        0 'entity' "!" $SCRIP
 check "chatgpt-direct: raw file token removed"          0 'filecite' "!" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
 check "chatgpt-direct: raw mem token removed"           0 'memcite' "!" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
 check "chatgpt-direct: grep finds tool output"          0 'hello from python' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl --grep "hello from python"
+check "chatgpt-direct: duplicate identity stays chronological" 0 'Second answer' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-chronological-duplicate-identity.jsonl
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo

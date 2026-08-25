@@ -1,0 +1,4 @@
+{"id":"u1","author":{"role":"user"},"content":{"content_type":"text","parts":["First question"]},"metadata":{"turn_exchange_id":"same-exchange","working_turn_id":"same-working"}}
+{"id":"a1","author":{"role":"assistant"},"channel":"final","content":{"content_type":"text","parts":["First answer"]},"metadata":{"turn_exchange_id":"same-exchange","working_turn_id":"same-working"}}
+{"id":"u2","author":{"role":"user"},"content":{"content_type":"text","parts":["Second question"]},"metadata":{"turn_exchange_id":"same-exchange","working_turn_id":"same-working"}}
+{"id":"a2","author":{"role":"assistant"},"channel":"final","content":{"content_type":"text","parts":["Second answer"]},"metadata":{"turn_exchange_id":"same-exchange","working_turn_id":"same-working"}}
