@@ -1,0 +1,35 @@
+name: Verify ChatGPT UAP identity regression
+on:
+  push:
+    branches: [master]
+    paths: ['.github/workflows/verify-chatgpt-uap-linking.yml']
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify interleaved UAPs
+        run: |
+          cat >/tmp/uap.jsonl <<'EOF'
+          {"id":"u1","author":{"role":"user"},"content":{"content_type":"multimodal_text","parts":["First multimodal question",{"content_type":"image_asset_pointer"}]},"metadata":{"turn_exchange_id":"e1","working_turn_id":"w1"}}
+          {"id":"u2","author":{"role":"user"},"content":{"content_type":"text","parts":["Second question"]},"metadata":{"turn_exchange_id":"e2","working_turn_id":"w2"}}
+          {"id":"a2","author":{"role":"assistant"},"channel":"final","content":{"content_type":"text","parts":["Second answer"]},"metadata":{"turn_exchange_id":"e2","working_turn_id":"w2"}}
+          {"id":"a1","author":{"role":"assistant"},"channel":"final","content":{"content_type":"text","parts":["First answer"]},"metadata":{"turn_exchange_id":"e1","working_turn_id":"w1"}}
+          EOF
+          python3 scripts/AI-transcript.py --chatgpt --file /tmp/uap.jsonl >/tmp/out.md
+          python3 - <<'PY'
+          text=open('/tmp/out.md',encoding='utf-8').read()
+          p=[text.index(x) for x in ('First multimodal question','First answer','Second question','Second answer')]
+          assert p == sorted(p), (p, text)
+          PY
+          python3 -m py_compile scripts/AI-transcript.py
+      - name: Remove workflow
+        run: |
+          rm .github/workflows/verify-chatgpt-uap-linking.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -u
+          git commit -m 'chore: remove one-time ChatGPT UAP verification [skip ci]'
+          git push
