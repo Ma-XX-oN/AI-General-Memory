@@ -691,6 +691,7 @@ def _cl_session_grep(path, *, plain=None, rx=None, before=0, after=0, first_only
   result = []
   rec_no = 0
   tagged = [] if (cross_record and not first_only) else None
+  file_ref_index = {}
   try:
     with open(path, encoding="utf-8") as f:
       for raw in f:
@@ -2579,6 +2580,135 @@ def _cg_text_parts(parts):
   return texts
 
 
+_CG_INLINE_TOKEN_START = "\ue200"
+_CG_INLINE_TOKEN_END = "\ue201"
+_CG_INLINE_TOKEN_SEP = "\ue202"
+_CG_INLINE_TOKEN_RX = re.compile(r"\ue200[^\ue201]*\ue201")
+
+
+def _cg_inline_token_segments(token):
+  """Return structured segments from one inline ChatGPT marker token.
+
+  Parameters
+  ----------
+  token : str
+      Raw inline marker text.
+
+  Returns
+  -------
+  list[str]
+      Token segments split on the private-use separator, or ``[]`` when
+      *token* is not a recognized inline marker.
+  """
+  if not isinstance(token, str):
+    return []
+  if not (token.startswith(_CG_INLINE_TOKEN_START) and
+          token.endswith(_CG_INLINE_TOKEN_END)):
+    return []
+  return token[1:-1].split(_CG_INLINE_TOKEN_SEP)
+
+
+def _cg_strip_inline_tokens(text):
+  """Return *text* with unresolved inline ChatGPT marker tokens removed.
+
+  Parameters
+  ----------
+  text : str
+      Text that may still contain raw private-use marker tokens.
+
+  Returns
+  -------
+  str
+      *text* with unresolved marker tokens removed.
+  """
+  if not isinstance(text, str) or not text:
+    return ""
+  return _CG_INLINE_TOKEN_RX.sub("", text)
+
+
+def _cg_file_token_spec(token):
+  """Parse one ``filecite`` token into its lookup key and line reference.
+
+  Parameters
+  ----------
+  token : str
+      Raw inline ``filecite`` token.
+
+  Returns
+  -------
+  tuple[tuple[int, int] | None, str]
+      ``((turn_number, file_index), line_ref)`` when *token* is a recognized
+      file marker, else ``(None, "")``.
+  """
+  segments = _cg_inline_token_segments(token)
+  if len(segments) < 2 or segments[0] != "filecite":
+    return None, ""
+  match = re.fullmatch(r"turn(\d+)file(\d+)", segments[1])
+  if not match:
+    return None, ""
+  line_ref = segments[2].strip() if len(segments) > 2 else ""
+  return (int(match.group(1)), int(match.group(2))), line_ref
+
+
+def _cg_register_file_reference(index, rec):
+  """Register one tool-provided file citation descriptor into *index*.
+
+  Parameters
+  ----------
+  index : dict[tuple[int, int], dict]
+      Mutable lookup keyed by ``(turn_number, file_index)``.
+  rec : dict
+      ChatGPT record that may carry ``retrieval_*`` citation metadata.
+
+  Returns
+  -------
+  None
+      The mapping is updated in place when *rec* carries usable file metadata.
+  """
+  if not isinstance(index, dict):
+    return
+  metadata = rec.get("metadata", {})
+  if not isinstance(metadata, dict):
+    return
+  citation = metadata.get("citation_metadata")
+  if not isinstance(citation, dict):
+    return
+  turn_number = metadata.get("retrieval_turn_number")
+  file_index = metadata.get("retrieval_file_index")
+  try:
+    key = (int(turn_number), int(file_index))
+  except (TypeError, ValueError):
+    return
+  title = citation.get("title", "")
+  url = citation.get("url", "")
+  if not ((isinstance(title, str) and title.strip()) or
+          (isinstance(url, str) and url.strip())):
+    return
+  index[key] = citation
+
+
+def _cg_build_file_reference_index(records):
+  """Return a lookup for ChatGPT hidden file markers across *records*.
+
+  Parameters
+  ----------
+  records : list[dict]
+      ChatGPT JSONL records from one conversation export.
+
+  Returns
+  -------
+  dict[tuple[int, int], dict]
+      Mapping from ``(turn_number, file_index)`` to citation metadata.
+  """
+  index = {}
+  if not isinstance(records, list):
+    return index
+  for rec in records:
+    if isinstance(rec, dict):
+      _cg_register_file_reference(index, rec)
+  return index
+
+
 def _cg_html_text(text):
   """Return *text* escaped for visible inline HTML.
 
@@ -2655,12 +2785,14 @@ def _cg_citation_root(url):
   Returns
   -------
   str
-      ``scheme://host`` when *url* has a network location, else ``""``.
+      ``scheme://host`` for HTTP(S) URLs with a network location, else ``""``.
   """
   parts = urllib.parse.urlsplit(url)
   if not parts.netloc:
     return ""
   scheme = parts.scheme or "https"
+  if scheme not in ("http", "https"):
+    return ""
   return urllib.parse.urlunsplit((scheme, parts.netloc, "", "", ""))
 
 
@@ -2980,6 +3112,110 @@ def _cg_collect_web_citation_sources(ref, *, url_index=None):
   return sources
 
 
+def _cg_collect_memory_citation_sources(rec):
+  """Return ordered visible sources for one ChatGPT ``memcite`` marker.
+
+  Parameters
+  ----------
+  rec : dict
+      ChatGPT record whose metadata may include
+      ``conversation_context_citation_metadata``.
+
+  Returns
+  -------
+  list[dict[str, str]]
+      Ordered unique source dictionaries with ``url``, ``label``, and
+      ``tooltip`` keys.
+  """
+  metadata = rec.get("metadata", {})
+  if not isinstance(metadata, dict):
+    return []
+  entries = metadata.get("conversation_context_citation_metadata", [])
+  if not isinstance(entries, list):
+    return []
+
+  sources = []
+  seen = set()
+
+  def append(url, label, tooltip):
+    cleaned_url = url.strip() if isinstance(url, str) else ""
+    shown = label.strip() if isinstance(label, str) and label.strip() else ""
+    if not cleaned_url and not shown:
+      return
+    dedupe_key = (cleaned_url, shown)
+    if dedupe_key in seen:
+      return
+    seen.add(dedupe_key)
+    sources.append({
+      "url": cleaned_url,
+      "label": shown or _cg_citation_hostname(cleaned_url) or "memory",
+      "tooltip": tooltip.strip() if isinstance(tooltip, str) else "",
+    })
+
+  for entry in entries:
+    if not isinstance(entry, dict):
+      continue
+    citation = entry.get("citation")
+    if not isinstance(citation, dict):
+      continue
+    url = citation.get("url", "")
+    label = citation.get("title", "")
+    if not isinstance(label, str) or not label.strip():
+      label = citation.get("attribution", "")
+    if not isinstance(label, str) or not label.strip():
+      label = _cg_citation_hostname(url) or "memory"
+    tooltip = _cg_citation_tooltip(citation, fallback=label)
+    append(url, label, tooltip)
+  return sources
+
+
+def _cg_render_source_citation(kind, sources):
+  """Return one compact citation block from prepared source entries.
+
+  Parameters
+  ----------
+  kind : str
+      Leading label such as ``"cite"`` or ``"memory"``.
+  sources : list[dict[str, str]]
+      Prepared source metadata with ``url``, ``label``, and ``tooltip`` keys.
+
+  Returns
+  -------
+  str
+      Bold Markdown citation block, or ``""`` when *sources* is empty.
+  """
+  links = []
+  for source in sources:
+    url = source.get("url", "")
+    label = source.get("label", "")
+    tooltip = source.get("tooltip", "")
+    favicon = _cg_citation_favicon(url) if url else ""
+    title_attr = ""
+    if tooltip:
+      title_attr = f' title="{_cg_html_title_attr(tooltip)}"'
+    icon = ""
+    if favicon:
+      icon = (
+        f'<img alt="" src="{_cg_html_attr(favicon)}" width="15" height="15"{title_attr} '
+        f'style="width:0.97em;height:0.97em;vertical-align:-0.13em;'
+        f'margin-right:0.22em;border-radius:2px;">'
+      )
+    if url:
+      links.append(
+        f'<a href="{_cg_html_attr(url)}"{title_attr} '
+        f'style="display:inline-block;white-space:nowrap;">'
+        f'{icon}{_cg_html_text(label)}</a>'
+      )
+    else:
+      links.append(
+        f'<span{title_attr} style="display:inline-block;white-space:nowrap;">'
+        f'{icon}{_cg_html_text(label)}</span>'
+      )
+  if not links:
+    return ""
+  return f"**({kind}: {', '.join(links)})**"
+
+
 def _cg_render_web_citation(ref, *, url_index=None):
   """Return one compact Markdown cite block for a grouped-web reference.
 
@@ -2997,31 +3233,196 @@ def _cg_render_web_citation(ref, *, url_index=None):
       Bold Markdown cite block, or ``""`` when *ref* contains no usable web
       sources.
   """
-  links = []
-  for source in _cg_collect_web_citation_sources(ref, url_index=url_index):
-    favicon = _cg_citation_favicon(source["url"])
-    title_attr = ""
-    if source["tooltip"]:
-      title_attr = f' title="{_cg_html_title_attr(source["tooltip"])}"'
-    icon = ""
-    if favicon:
-      icon = (
-        f'<img alt="" src="{_cg_html_attr(favicon)}" width="15" height="15"{title_attr} '
-        f'style="width:0.97em;height:0.97em;vertical-align:-0.13em;'
-        f'margin-right:0.22em;border-radius:2px;">'
-      )
-    links.append(
-      f'<a href="{_cg_html_attr(source["url"])}"{title_attr} '
-      f'style="display:inline-block;white-space:nowrap;">'
-      f'{icon}{_cg_html_text(source["label"])}</a>'
-    )
-  if not links:
+  sources = _cg_collect_web_citation_sources(ref, url_index=url_index)
+  return _cg_render_source_citation("cite", sources)
+
+
+def _cg_render_memory_citation(rec):
+  """Return one readable replacement block for a ChatGPT ``memcite`` token.
+
+  Parameters
+  ----------
+  rec : dict
+      ChatGPT record whose metadata may include memory/source citations.
+
+  Returns
+  -------
+  str
+      Compact memory-citation block, or a generic placeholder when only the
+      marker itself is available.
+  """
+  sources = _cg_collect_memory_citation_sources(rec)
+  if sources:
+    return _cg_render_source_citation("memory", sources)
+  return "**(memory context)**"
+
+
+def _cg_display_file_url(url):
+  """Return a user-facing file URL derived from *url* when possible.
+
+  Parameters
+  ----------
+  url : str
+      Source URL from ChatGPT file-citation metadata.
+
+  Returns
+  -------
+  str
+      User-facing URL suitable for transcript links, or ``""`` when *url* is
+      unusable.
+  """
+  if not isinstance(url, str):
     return ""
-  return f"**(cite: {', '.join(links)})**"
+  cleaned = url.strip()
+  if not cleaned:
+    return ""
+  parts = urllib.parse.urlsplit(cleaned)
+  if parts.netloc.lower() == "api.github.com":
+    segments = [seg for seg in parts.path.split("/") if seg]
+    if len(segments) >= 4 and segments[0] == "repos" and segments[3] == "contents":
+      owner = segments[1]
+      repo = segments[2]
+      rel = [urllib.parse.unquote(seg) for seg in segments[4:]]
+      ref = urllib.parse.parse_qs(parts.query).get("ref", ["main"])[0]
+      ref_q = urllib.parse.quote(ref, safe="")
+      if rel:
+        target = "blob" if "." in rel[-1] else "tree"
+        rel_q = "/".join(urllib.parse.quote(seg, safe="") for seg in rel)
+        return f"https://github.com/{owner}/{repo}/{target}/{ref_q}/{rel_q}"
+      return f"https://github.com/{owner}/{repo}/tree/{ref_q}"
+  return cleaned
 
 
-def _cg_render_inline_reference(ref, *, url_index=None):
-  """Return one human-readable replacement for a ChatGPT inline reference."""
+def _cg_display_file_label(name, url):
+  """Return a readable file-citation label from metadata.
+
+  Parameters
+  ----------
+  name : str
+      Source title from ChatGPT file-citation metadata.
+  url : str
+      Source URL from ChatGPT file-citation metadata.
+
+  Returns
+  -------
+  str
+      Readable label for the cited file/resource.
+  """
+  shown = name.strip().replace("`", "") if isinstance(name, str) else ""
+  cleaned_url = _cg_display_file_url(url)
+  parts = urllib.parse.urlsplit(cleaned_url) if cleaned_url else None
+  segments = [seg for seg in parts.path.split("/") if seg] if parts else []
+  generic = {"", "file", "content", "contents"}
+  if shown.lower() in generic:
+    if parts and parts.netloc.lower() == "github.com":
+      if len(segments) >= 4 and segments[2] == "tree" and len(segments) == 4:
+        shown = f"{segments[1]} contents"
+      elif len(segments) >= 5 and segments[2] in ("blob", "tree"):
+        if segments[-1]:
+          shown = urllib.parse.unquote(segments[-1])
+      elif segments:
+        shown = urllib.parse.unquote(segments[-1])
+    elif segments:
+      shown = urllib.parse.unquote(segments[-1])
+  return shown or "file"
+
+
+def _cg_render_named_file_reference(name, *, matched_text="", url=""):
+  """Return one readable replacement for a file citation reference.
+
+  Parameters
+  ----------
+  name : str
+      File label to show in the transcript.
+  matched_text : str, optional
+      Original inline token, used to preserve any line-range suffix.
+  url : str, optional
+      Optional hyperlink target for the cited file. Accepted for metadata
+      compatibility, but file references render as transcript text.
+
+  Returns
+  -------
+  str
+      Human-readable file reference text or link.
+  """
+  shown = _cg_display_file_label(name, url)
+  _key, line_ref = _cg_file_token_spec(matched_text)
+  label = f"{shown} {line_ref}".strip()
+  display_url = _cg_display_file_url(url)
+  if display_url:
+    return (
+      f'<a href="{_cg_html_attr(display_url)}">'
+      f'{_cg_html_text(label)}</a>'
+    )
+  if line_ref:
+    return f"`{shown}` {line_ref}"
+  return f"`{shown}`"
+
+
+def _cg_hidden_file_reference(ref, *, rec=None, file_ref_index=None):
+  """Return one readable replacement for a hidden ``filecite`` marker.
+
+  Parameters
+  ----------
+  ref : dict
+      Hidden inline-reference entry from ``metadata.content_references``.
+  rec : dict, optional
+      Current ChatGPT record, used for direct tool citation metadata fallback.
+  file_ref_index : dict, optional
+      Conversation-wide lookup keyed by ``(turn_number, file_index)``.
+
+  Returns
+  -------
+  str
+      Human-readable file reference, or ``""`` when the token is unsupported.
+  """
+  token = ref.get("matched_text", "")
+  key, _line_ref = _cg_file_token_spec(token)
+  if key is None:
+    return ""
+
+  citation = {}
+  if isinstance(rec, dict):
+    metadata = rec.get("metadata", {})
+    if isinstance(metadata, dict):
+      turn_number = metadata.get("retrieval_turn_number")
+      file_index = metadata.get("retrieval_file_index")
+      try:
+        current_key = (int(turn_number), int(file_index))
+      except (TypeError, ValueError):
+        current_key = None
+      if current_key == key and isinstance(metadata.get("citation_metadata"), dict):
+        citation = metadata.get("citation_metadata")
+  if (not citation) and isinstance(file_ref_index, dict):
+    candidate = file_ref_index.get(key)
+    if isinstance(candidate, dict):
+      citation = candidate
+
+  name = citation.get("title", "") if isinstance(citation, dict) else ""
+  url = citation.get("url", "") if isinstance(citation, dict) else ""
+  return _cg_render_named_file_reference(name, matched_text=token, url=url)
+
+
+def _cg_render_inline_reference(ref, *, rec=None, url_index=None,
+                                file_ref_index=None):
+  """Return one human-readable replacement for a ChatGPT inline reference.
+
+  Parameters
+  ----------
+  ref : dict
+      Inline-reference metadata entry from ``content_references``.
+  rec : dict, optional
+      Current ChatGPT record that owns the reference token.
+  url_index : dict, optional
+      Search-result metadata indexed by normalized URL.
+  file_ref_index : dict, optional
+      Conversation-wide lookup for hidden tool/file citations.
+
+  Returns
+  -------
+  str
+      Human-readable replacement text, or ``""`` when *ref* is unsupported.
+  """
   ref_type = ref.get("type")
   if ref_type == "grouped_webpages":
     return _cg_render_web_citation(ref, url_index=url_index)
@@ -3033,13 +3434,52 @@ def _cg_render_inline_reference(ref, *, url_index=None):
     return ""
   if ref_type == "file":
     name = ref.get("name", "")
-    if isinstance(name, str) and name.strip():
-      return f"`{name.strip().replace('`', '')}`"
-    return "`file`"
+    return _cg_render_named_file_reference(name, matched_text=ref.get("matched_text", ""))
+  if ref_type == "hidden":
+    segments = _cg_inline_token_segments(ref.get("matched_text", ""))
+    if not segments:
+      return ""
+    if segments[0] == "memcite" and isinstance(rec, dict):
+      return _cg_render_memory_citation(rec)
+    if segments[0] == "filecite":
+      return _cg_hidden_file_reference(
+        ref, rec=rec, file_ref_index=file_ref_index
+      )
   return ""
 
 
-def _cg_render_inline_references(text, rec):
+def _cg_render_unstructured_inline_token(token, *, rec=None, file_ref_index=None):
+  """Return a fallback replacement for one raw inline marker token.
+
+  Parameters
+  ----------
+  token : str
+      Raw inline marker found directly in visible text.
+  rec : dict, optional
+      Current ChatGPT record that owns the token.
+  file_ref_index : dict, optional
+      Conversation-wide lookup for hidden tool/file citations.
+
+  Returns
+  -------
+  str
+      Human-readable fallback replacement, or ``""`` when unresolved.
+  """
+  segments = _cg_inline_token_segments(token)
+  if not segments:
+    return ""
+  if segments[0] == "memcite" and isinstance(rec, dict):
+    return _cg_render_memory_citation(rec)
+  if segments[0] == "filecite":
+    return _cg_hidden_file_reference(
+      {"matched_text": token, "type": "hidden"},
+      rec=rec,
+      file_ref_index=file_ref_index,
+    )
+  return ""
+
+
+def _cg_render_inline_references(text, rec, *, file_ref_index=None):
   """Replace inline ChatGPT citation/entity/file tokens in *text*.
 
   Parameters
@@ -3058,11 +3498,11 @@ def _cg_render_inline_references(text, rec):
   if not text:
     return text
   metadata = rec.get("metadata", {})
-  if not isinstance(metadata, dict):
-    return text
-  refs = metadata.get("content_references", [])
-  if not isinstance(refs, list):
-    return text
+  refs = []
+  if isinstance(metadata, dict):
+    refs = metadata.get("content_references", [])
+    if not isinstance(refs, list):
+      refs = []
   url_index = _cg_search_result_url_index(rec)
   rendered = text
   for ref in refs:
@@ -3071,43 +3511,140 @@ def _cg_render_inline_references(text, rec):
     matched = ref.get("matched_text")
     if not isinstance(matched, str) or not matched or matched not in rendered:
       continue
-    replacement = _cg_render_inline_reference(ref, url_index=url_index)
+    replacement = _cg_render_inline_reference(
+      ref,
+      rec=rec,
+      url_index=url_index,
+      file_ref_index=file_ref_index,
+    )
     if replacement:
       rendered = rendered.replace(matched, replacement)
+  for token in _CG_INLINE_TOKEN_RX.findall(rendered):
+    replacement = _cg_render_unstructured_inline_token(
+      token, rec=rec, file_ref_index=file_ref_index
+    )
+    if replacement:
+      rendered = rendered.replace(token, replacement)
   return rendered
 
 
-def _cg_visible_user_text(rec):
-  """Return visible user text from a ChatGPT record, or ``""``."""
+def _cg_content_text_parts(rec, *, file_ref_index=None):
+  """Return cleaned visible/searchable text fragments from one record.
+
+  Parameters
+  ----------
+  rec : dict
+      ChatGPT record carrying ``content.parts`` text fragments.
+  file_ref_index : dict, optional
+      Conversation-wide lookup for hidden tool/file citations.
+
+  Returns
+  -------
+  list[str]
+      Cleaned visible/searchable text fragments.
+  """
+  content = rec.get("content", {})
+  parts = content.get("parts", [])
+  role = rec.get("author", {}).get("role", "")
+  ctype = content.get("content_type", "")
+  cleaned = []
+  image_placeholders = []
+  if not isinstance(parts, list):
+    return cleaned
+  for part in parts:
+    texts = []
+    if isinstance(part, str):
+      if part.strip():
+        texts.append(part)
+    elif isinstance(part, dict):
+      if part.get("content_type") == "image_asset_pointer":
+        image_placeholders.append("[image missing]")
+        continue
+      for key in ("text", "content"):
+        value = part.get(key)
+        if isinstance(value, str) and value.strip():
+          texts.append(value)
+    for text in texts:
+      if not isinstance(text, str):
+        continue
+      stripped = text.strip()
+      if (role == "tool" and ctype == "multimodal_text" and
+          stripped.startswith("Make sure to include ") and
+          "cite this file" in stripped):
+        continue
+      rendered = _cg_render_inline_references(
+        text, rec, file_ref_index=file_ref_index
+      )
+      rendered = _cg_strip_inline_tokens(rendered).strip()
+      if rendered:
+        cleaned.append(rendered)
+  cleaned.extend(image_placeholders)
+  return cleaned
+
+
+def _cg_visible_user_text(rec, *, file_ref_index=None):
+  """Return visible user text from a ChatGPT record, or ``""``.
+
+  Parameters
+  ----------
+  rec : dict
+      ChatGPT record.
+  file_ref_index : dict, optional
+      Conversation-wide lookup for hidden tool/file citations.
+
+  Returns
+  -------
+  str
+      Visible user text extracted from *rec*.
+  """
   if _cg_is_hidden(rec):
     return ""
   if rec.get("author", {}).get("role") != "user":
     return ""
   content = rec.get("content", {})
-  if content.get("content_type") != "text":
+  if content.get("content_type") not in ("text", "multimodal_text"):
     return ""
-  return "\n\n".join(_cg_text_parts(content.get("parts", []))).strip()
+  return "\n\n".join(
+    _cg_content_text_parts(rec, file_ref_index=file_ref_index)
+  ).strip()
 
 
-def _cg_visible_assistant_text(rec):
-  """Return visible assistant text from a ChatGPT record, or ``""``."""
+def _cg_visible_assistant_text(rec, *, file_ref_index=None):
+  """Return visible assistant text from a ChatGPT record, or ``""``.
+
+  Parameters
+  ----------
+  rec : dict
+      ChatGPT record.
+  file_ref_index : dict, optional
+      Conversation-wide lookup for hidden tool/file citations.
+
+  Returns
+  -------
+  str
+      Visible assistant text extracted from *rec*.
+  """
   if _cg_is_hidden(rec):
     return ""
   if rec.get("author", {}).get("role") != "assistant":
     return ""
   content = rec.get("content", {})
-  if content.get("content_type") != "text":
+  if content.get("content_type") not in ("text", "multimodal_text"):
     return ""
-  return "\n\n".join(_cg_text_parts(content.get("parts", []))).strip()
+  return "\n\n".join(
+    _cg_content_text_parts(rec, file_ref_index=file_ref_index)
+  ).strip()
 
 
-def _cg_visible_assistant_markdown(rec):
+def _cg_visible_assistant_markdown(rec, *, file_ref_index=None):
   """Return visible assistant text with transcript-only cite formatting.
 
   Parameters
   ----------
   rec : dict
       ChatGPT assistant record.
+  file_ref_index : dict, optional
+      Conversation-wide lookup for hidden tool/file citations.
 
   Returns
   -------
@@ -3115,12 +3652,24 @@ def _cg_visible_assistant_markdown(rec):
       Visible assistant text with grouped-web citation tokens rendered as
       compact Markdown cite blocks.
   """
-  text = _cg_visible_assistant_text(rec)
-  return _cg_render_inline_references(text, rec)
+  return _cg_visible_assistant_text(rec, file_ref_index=file_ref_index)
 
 
-def _cg_record_search_texts(rec):
-  """Return searchable text fragments extracted from a ChatGPT record."""
+def _cg_record_search_texts(rec, *, file_ref_index=None):
+  """Return searchable text fragments extracted from a ChatGPT record.
+
+  Parameters
+  ----------
+  rec : dict
+      ChatGPT record.
+  file_ref_index : dict, optional
+      Conversation-wide lookup for hidden tool/file citations.
+
+  Returns
+  -------
+  list[str]
+      Searchable text fragments extracted from *rec*.
+  """
   if _cg_is_hidden(rec):
     return []
   role = rec.get("author", {}).get("role", "")
@@ -3131,8 +3680,8 @@ def _cg_record_search_texts(rec):
   ctype = content.get("content_type", "")
   texts = []
 
-  if ctype == "text":
-    texts.extend(_cg_text_parts(content.get("parts", [])))
+  if ctype in ("text", "multimodal_text"):
+    texts.extend(_cg_content_text_parts(rec, file_ref_index=file_ref_index))
   elif ctype == "thoughts":
     thoughts = content.get("thoughts", [])
     if isinstance(thoughts, list):
@@ -3164,6 +3713,20 @@ def _cg_record_search_texts(rec):
       value = content.get(key)
       if isinstance(value, str) and value.strip():
         texts.append(value)
+  elif ctype == "tether_browsing_display":
+    for key in ("summary", "result"):
+      value = content.get(key)
+      if isinstance(value, str) and value.strip():
+        texts.append(value)
+    assets = content.get("assets")
+    asset_items = assets if isinstance(assets, list) else [assets]
+    for asset in asset_items:
+      if not isinstance(asset, dict):
+        continue
+      for key in ("title", "text", "alt", "caption", "url"):
+        value = asset.get(key)
+        if isinstance(value, str) and value.strip():
+          texts.append(value)
 
   return texts
 
@@ -3175,8 +3738,21 @@ def _cg_render_detail(summary, body):
   return f"<details>\n<summary>{summary}</summary>\n\n{body}\n\n</details>"
 
 
-def _cg_render_thought_item(rec):
-  """Render one non-inline ChatGPT record as Markdown inside Thoughts."""
+def _cg_render_thought_item(rec, *, file_ref_index=None):
+  """Render one non-inline ChatGPT record as Markdown inside Thoughts.
+
+  Parameters
+  ----------
+  rec : dict
+      ChatGPT record to render.
+  file_ref_index : dict, optional
+      Conversation-wide lookup for hidden tool/file citations.
+
+  Returns
+  -------
+  str
+      Markdown body for the thought/tool item, or ``""`` when hidden.
+  """
   role = rec.get("author", {}).get("role", "")
   content = rec.get("content", {})
   ctype = content.get("content_type", "")
@@ -3223,13 +3799,13 @@ def _cg_render_thought_item(rec):
     )
 
   if role == "assistant" and ctype == "model_editable_context":
-    texts = _cg_record_search_texts(rec)
+    texts = _cg_record_search_texts(rec, file_ref_index=file_ref_index)
     if texts:
       return _cg_render_detail("editable context", _md_quote("\n\n".join(texts)))
     return ""
 
   if role == "tool":
-    texts = _cg_record_search_texts(rec)
+    texts = _cg_record_search_texts(rec, file_ref_index=file_ref_index)
     if not texts:
       return ""
     name = rec.get("author", {}).get("name") or rec.get("recipient") or "tool"
@@ -3238,8 +3814,23 @@ def _cg_render_thought_item(rec):
   return ""
 
 
-def _cg_render_thought_block(items, *, rec_width=1):
-  """Render ChatGPT thought/tool items as one collapsible block."""
+def _cg_render_thought_block(items, *, rec_width=1, file_ref_index=None):
+  """Render ChatGPT thought/tool items as one collapsible block.
+
+  Parameters
+  ----------
+  items : list[tuple[int, str, dict]]
+      ``(rec_no, ts_str, rec)`` items pending under one assistant block.
+  rec_width : int, optional
+      Width used when formatting record-number prefixes.
+  file_ref_index : dict, optional
+      Conversation-wide lookup for hidden tool/file citations.
+
+  Returns
+  -------
+  str
+      Collapsible Markdown details block, or ``""`` when empty.
+  """
   if not items:
     return ""
   policy = _display_policy()
@@ -3248,7 +3839,7 @@ def _cg_render_thought_block(items, *, rec_width=1):
   thought_no = 0
 
   for rec_no, ts_str, rec in items:
-    body = _cg_render_thought_item(rec)
+    body = _cg_render_thought_item(rec, file_ref_index=file_ref_index)
     if not body:
       continue
     if policy.separate_thoughts:
@@ -3342,10 +3933,11 @@ def _cg_session_grep(path, *, plain=None, rx=None, before=0, after=0, first_only
           if not rec_filter.allows_rec(rec_no):
             continue
         rec = json.loads(raw)
+        _cg_register_file_reference(file_ref_index, rec)
         ts_str = _cg_record_ts(rec)
         if rec_filter and not rec_filter.allows_ts(ts_str):
           continue
-        texts = _cg_record_search_texts(rec)
+        texts = _cg_record_search_texts(rec, file_ref_index=file_ref_index)
         if tagged is not None:
           for text in texts:
             for line in text.splitlines():
@@ -3440,6 +4032,7 @@ class ChatGPTSessionStore(SessionStore):
     line1, line2 = _format_session_lines(session)
     out = [f"{line1}\n{line2}\n"]
     pending_thoughts = []
+    file_ref_index = _cg_build_file_reference_index(lines)
 
     def flush_assistant_block(text="", *, rec_no=None, ts_str=None, channel=None):
       """Emit a ChatGPT assistant block from pending thought items plus *text*."""
@@ -3457,7 +4050,11 @@ class ChatGPTSessionStore(SessionStore):
           suffix = " " + stamp
       heading = _cg_heading_for_channel(channel)
       parts = [f"{heading}{suffix}"]
-      thoughts_md = _cg_render_thought_block(pending_thoughts, rec_width=rec_width)
+      thoughts_md = _cg_render_thought_block(
+        pending_thoughts,
+        rec_width=rec_width,
+        file_ref_index=file_ref_index,
+      )
       if thoughts_md:
         parts.append(thoughts_md)
       if text:
@@ -3471,7 +4068,7 @@ class ChatGPTSessionStore(SessionStore):
     for idx, rec in enumerate(lines):
       rec_no = rec.get("_rec_no", idx + 1)
       ts_str = _cg_record_ts(rec)
-      user_text = _cg_visible_user_text(rec)
+      user_text = _cg_visible_user_text(rec, file_ref_index=file_ref_index)
       if user_text:
         flush_assistant_block()
         suffix = ""
@@ -3485,7 +4082,9 @@ class ChatGPTSessionStore(SessionStore):
         out.append(f"{headings.user}{suffix}\n\n{_md_quote(user_text)}\n")
         continue
 
-      asst_text = _cg_visible_assistant_markdown(rec)
+      asst_text = _cg_visible_assistant_markdown(
+        rec, file_ref_index=file_ref_index
+      )
       if asst_text:
         flush_assistant_block(
           asst_text,
@@ -3495,7 +4094,7 @@ class ChatGPTSessionStore(SessionStore):
         )
         continue
 
-      if _cg_render_thought_item(rec):
+      if _cg_render_thought_item(rec, file_ref_index=file_ref_index):
         pending_thoughts.append((rec_no, ts_str, rec))
 
     flush_assistant_block()

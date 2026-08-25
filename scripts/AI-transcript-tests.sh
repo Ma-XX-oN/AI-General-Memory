@@ -404,6 +404,8 @@ check "codex-orphan-patch: patch content present"       0 'foo\.py'         ""  
 # chatgpt-direct: auto-detected ChatGPT transcript renders commentary and tool details
 check "chatgpt-direct: auto-detect commentary heading"  0 '## ChatGPT Commentary' "" $SCRIPT --file scripts/fixtures/chatgpt-direct.jsonl
 check "chatgpt-direct: explicit flag renders tool output" 0 'hello from python' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
+check "chatgpt-direct: multimodal user rendered"        0 'Find the screenshot-backed tool output and final answer\.' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
+check "chatgpt-direct: multimodal image placeholder"    0 '\[image missing\]' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
 check "chatgpt-direct: grouped cite block rendered"      0 '\*\*\(cite:' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
 check "chatgpt-direct: cite sources named"              0 'Python Docs.*Example|Example.*Python Docs' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
 check "chatgpt-direct: google favicon service used"     0 'google\.com/s2/favicons\?domain=https://docs\.python\.org&sz=32' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
@@ -413,9 +415,15 @@ check "chatgpt-direct: tooltip falls back by URL"       0 'title="Python note&#1
 check "chatgpt-direct: container exec inferred bash"    0 '```bash' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
 check "chatgpt-direct: alt text rendered"               0 'Morris Plotkin checked uploaded file' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
 check "chatgpt-direct: file cite rendered"              0 '`notes\.txt`' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
+check "chatgpt-direct: hidden file cite resolved"       0 '<a href="https://example\.com/AI-transcript\.py">AI-transcript\.py L1-L2</a>' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
+check "chatgpt-direct: tool multimodal preserved"       0 '\[L1\] def demo\(\):' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
+check "chatgpt-direct: tether browsing preserved"       0 'Waiting for sources\.' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
+check "chatgpt-direct: memory cite rendered"            0 '\*\*\(memory:' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
+check "chatgpt-direct: memory cite labels shown"        0 'Prior design note.*transcript-plan\.md|transcript-plan\.md.*Prior design note' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
 check "chatgpt-direct: raw cite token removed"          0 'cite' "!" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
 check "chatgpt-direct: raw entity token removed"        0 'entity' "!" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
 check "chatgpt-direct: raw file token removed"          0 'filecite' "!" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
+check "chatgpt-direct: raw mem token removed"           0 'memcite' "!" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
 check "chatgpt-direct: grep finds tool output"          0 'hello from python' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl --grep "hello from python"
 
 # ── Summary ──────────────────────────────────────────────────────────────────
