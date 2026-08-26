@@ -1,0 +1,124 @@
+name: Repair AI transcript regressions
+
+on:
+  push:
+    paths:
+      - '.github/workflows/repair-ai-transcript.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fix sandbox artifact preservation
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('scripts/AI-transcript.py')
+          s = p.read_text(encoding='utf-8')
+          original = s
+
+          s = s.replace('CHATGPT_CONVERSATION_ID = None\n', '', 1)
+
+          s, n = re.subn(
+            r'\ndef _cg_conversation_id_from_path\(path\):\n.*?(?=\ndef _cg_message_records\(path\):)',
+            '\n', s, count=1, flags=re.S,
+          )
+          assert n == 1, 'conversation-id helper block not found'
+
+          s, n = re.subn(
+            r'\ndef _cg_sandbox_path\(source\):\n.*?(?=\ndef _cg_visible_assistant_markdown\(rec, \*, file_ref_index=None\):)',
+            '\n', s, count=1, flags=re.S,
+          )
+          assert n == 1, 'sandbox translation block not found'
+
+          old = '''  text = _cg_visible_assistant_text(rec, file_ref_index=file_ref_index)\n  return _cg_translate_sandbox_links(text, rec, CHATGPT_CONVERSATION_ID)\n'''
+          new = '''  return _cg_visible_assistant_text(rec, file_ref_index=file_ref_index)\n'''
+          assert old in s, 'assistant sandbox translation call not found'
+          s = s.replace(old, new, 1)
+
+          old = '''    global CHATGPT_CONVERSATION_ID\n    path = str(path)\n    if not CHATGPT_CONVERSATION_ID:\n      CHATGPT_CONVERSATION_ID = _cg_conversation_id_from_path(path) or None\n'''
+          new = '''    path = str(path)\n'''
+          assert old in s, 'session conversation-id extraction block not found'
+          s = s.replace(old, new, 1)
+
+          old = '''  ap.add_argument(\n    "--conversation-id",\n    help=(\n      "ChatGPT conversation ID used to translate generated sandbox links "\n      "to interpreter download URLs."\n    ),\n  )\n\n'''
+          assert old in s, '--conversation-id argument block not found'
+          s = s.replace(old, '', 1)
+
+          old = '''  global CHATGPT_CONVERSATION_ID\n  CHATGPT_CONVERSATION_ID = args.conversation_id\n\n'''
+          assert old in s, 'CHATGPT_CONVERSATION_ID assignment not found'
+          s = s.replace(old, '', 1)
+
+          assert s != original
+          assert 'interpreter/download?message_id=' not in s
+          assert '_cg_translate_sandbox_links' not in s
+          assert 'CHATGPT_CONVERSATION_ID' not in s
+          p.write_text(s, encoding='utf-8')
+          PY
+
+          python -m py_compile scripts/AI-transcript.py
+          python scripts/AI-transcript.py \
+            --file scripts/fixtures/chatgpt-metadata-sandbox.jsonl \
+            --color never > /tmp/sandbox.md 2>/tmp/sandbox.err
+          grep -F '[Download fixture](sandbox:/mnt/data/work/fixture.txt)' /tmp/sandbox.md
+          ! grep -F 'interpreter/download' /tmp/sandbox.md
+          git diff --check
+          git diff -- scripts/AI-transcript.py
+          git add scripts/AI-transcript.py
+          git commit -m 'fix: preserve ChatGPT sandbox artifact links [skip ci]'
+
+      - name: Fix ChatGPT metadata JSONL auto-detection
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('scripts/AI-transcript.py')
+          s = p.read_text(encoding='utf-8')
+          old = '''        if _cg_conversation_metadata(rec):\n          return "chatgpt"\n'''
+          new = '''        if rec.get("record_type") == "chatgpt_conversation_metadata":\n          return "chatgpt"\n'''
+          assert old in s, 'strict metadata detection branch not found'
+          s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+
+          cat > /tmp/chatgpt-metadata-header.jsonl <<'EOF'
+          {"record_type":"chatgpt_conversation_metadata","schema_version":1,"conversation_id":"6a89140e-c820-83ea-b2d6-c3ad20435b30"}
+          {"id":"06e90453-4b46-40b3-a318-f2044a77b0b5","author":{"role":"system","name":null,"metadata":{}},"create_time":1787368517.508908,"update_time":null,"content":{"content_type":"text","parts":[""]},"status":"finished_successfully","end_turn":true,"weight":0,"metadata":{"is_visually_hidden_from_conversation":true,"can_save":false},"recipient":"all","channel":null}
+          EOF
+
+          python -m py_compile scripts/AI-transcript.py
+          python scripts/AI-transcript.py --file /tmp/chatgpt-metadata-header.jsonl --color never \
+            > /tmp/metadata.md 2>/tmp/metadata.err
+          ! grep -F 'source auto-detection failed' /tmp/metadata.err
+          grep -F '[chatgpt]' /tmp/metadata.md
+          python scripts/AI-transcript.py \
+            --file scripts/fixtures/chatgpt-metadata-sandbox.jsonl \
+            --color never > /tmp/metadata-fixture.md 2>/tmp/metadata-fixture.err
+          grep -F '[Download fixture](sandbox:/mnt/data/work/fixture.txt)' /tmp/metadata-fixture.md
+          git diff --check
+          git diff -- scripts/AI-transcript.py
+          git add scripts/AI-transcript.py
+          git commit -m 'fix: detect ChatGPT recorder metadata JSONL [skip ci]'
+
+      - name: Remove temporary workflow and push
+        shell: bash
+        run: |
+          git rm .github/workflows/repair-ai-transcript.yml
+          git commit -m 'Remove temporary AI-transcript regression repair workflow [skip ci]'
+          git push origin HEAD:master
