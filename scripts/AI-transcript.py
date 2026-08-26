@@ -3542,6 +3542,16 @@ def _cg_image_pointer_markdown(part):
   if source.startswith("data:image/"):
     return f"![image]({source})"
 
+  if source.startswith("sediment://"):
+    asset_id = source[len("sediment://"):].split("?", 1)[0].split("#", 1)[0]
+    if asset_id.startswith("file_"):
+      encoded_id = urllib.parse.quote(asset_id, safe="")
+      download_url = f"https://chatgpt.com/backend-api/files/download/{encoded_id}"
+      return (
+        f"[image not available]({download_url}) "
+        f"<!-- source: {source} -->"
+      )
+
   parsed = urllib.parse.urlparse(source)
   if parsed.scheme not in ("http", "https"):
     return f"[image not available]({source})"
