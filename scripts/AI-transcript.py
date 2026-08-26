@@ -4557,7 +4557,7 @@ def _detect_file_source(path):
         rec = json.loads(raw)
         if not isinstance(rec, dict):
           return None
-        if _cg_conversation_metadata(rec):
+        if rec.get("record_type") == "chatgpt_conversation_metadata":
           return "chatgpt"
         if "author" in rec and "content" in rec:
           return "chatgpt"
