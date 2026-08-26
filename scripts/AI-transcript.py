@@ -2551,6 +2551,49 @@ def _cg_record_ts(rec):
   return _cg_float_ts_to_iso(rec.get("update_time"))
 
 
+def _cg_conversation_metadata(rec):
+  """Return the conversation ID from one synthetic ChatGPT metadata record."""
+  if not isinstance(rec, dict):
+    return ""
+  if rec.get("record_type") != "chatgpt_conversation_metadata":
+    return ""
+  if rec.get("schema_version") != 1:
+    return ""
+  conversation_id = rec.get("conversation_id")
+  if not isinstance(conversation_id, str):
+    return ""
+  return conversation_id.strip()
+
+
+def _cg_conversation_id_from_path(path):
+  """Return the exported ChatGPT conversation ID, or ``""`` when absent."""
+  try:
+    with open(path, encoding="utf-8") as f:
+      for raw in f:
+        raw = raw.strip()
+        if not raw:
+          continue
+        return _cg_conversation_metadata(json.loads(raw))
+  except Exception:
+    return ""
+  return ""
+
+
+def _cg_message_records(path):
+  """Return ChatGPT message records, excluding the synthetic metadata record."""
+  records = []
+  with open(path, encoding="utf-8") as f:
+    for raw in f:
+      raw = raw.strip()
+      if not raw:
+        continue
+      rec = json.loads(raw)
+      if _cg_conversation_metadata(rec):
+        continue
+      records.append(rec)
+  return records
+
+
 def _cg_is_hidden(rec):
   """True when a ChatGPT record is hidden from the visible conversation."""
   metadata = rec.get("metadata", {})
@@ -4013,8 +4056,10 @@ def _cg_session_meta(path):
         raw = raw.strip()
         if not raw:
           continue
-        rc += 1
         rec = json.loads(raw)
+        if _cg_conversation_metadata(rec):
+          continue
+        rc += 1
 
         create_dt = _cg_float_ts_to_local(rec.get("create_time"))
         update_dt = _cg_float_ts_to_local(rec.get("update_time"))
@@ -4055,13 +4100,15 @@ def _cg_session_grep(path, *, plain=None, rx=None, before=0, after=0, first_only
         raw = raw.strip()
         if not raw:
           continue
+        rec = json.loads(raw)
+        if _cg_conversation_metadata(rec):
+          continue
         rec_no += 1
         if rec_filter and not rec_filter.is_trivial():
           if rec_filter.past_hi(rec_no):
             break
           if not rec_filter.allows_rec(rec_no):
             continue
-        rec = json.loads(raw)
         _cg_register_file_reference(file_ref_index, rec)
         ts_str = _cg_record_ts(rec)
         if rec_filter and not rec_filter.allows_ts(ts_str):
@@ -4104,7 +4151,10 @@ class ChatGPTSessionStore(SessionStore):
 
   def _make_session_from_path(self, path):
     """Build a Session from a ChatGPT JSONL file path."""
+    global CHATGPT_CONVERSATION_ID
     path = str(path)
+    if not CHATGPT_CONVERSATION_ID:
+      CHATGPT_CONVERSATION_ID = _cg_conversation_id_from_path(path) or None
     stem = os.path.splitext(os.path.basename(path))[0]
     title, ctime, mtime, rc = _cg_session_meta(path)
     try:
@@ -4137,23 +4187,20 @@ class ChatGPTSessionStore(SessionStore):
   def transcript(self, session, rec_filter=None):
     """Return the full Markdown transcript for a ChatGPT JSONL file."""
     path = str(session.path)
-    with open(path, encoding="utf-8") as f:
+    records = _cg_message_records(path)
+    lines = []
+    for rec_no, rec in enumerate(records, start=1):
       if rec_filter and not rec_filter.is_trivial():
-        lines = []
-        for i, raw in enumerate((l for l in f if l.strip()), start=1):
-          rec_no = i
-          if rec_filter.past_hi(rec_no):
-            break
-          if not rec_filter.allows_rec(rec_no):
-            continue
-          rec = json.loads(raw)
-          ts_str = _cg_record_ts(rec)
-          if not rec_filter.allows_ts(ts_str):
-            continue
-          rec["_rec_no"] = rec_no
-          lines.append(rec)
-      else:
-        lines = [json.loads(l) for l in f if l.strip()]
+        if rec_filter.past_hi(rec_no):
+          break
+        if not rec_filter.allows_rec(rec_no):
+          continue
+        ts_str = _cg_record_ts(rec)
+        if not rec_filter.allows_ts(ts_str):
+          continue
+      rec = dict(rec)
+      rec["_rec_no"] = rec_no
+      lines.append(rec)
 
     headings = _headings()
     policy = _display_policy()
@@ -4611,6 +4658,8 @@ def _detect_file_source(path):
         rec = json.loads(raw)
         if not isinstance(rec, dict):
           return None
+        if _cg_conversation_metadata(rec):
+          return "chatgpt"
         if "author" in rec and "content" in rec:
           return "chatgpt"
         if rec.get("type") in ("event_msg", "response_item") and "payload" in rec:
