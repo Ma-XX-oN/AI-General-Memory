@@ -1,0 +1,67 @@
+name: Fix 5 HTTP image status
+
+on:
+  push:
+    branches: [fix-5-http-image-status]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+      - name: Resolve HTTP image status
+        shell: bash
+        run: |
+          git show origin/fix-5-http-image-status:.github/fix5-http.py > /tmp/fix5-http.py
+          python3 /tmp/fix5-http.py
+          python3 -m py_compile scripts/AI-transcript.py
+          python3 scripts/AI-transcript.py --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl --color=never > /tmp/chatgpt.md
+          python3 - <<'PY'
+          import importlib.util
+          import urllib.error
+          from pathlib import Path
+
+          spec = importlib.util.spec_from_file_location('ai_transcript', 'scripts/AI-transcript.py')
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+
+          class Response:
+            def __init__(self, status): self.status = status
+            def __enter__(self): return self
+            def __exit__(self, *args): return False
+
+          original = module.urllib.request.urlopen
+          try:
+            module.urllib.request.urlopen = lambda *args, **kwargs: Response(200)
+            assert module._cg_image_pointer_markdown({'asset_pointer': 'https://example.test/image.png'}) == '![image](https://example.test/image.png)'
+
+            def not_found(*args, **kwargs):
+              raise urllib.error.HTTPError('https://example.test/missing.png', 404, 'not found', None, None)
+            module.urllib.request.urlopen = not_found
+            assert module._cg_image_pointer_markdown({'asset_pointer': 'https://example.test/missing.png'}) == '[image missing]'
+
+            def forbidden(*args, **kwargs):
+              raise urllib.error.HTTPError('https://example.test/private.png', 403, 'forbidden', None, None)
+            module.urllib.request.urlopen = forbidden
+            assert module._cg_image_pointer_markdown({'asset_pointer': 'https://example.test/private.png'}) == '[image not available](https://example.test/private.png)'
+          finally:
+            module.urllib.request.urlopen = original
+
+          rendered = Path('/tmp/chatgpt.md').read_text()
+          protected = '[image not available](sediment://fixture-image-1)'
+          missing = '[image missing]'
+          user_text = 'Find the screenshot-backed tool output and final answer.'
+          assert rendered.index(protected) < rendered.index(missing) < rendered.index(user_text)
+          PY
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/AI-transcript.py
+          git commit -m 'fix: classify resolvable ChatGPT image URLs [skip ci]'
+          git push origin HEAD:master
