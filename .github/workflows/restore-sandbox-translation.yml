@@ -1,0 +1,40 @@
+name: Restore sandbox link translation
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/restore-sandbox-translation.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Configure git
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+      - name: Revert bad sandbox preservation commit
+        run: |
+          git revert --no-edit 9f48cb49334ef57af0d7e194a6d74457968af015
+          python -m py_compile scripts/AI-transcript.py
+          python scripts/AI-transcript.py --file scripts/fixtures/chatgpt-metadata-sandbox.jsonl > /tmp/out.md 2>/tmp/err.txt
+          grep -F 'https://chatgpt.com/backend-api/conversation/fixture-conversation-123/interpreter/download?' /tmp/out.md
+          grep -F 'download_intent=true' /tmp/out.md
+          if grep -Fq '](sandbox:/mnt/data/' /tmp/out.md; then
+            echo 'sandbox protocol leaked into rendered transcript' >&2
+            exit 1
+          fi
+          git diff --check HEAD^ HEAD
+          git push origin master
+      - name: Remove temporary workflow
+        run: |
+          git rm .github/workflows/restore-sandbox-translation.yml
+          git commit -m 'Remove temporary sandbox restoration workflow [skip ci]'
+          git push origin master
