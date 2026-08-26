@@ -36,7 +36,9 @@ import os
 import re
 import sys
 import textwrap
+import urllib.error
 import urllib.parse
+import urllib.request
 import xml.etree.ElementTree as ET
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -3539,7 +3541,26 @@ def _cg_image_pointer_markdown(part):
   source = source.strip()
   if source.startswith("data:image/"):
     return f"![image]({source})"
-  return f"[image not available]({source})"
+
+  parsed = urllib.parse.urlparse(source)
+  if parsed.scheme not in ("http", "https"):
+    return f"[image not available]({source})"
+
+  request = urllib.request.Request(source, method="HEAD", headers={"User-Agent": "AI-transcript.py"})
+  try:
+    with urllib.request.urlopen(request, timeout=3) as response:
+      status = getattr(response, "status", 200)
+      if 200 <= status < 400:
+        return f"![image]({source})"
+      if status in (404, 410):
+        return "[image missing]"
+      return f"[image not available]({source})"
+  except urllib.error.HTTPError as error:
+    if error.code in (404, 410):
+      return "[image missing]"
+    return f"[image not available]({source})"
+  except (urllib.error.URLError, TimeoutError, OSError):
+    return f"[image not available]({source})"
 
 def _cg_content_text_parts(rec, *, file_ref_index=None):
   """Return cleaned visible/searchable text fragments from one record.
