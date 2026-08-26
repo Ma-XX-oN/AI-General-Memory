@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-26T22:08:17.841640+00:00",
+  "source_commit": "abcc2f33783e3690b9e1335161c73e7dabaed757",
+  "script_path": "scripts/AI-transcript.py",
+  "script_blob_sha": "69115508946fad15e03fa3f9074645ec0e9131db",
+  "cases": {
+    "chatgpt-metadata-sandbox": {
+      "command": "python scripts/AI-transcript.py --chatgpt --file scripts/fixtures/chatgpt-metadata-sandbox.jsonl",
+      "exit_code": 0,
+      "stdout_path": "chatgpt-metadata-sandbox.md",
+      "stderr_path": "chatgpt-metadata-sandbox.stderr.txt"
+    },
+    "chatgpt-chronological-duplicate-identity": {
+      "command": "python scripts/AI-transcript.py --chatgpt --file scripts/fixtures/chatgpt-chronological-duplicate-identity.jsonl",
+      "exit_code": 0,
+      "stdout_path": "chatgpt-chronological-duplicate-identity.md",
+      "stderr_path": "chatgpt-chronological-duplicate-identity.stderr.txt"
+    },
+    "codex-orphan-patch": {
+      "command": "python scripts/AI-transcript.py --codex --file scripts/fixtures/codex-orphan-patch.jsonl",
+      "exit_code": 0,
+      "stdout_path": "codex-orphan-patch.md",
+      "stderr_path": "codex-orphan-patch.stderr.txt"
+    },
+    "claude-adaptive-fence": {
+      "command": "python scripts/AI-transcript.py --claude --file scripts/fixtures/adaptive-fence.jsonl",
+      "exit_code": 0,
+      "stdout_path": "claude-adaptive-fence.md",
+      "stderr_path": "claude-adaptive-fence.stderr.txt"
+    }
+  }
+}
