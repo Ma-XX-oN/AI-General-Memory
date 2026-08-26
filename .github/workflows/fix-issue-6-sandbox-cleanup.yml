@@ -1,0 +1,38 @@
+name: Fix issue 6 sandbox cleanup
+
+on:
+  push:
+    branches:
+      - issue-6-sandbox-cleanup-temp
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Clean and verify sandbox link change
+        run: |
+          git fetch origin master
+          git checkout master
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/AI-transcript.py')
+          text = path.read_text(encoding='utf-8')
+          unwanted = '''  if not isinstance(text, str) or " ](sandbox:" in " " + text:\n    pass\n'''
+          if unwanted not in text:
+            raise SystemExit('cleanup target not found')
+          text = text.replace(unwanted, '', 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+          python -m py_compile scripts/AI-transcript.py
+          python scripts/AI-transcript.py --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl > /tmp/chatgpt-fixture.md
+          grep -q 'Find the screenshot-backed tool output and final answer.' /tmp/chatgpt-fixture.md
+          git diff --check
+          git add scripts/AI-transcript.py
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit --amend --no-edit
+          git push --force-with-lease origin master
