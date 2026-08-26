@@ -1,0 +1,42 @@
+name: Fix 5 ChatGPT image pointers
+
+on:
+  push:
+    branches: [fix-5-chatgpt-image-pointers]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+      - name: Fix ChatGPT image pointer rendering
+        shell: bash
+        run: |
+          git show origin/fix-5-chatgpt-image-pointers:.github/fix5.py > /tmp/fix5.py
+          python3 /tmp/fix5.py
+          python3 -m py_compile scripts/AI-transcript.py
+          python3 scripts/AI-transcript.py --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl --color=never > /tmp/chatgpt.md
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path('/tmp/chatgpt.md').read_text()
+          protected = '[image not available](sediment://fixture-image-1)'
+          missing = '[image missing]'
+          user_text = 'Find the screenshot-backed tool output and final answer.'
+          assert protected in text
+          assert missing in text
+          assert user_text in text
+          assert text.index(protected) < text.index(missing) < text.index(user_text)
+          assert '[image missing]\n\n[image not available]' not in text
+          PY
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/AI-transcript.py scripts/fixtures/chatgpt-direct.jsonl
+          git commit -m 'fix: render ChatGPT image pointers in source order [skip ci]'
+          git push origin HEAD:master
