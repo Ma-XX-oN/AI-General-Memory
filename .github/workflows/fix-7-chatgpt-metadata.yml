@@ -1,0 +1,29 @@
+name: Fix issue 7 ChatGPT metadata
+
+on:
+  push:
+    branches:
+      - issue-7-chatgpt-metadata
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preserve patch and switch to master
+        run: |
+          cp .github/fix7.py /tmp/fix7.py
+          git fetch origin master
+          git checkout -B master origin/master
+      - name: Apply and verify patch
+        run: python /tmp/fix7.py
+      - name: Commit source and fixture
+        run: |
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/AI-transcript.py scripts/fixtures/chatgpt-metadata-sandbox.jsonl
+          git commit -m 'fix: read ChatGPT JSONL conversation metadata [skip ci]'
+          git push origin HEAD:master
