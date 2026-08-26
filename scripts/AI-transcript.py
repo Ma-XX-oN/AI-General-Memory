@@ -120,6 +120,7 @@ class DisplayPolicy:
 
 DISPLAY_POLICY: "DisplayPolicy | None" = None
 HEADINGS = None
+CHATGPT_CONVERSATION_ID = None
 
 
 def _display_policy():
@@ -2564,6 +2565,19 @@ def _cg_conversation_metadata(rec):
   return conversation_id.strip()
 
 
+def _cg_conversation_id_from_path(path):
+  """Return the exported ChatGPT conversation ID, or ``""`` when absent."""
+  try:
+    with open(path, encoding="utf-8") as f:
+      for raw in f:
+        raw = raw.strip()
+        if not raw:
+          continue
+        return _cg_conversation_metadata(json.loads(raw))
+  except Exception:
+    return ""
+  return ""
+
 
 def _cg_message_records(path):
   """Return ChatGPT message records, excluding the synthetic metadata record."""
@@ -3708,6 +3722,89 @@ def _cg_visible_assistant_text(rec, *, file_ref_index=None):
   ).strip()
 
 
+def _cg_sandbox_path(source):
+  """Return a local sandbox path from one ChatGPT ``sandbox:`` URI."""
+  if not isinstance(source, str):
+    return ""
+  raw = source.strip()
+  if raw.startswith("sandbox:/") and not raw.startswith("sandbox://"):
+    path = raw[len("sandbox:"):]
+    return path if path.startswith("/mnt/data/") else ""
+  if raw.startswith("sandbox://"):
+    remainder = raw[len("sandbox://"):]
+    if remainder.startswith("mnt/data/"):
+      return "/" + remainder
+    marker = "/mnt/data/"
+    index = remainder.find(marker)
+    if index >= 0:
+      return remainder[index:]
+  return ""
+
+
+def _cg_sandbox_download_url(source, rec, conversation_id):
+  """Return the observed ChatGPT interpreter download URL for *source*."""
+  path = _cg_sandbox_path(source)
+  if not path or not isinstance(rec, dict):
+    return ""
+  if rec.get("author", {}).get("role") != "assistant":
+    return ""
+  message_id = rec.get("id", "")
+  if not isinstance(message_id, str) or not message_id.strip():
+    return ""
+  if not isinstance(conversation_id, str) or not conversation_id.strip():
+    return ""
+  conversation_q = urllib.parse.quote(conversation_id.strip(), safe="")
+  message_q = urllib.parse.quote(message_id.strip(), safe="")
+  path_q = urllib.parse.quote(path, safe="")
+  return (
+    f"https://chatgpt.com/backend-api/conversation/{conversation_q}/"
+    f"interpreter/download?message_id={message_q}&sandbox_path={path_q}"
+    f"&download_intent=true"
+  )
+
+
+def _cg_translate_sandbox_links(text, rec, conversation_id):
+  """Translate Markdown ``sandbox:`` destinations without changing link text."""
+  if not isinstance(text, str) or "](sandbox:" not in text:
+    return text
+  if not isinstance(conversation_id, str) or not conversation_id.strip():
+    return text
+  if not isinstance(rec, dict) or rec.get("author", {}).get("role") != "assistant":
+    return text
+
+  marker = "](sandbox:"
+  pieces = []
+  cursor = 0
+  while True:
+    start = text.find(marker, cursor)
+    if start < 0:
+      pieces.append(text[cursor:])
+      break
+    destination_start = start + 2
+    depth = 1
+    index = destination_start
+    destination_end = None
+    while index < len(text):
+      char = text[index]
+      if char == "(":
+        depth += 1
+      elif char == ")":
+        depth -= 1
+        if depth == 0:
+          destination_end = index
+          break
+      index += 1
+    if destination_end is None:
+      pieces.append(text[cursor:])
+      break
+
+    source = text[destination_start:destination_end]
+    replacement = _cg_sandbox_download_url(source, rec, conversation_id)
+    pieces.append(text[cursor:destination_start])
+    pieces.append(replacement or source)
+    cursor = destination_end
+  return "".join(pieces)
+
 
 def _cg_visible_assistant_markdown(rec, *, file_ref_index=None):
   """Return visible assistant text with transcript-only cite formatting.
@@ -3725,7 +3822,8 @@ def _cg_visible_assistant_markdown(rec, *, file_ref_index=None):
       Visible assistant text with grouped-web citation tokens rendered as
       compact Markdown cite blocks.
   """
-  return _cg_visible_assistant_text(rec, file_ref_index=file_ref_index)
+  text = _cg_visible_assistant_text(rec, file_ref_index=file_ref_index)
+  return _cg_translate_sandbox_links(text, rec, CHATGPT_CONVERSATION_ID)
 
 
 def _cg_record_search_texts(rec, *, file_ref_index=None):
@@ -4053,7 +4151,10 @@ class ChatGPTSessionStore(SessionStore):
 
   def _make_session_from_path(self, path):
     """Build a Session from a ChatGPT JSONL file path."""
+    global CHATGPT_CONVERSATION_ID
     path = str(path)
+    if not CHATGPT_CONVERSATION_ID:
+      CHATGPT_CONVERSATION_ID = _cg_conversation_id_from_path(path) or None
     stem = os.path.splitext(os.path.basename(path))[0]
     title, ctime, mtime, rc = _cg_session_meta(path)
     try:
@@ -4813,7 +4914,18 @@ def main():
     help="Write transcript to file instead of stdout (requires --id, no --grep).",
   )
 
+  ap.add_argument(
+    "--conversation-id",
+    help=(
+      "ChatGPT conversation ID used to translate generated sandbox links "
+      "to interpreter download URLs."
+    ),
+  )
+
   args = ap.parse_args()
+
+  global CHATGPT_CONVERSATION_ID
+  CHATGPT_CONVERSATION_ID = args.conversation_id
 
   # ── Validate argument combinations ─────────────────────────────────────────
 
