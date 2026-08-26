@@ -1,0 +1,73 @@
+name: Fix issue 6 sandbox links
+
+on:
+  push:
+    branches:
+      - issue-6-sandbox-download-links-temp
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch ChatGPT sandbox download links
+        run: |
+          git fetch origin master
+          git checkout master
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/AI-transcript.py')
+          text = path.read_text(encoding='utf-8')
+
+          old = 'DISPLAY_POLICY: "DisplayPolicy | None" = None\nHEADINGS = None\n'
+          new = 'DISPLAY_POLICY: "DisplayPolicy | None" = None\nHEADINGS = None\nCHATGPT_CONVERSATION_ID = None\n'
+          if old not in text:
+            raise SystemExit('global insertion target not found')
+          text = text.replace(old, new, 1)
+
+          marker = '''def _cg_visible_assistant_markdown(rec, *, file_ref_index=None):\n'''
+          if marker not in text:
+            raise SystemExit('assistant markdown target not found')
+          helper = '''def _cg_sandbox_path(source):\n  """Return a local sandbox path from one ChatGPT ``sandbox:`` URI."""\n  if not isinstance(source, str):\n    return ""\n  raw = source.strip()\n  if raw.startswith("sandbox:/") and not raw.startswith("sandbox://"):\n    path = raw[len("sandbox:"):]\n    return path if path.startswith("/mnt/data/") else ""\n  if raw.startswith("sandbox://"):\n    remainder = raw[len("sandbox://"):]\n    if remainder.startswith("mnt/data/"):\n      return "/" + remainder\n    marker = "/mnt/data/"\n    index = remainder.find(marker)\n    if index >= 0:\n      return remainder[index:]\n  return ""\n\n\ndef _cg_sandbox_download_url(source, rec, conversation_id):\n  """Return the observed ChatGPT interpreter download URL for *source*."""\n  path = _cg_sandbox_path(source)\n  if not path or not isinstance(rec, dict):\n    return ""\n  if rec.get("author", {}).get("role") != "assistant":\n    return ""\n  message_id = rec.get("id", "")\n  if not isinstance(message_id, str) or not message_id.strip():\n    return ""\n  if not isinstance(conversation_id, str) or not conversation_id.strip():\n    return ""\n  conversation_q = urllib.parse.quote(conversation_id.strip(), safe="")\n  message_q = urllib.parse.quote(message_id.strip(), safe="")\n  path_q = urllib.parse.quote(path, safe="")\n  return (\n    f"https://chatgpt.com/backend-api/conversation/{conversation_q}/"\n    f"interpreter/download?message_id={message_q}&sandbox_path={path_q}"\n    f"&download_intent=true"\n  )\n\n\ndef _cg_translate_sandbox_links(text, rec, conversation_id):\n  """Translate Markdown ``sandbox:`` destinations without changing link text."""\n  if not isinstance(text, str) or " ](sandbox:" in " " + text:\n    pass\n  if not isinstance(text, str) or "](sandbox:" not in text:\n    return text\n  if not isinstance(conversation_id, str) or not conversation_id.strip():\n    return text\n  if not isinstance(rec, dict) or rec.get("author", {}).get("role") != "assistant":\n    return text\n\n  marker = "](sandbox:"\n  pieces = []\n  cursor = 0\n  while True:\n    start = text.find(marker, cursor)\n    if start < 0:\n      pieces.append(text[cursor:])\n      break\n    destination_start = start + 2\n    depth = 1\n    index = destination_start\n    destination_end = None\n    while index < len(text):\n      char = text[index]\n      if char == "(":\n        depth += 1\n      elif char == ")":\n        depth -= 1\n        if depth == 0:\n          destination_end = index\n          break\n      index += 1\n    if destination_end is None:\n      pieces.append(text[cursor:])\n      break\n\n    source = text[destination_start:destination_end]\n    replacement = _cg_sandbox_download_url(source, rec, conversation_id)\n    pieces.append(text[cursor:destination_start])\n    pieces.append(replacement or source)\n    cursor = destination_end\n  return "".join(pieces)\n\n\n'''
+          text = text.replace(marker, helper + marker, 1)
+
+          old = '''  return _cg_visible_assistant_text(rec, file_ref_index=file_ref_index)\n\n\ndef _cg_record_search_texts'''
+          new = '''  text = _cg_visible_assistant_text(rec, file_ref_index=file_ref_index)\n  return _cg_translate_sandbox_links(text, rec, CHATGPT_CONVERSATION_ID)\n\n\ndef _cg_record_search_texts'''
+          if old not in text:
+            raise SystemExit('assistant markdown return target not found')
+          text = text.replace(old, new, 1)
+
+          old = '''  args = ap.parse_args()\n\n  # ── Validate argument combinations'''
+          new = '''  ap.add_argument(\n    "--conversation-id",\n    help=(\n      "ChatGPT conversation ID used to translate generated sandbox links "\n      "to interpreter download URLs."\n    ),\n  )\n\n  args = ap.parse_args()\n\n  global CHATGPT_CONVERSATION_ID\n  CHATGPT_CONVERSATION_ID = args.conversation_id\n\n  # ── Validate argument combinations'''
+          if old not in text:
+            raise SystemExit('argument parser insertion target not found')
+          text = text.replace(old, new, 1)
+
+          path.write_text(text, encoding='utf-8')
+          PY
+          python -m py_compile scripts/AI-transcript.py
+          python - <<'PY'
+          import runpy
+          ns = runpy.run_path('scripts/AI-transcript.py', run_name='ai_transcript_test')
+          translate = ns['_cg_translate_sandbox_links']
+          rec = {'id': 'e0c3a20b-d9be-49f6-b1b3-192276ec864d', 'author': {'role': 'assistant'}}
+          cid = '6a89140e-c820-83ea-b2d6-c3ad20435b30'
+          source = '[Download ZIP](sandbox:/mnt/data/chatgpt-conversation-markdown-export(20260824-201105).zip)'
+          got = translate(source, rec, cid)
+          expected = '[Download ZIP](https://chatgpt.com/backend-api/conversation/6a89140e-c820-83ea-b2d6-c3ad20435b30/interpreter/download?message_id=e0c3a20b-d9be-49f6-b1b3-192276ec864d&sandbox_path=%2Fmnt%2Fdata%2Fchatgpt-conversation-markdown-export%2820260824-201105%29.zip&download_intent=true)'
+          assert got == expected, (got, expected)
+          alt = '[file](sandbox://runtime/mnt/data/work107/test.diff)'
+          got_alt = translate(alt, rec, cid)
+          assert 'sandbox_path=%2Fmnt%2Fdata%2Fwork107%2Ftest.diff&download_intent=true' in got_alt
+          assert translate(source, rec, None) == source
+          assert translate(source, {'id': 'u1', 'author': {'role': 'user'}}, cid) == source
+          PY
+          git diff --check
+          git add scripts/AI-transcript.py
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix: translate ChatGPT sandbox download links [skip ci]'
+          git push origin master
