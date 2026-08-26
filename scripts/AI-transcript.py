@@ -3527,6 +3527,20 @@ def _cg_render_inline_references(text, rec, *, file_ref_index=None):
   return rendered
 
 
+
+def _cg_image_pointer_markdown(part):
+  """Render one ChatGPT ``image_asset_pointer`` without changing part order."""
+  if not isinstance(part, dict):
+    return "[image missing]"
+  metadata = part.get("metadata") if isinstance(part.get("metadata"), dict) else {}
+  source = metadata.get("asset_pointer_link") or part.get("asset_pointer_link") or part.get("asset_pointer")
+  if not isinstance(source, str) or not source.strip():
+    return "[image missing]"
+  source = source.strip()
+  if source.startswith("data:image/"):
+    return f"![image]({source})"
+  return f"[image not available]({source})"
+
 def _cg_content_text_parts(rec, *, file_ref_index=None):
   """Return cleaned visible/searchable text fragments from one record.
 
@@ -3547,7 +3561,6 @@ def _cg_content_text_parts(rec, *, file_ref_index=None):
   role = rec.get("author", {}).get("role", "")
   ctype = content.get("content_type", "")
   cleaned = []
-  image_placeholders = []
   if not isinstance(parts, list):
     return cleaned
   for part in parts:
@@ -3557,7 +3570,7 @@ def _cg_content_text_parts(rec, *, file_ref_index=None):
         texts.append(part)
     elif isinstance(part, dict):
       if part.get("content_type") == "image_asset_pointer":
-        image_placeholders.append("[image missing]")
+        cleaned.append(_cg_image_pointer_markdown(part))
         continue
       for key in ("text", "content"):
         value = part.get(key)
@@ -3577,7 +3590,6 @@ def _cg_content_text_parts(rec, *, file_ref_index=None):
       rendered = _cg_strip_inline_tokens(rendered).strip()
       if rendered:
         cleaned.append(rendered)
-  cleaned.extend(image_placeholders)
   return cleaned
 
 
