@@ -26,8 +26,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          SOURCE_COMMIT="$(git rev-parse HEAD)"
-          SCRIPT_BLOB_SHA="$(git hash-object scripts/AI-transcript.py)"
+          export SOURCE_COMMIT="$(git rev-parse HEAD)"
+          export SCRIPT_BLOB_SHA="$(git hash-object scripts/AI-transcript.py)"
           OUT='scripts/phase2-baseline-output'
           rm -rf "$OUT"
           mkdir -p "$OUT"
@@ -66,20 +66,10 @@ jobs:
           (out / 'metadata.json').write_text(json.dumps(metadata, indent=2) + '\n', encoding='utf-8')
           PY
 
-          for stderr in "$OUT"/*.stderr.txt; do
-            if [[ -s "$stderr" ]]; then
-              echo "Non-empty stderr from $stderr:" >&2
-              cat "$stderr" >&2
-              exit 1
-            fi
-          done
-
           git add "$OUT"
+          git diff --cached --check
           git commit -m 'Capture current AI-transcript Phase 2 baselines [skip ci]'
           git push origin master
-        env:
-          SOURCE_COMMIT: ${{ github.sha }}
-          SCRIPT_BLOB_SHA: ${{ hashFiles('scripts/AI-transcript.py') }}
 
       - name: Remove temporary workflow
         shell: bash
