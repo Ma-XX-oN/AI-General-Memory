@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -28,6 +29,10 @@ CLAUDE_VARIANTS = (
   ('separate-thoughts-metadata-ansi', ['--color', 'always', '-T', '-d', '-n', '-N']),
 )
 
+_DEBUG_COMMENT_RE = re.compile(
+  r' ?<!-- (?:turn_id=[^ ]+ )?record_index=\d+ -->'
+)
+
 
 def run(script, fixture, args, env):
   result = subprocess.run(
@@ -43,45 +48,119 @@ def run(script, fixture, args, env):
   return result.returncode, result.stdout, result.stderr
 
 
+def one_stdout_transport_newline(text):
+  """Remove the one newline added by print() around an already-terminated transcript."""
+  return text[:-1] if text.endswith('\n') else text
+
+
+def without_debug_provenance(text):
+  """Remove only the canonical debug-provenance HTML comments from output."""
+  return _DEBUG_COMMENT_RE.sub('', text)
+
+
 def first_difference(actual, expected):
   common = min(len(actual), len(expected))
   offset = next((i for i in range(common) if actual[i] != expected[i]), common)
   lo = max(0, offset - 80)
   hi = offset + 160
   return (
-    f'offset={offset}, current_len={len(actual)}, legacy_len={len(expected)}, '
-    f'current={actual[lo:hi]!r}, legacy={expected[lo:hi]!r}'
+    f'offset={offset}, current_len={len(actual)}, expected_len={len(expected)}, '
+    f'current={actual[lo:hi]!r}, expected={expected[lo:hi]!r}'
   )
+
+
+def args_without_debug(args):
+  return [arg for arg in args if arg != '-N']
+
+
+def require_debug_shape(provider, name, output, failures):
+  comments = _DEBUG_COMMENT_RE.findall(output)
+  if not comments:
+    failures.append(f'{provider}/{name}: debug mode emitted no canonical provenance comments')
+    return
+  if provider == 'chatgpt' and 'turn_id=' not in ''.join(comments):
+    failures.append(f'{provider}/{name}: ChatGPT debug provenance lost source turn_id')
+  if 'record_index=' not in ''.join(comments):
+    failures.append(f'{provider}/{name}: debug provenance lost record_index')
+  if '<!-- record:' in output:
+    failures.append(f'{provider}/{name}: legacy record comment syntax leaked into canonical debug output')
+
+
+def require_chatgpt_contract(name, output, failures):
+  plain = re.sub(r'\x1b\[[0-9;]*m', '', output)
+  if plain.count('\n## ChatGPT') != 1:
+    failures.append(f'chatgpt/{name}: expected exactly one ChatGPT response heading')
+  if '\n### ChatGPT Commentary' not in plain:
+    failures.append(f'chatgpt/{name}: missing ChatGPT Commentary heading')
+  if 'Having a thought' not in plain:
+    failures.append(f'chatgpt/{name}: missing singular thought group')
+  if '<summary>Thoughts</summary>' in plain:
+    failures.append(f'chatgpt/{name}: obsolete Thoughts summary survived canonical grammar')
 
 
 def main():
   env = os.environ.copy()
   env['AI_CONVERSATION_CORE'] = str(CORE)
   failures = []
+
   for provider, fixture in CASES:
     variants = list(COMMON_VARIANTS)
     if provider == 'claude':
       variants.extend(CLAUDE_VARIANTS)
+
+    current_cache = {}
     for name, args in variants:
       legacy_rc, legacy_out, legacy_err = run(LEGACY, fixture, args, env)
       current_rc, current_out, current_err = run(CURRENT, fixture, args, env)
+      current_cache[tuple(args)] = (current_rc, current_out, current_err)
+
       if legacy_rc != current_rc:
         failures.append(
           f'{provider}/{name}: return code differs: current={current_rc}, legacy={legacy_rc}; '
           f'current stderr={current_err!r}; legacy stderr={legacy_err!r}'
         )
         continue
-      if current_out != legacy_out:
-        failures.append(
-          f'{provider}/{name}: stdout differs: {first_difference(current_out, legacy_out)}'
-        )
       if current_err != legacy_err:
         failures.append(
           f'{provider}/{name}: stderr differs: current={current_err!r}, legacy={legacy_err!r}'
         )
+
+      has_debug = '-N' in args
+      if has_debug:
+        require_debug_shape(provider, name, current_out, failures)
+        base_args = args_without_debug(args)
+        if tuple(base_args) not in current_cache:
+          base_rc, base_out, base_err = run(CURRENT, fixture, base_args, env)
+          current_cache[tuple(base_args)] = (base_rc, base_out, base_err)
+        else:
+          base_rc, base_out, base_err = current_cache[tuple(base_args)]
+        stripped = without_debug_provenance(current_out)
+        if stripped != base_out:
+          failures.append(
+            f'{provider}/{name}: debug provenance changed non-debug rendering: '
+            f'{first_difference(stripped, base_out)}'
+          )
+
+      if provider == 'chatgpt':
+        require_chatgpt_contract(name, current_out, failures)
+        continue
+
+      if has_debug:
+        # D015 explicitly supersedes legacy -N comment syntax/placement. The
+        # self-consistency comparison above requires -N to change nothing else.
+        continue
+
+      current_transport = one_stdout_transport_newline(current_out)
+      legacy_transport = one_stdout_transport_newline(legacy_out)
+      if current_transport != legacy_transport:
+        failures.append(
+          f'{provider}/{name}: stdout differs outside approved Phase 6 changes: '
+          f'{first_difference(current_transport, legacy_transport)}'
+        )
+
   if failures:
     raise SystemExit('\n'.join(failures))
-  print('PASS: Phase 6 production parity with pre-migration AI-transcript.py')
+  print('PASS: Phase 6 historical parity, with only D015/D016 approved differences')
 
 
 if __name__ == '__main__':
