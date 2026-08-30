@@ -29,15 +29,11 @@ CASES = (
 
 
 def transcript_body(text):
-  """Return the transcript body, excluding print()'s stdout terminator."""
+  """Return the transcript body exactly as emitted on stdout."""
   start = text.find("## ")
   if start < 0:
     raise AssertionError("AI-transcript.py output has no transcript heading")
-  body = text[start:]
-  # Direct stdout mode calls print(transcript_text), which appends exactly one
-  # transport newline beyond the transcript string.  The canonical golden is
-  # the transcript string itself, so remove only that print-added terminator.
-  return body[:-1] if body.endswith("\n") else body
+  return text[start:]
 
 
 def mismatch_detail(actual, expected):
