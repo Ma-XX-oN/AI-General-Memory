@@ -58,7 +58,7 @@ helper = '''def _core_projection(rec_no, ts_str, *, rec_width):
     }
   return {
     "heading_suffix": suffix,
-    "record_comment": _record_comment(rec_no),
+    "debug_provenance": policy.debug_record_comment,
     "separate_thoughts": policy.separate_thoughts,
     "colors": colors,
   }
