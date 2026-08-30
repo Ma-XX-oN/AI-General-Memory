@@ -31,7 +31,10 @@ CLAUDE_VARIANTS = (
 
 _DEBUG_BODY = r'<!-- (?:turn_id=[^ ]+ )?record_index=\d+ -->'
 _DEBUG_COMMENT_RE = re.compile(r' ?' + _DEBUG_BODY)
-_DEBUG_COMMENT_LINE_RE = re.compile(r'^(?:> )?' + _DEBUG_BODY + r'\n?', re.MULTILINE)
+_DEBUG_COMMENT_BLOCK_RE = re.compile(
+  r'^(?:> )?' + _DEBUG_BODY + r'\n(?:(?:> ?)?\n)?',
+  re.MULTILINE,
+)
 
 
 def run(script, fixture, args, env):
@@ -49,8 +52,8 @@ def run(script, fixture, args, env):
 
 
 def without_debug_provenance(text):
-  """Remove exactly canonical provenance comments and their standalone lines."""
-  text = _DEBUG_COMMENT_LINE_RE.sub('', text)
+  """Remove canonical provenance plus a blank line owned by standalone comments."""
+  text = _DEBUG_COMMENT_BLOCK_RE.sub('', text)
   return _DEBUG_COMMENT_RE.sub('', text)
 
 
