@@ -7,6 +7,7 @@ on:
       - scripts/AI-transcript-core-worker.mjs
       - scripts/apply-phase6-complete-bridge.py
       - scripts/test-AI-transcript-phase6-parity.py
+      - scripts/test-AI-transcript-core-parity.py
 
 permissions:
   contents: write
@@ -38,7 +39,7 @@ jobs:
       - name: Apply complete production bridge
         run: python scripts/apply-phase6-complete-bridge.py
       - name: Python syntax gate
-        run: python -m py_compile scripts/AI-transcript.py scripts/test-AI-transcript-phase6-parity.py scripts/apply-phase6-complete-bridge.py
+        run: python -m py_compile scripts/AI-transcript.py scripts/test-AI-transcript-phase6-parity.py scripts/test-AI-transcript-core-parity.py scripts/apply-phase6-complete-bridge.py
       - name: Pre-migration presentation parity
         env:
           AI_CONVERSATION_CORE: ${{ github.workspace }}/.phase6-core
