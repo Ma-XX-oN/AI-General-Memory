@@ -1,21 +1,44 @@
 #!/usr/bin/env node
 
 import { createInterface } from 'node:readline';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const CORE_COMMIT = 'cdad429007754f7c1ce1eb5ec3b33924ffb0aee1';
+const CORE_COMMIT = '44c41e2b6160171e9c0d43e4cae1314681f8a3ec';
+
+function coreRootPath() {
+  const configured = process.env.AI_CONVERSATION_CORE;
+  if (configured && !configured.endsWith('.js')) return path.resolve(configured);
+  return path.resolve(import.meta.dirname, '..', '..', 'AIConversationCore');
+}
 
 function coreEntryPath() {
   const configured = process.env.AI_CONVERSATION_CORE;
-  if (configured) {
-    return configured.endsWith('.js')
-      ? configured
-      : path.join(configured, 'src', 'index.js');
-  }
-  return path.resolve(import.meta.dirname, '..', '..', 'AIConversationCore', 'src', 'index.js');
+  if (configured?.endsWith('.js')) return configured;
+  return path.join(coreRootPath(), 'src', 'index.js');
 }
 
+function verifyCorePin() {
+  const configured = process.env.AI_CONVERSATION_CORE;
+  if (configured?.endsWith('.js')) {
+    throw new Error('AI_CONVERSATION_CORE must name the pinned AIConversationCore repository, not a JavaScript file');
+  }
+  let actual;
+  try {
+    actual = execFileSync('git', ['-C', coreRootPath(), 'rev-parse', 'HEAD'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe']
+    }).trim();
+  } catch (error) {
+    throw new Error(`Cannot verify AIConversationCore checkout at ${coreRootPath()}: ${error.message}`);
+  }
+  if (actual !== CORE_COMMIT) {
+    throw new Error(`AIConversationCore commit mismatch: expected ${CORE_COMMIT}, found ${actual}`);
+  }
+}
+
+verifyCorePin();
 const core = await import(pathToFileURL(coreEntryPath()).href);
 
 function adapt(provider, records) {
@@ -36,7 +59,13 @@ function render(request) {
     throw new TypeError('render request records must be an array');
   }
 
-  let events = adapt(request.provider, request.records);
+  const projectionByIndex = new Map(
+    Object.entries(request.projections ?? {}).map(([index, projection]) => [Number(index), projection])
+  );
+  let events = adapt(request.provider, request.records).map(event => {
+    const projection = projectionByIndex.get(event.source_index);
+    return projection ? { ...event, projection } : event;
+  });
   if (Array.isArray(request.source_indexes)) {
     const allowed = new Set(request.source_indexes);
     events = events.filter(event => allowed.has(event.source_index));
