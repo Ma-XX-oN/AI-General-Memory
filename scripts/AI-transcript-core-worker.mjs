@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const CORE_COMMIT = 'ee1bd128c98dc381688667033c77e007d64148e4';
+const CORE_COMMIT = 'b27954bcfb364b9e39366afb0a7d2f6200766602';
 
 function coreRootPath() {
   const configured = process.env.AI_CONVERSATION_CORE;
@@ -48,6 +48,19 @@ function adapt(provider, records) {
   throw new Error(`Unsupported provider: ${provider}`);
 }
 
+function eventProjection(event, projectionByIndex) {
+  const base = projectionByIndex.get(event.source_index) ?? {};
+  const relatedSources = {};
+  for (const [name, source] of Object.entries(event.relationships ?? {})) {
+    if (!source || typeof source !== 'object' || !Number.isInteger(source.record_index)) continue;
+    const related = projectionByIndex.get(source.record_index);
+    if (related) relatedSources[name] = related;
+  }
+  return Object.keys(relatedSources).length
+    ? { ...base, related_sources: relatedSources }
+    : base;
+}
+
 function render(request) {
   if (request?.operation === 'ping') {
     return { ok: true, core_commit: CORE_COMMIT };
@@ -63,8 +76,8 @@ function render(request) {
     Object.entries(request.projections ?? {}).map(([index, projection]) => [Number(index), projection])
   );
   let events = adapt(request.provider, request.records).map(event => {
-    const projection = projectionByIndex.get(event.source_index);
-    return projection ? { ...event, projection } : event;
+    const projection = eventProjection(event, projectionByIndex);
+    return Object.keys(projection).length ? { ...event, projection } : event;
   });
   if (Array.isArray(request.source_indexes)) {
     const allowed = new Set(request.source_indexes);
