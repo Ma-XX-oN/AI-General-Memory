@@ -31,7 +31,7 @@ CLAUDE_VARIANTS = (
 
 _DEBUG_BODY = r'<!-- (?:turn_id=[^ ]+ )?record_index=\d+ -->'
 _DEBUG_COMMENT_RE = re.compile(r' ?' + _DEBUG_BODY)
-_DEBUG_STANDALONE_RE = re.compile(r'^(?:> )?' + _DEBUG_BODY + r'$', re.MULTILINE)
+_DEBUG_STANDALONE_RE = re.compile(r'^(?:> )?' + _DEBUG_BODY + r'$')
 
 
 def run(script, fixture, args, env):
@@ -48,12 +48,27 @@ def run(script, fixture, args, env):
   return result.returncode, result.stdout, result.stderr
 
 
+def _blank_markdown_line(line):
+  raw = line[:-1] if line.endswith('\n') else line
+  return raw in ('', '>')
+
+
 def without_debug_provenance(text):
-  """Remove only canonical provenance text/lines, preserving surrounding Markdown."""
+  """Remove canonical provenance while preserving the non-debug Markdown layout."""
+  lines = text.splitlines(keepends=True)
   out = []
-  for line in text.splitlines(keepends=True):
+  skip_next_blank = False
+  for index, line in enumerate(lines):
+    if skip_next_blank and _blank_markdown_line(line):
+      skip_next_blank = False
+      continue
+    skip_next_blank = False
     raw = line[:-1] if line.endswith('\n') else line
     if _DEBUG_STANDALONE_RE.fullmatch(raw):
+      previous_blank = bool(out) and _blank_markdown_line(out[-1])
+      next_blank = index + 1 < len(lines) and _blank_markdown_line(lines[index + 1])
+      if previous_blank and next_blank:
+        skip_next_blank = True
       continue
     out.append(_DEBUG_COMMENT_RE.sub('', line))
   return ''.join(out)
@@ -147,8 +162,6 @@ def main():
         continue
 
       if has_debug:
-        # D015 explicitly supersedes legacy -N comment syntax/placement. The
-        # self-consistency comparison above requires -N to change nothing else.
         continue
 
       if current_out != legacy_out:
