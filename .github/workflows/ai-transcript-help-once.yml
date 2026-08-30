@@ -1,0 +1,51 @@
+name: Correct AI-transcript debug help once
+
+on:
+  push:
+    paths:
+      - .github/workflows/ai-transcript-help-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Correct -N help text
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/AI-transcript.py')
+          text = path.read_text(encoding='utf-8')
+          old = '''    help=(
+              "In transcript mode: emit a '<!-- record: N -->' comment before each "
+              "visible record block for debugging."
+            ),'''
+          new = '''    help=(
+              "In transcript mode: emit canonical source provenance using turn_id "
+              "and zero-based record_index comments on renderer-generated "
+              "headings/groupings for debugging."
+            ),'''
+          if old not in text:
+            raise SystemExit('legacy -N help anchor not found')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+      - name: Syntax and diff hygiene
+        run: |
+          python -m py_compile scripts/AI-transcript.py
+          git diff --check
+      - name: Commit corrected help and remove one-shot workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/ai-transcript-help-once.yml
+          git add scripts/AI-transcript.py
+          git commit -m "phase6: describe canonical debug provenance in CLI help"
+          git push
