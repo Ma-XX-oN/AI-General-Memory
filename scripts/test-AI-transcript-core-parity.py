@@ -29,11 +29,15 @@ CASES = (
 
 
 def transcript_body(text):
-  """Return the transcript beginning with its first Markdown turn heading."""
+  """Return the transcript body, excluding print()'s stdout terminator."""
   start = text.find("## ")
   if start < 0:
     raise AssertionError("AI-transcript.py output has no transcript heading")
-  return text[start:]
+  body = text[start:]
+  # Direct stdout mode calls print(transcript_text), which appends exactly one
+  # transport newline beyond the transcript string.  The canonical golden is
+  # the transcript string itself, so remove only that print-added terminator.
+  return body[:-1] if body.endswith("\n") else body
 
 
 def mismatch_detail(actual, expected):
