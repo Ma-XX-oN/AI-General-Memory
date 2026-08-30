@@ -31,10 +31,7 @@ CLAUDE_VARIANTS = (
 
 _DEBUG_BODY = r'<!-- (?:turn_id=[^ ]+ )?record_index=\d+ -->'
 _DEBUG_COMMENT_RE = re.compile(r' ?' + _DEBUG_BODY)
-_DEBUG_COMMENT_BLOCK_RE = re.compile(
-  r'^(?:> )?' + _DEBUG_BODY + r'\n(?:(?:> ?)?\n)?',
-  re.MULTILINE,
-)
+_DEBUG_STANDALONE_RE = re.compile(r'^(?P<quote>> )?' + _DEBUG_BODY + r'$', re.MULTILINE)
 
 
 def run(script, fixture, args, env):
@@ -52,9 +49,21 @@ def run(script, fixture, args, env):
 
 
 def without_debug_provenance(text):
-  """Remove canonical provenance plus a blank line owned by standalone comments."""
-  text = _DEBUG_COMMENT_BLOCK_RE.sub('', text)
-  return _DEBUG_COMMENT_RE.sub('', text)
+  """Remove canonical provenance without changing the represented Markdown structure."""
+  lines = text.splitlines(keepends=True)
+  out = []
+  in_standalone_run = False
+  for line in lines:
+    raw = line[:-1] if line.endswith('\n') else line
+    match = _DEBUG_STANDALONE_RE.fullmatch(raw)
+    if match:
+      if not in_standalone_run:
+        out.append(('>' if match.group('quote') else '') + ('\n' if line.endswith('\n') else ''))
+      in_standalone_run = True
+      continue
+    in_standalone_run = False
+    out.append(_DEBUG_COMMENT_RE.sub('', line))
+  return ''.join(out)
 
 
 def first_difference(actual, expected):
