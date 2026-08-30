@@ -36,6 +36,16 @@ def transcript_body(text):
   return text[start:]
 
 
+def mismatch_detail(actual, expected):
+  """Return the first differing offset and compact suffix evidence."""
+  common = min(len(actual), len(expected))
+  offset = next((i for i in range(common) if actual[i] != expected[i]), common)
+  return (
+    f"offset={offset}, actual_len={len(actual)}, expected_len={len(expected)}, "
+    f"actual_tail={actual[-80:]!r}, expected_tail={expected[-80:]!r}"
+  )
+
+
 def main():
   """Verify all three production provider entry points match canonical output."""
   env = os.environ.copy()
@@ -60,7 +70,10 @@ def main():
     actual = transcript_body(result.stdout)
     expected = expected_path.read_text(encoding="utf-8")
     if actual != expected:
-      failures.append(f"{provider}: production transcript differs from canonical golden")
+      failures.append(
+        f"{provider}: production transcript differs from canonical golden: "
+        f"{mismatch_detail(actual, expected)}"
+      )
 
   if failures:
     raise SystemExit("\n".join(failures))
