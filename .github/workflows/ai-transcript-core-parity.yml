@@ -1,6 +1,7 @@
 name: AI-transcript canonical parity
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - scripts/AI-transcript.py
