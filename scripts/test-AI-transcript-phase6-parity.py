@@ -29,9 +29,9 @@ CLAUDE_VARIANTS = (
   ('separate-thoughts-metadata-ansi', ['--color', 'always', '-T', '-d', '-n', '-N']),
 )
 
-_DEBUG_COMMENT_RE = re.compile(
-  r' ?<!-- (?:turn_id=[^ ]+ )?record_index=\d+ -->'
-)
+_DEBUG_BODY = r'<!-- (?:turn_id=[^ ]+ )?record_index=\d+ -->'
+_DEBUG_COMMENT_RE = re.compile(r' ?' + _DEBUG_BODY)
+_DEBUG_COMMENT_LINE_RE = re.compile(r'^(?:> )?' + _DEBUG_BODY + r'\n?', re.MULTILINE)
 
 
 def run(script, fixture, args, env):
@@ -48,13 +48,9 @@ def run(script, fixture, args, env):
   return result.returncode, result.stdout, result.stderr
 
 
-def one_stdout_transport_newline(text):
-  """Remove the one newline added by print() around an already-terminated transcript."""
-  return text[:-1] if text.endswith('\n') else text
-
-
 def without_debug_provenance(text):
-  """Remove only the canonical debug-provenance HTML comments from output."""
+  """Remove exactly canonical provenance comments and their standalone lines."""
+  text = _DEBUG_COMMENT_LINE_RE.sub('', text)
   return _DEBUG_COMMENT_RE.sub('', text)
 
 
@@ -150,12 +146,10 @@ def main():
         # self-consistency comparison above requires -N to change nothing else.
         continue
 
-      current_transport = one_stdout_transport_newline(current_out)
-      legacy_transport = one_stdout_transport_newline(legacy_out)
-      if current_transport != legacy_transport:
+      if current_out != legacy_out:
         failures.append(
           f'{provider}/{name}: stdout differs outside approved Phase 6 changes: '
-          f'{first_difference(current_transport, legacy_transport)}'
+          f'{first_difference(current_out, legacy_out)}'
         )
 
   if failures:
