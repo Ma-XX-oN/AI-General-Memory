@@ -110,6 +110,8 @@ new = '''  records = []
   body = _core_bridge().render(
     session.source, records, source_indexes, projections
   )
+  if body.endswith("\\n"):
+    body = body[:-1]
 '''
 if old not in text:
   raise SystemExit('core transcript body anchor not found')
