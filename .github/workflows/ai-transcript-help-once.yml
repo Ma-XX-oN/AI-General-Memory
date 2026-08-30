@@ -21,21 +21,27 @@ jobs:
       - name: Correct -N help text
         run: |
           python - <<'PY'
+          import re
           from pathlib import Path
           path = Path('scripts/AI-transcript.py')
           text = path.read_text(encoding='utf-8')
-          old = '''    help=(
-              "In transcript mode: emit a '<!-- record: N -->' comment before each "
-              "visible record block for debugging."
-            ),'''
-          new = '''    help=(
-              "In transcript mode: emit canonical source provenance using turn_id "
-              "and zero-based record_index comments on renderer-generated "
-              "headings/groupings for debugging."
-            ),'''
-          if old not in text:
-            raise SystemExit('legacy -N help anchor not found')
-          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          pattern = re.compile(
+            r'(  ap\.add_argument\(\n    "-N",\n    action="store_true", dest="debug_record_comment",\n    help=\(\n)'
+            r'      "In transcript mode: emit a \'<!-- record: N -->\' comment before each "\n'
+            r'      "visible record block for debugging\."\n'
+            r'(    \),\n  \))'
+          )
+          replacement = (
+            r'\1'
+            '      "In transcript mode: emit canonical source provenance using turn_id "\n'
+            '      "and zero-based record_index comments on renderer-generated "\n'
+            '      "headings/groupings for debugging."\n'
+            r'\2'
+          )
+          text, count = pattern.subn(replacement, text, count=1)
+          if count != 1:
+            raise SystemExit(f'expected one legacy -N help block, replaced {count}')
+          path.write_text(text, encoding='utf-8')
           PY
       - name: Syntax and diff hygiene
         run: |
