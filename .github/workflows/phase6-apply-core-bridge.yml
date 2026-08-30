@@ -1,0 +1,66 @@
+name: Apply Phase 6 core bridge
+
+on:
+  push:
+    paths:
+      - .github/workflows/phase6-apply-core-bridge.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out AI-General-Memory
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check out pinned AIConversationCore
+        uses: actions/checkout@v4
+        with:
+          repository: Ma-XX-oN/AIConversationCore
+          ref: cdad429007754f7c1ce1eb5ec3b33924ffb0aee1
+          path: .phase6-core
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Apply production bridge patch
+        run: python scripts/apply-phase6-core-bridge.py
+
+      - name: Python syntax gate
+        run: python -m py_compile scripts/AI-transcript.py scripts/test-AI-transcript-core-parity.py scripts/apply-phase6-core-bridge.py
+
+      - name: Canonical production parity
+        env:
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/.phase6-core
+        run: python scripts/test-AI-transcript-core-parity.py
+
+      - name: Core regression suite
+        working-directory: .phase6-core
+        run: npm test
+
+      - name: Diff hygiene
+        run: git diff --check
+
+      - name: Commit verified production integration
+        run: |
+          rm -rf .phase6-core
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/AI-transcript.py
+          if git diff --cached --quiet; then
+            echo "Production bridge patch already applied."
+            exit 0
+          fi
+          git commit -m "phase6: route default transcripts through AIConversationCore"
+          git push
