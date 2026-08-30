@@ -23,7 +23,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Ma-XX-oN/AIConversationCore
-          ref: f333c50171ac2f850f38981c31411010a2124ee5
+          ref: ee1bd128c98dc381688667033c77e007d64148e4
           path: .phase6-core
       - uses: actions/setup-node@v4
         with:
