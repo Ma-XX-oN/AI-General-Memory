@@ -4408,8 +4408,9 @@ def main():
     "-N",
     action="store_true", dest="debug_record_comment",
     help=(
-      "In transcript mode: emit a '<!-- record: N -->' comment before each "
-      "visible record block for debugging."
+      "In transcript mode: emit canonical source provenance using turn_id "
+      "and zero-based record_index comments on renderer-generated "
+      "headings/groupings for debugging."
     ),
   )
   ap.add_argument(
