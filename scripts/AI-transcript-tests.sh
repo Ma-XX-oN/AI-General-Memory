@@ -408,7 +408,7 @@ check "chatgpt-direct: multimodal user rendered"        0 'Find the screenshot-b
 check "chatgpt-direct: multimodal image placeholder"    0 '\[image missing\]' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
 check "chatgpt-direct: grouped cite block rendered"      0 '\*\*\(cite:' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
 check "chatgpt-direct: cite sources named"              0 'Python Docs.*Example|Example.*Python Docs' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
-check "chatgpt-direct: google favicon service used"     0 'google\.com/s2/favicons\?domain=https://docs\.python\.org&sz=32' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
+check "chatgpt-direct: google favicon service used"     0 'google\.com/s2/favicons\?domain=https://docs\.python\.org&amp;sz=32' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
 check "chatgpt-direct: cite favicon size fixed"         0 'width="15" height="15"' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
 check "chatgpt-direct: cite links kept together"        0 'display:inline-block;white-space:nowrap;' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl
 check "chatgpt-direct: tooltip falls back by URL"       0 'title="Python note&#10;&#10;Supporting note for the transcript fixture\."' "" $SCRIPT --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl

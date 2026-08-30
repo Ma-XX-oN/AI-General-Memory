@@ -192,13 +192,14 @@ class _AIConversationCoreBridge:
       raise RuntimeError(f"AIConversationCore worker error: {response.get('error', 'unknown error')}")
     return response
 
-  def render(self, provider, records, source_indexes):
+  def render(self, provider, records, source_indexes, projections):
     """Render canonical Markdown for one provider record sequence."""
     response = self.request({
       "operation": "render",
       "provider": provider,
       "records": records,
       "source_indexes": source_indexes,
+      "projections": projections,
     })
     return response["markdown"]
 
@@ -224,16 +225,28 @@ def _core_bridge():
   return _CORE_BRIDGE
 
 
-def _core_presentation_supported():
-  """Return whether canonical rendering can reproduce the active presentation."""
+def _core_projection(rec_no, ts_str, *, rec_width):
+  """Return consumer presentation metadata for one canonical source event."""
   policy = _display_policy()
-  return not (
-    policy.render_color
-    or policy.show_date
-    or policy.record_number
-    or policy.debug_record_comment
-    or policy.separate_thoughts
-  )
+  suffix = ""
+  if policy.show_date or policy.record_number:
+    rendered = _build_hunk_prefix(rec_no, ts_str, rec_width=rec_width).rstrip()
+    if rendered:
+      suffix = " " + rendered
+  colors = {}
+  if policy.render_color:
+    colors = {
+      "user": _C_ROLE_USER,
+      "ai": _C_ROLE_AI,
+      "thought": _C_ROLE_THOUGHT,
+      "reset": _C_RESET,
+    }
+  return {
+    "heading_suffix": suffix,
+    "debug_provenance": policy.debug_record_comment,
+    "separate_thoughts": policy.separate_thoughts,
+    "colors": colors,
+  }
 
 
 def _core_record_timestamp(source, record):
@@ -256,19 +269,29 @@ def _core_transcript(session, rec_filter=None):
   """Render one transcript body through the shared canonical JavaScript core."""
   records = []
   source_indexes = []
+  projections = {}
+  rec_width = max(1, len(str(session.rc)))
   with open(session.path, encoding="utf-8") as source:
     for source_index, raw in enumerate(line for line in source if line.strip()):
       record = json.loads(raw)
       records.append(record)
       rec_no = source_index + 1
+      ts_str = _core_record_timestamp(session.source, record)
       if rec_filter and not rec_filter.is_trivial():
         if not rec_filter.allows_rec(rec_no):
           continue
-        if not rec_filter.allows_ts(_core_record_timestamp(session.source, record)):
+        if not rec_filter.allows_ts(ts_str):
           continue
       source_indexes.append(source_index)
+      projections[str(source_index)] = _core_projection(
+        rec_no, ts_str, rec_width=rec_width
+      )
 
-  body = _core_bridge().render(session.source, records, source_indexes)
+  body = _core_bridge().render(
+    session.source, records, source_indexes, projections
+  )
+  if body.endswith("\n"):
+    body = body[:-1]
   line1, line2 = _format_session_lines(session)
   return f"{line1}\n{line2}\n\n{body}"
 
@@ -1702,255 +1725,7 @@ class ClaudeSessionStore(SessionStore):
 
   def transcript(self, session, rec_filter=None):
     """Return the full Markdown transcript for *session*."""
-    if _core_presentation_supported():
-      return _core_transcript(session, rec_filter)
-    path = str(session.path)
-    with open(path, encoding="utf-8") as f:
-      if rec_filter and not rec_filter.is_trivial():
-        records = []
-        rec_nos = []
-        for i, raw in enumerate((l for l in f if l.strip()), start=1):
-          rec_no = i
-          if rec_filter.past_hi(rec_no):
-            break
-          if not rec_filter.allows_rec(rec_no):
-            continue
-          rec = json.loads(raw)
-          if not rec_filter.allows_ts(rec.get("timestamp")):
-            continue
-          records.append(rec)
-          rec_nos.append(rec_no)
-      else:
-        records = [json.loads(l) for l in f if l.strip()]
-        rec_nos = list(range(1, len(records) + 1))
-
-    policy = _display_policy()
-    headings = _headings()
-    rec_width = len(str(session.rc))
-    line1, line2 = _format_session_lines(session)
-    out = [f"{line1}\n{line2}\n"]
-
-    last_user_text = None  # deduplicate retried user messages
-    turns, plan_ids = _cl_group_turns(rec_nos, records)
-    for turn_item in turns:
-      item_type = turn_item[0]
-
-      # ── User turn ──────────────────────────────────────────────────
-      if item_type == 'user':
-        _, rec_no, ts, rec = turn_item
-        suffix = ""
-        if policy.show_date or policy.record_number:
-          s = _build_hunk_prefix(rec_no, ts, rec_width=rec_width).rstrip()
-          if s:
-            suffix = " " + s
-        content = rec.get("message", {}).get("content", [])
-        if not isinstance(content, list):
-          continue
-        is_plan_approval = any(
-          isinstance(b, dict) and b.get("tool_use_id", "") in plan_ids
-          for b in content
-        )
-        text = _cl_user_text(content)
-        if not text and all(
-          isinstance(b, dict) and b.get("type") == "tool_result"
-          for b in content
-        ):
-          # AskUserQuestion / ExitPlanMode answer carried as a tool-result record
-          texts = []
-          for b in content:
-            if not isinstance(b, dict):
-              continue
-            c = b.get("content", "")
-            if isinstance(c, str) and c:
-              texts.append(c)
-            elif isinstance(c, list):
-              for itm in c:
-                if isinstance(itm, dict) and itm.get("type") == "text":
-                  texts.append(itm["text"])
-          text = "\n\n".join(t for t in texts if t)
-        if text and text != last_user_text:
-          last_user_text = text
-          block = ""
-          if is_plan_approval:
-            m = re.search(r"(?m)^#{0,6} *Approved Plan[: ]", text)
-            if m:
-              pre = text[:m.start()].rstrip()
-              post = text[m.start():]
-              details = (
-                f"> <details>\n> <summary>Approved Plan</summary>\n>\n"
-                f"{_md_quote(post)}\n>\n> </details>"
-              )
-              if pre:
-                block = f"{headings.user}{suffix}\n\n{_md_quote(pre)}\n\n{details}\n"
-              else:
-                block = f"{headings.user}{suffix}\n\n{details}\n"
-            else:
-              block = f"{headings.user}{suffix}\n\n{_md_quote(text)}\n"
-          else:
-            block = f"{headings.user}{suffix}\n\n{_md_quote(text)}\n"
-          if block:
-            comment = _record_comment(rec_no)
-            if comment:
-              out.append(comment)
-            out.append(block)
-
-      # ── Queued command attachment ──────────────────────────────────
-      elif item_type == 'queued_command':
-        _, rec_no, ts, rec = turn_item
-        block = _cl_render_queued_command(rec_no, ts, rec, rec_width=rec_width)
-        if block:
-          out.append(block + "\n")
-
-      # ── System notice (synthetic assistant record) ─────────────────
-      elif item_type == 'notice':
-        _, rec_no, ts, notice_text = turn_item
-        comment = _record_comment(rec_no)
-        if comment:
-          out.append(comment)
-        out.append(f"> *(system: {notice_text})*\n")
-
-      # ── Completed child-agent task notification ─────────────────────
-      elif item_type == 'subagent_notification':
-        _, rec_no, ts, rec = turn_item
-        block = _cl_render_task_notification(rec_no, ts, rec, rec_width=rec_width)
-        if block:
-          out.append(block + "\n")
-
-      # ── Assistant turn ─────────────────────────────────────────────
-      elif item_type == 'assistant_turn':
-        _, display_rec_no, display_ts, sub_records, tr_map = turn_item
-        suffix = ""
-        if policy.show_date or policy.record_number:
-          s = _build_hunk_prefix(
-            display_rec_no, display_ts, rec_width=rec_width
-          ).rstrip()
-          if s:
-            suffix = " " + s
-
-        # Split sub_records into segments: thought groups and inline items.
-        #
-        # State-machine classification:
-        # - AskUserQuestion / EnterPlanMode / ExitPlanMode always go inline
-        #   (they are explicit user-directed interactions).
-        # - Text-only records (no tool_use) that appear AFTER the last
-        #   tool_use record in the turn are user-directed output (inline).
-        # Classification rules (deterministic, no position heuristics):
-        # - AskUserQuestion / EnterPlanMode / ExitPlanMode → always inline.
-        # - Records whose content is text-only (no tool_use, no thinking) →
-        #   always inline; text blocks are always directed at the user.
-        # - Everything else (thinking, tool_use, mixed) → thought group.
-
-        segments = []
-        current_thoughts: list = []
-
-        for sub_rec_no, sub_ts, sub_rec in sub_records:
-          sub_content = sub_rec.get("message", {}).get("content", [])
-          has_ask = any(
-            b.get("type") == "tool_use" and b.get("name") == "AskUserQuestion"
-            for b in sub_content
-          )
-          has_plan_op = any(
-            b.get("type") == "tool_use"
-            and b.get("name") in ("EnterPlanMode", "ExitPlanMode")
-            for b in sub_content
-          )
-          has_tool_use = any(b.get("type") == "tool_use" for b in sub_content)
-          has_text = any(
-            b.get("type") == "text" and b.get("text") for b in sub_content
-          )
-          is_inline = (
-            has_ask or has_plan_op
-            or (has_text and not has_tool_use)
-          )
-
-          if is_inline:
-            if current_thoughts:
-              segments.append(('thoughts', current_thoughts[:]))
-              current_thoughts = []
-            segments.append(('inline', sub_rec_no, sub_ts, sub_rec))
-          else:
-            current_thoughts.append((sub_rec_no, sub_ts, sub_rec))
-
-        if current_thoughts:
-          segments.append(('thoughts', current_thoughts))
-
-        if not segments:
-          continue
-
-        block = f"{headings.claude}{suffix}"
-        thought_counter = 0
-        question_counter = [0]
-
-        for seg in segments:
-          if seg[0] == 'thoughts':
-            _, thought_group = seg
-            inner_parts = []
-            for t_rec_no, t_ts, t_rec in thought_group:
-              item_md = _cl_render_thought_item(t_rec, tr_map)
-              if not item_md:
-                continue
-              thought_counter += 1
-              comment = _record_comment(t_rec_no, quoted=True)
-              if policy.separate_thoughts:
-                t_suffix = ""
-                if policy.show_date or policy.record_number:
-                  t_s = _build_hunk_prefix(t_rec_no, t_ts, rec_width=rec_width).rstrip()
-                  if t_s:
-                    t_suffix = " " + t_s
-                part = (
-                  f"> {headings.thought(thought_counter)}{t_suffix}\n>\n"
-                  f"{_md_quote(item_md)}"
-                )
-              else:
-                part = _md_quote(item_md)
-              if comment:
-                part = f"{comment}\n>\n{part}"
-              inner_parts.append(part)
-            if inner_parts:
-              # Use "\n>\n" separator to keep blockquote context continuous.
-              # Outer <details> tags are explicitly blockquoted; per-item
-              # _md_quote() handles the content so ### Thought N stays unquoted.
-              sep = "\n>\n> ***\n>\n" if len(inner_parts) > 1 else "\n>\n"
-              inner = sep.join(inner_parts)
-              block += (
-                f"\n\n> <details>\n> <summary>{_thought_summary(len(inner_parts))}</summary>\n>\n"
-                f"{inner}\n>\n> </details>"
-              )
-
-          elif seg[0] == 'inline':
-            _, sub_rec_no, sub_ts, sub_rec = seg
-            inline_md = _cl_render_inline_item(sub_rec, tr_map, question_counter)
-            if inline_md:
-              comment = _record_comment(sub_rec_no)
-              if policy.separate_thoughts:
-                inner_suffix = ""
-                if policy.show_date or policy.record_number:
-                  s = _build_hunk_prefix(sub_rec_no, sub_ts, rec_width=rec_width).rstrip()
-                  if s:
-                    inner_suffix = " " + s
-                inline_block = f"> {headings.claude}{inner_suffix}\n>\n{inline_md}"
-                if comment:
-                  inline_block = f"{comment}\n\n{inline_block}"
-                block += f"\n\n{inline_block}"
-              else:
-                if comment:
-                  block += f"\n\n{comment}\n\n{inline_md}"
-                else:
-                  block += f"\n\n{inline_md}"
-
-        if block == f"{headings.claude}{suffix}":
-          block = ""
-
-        if block:
-          out.append(block + "\n")
-        out.extend(
-          subagent_block + "\n"
-          for subagent_block in _cl_render_subagents(
-            sub_records, tr_map, rec_width=rec_width
-          )
-        )
-
-    return "\n".join(out)
+    return _core_transcript(session, rec_filter)
 
 
 # ── Codex-specific helpers ────────────────────────────────────────────────────
@@ -2416,237 +2191,7 @@ class CodexSessionStore(SessionStore):
 
   def transcript(self, session, rec_filter=None):
     """Return the full Markdown transcript for *session*."""
-    if _core_presentation_supported():
-      return _core_transcript(session, rec_filter)
-    path = str(session.path)
-    with open(path, encoding="utf-8") as f:
-      if rec_filter and not rec_filter.is_trivial():
-        lines = []
-        for i, raw in enumerate((l for l in f if l.strip()), start=1):
-          rec_no = i
-          if rec_filter.past_hi(rec_no):
-            break
-          if not rec_filter.allows_rec(rec_no):
-            continue
-          rec = json.loads(raw)
-          if not rec_filter.allows_ts(rec.get("timestamp")):
-            continue
-          rec["_rec_no"] = rec_no
-          lines.append(rec)
-      else:
-        lines = [json.loads(l) for l in f if l.strip()]
-
-    # First pass: collect messages in order
-    policy = _display_policy()
-    headings = _headings()
-    rec_width = len(str(session.rc))
-    msgs = []
-    _cx_pending_questions: dict = {}  # call_id → questions list
-    for idx, l in enumerate(lines):
-      rec_no = l.get("_rec_no", idx + 1)
-      if l.get("type") == "event_msg":
-        et = l["payload"].get("type")
-        if et == "user_message":
-          text = l["payload"].get("message", "")
-          m = re.search(r"## My request for Codex:\n(.+)", text, re.DOTALL)
-          if m:
-            text = m.group(1).strip()
-          images = _cx_get_images_before(lines, idx)
-          msgs.append({"role": "user", "text": text, "images": images, "idx": idx,
-                       "rec_no": rec_no, "ts": l.get("timestamp")})
-        elif et == "agent_message":
-          phase = l["payload"].get("phase", "")
-          text = l["payload"].get("message", "")
-          msgs.append(
-            {"role": "codex", "phase": phase, "text": text, "idx": idx,
-             "patches": [], "rec_no": rec_no, "ts": l.get("timestamp")}
-          )
-        elif et == "agent_reasoning":
-          text = l["payload"].get("text", "")
-          if text:
-            msgs.append({"role": "codex_reasoning", "text": text, "idx": idx,
-                         "rec_no": rec_no, "ts": l.get("timestamp")})
-      elif l.get("type") == "response_item":
-        pt = l.get("payload", {}).get("type", "")
-        if pt == "function_call" and l["payload"].get("name") == "request_user_input":
-          try:
-            args = json.loads(l["payload"].get("arguments", "{}"))
-          except Exception:
-            args = {}
-          questions = args.get("questions", [])
-          if questions:
-            call_id = l["payload"].get("call_id", "")
-            _cx_pending_questions[call_id] = questions
-            msgs.append({"role": "codex_question", "questions": questions,
-                         "call_id": call_id, "idx": idx,
-                         "rec_no": rec_no, "ts": l.get("timestamp")})
-        elif pt == "function_call_output":
-          call_id = l["payload"].get("call_id", "")
-          if call_id in _cx_pending_questions:
-            try:
-              output = json.loads(l["payload"].get("output", "{}"))
-            except Exception:
-              output = {}
-            answers = output.get("answers", {})
-            if answers:
-              msgs.append({"role": "codex_answer",
-                           "questions": _cx_pending_questions[call_id],
-                           "answers": answers, "idx": idx,
-                           "rec_no": rec_no, "ts": l.get("timestamp")})
-
-    # Second pass: attach patches to each final Codex message
-    prev_idx = 0
-    for msg in msgs:
-      if msg["role"] == "codex" and msg["phase"] != "commentary":
-        msg["patches"] = _cx_get_patches_between(lines, prev_idx, msg["idx"])
-      if msg["role"] == "user":
-        prev_idx = msg["idx"]
-
-    line1, line2 = _format_session_lines(session)
-    out = [f"{line1}\n{line2}\n"]
-
-    i = 0
-    prev_msg_idx = 0  # Line index of last user/codex_answer msg (for orphan patch collection)
-    while i < len(msgs):
-      msg = msgs[i]
-
-      if msg["role"] == "user":
-        suffix = ""
-        if policy.show_date or policy.record_number:
-          s = _build_hunk_prefix(
-            msg["rec_no"], msg["ts"], rec_width=rec_width
-          ).rstrip()
-          if s:
-            suffix = " " + s
-        img_md = "\n".join(f'![image]({url})' for url in msg["images"])
-        block = f"{headings.user}{suffix}\n\n{_md_quote(msg['text'])}"
-        if img_md:
-          block += f"\n\n{img_md}"
-        comment = _record_comment(msg["rec_no"])
-        if comment:
-          out.append(comment)
-        out.append(block + "\n")
-        prev_msg_idx = msg["idx"]
-        i += 1
-
-      elif msg["role"] == "codex_answer":
-        # User's answers to a Codex request_user_input question
-        suffix = ""
-        if policy.show_date or policy.record_number:
-          s = _build_hunk_prefix(
-            msg["rec_no"], msg["ts"], rec_width=rec_width
-          ).rstrip()
-          if s:
-            suffix = " " + s
-        questions = msg["questions"]
-        answers = msg["answers"]
-        parts = []
-        for q in questions:
-          q_text = q.get("question", "")
-          q_id = q.get("id", "")
-          a_data = answers.get(q_id, {})
-          selected = a_data.get("answers", []) if isinstance(a_data, dict) else []
-          if q_text and selected:
-            answer_str = ", ".join(f'"{a}"' for a in selected)
-            parts.append(f'**{q_text}** → {answer_str}')
-        if parts:
-          comment = _record_comment(msg["rec_no"])
-          if comment:
-            out.append(comment)
-          out.append(f"{headings.user}{suffix}\n\n" + _md_quote("\n\n".join(parts)) + "\n")
-        prev_msg_idx = msg["idx"]
-        i += 1
-
-      else:  # codex turn (codex, codex_reasoning, codex_question)
-        codex_rec_no = msgs[i]["rec_no"]
-        codex_ts = msgs[i]["ts"]
-        thinking_items = []  # [(rec_no, ts, text), ...]
-        while i < len(msgs) and msgs[i]["role"] in ("codex", "codex_reasoning"):
-          m = msgs[i]
-          if m["role"] == "codex_reasoning":
-            thinking_items.append((m["rec_no"], m["ts"], m["text"]))
-            i += 1
-          elif m["role"] == "codex" and m["phase"] == "commentary":
-            thinking_items.append((m["rec_no"], m["ts"], m["text"]))
-            i += 1
-          else:
-            break  # non-commentary codex message - stop
-
-        final_msg = None
-        if i < len(msgs) and msgs[i]["role"] == "codex" and msgs[i]["phase"] != "commentary":
-          final_msg = msgs[i]
-          i += 1
-
-        # Check for an inline question (request_user_input) from Codex
-        question_block = None
-        if i < len(msgs) and msgs[i]["role"] == "codex_question":
-          question_block = msgs[i]
-          i += 1
-
-        suffix = ""
-        if policy.show_date or policy.record_number:
-          s = _build_hunk_prefix(
-            codex_rec_no, codex_ts, rec_width=rec_width
-          ).rstrip()
-          if s:
-            suffix = " " + s
-        block = f"{headings.codex}{suffix}"
-        if thinking_items:
-          inner = _format_thought_items(thinking_items, rec_width=rec_width)
-          block += (
-            f"\n\n> <details>\n> <summary>{_thought_summary(len(thinking_items))}</summary>\n>\n"
-            f"{inner}\n>\n> </details>"
-          )
-        if final_msg:
-          comment = _record_comment(final_msg["rec_no"])
-          if comment:
-            block += f"\n\n{comment}"
-          block += f"\n\n{_md_quote(final_msg['text'])}"
-          if final_msg["patches"]:
-            n = len(final_msg["patches"])
-            label = f"{n} file change{'s' if n != 1 else ''}"
-            patches_md = "\n\n".join(
-              f"```diff\n{p}\n```" for p in final_msg["patches"]
-            )
-            block += (
-              f"\n\n<details>\n<summary>{label}</summary>\n\n"
-              f"{_md_quote(patches_md)}\n\n</details>"
-            )
-        else:
-          # No final text response - collect any apply_patch calls that have
-          # no non-commentary agent_message to attach to (item 34).
-          end_idx = msgs[i]["idx"] if i < len(msgs) else len(lines)
-          orphan_patches = _cx_get_patches_between(lines, prev_msg_idx, end_idx)
-          if orphan_patches:
-            n = len(orphan_patches)
-            label = f"{n} file change{'s' if n != 1 else ''}"
-            patches_md = "\n\n".join(
-              f"```diff\n{p}\n```" for p in orphan_patches
-            )
-            block += (
-              f"\n\n<details>\n<summary>{label}</summary>\n\n"
-              f"{_md_quote(patches_md)}\n\n</details>"
-            )
-        if question_block:
-          comment = _record_comment(question_block["rec_no"])
-          if comment:
-            block += f"\n\n{comment}"
-          questions = question_block["questions"]
-          for qi, q in enumerate(questions, 1):
-            q_text = q.get("question", "")
-            options = q.get("options", [])
-            q_md = f"**{q_text}**"
-            for opt in options:
-              opt_label = opt.get("label", "")
-              opt_desc = opt.get("description", "")
-              if opt_desc:
-                q_md += f"\n- {opt_label} - {opt_desc}"
-              else:
-                q_md += f"\n- {opt_label}"
-            block += f"\n\n{headings.question(qi)}\n\n{_md_quote(q_md)}"
-        out.append(block + "\n")
-
-    return "\n".join(out)
+    return _core_transcript(session, rec_filter)
 
 
 # ── ChatGPT-specific helpers ──────────────────────────────────────────────────
@@ -4319,97 +3864,7 @@ class ChatGPTSessionStore(SessionStore):
 
   def transcript(self, session, rec_filter=None):
     """Return the full Markdown transcript for a ChatGPT JSONL file."""
-    if _core_presentation_supported():
-      return _core_transcript(session, rec_filter)
-    path = str(session.path)
-    records = _cg_message_records(path)
-    lines = []
-    for rec_no, rec in enumerate(records, start=1):
-      if rec_filter and not rec_filter.is_trivial():
-        if rec_filter.past_hi(rec_no):
-          break
-        if not rec_filter.allows_rec(rec_no):
-          continue
-        ts_str = _cg_record_ts(rec)
-        if not rec_filter.allows_ts(ts_str):
-          continue
-      rec = dict(rec)
-      rec["_rec_no"] = rec_no
-      lines.append(rec)
-
-    headings = _headings()
-    policy = _display_policy()
-    rec_width = len(str(session.rc))
-    line1, line2 = _format_session_lines(session)
-    out = [f"{line1}\n{line2}\n"]
-    pending_thoughts = []
-    file_ref_index = _cg_build_file_reference_index(lines)
-
-    def flush_assistant_block(text="", *, rec_no=None, ts_str=None, channel=None):
-      """Emit a ChatGPT assistant block from pending thought items plus *text*."""
-      nonlocal pending_thoughts
-      if not text and not pending_thoughts:
-        return
-      display_rec_no = rec_no if rec_no is not None else pending_thoughts[0][0]
-      display_ts = ts_str if ts_str is not None else (pending_thoughts[0][1] if pending_thoughts else None)
-      suffix = ""
-      if policy.show_date or policy.record_number:
-        stamp = _build_hunk_prefix(
-          display_rec_no, display_ts, rec_width=rec_width
-        ).rstrip()
-        if stamp:
-          suffix = " " + stamp
-      heading = _cg_heading_for_channel(channel)
-      parts = [f"{heading}{suffix}"]
-      thoughts_md = _cg_render_thought_block(
-        pending_thoughts,
-        rec_width=rec_width,
-        file_ref_index=file_ref_index,
-      )
-      if thoughts_md:
-        parts.append(thoughts_md)
-      if text:
-        parts.append(_md_quote(text))
-      comment = _record_comment(display_rec_no)
-      if comment:
-        out.append(comment)
-      out.append("\n\n".join(parts) + "\n")
-      pending_thoughts = []
-
-    for idx, rec in enumerate(lines):
-      rec_no = rec.get("_rec_no", idx + 1)
-      ts_str = _cg_record_ts(rec)
-      user_text = _cg_visible_user_text(rec, file_ref_index=file_ref_index)
-      if user_text:
-        flush_assistant_block()
-        suffix = ""
-        if policy.show_date or policy.record_number:
-          stamp = _build_hunk_prefix(rec_no, ts_str, rec_width=rec_width).rstrip()
-          if stamp:
-            suffix = " " + stamp
-        comment = _record_comment(rec_no)
-        if comment:
-          out.append(comment)
-        out.append(f"{headings.user}{suffix}\n\n{_md_quote(user_text)}\n")
-        continue
-
-      asst_text = _cg_visible_assistant_markdown(
-        rec, file_ref_index=file_ref_index
-      )
-      if asst_text:
-        flush_assistant_block(
-          asst_text,
-          rec_no=rec_no,
-          ts_str=ts_str,
-          channel=rec.get("channel"),
-        )
-        continue
-
-      if _cg_render_thought_item(rec, file_ref_index=file_ref_index):
-        pending_thoughts.append((rec_no, ts_str, rec))
-
-    flush_assistant_block()
-    return "\n".join(out)
+    return _core_transcript(session, rec_filter)
 
 
 # ── Shared display functions ──────────────────────────────────────────────────
