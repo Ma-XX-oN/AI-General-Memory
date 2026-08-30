@@ -49,6 +49,16 @@ jobs:
         env:
           AI_CONVERSATION_CORE: ${{ github.workspace }}/.phase6-core
         run: python scripts/test-AI-transcript-core-parity.py
+      - name: Diagnose legacy fixture assertions
+        env:
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/.phase6-core
+        run: |
+          echo '=== thinking-lt-escape ==='
+          python scripts/AI-transcript.py --claude --file scripts/fixtures/thinking-lt-escape.jsonl --color never
+          echo '=== exit-plan-mode ==='
+          python scripts/AI-transcript.py --claude --file scripts/fixtures/exit-plan-mode.jsonl --color never
+          echo '=== chatgpt favicon excerpt ==='
+          python scripts/AI-transcript.py --chatgpt --file scripts/fixtures/chatgpt-direct.jsonl --color never | grep -oE 'https?[^" )]+' | grep -E 'favicon|python' || true
       - name: Existing AI-transcript regression suite
         env:
           AI_CONVERSATION_CORE: ${{ github.workspace }}/.phase6-core
