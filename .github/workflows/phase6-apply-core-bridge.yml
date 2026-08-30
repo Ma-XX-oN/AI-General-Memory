@@ -4,6 +4,9 @@ on:
   push:
     paths:
       - .github/workflows/phase6-apply-core-bridge.yml
+      - scripts/AI-transcript-core-worker.mjs
+      - scripts/apply-phase6-core-bridge.py
+      - scripts/test-AI-transcript-core-parity.py
 
 permissions:
   contents: write
