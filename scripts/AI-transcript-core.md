@@ -13,7 +13,7 @@ through one persistent Node.js worker (`AI-transcript-core-worker.mjs`).
   repository or at the repository path named by `AI_CONVERSATION_CORE`.
 - `AI_CONVERSATION_CORE` must name the repository root, not a JavaScript file.
 - The checkout must be exactly commit
-  `29a9fea4903f0214d450e1399a7af8e20823fcd1`.  The worker verifies the checkout
+  `3233cba838bbf2d2cea5a2a6f1900ed6014dcfb0`.  The worker verifies the checkout
   HEAD before importing the core and refuses to run against a different revision.
 
 ## Bridge behaviour
@@ -21,9 +21,17 @@ through one persistent Node.js worker (`AI-transcript-core-worker.mjs`).
 The Python process starts one line-delimited JSON Node.js worker and reuses it for
 the process lifetime.  It does not spawn a JavaScript process per source record.
 Python reads/filter-selects the source JSONL records and supplies consumer-specific
-projection metadata such as date/record-number suffixes, ANSI presentation,
-separate-thought mode, and debug provenance enablement.  Provider interpretation,
+projection metadata such as date, record number, optional source turn ID,
+ANSI presentation, separate-thought mode, and debug provenance enablement.  Provider interpretation,
 canonical structures, and Markdown rendering remain in `AIConversationCore`.
+
+## Optional source turn IDs
+
+`--turn-id` is a normal transcript presentation option, independent of `-d`,
+`-n`, and `-N`.  ChatGPT headings use the source message `id`; Claude
+headings use the source record `uuid`.  Codex does not expose a suitable
+UUID-like ID for every rendered record, so requesting `--turn-id` for Codex
+emits one warning and no `turn_id` fields.
 
 ## Debug provenance
 

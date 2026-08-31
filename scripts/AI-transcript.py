@@ -115,6 +115,7 @@ class DisplayPolicy:
   diag_color: bool
   show_date: bool
   record_number: bool
+  show_turn_id: bool
   debug_record_comment: bool
   display_tz: "datetime.timezone | None"
   separate_thoughts: bool
@@ -228,25 +229,31 @@ def _core_bridge():
 def _core_projection(rec_no, ts_str, *, rec_width):
   """Return consumer presentation metadata for one canonical source event."""
   policy = _display_policy()
-  suffix = ""
-  if policy.show_date or policy.record_number:
-    rendered = _build_hunk_prefix(rec_no, ts_str, rec_width=rec_width).rstrip()
-    if rendered:
-      suffix = " " + rendered
+  heading_metadata = {}
+  if policy.show_date:
+    heading_metadata["timestamp"] = _parse_ts(ts_str, policy.display_tz)
+  if policy.record_number:
+    heading_metadata["record_number"] = f"{rec_no:{rec_width}}"
+  if policy.show_turn_id and not policy.debug_record_comment:
+    heading_metadata["show_turn_id"] = True
   colors = {}
   if policy.render_color:
     colors = {
       "user": _C_ROLE_USER,
       "ai": _C_ROLE_AI,
       "thought": _C_ROLE_THOUGHT,
+      "timestamp": _C_RECDATE,
+      "record_number": _C_RECNO,
       "reset": _C_RESET,
     }
-  return {
-    "heading_suffix": suffix,
+  projection = {
     "debug_provenance": policy.debug_record_comment,
     "separate_thoughts": policy.separate_thoughts,
     "colors": colors,
   }
+  if heading_metadata:
+    projection["heading_metadata"] = heading_metadata
+  return projection
 
 
 def _core_record_timestamp(source, record):
@@ -267,6 +274,11 @@ def _core_record_timestamp(source, record):
 
 def _core_transcript(session, rec_filter=None):
   """Render one transcript body through the shared canonical JavaScript core."""
+  if _display_policy().show_turn_id and session.source == "codex":
+    _warn(
+      "Codex records do not expose a suitable unique UUID for turn_id; "
+      "no turn IDs will be emitted."
+    )
   records = []
   source_indexes = []
   projections = {}
@@ -4396,6 +4408,15 @@ def main():
     help="With --grep: prefix each output line with the record timestamp.",
   )
   ap.add_argument(
+    "--turn-id",
+    action="store_true", dest="turn_id",
+    help=(
+      "In transcript mode: emit provider/source turn_id comments on rendered "
+      "headings. ChatGPT uses message id; Claude uses record uuid; Codex "
+      "warns and emits no turn IDs."
+    ),
+  )
+  ap.add_argument(
     "-T", "--separate-thoughts",
     action="store_true", dest="separate_thoughts",
     help=(
@@ -4587,6 +4608,7 @@ def main():
     diag_color=diag_color,
     show_date=args.show_date,
     record_number=args.record_number,
+    show_turn_id=args.turn_id,
     debug_record_comment=args.debug_record_comment,
     display_tz=_display_tz,
     separate_thoughts=args.separate_thoughts,
