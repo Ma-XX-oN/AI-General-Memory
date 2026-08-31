@@ -1,0 +1,63 @@
+name: Correct Claude turn-id fixture
+
+on:
+  push:
+    paths:
+      - '.github/workflows/issue-10-turn-id-retry.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Correct focused Claude fixture
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('.github/workflows/issue-10-turn-id.yml')
+          text = path.read_text(encoding='utf-8')
+          old = '''            claude_fixture, claude = run(
+                        "claude", "claude-rich-subagent.jsonl", "--turn-id"
+                      )
+                      claude_ids = [
+                        rec.get("uuid") for rec in records(claude_fixture)
+                        if isinstance(rec.get("uuid"), str) and rec.get("uuid")
+                      ]
+                      assert any(
+                        f"turn_id={record_id}" in claude.stdout
+                        for record_id in claude_ids
+                      ), "Claude --turn-id emitted no native source record uuid"
+          '''
+          new = '''            claude_fixture = (
+                        CORE / "tests" / "fixtures" / "claude" / "claude-turn-id.jsonl"
+                      )
+                      claude_fixture.write_text(
+                        '{"type":"user","uuid":"claude-user-uuid","timestamp":"2026-01-02T12:00:01.000Z","message":{"role":"user","content":[{"type":"text","text":"Hello"}]}}\\n'
+                        '{"type":"assistant","uuid":"claude-assistant-uuid","timestamp":"2026-01-02T12:00:02.000Z","message":{"role":"assistant","content":[{"type":"text","text":"Hi"}]}}\\n',
+                        encoding="utf-8",
+                      )
+                      _, claude = run("claude", "claude-turn-id.jsonl", "--turn-id")
+                      assert "turn_id=claude-user-uuid" in claude.stdout, (
+                        "Claude User --turn-id did not use the native source record uuid"
+                      )
+                      assert "turn_id=claude-assistant-uuid" in claude.stdout, (
+                        "Claude Assistant --turn-id did not use the native source record uuid"
+                      )
+          '''
+          if old not in text:
+            raise SystemExit('Claude focused-test block not found')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+      - name: Commit correction and remove helper
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/issue-10-turn-id-retry.yml
+          git add .github/workflows/issue-10-turn-id.yml
+          git commit -m 'test: use Claude UUID fixture for turn ids'
+          git push
