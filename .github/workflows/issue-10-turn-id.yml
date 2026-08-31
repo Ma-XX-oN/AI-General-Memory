@@ -160,30 +160,11 @@ jobs:
 
           worker = Path('scripts/AI-transcript-core-worker.mjs')
           worker_text = worker.read_text(encoding='utf-8')
-          worker_text = worker_text.replace(
-            "const CORE_COMMIT = '29a9fea4903f0214d450e1399a7af8e20823fcd1';",
-            "const CORE_COMMIT = '3233cba838bbf2d2cea5a2a6f1900ed6014dcfb0';",
-            1,
-          )
-          worker.write_text(worker_text, encoding='utf-8')
-
-          workflow = Path('.github/workflows/ai-transcript-core-parity.yml')
-          workflow_text = workflow.read_text(encoding='utf-8')
-          workflow_text = workflow_text.replace(
-            'ref: 29a9fea4903f0214d450e1399a7af8e20823fcd1',
-            'ref: 3233cba838bbf2d2cea5a2a6f1900ed6014dcfb0',
-            1,
-          )
-          workflow_text = workflow_text.replace(
-            'scripts/test-AI-transcript-core-parity.py\n',
-            'scripts/test-AI-transcript-core-parity.py\n      - scripts/test-AI-transcript-turn-id.py\n',
-          )
-          workflow_text = workflow_text.replace(
-            'python scripts/test-AI-transcript-core-parity.py\n',
-            'python scripts/test-AI-transcript-core-parity.py\n      - name: Turn-ID and record-number projection\n        env:\n          AI_CONVERSATION_CORE: ${{ github.workspace }}/.phase6-core\n        run: python scripts/test-AI-transcript-turn-id.py\n',
-            1,
-          )
-          workflow.write_text(workflow_text, encoding='utf-8')
+          old_pin = "const CORE_COMMIT = '29a9fea4903f0214d450e1399a7af8e20823fcd1';"
+          new_pin = "const CORE_COMMIT = '3233cba838bbf2d2cea5a2a6f1900ed6014dcfb0';"
+          if old_pin not in worker_text:
+            raise SystemExit('worker core pin not found')
+          worker.write_text(worker_text.replace(old_pin, new_pin, 1), encoding='utf-8')
 
           doc = Path('scripts/AI-transcript-core.md')
           doc_text = doc.read_text(encoding='utf-8')
@@ -203,8 +184,7 @@ jobs:
           section = '''## Optional source turn IDs\n\n`--turn-id` is a normal transcript presentation option, independent of `-d`,\n`-n`, and `-N`.  ChatGPT headings use the source message `id`; Claude\nheadings use the source record `uuid`.  Codex does not expose a suitable\nUUID-like ID for every rendered record, so requesting `--turn-id` for Codex\nemits one warning and no `turn_id` fields.\n\n'''
           if marker not in doc_text:
             raise SystemExit('AI-transcript-core.md insertion point not found')
-          doc_text = doc_text.replace(marker, section + marker, 1)
-          doc.write_text(doc_text, encoding='utf-8')
+          doc.write_text(doc_text.replace(marker, section + marker, 1), encoding='utf-8')
 
           Path('scripts/test-AI-transcript-turn-id.py').write_text(r'''#!/usr/bin/env python3
           import json
@@ -212,6 +192,7 @@ jobs:
           import re
           import subprocess
           import sys
+          import tempfile
           from pathlib import Path
 
           ROOT = Path(__file__).resolve().parents[1]
@@ -219,12 +200,11 @@ jobs:
           SCRIPT = ROOT / "scripts" / "AI-transcript.py"
 
 
-          def run(provider, fixture_name, *args):
-            fixture = CORE / "tests" / "fixtures" / provider / fixture_name
+          def run_path(path, *args):
             env = os.environ.copy()
             env["AI_CONVERSATION_CORE"] = str(CORE)
             result = subprocess.run(
-              [sys.executable, str(SCRIPT), "--file", str(fixture),
+              [sys.executable, str(SCRIPT), "--file", str(path),
                "--color", "never", *args],
               cwd=ROOT,
               env=env,
@@ -236,9 +216,13 @@ jobs:
             )
             if result.returncode != 0:
               raise AssertionError(
-                f"{provider} exited {result.returncode}: {result.stderr.strip()}"
+                f"{path.name} exited {result.returncode}: {result.stderr.strip()}"
               )
-            return fixture, result
+            return result
+
+
+          def fixture(provider, name):
+            return CORE / "tests" / "fixtures" / provider / name
 
 
           def records(path):
@@ -247,11 +231,10 @@ jobs:
 
 
           def main():
-            chatgpt_fixture, chatgpt = run(
-              "chatgpt", "chatgpt-direct.jsonl", "--turn-id"
-            )
+            chatgpt_path = fixture("chatgpt", "chatgpt-direct.jsonl")
+            chatgpt = run_path(chatgpt_path, "--turn-id")
             chatgpt_ids = [
-              rec.get("id") for rec in records(chatgpt_fixture)
+              rec.get("id") for rec in records(chatgpt_path)
               if isinstance(rec.get("id"), str) and rec.get("id")
             ]
             assert any(
@@ -259,19 +242,22 @@ jobs:
               for record_id in chatgpt_ids
             ), "ChatGPT --turn-id emitted no native source message id"
 
-            claude_fixture, claude = run(
-              "claude", "claude-rich-subagent.jsonl", "--turn-id"
+            with tempfile.TemporaryDirectory() as tmp:
+              claude_path = Path(tmp) / "claude-turn-id.jsonl"
+              claude_path.write_text(
+                '{"type":"user","uuid":"claude-user-uuid","timestamp":"2026-01-02T12:00:01.000Z","message":{"role":"user","content":[{"type":"text","text":"Hello"}]}}\n'
+                '{"type":"assistant","uuid":"claude-assistant-uuid","timestamp":"2026-01-02T12:00:02.000Z","message":{"role":"assistant","content":[{"type":"text","text":"Hi"}]}}\n',
+                encoding="utf-8",
+              )
+              claude = run_path(claude_path, "--turn-id")
+            assert "turn_id=claude-user-uuid" in claude.stdout, (
+              "Claude User --turn-id did not use the native source record uuid"
             )
-            claude_ids = [
-              rec.get("uuid") for rec in records(claude_fixture)
-              if isinstance(rec.get("uuid"), str) and rec.get("uuid")
-            ]
-            assert any(
-              f"turn_id={record_id}" in claude.stdout
-              for record_id in claude_ids
-            ), "Claude --turn-id emitted no native source record uuid"
+            assert "turn_id=claude-assistant-uuid" in claude.stdout, (
+              "Claude Assistant --turn-id did not use the native source record uuid"
+            )
 
-            _, codex = run("codex", "codex-rich.jsonl", "--turn-id")
+            codex = run_path(fixture("codex", "codex-rich.jsonl"), "--turn-id")
             assert "turn_id=" not in codex.stdout, (
               "Codex --turn-id unexpectedly emitted a turn id"
             )
@@ -280,18 +266,18 @@ jobs:
               "no turn IDs will be emitted."
             ) in codex.stderr, "Codex --turn-id warning was not emitted"
 
-            _, numbered = run(
-              "chatgpt", "chatgpt-direct.jsonl", "-n"
-            )
-            assert re.search(r"^## User\s+2:\s*$", numbered.stdout, re.MULTILINE), (
-              "ChatGPT first visible message was not JSONL record 2"
-            )
-
-            _, dated_numbered = run(
-              "chatgpt", "chatgpt-direct.jsonl", "-d", "-n"
+            numbered = run_path(chatgpt_path, "-n")
+            first_visible = next(
+              index + 1 for index, rec in enumerate(records(chatgpt_path))
+              if rec.get("author", {}).get("role") in ("user", "assistant")
             )
             assert re.search(
-              r"^## User \[[^\]]+\]:\s+2:\s*$",
+              rf"^## User\s+{first_visible}:\s*$", numbered.stdout, re.MULTILINE
+            ), "ChatGPT first visible User heading has the wrong JSONL record number"
+
+            dated_numbered = run_path(chatgpt_path, "-d", "-n")
+            assert re.search(
+              rf"^## User \[[^\]]+\]:\s+{first_visible}:\s*$",
               dated_numbered.stdout,
               re.MULTILINE,
             ), "ChatGPT -d/-n shared heading projection is malformed"
@@ -326,11 +312,10 @@ jobs:
         run: bash scripts/AI-transcript-tests.sh $(seq -s ' ' 69 105)
       - name: Diff hygiene
         run: git diff --check
-      - name: Commit implementation and remove helper
+      - name: Commit production files
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git rm .github/workflows/issue-10-turn-id.yml
-          git add scripts/AI-transcript.py scripts/AI-transcript-core-worker.mjs scripts/AI-transcript-core.md scripts/test-AI-transcript-turn-id.py .github/workflows/ai-transcript-core-parity.yml
+          git add scripts/AI-transcript.py scripts/AI-transcript-core-worker.mjs scripts/AI-transcript-core.md scripts/test-AI-transcript-turn-id.py
           git commit -m 'transcript: add optional source turn ids'
           git push
