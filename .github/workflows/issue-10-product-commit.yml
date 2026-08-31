@@ -1,0 +1,63 @@
+name: Commit gated AI-transcript turn-id implementation
+
+on:
+  push:
+    paths:
+      - '.github/workflows/issue-10-product-commit.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/checkout@v4
+        with:
+          repository: Ma-XX-oN/AIConversationCore
+          ref: 3233cba838bbf2d2cea5a2a6f1900ed6014dcfb0
+          path: .issue10-core
+      - run: python -m pip install colorama regex
+      - name: Reapply the gated transformation
+        shell: python
+        run: |
+          from pathlib import Path
+          import textwrap
+
+          workflow = Path('.github/workflows/issue-10-turn-id.yml').read_text(encoding='utf-8')
+          start_marker = '      - name: Apply implementation\n        shell: python\n        run: |\n'
+          end_marker = '      - name: Python syntax gate\n'
+          start = workflow.index(start_marker) + len(start_marker)
+          end = workflow.index(end_marker, start)
+          script = textwrap.dedent(workflow[start:end])
+          exec(compile(script, '<issue-10-apply>', 'exec'), {})
+      - name: Re-run required gates
+        env:
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/.issue10-core
+          LEGACY_AI_TRANSCRIPT: /tmp/AI-transcript-legacy.py
+          TERM: xterm
+        run: |
+          python -m py_compile scripts/AI-transcript.py scripts/test-AI-transcript-turn-id.py
+          git show abcc2f33783e3690b9e1335161c73e7dabaed757:scripts/AI-transcript.py > /tmp/AI-transcript-legacy.py
+          python scripts/test-AI-transcript-phase6-parity.py
+          python scripts/test-AI-transcript-core-parity.py
+          python scripts/test-AI-transcript-turn-id.py
+          bash scripts/AI-transcript-tests.sh $(seq -s ' ' 69 105)
+          git diff --check
+      - name: Commit production files
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/AI-transcript.py scripts/AI-transcript-core-worker.mjs scripts/AI-transcript-core.md
+          git add -f scripts/test-AI-transcript-turn-id.py
+          git commit -m 'transcript: add optional source turn ids'
+          git push
