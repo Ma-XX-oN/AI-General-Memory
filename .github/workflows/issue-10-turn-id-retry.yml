@@ -58,6 +58,6 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git rm .github/workflows/issue-10-turn-id-retry.yml
-          git add .github/workflows/issue-10-turn-id.yml
+          git add -f .github/workflows/issue-10-turn-id.yml
           git commit -m 'test: use Claude UUID fixture for turn ids'
           git push
