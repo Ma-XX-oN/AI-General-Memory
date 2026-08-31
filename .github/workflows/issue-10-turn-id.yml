@@ -1,0 +1,336 @@
+name: Apply AI-transcript turn-id projection
+
+on:
+  push:
+    paths:
+      - '.github/workflows/issue-10-turn-id.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Check out updated AIConversationCore
+        uses: actions/checkout@v4
+        with:
+          repository: Ma-XX-oN/AIConversationCore
+          ref: 3233cba838bbf2d2cea5a2a6f1900ed6014dcfb0
+          path: .issue10-core
+      - name: Install presentation dependencies
+        run: python -m pip install colorama regex
+      - name: Apply implementation
+        shell: python
+        run: |
+          from pathlib import Path
+
+          script = Path('scripts/AI-transcript.py')
+          text = script.read_text(encoding='utf-8')
+
+          old = '''  show_date: bool
+            record_number: bool
+            debug_record_comment: bool
+            display_tz: "datetime.timezone | None"
+          '''
+          new = '''  show_date: bool
+            record_number: bool
+            show_turn_id: bool
+            debug_record_comment: bool
+            display_tz: "datetime.timezone | None"
+          '''
+          if old not in text:
+            raise SystemExit('DisplayPolicy insertion point not found')
+          text = text.replace(old, new, 1)
+
+          old = '''def _core_projection(rec_no, ts_str, *, rec_width):
+            """Return consumer presentation metadata for one canonical source event."""
+            policy = _display_policy()
+            suffix = ""
+            if policy.show_date or policy.record_number:
+              rendered = _build_hunk_prefix(rec_no, ts_str, rec_width=rec_width).rstrip()
+              if rendered:
+                suffix = " " + rendered
+            colors = {}
+            if policy.render_color:
+              colors = {
+                "user": _C_ROLE_USER,
+                "ai": _C_ROLE_AI,
+                "thought": _C_ROLE_THOUGHT,
+                "reset": _C_RESET,
+              }
+            return {
+              "heading_suffix": suffix,
+              "debug_provenance": policy.debug_record_comment,
+              "separate_thoughts": policy.separate_thoughts,
+              "colors": colors,
+            }
+          '''
+          new = '''def _core_projection(rec_no, ts_str, *, rec_width):
+            """Return consumer presentation metadata for one canonical source event."""
+            policy = _display_policy()
+            heading_metadata = {}
+            if policy.show_date:
+              heading_metadata["timestamp"] = _parse_ts(ts_str, policy.display_tz)
+            if policy.record_number:
+              heading_metadata["record_number"] = f"{rec_no:{rec_width}}"
+            if policy.show_turn_id and not policy.debug_record_comment:
+              heading_metadata["show_turn_id"] = True
+            colors = {}
+            if policy.render_color:
+              colors = {
+                "user": _C_ROLE_USER,
+                "ai": _C_ROLE_AI,
+                "thought": _C_ROLE_THOUGHT,
+                "timestamp": _C_RECDATE,
+                "record_number": _C_RECNO,
+                "reset": _C_RESET,
+              }
+            projection = {
+              "debug_provenance": policy.debug_record_comment,
+              "separate_thoughts": policy.separate_thoughts,
+              "colors": colors,
+            }
+            if heading_metadata:
+              projection["heading_metadata"] = heading_metadata
+            return projection
+          '''
+          if old not in text:
+            raise SystemExit('_core_projection source block not found')
+          text = text.replace(old, new, 1)
+
+          old = '''def _core_transcript(session, rec_filter=None):
+            """Render one transcript body through the shared canonical JavaScript core."""
+            records = []
+          '''
+          new = '''def _core_transcript(session, rec_filter=None):
+            """Render one transcript body through the shared canonical JavaScript core."""
+            if _display_policy().show_turn_id and session.source == "codex":
+              _warn(
+                "Codex records do not expose a suitable unique UUID for turn_id; "
+                "no turn IDs will be emitted."
+              )
+            records = []
+          '''
+          if old not in text:
+            raise SystemExit('_core_transcript insertion point not found')
+          text = text.replace(old, new, 1)
+
+          old = '''  ap.add_argument(
+              "-T", "--separate-thoughts",
+          '''
+          new = '''  ap.add_argument(
+              "--turn-id",
+              action="store_true", dest="turn_id",
+              help=(
+                "In transcript mode: emit provider/source turn_id comments on rendered "
+                "headings. ChatGPT uses message id; Claude uses record uuid; Codex "
+                "warns and emits no turn IDs."
+              ),
+            )
+            ap.add_argument(
+              "-T", "--separate-thoughts",
+          '''
+          if old not in text:
+            raise SystemExit('--turn-id CLI insertion point not found')
+          text = text.replace(old, new, 1)
+
+          old = '''    show_date=args.show_date,
+              record_number=args.record_number,
+              debug_record_comment=args.debug_record_comment,
+          '''
+          new = '''    show_date=args.show_date,
+              record_number=args.record_number,
+              show_turn_id=args.turn_id,
+              debug_record_comment=args.debug_record_comment,
+          '''
+          if old not in text:
+            raise SystemExit('DisplayPolicy construction point not found')
+          text = text.replace(old, new, 1)
+          script.write_text(text, encoding='utf-8')
+
+          worker = Path('scripts/AI-transcript-core-worker.mjs')
+          worker_text = worker.read_text(encoding='utf-8')
+          worker_text = worker_text.replace(
+            "const CORE_COMMIT = '29a9fea4903f0214d450e1399a7af8e20823fcd1';",
+            "const CORE_COMMIT = '3233cba838bbf2d2cea5a2a6f1900ed6014dcfb0';",
+            1,
+          )
+          worker.write_text(worker_text, encoding='utf-8')
+
+          workflow = Path('.github/workflows/ai-transcript-core-parity.yml')
+          workflow_text = workflow.read_text(encoding='utf-8')
+          workflow_text = workflow_text.replace(
+            'ref: 29a9fea4903f0214d450e1399a7af8e20823fcd1',
+            'ref: 3233cba838bbf2d2cea5a2a6f1900ed6014dcfb0',
+            1,
+          )
+          workflow_text = workflow_text.replace(
+            'scripts/test-AI-transcript-core-parity.py\n',
+            'scripts/test-AI-transcript-core-parity.py\n      - scripts/test-AI-transcript-turn-id.py\n',
+          )
+          workflow_text = workflow_text.replace(
+            'python scripts/test-AI-transcript-core-parity.py\n',
+            'python scripts/test-AI-transcript-core-parity.py\n      - name: Turn-ID and record-number projection\n        env:\n          AI_CONVERSATION_CORE: ${{ github.workspace }}/.phase6-core\n        run: python scripts/test-AI-transcript-turn-id.py\n',
+            1,
+          )
+          workflow.write_text(workflow_text, encoding='utf-8')
+
+          doc = Path('scripts/AI-transcript-core.md')
+          doc_text = doc.read_text(encoding='utf-8')
+          doc_text = doc_text.replace(
+            '`29a9fea4903f0214d450e1399a7af8e20823fcd1`.',
+            '`3233cba838bbf2d2cea5a2a6f1900ed6014dcfb0`.',
+            1,
+          )
+          doc_text = doc_text.replace(
+            'projection metadata such as date/record-number suffixes, ANSI presentation,\n'
+            'separate-thought mode, and debug provenance enablement.',
+            'projection metadata such as date, record number, optional source turn ID,\n'
+            'ANSI presentation, separate-thought mode, and debug provenance enablement.',
+            1,
+          )
+          marker = '## Debug provenance\n'
+          section = '''## Optional source turn IDs\n\n`--turn-id` is a normal transcript presentation option, independent of `-d`,\n`-n`, and `-N`.  ChatGPT headings use the source message `id`; Claude\nheadings use the source record `uuid`.  Codex does not expose a suitable\nUUID-like ID for every rendered record, so requesting `--turn-id` for Codex\nemits one warning and no `turn_id` fields.\n\n'''
+          if marker not in doc_text:
+            raise SystemExit('AI-transcript-core.md insertion point not found')
+          doc_text = doc_text.replace(marker, section + marker, 1)
+          doc.write_text(doc_text, encoding='utf-8')
+
+          Path('scripts/test-AI-transcript-turn-id.py').write_text(r'''#!/usr/bin/env python3
+          import json
+          import os
+          import re
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          ROOT = Path(__file__).resolve().parents[1]
+          CORE = Path(os.environ["AI_CONVERSATION_CORE"]).resolve()
+          SCRIPT = ROOT / "scripts" / "AI-transcript.py"
+
+
+          def run(provider, fixture_name, *args):
+            fixture = CORE / "tests" / "fixtures" / provider / fixture_name
+            env = os.environ.copy()
+            env["AI_CONVERSATION_CORE"] = str(CORE)
+            result = subprocess.run(
+              [sys.executable, str(SCRIPT), "--file", str(fixture),
+               "--color", "never", *args],
+              cwd=ROOT,
+              env=env,
+              text=True,
+              encoding="utf-8",
+              stdout=subprocess.PIPE,
+              stderr=subprocess.PIPE,
+              check=False,
+            )
+            if result.returncode != 0:
+              raise AssertionError(
+                f"{provider} exited {result.returncode}: {result.stderr.strip()}"
+              )
+            return fixture, result
+
+
+          def records(path):
+            with path.open(encoding="utf-8") as source:
+              return [json.loads(line) for line in source if line.strip()]
+
+
+          def main():
+            chatgpt_fixture, chatgpt = run(
+              "chatgpt", "chatgpt-direct.jsonl", "--turn-id"
+            )
+            chatgpt_ids = [
+              rec.get("id") for rec in records(chatgpt_fixture)
+              if isinstance(rec.get("id"), str) and rec.get("id")
+            ]
+            assert any(
+              f"turn_id={record_id}" in chatgpt.stdout
+              for record_id in chatgpt_ids
+            ), "ChatGPT --turn-id emitted no native source message id"
+
+            claude_fixture, claude = run(
+              "claude", "claude-rich-subagent.jsonl", "--turn-id"
+            )
+            claude_ids = [
+              rec.get("uuid") for rec in records(claude_fixture)
+              if isinstance(rec.get("uuid"), str) and rec.get("uuid")
+            ]
+            assert any(
+              f"turn_id={record_id}" in claude.stdout
+              for record_id in claude_ids
+            ), "Claude --turn-id emitted no native source record uuid"
+
+            _, codex = run("codex", "codex-rich.jsonl", "--turn-id")
+            assert "turn_id=" not in codex.stdout, (
+              "Codex --turn-id unexpectedly emitted a turn id"
+            )
+            assert (
+              "Codex records do not expose a suitable unique UUID for turn_id; "
+              "no turn IDs will be emitted."
+            ) in codex.stderr, "Codex --turn-id warning was not emitted"
+
+            _, numbered = run(
+              "chatgpt", "chatgpt-direct.jsonl", "-n"
+            )
+            assert re.search(r"^## User\s+2:\s*$", numbered.stdout, re.MULTILINE), (
+              "ChatGPT first visible message was not JSONL record 2"
+            )
+
+            _, dated_numbered = run(
+              "chatgpt", "chatgpt-direct.jsonl", "-d", "-n"
+            )
+            assert re.search(
+              r"^## User \[[^\]]+\]:\s+2:\s*$",
+              dated_numbered.stdout,
+              re.MULTILINE,
+            ), "ChatGPT -d/-n shared heading projection is malformed"
+
+            print("PASS: turn-id and JSONL record-number transcript projection")
+
+
+          if __name__ == "__main__":
+            main()
+          ''', encoding='utf-8')
+      - name: Python syntax gate
+        run: python -m py_compile scripts/AI-transcript.py scripts/test-AI-transcript-turn-id.py
+      - name: Historical presentation parity
+        env:
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/.issue10-core
+          LEGACY_AI_TRANSCRIPT: /tmp/AI-transcript-legacy.py
+        run: |
+          git show abcc2f33783e3690b9e1335161c73e7dabaed757:scripts/AI-transcript.py > /tmp/AI-transcript-legacy.py
+          python scripts/test-AI-transcript-phase6-parity.py
+      - name: Canonical production parity
+        env:
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/.issue10-core
+        run: python scripts/test-AI-transcript-core-parity.py
+      - name: Turn-ID and record-number projection
+        env:
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/.issue10-core
+        run: python scripts/test-AI-transcript-turn-id.py
+      - name: Portable regression subset
+        env:
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/.issue10-core
+          TERM: xterm
+        run: bash scripts/AI-transcript-tests.sh $(seq -s ' ' 69 105)
+      - name: Diff hygiene
+        run: git diff --check
+      - name: Commit implementation and remove helper
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/issue-10-turn-id.yml
+          git add scripts/AI-transcript.py scripts/AI-transcript-core-worker.mjs scripts/AI-transcript-core.md scripts/test-AI-transcript-turn-id.py .github/workflows/ai-transcript-core-parity.yml
+          git commit -m 'transcript: add optional source turn ids'
+          git push
