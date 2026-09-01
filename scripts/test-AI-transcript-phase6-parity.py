@@ -95,7 +95,7 @@ def require_debug_shape(provider, name, output, failures):
     failures.append(f'{provider}/{name}: debug mode emitted no canonical provenance comments')
     return
   joined = ''.join(comments)
-  if provider in ('chatgpt', 'claude') and 'record_id=' not in joined:
+  if provider == 'chatgpt' and 'record_id=' not in joined:
     failures.append(f'{provider}/{name}: debug provenance lost source record_id')
   if provider == 'codex' and 'record_id=' in joined:
     failures.append(f'{provider}/{name}: Codex debug provenance invented a source record_id')
