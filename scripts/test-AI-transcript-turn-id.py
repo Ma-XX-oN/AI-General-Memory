@@ -53,6 +53,9 @@ def main():
     f"turn_id={record_id}" in chatgpt.stdout
     for record_id in chatgpt_ids
   ), "ChatGPT --turn-id emitted no native source message id"
+  assert "<!-- turn_id=" not in chatgpt.stdout, (
+    "ChatGPT --turn-id used an ordinary HTML provenance comment"
+  )
 
   with tempfile.TemporaryDirectory() as tmp:
     claude_path = Path(tmp) / "claude-turn-id.jsonl"
@@ -62,14 +65,25 @@ def main():
       encoding="utf-8",
     )
     claude = run_path(claude_path, "--turn-id")
+    claude_debug = run_path(claude_path, "-N")
   assert "turn_id=claude-user-uuid" in claude.stdout, (
     "Claude User --turn-id did not use the native source record uuid"
   )
   assert "turn_id=claude-assistant-uuid" in claude.stdout, (
     "Claude Assistant --turn-id did not use the native source record uuid"
   )
+  assert "<!-- turn_id=" not in claude.stdout, (
+    "Claude --turn-id used an ordinary HTML provenance comment"
+  )
+  assert "record_id=claude-user-uuid record_index=0" in claude_debug.stdout, (
+    "Claude -N did not preserve the native source record uuid as record_id"
+  )
+  assert "turn_id=" not in claude_debug.stdout, (
+    "Claude -N reused the first-class turn_id label for debug provenance"
+  )
 
-  codex = run_path(fixture("codex", "codex-rich.jsonl"), "--turn-id")
+  codex_path = fixture("codex", "codex-rich.jsonl")
+  codex = run_path(codex_path, "--turn-id")
   assert "turn_id=" not in codex.stdout, (
     "Codex --turn-id unexpectedly emitted a turn id"
   )
@@ -77,6 +91,25 @@ def main():
     "Codex records do not expose a suitable unique UUID for turn_id; "
     "no turn IDs will be emitted."
   ) in codex.stderr, "Codex --turn-id warning was not emitted"
+  codex_debug = run_path(codex_path, "-N")
+  assert "record_index=" in codex_debug.stdout, (
+    "Codex -N emitted no source record_index"
+  )
+  assert "record_id=" not in codex_debug.stdout, (
+    "Codex -N invented a native source record_id"
+  )
+  assert "turn_id=" not in codex_debug.stdout, (
+    "Codex -N reused conversational turn_id as debug provenance"
+  )
+
+  chatgpt_debug = run_path(chatgpt_path, "-N")
+  assert any(
+    f"record_id={record_id}" in chatgpt_debug.stdout
+    for record_id in chatgpt_ids
+  ), "ChatGPT -N did not preserve native source message ids as record_id"
+  assert "<!-- turn_id=" not in chatgpt_debug.stdout, (
+    "ChatGPT -N reused the first-class turn_id label for debug provenance"
+  )
 
   numbered = run_path(chatgpt_path, "-n")
   first_visible = next(
@@ -94,7 +127,14 @@ def main():
     re.MULTILINE,
   ), "ChatGPT -d/-n shared heading projection is malformed"
 
-  print("PASS: turn-id and JSONL record-number transcript projection")
+  combined = run_path(chatgpt_path, "-d", "-n", "--turn-id")
+  assert re.search(
+    rf"^## User \[[^\]]+\]:\s+{first_visible}:\s+turn_id=[^\s]+\s*$",
+    combined.stdout,
+    re.MULTILINE,
+  ), "ChatGPT combined heading metadata order is malformed"
+
+  print("PASS: turn-id, debug provenance, and JSONL record-number projection")
 
 
 if __name__ == "__main__":
