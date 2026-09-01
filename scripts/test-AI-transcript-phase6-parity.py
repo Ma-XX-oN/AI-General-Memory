@@ -29,7 +29,7 @@ CLAUDE_VARIANTS = (
   ('separate-thoughts-metadata-ansi', ['--color', 'always', '-T', '-d', '-n', '-N']),
 )
 
-_DEBUG_BODY = r'<!-- (?:turn_id=[^ ]+ )?record_index=\d+ -->'
+_DEBUG_BODY = r'<!-- (?:record_id=[^ ]+ )?record_index=\d+ -->'
 _DEBUG_COMMENT_RE = re.compile(r' ?' + _DEBUG_BODY)
 _DEBUG_STANDALONE_RE = re.compile(r'^(?:> )?' + _DEBUG_BODY + r'$')
 
@@ -94,10 +94,15 @@ def require_debug_shape(provider, name, output, failures):
   if not comments:
     failures.append(f'{provider}/{name}: debug mode emitted no canonical provenance comments')
     return
-  if provider == 'chatgpt' and 'turn_id=' not in ''.join(comments):
-    failures.append(f'{provider}/{name}: ChatGPT debug provenance lost source turn_id')
-  if 'record_index=' not in ''.join(comments):
+  joined = ''.join(comments)
+  if provider in ('chatgpt', 'claude') and 'record_id=' not in joined:
+    failures.append(f'{provider}/{name}: debug provenance lost source record_id')
+  if provider == 'codex' and 'record_id=' in joined:
+    failures.append(f'{provider}/{name}: Codex debug provenance invented a source record_id')
+  if 'record_index=' not in joined:
     failures.append(f'{provider}/{name}: debug provenance lost record_index')
+  if 'turn_id=' in joined:
+    failures.append(f'{provider}/{name}: debug provenance reused the first-class turn_id label')
   if '<!-- record:' in output:
     failures.append(f'{provider}/{name}: legacy record comment syntax leaked into canonical debug output')
 
