@@ -13,7 +13,7 @@ through one persistent Node.js worker (`AI-transcript-core-worker.mjs`).
   repository or at the repository path named by `AI_CONVERSATION_CORE`.
 - `AI_CONVERSATION_CORE` must name the repository root, not a JavaScript file.
 - The checkout must be exactly commit
-  `3233cba838bbf2d2cea5a2a6f1900ed6014dcfb0`.  The worker verifies the checkout
+  `c9c618ab1181109a2cf16f6d5596e886513799ba`.  The worker verifies the checkout
   HEAD before importing the core and refuses to run against a different revision.
 
 ## Bridge behaviour
