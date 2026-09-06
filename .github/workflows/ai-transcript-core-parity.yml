@@ -64,6 +64,17 @@ jobs:
           assert response["ok"] is True
           assert response["core_commit"] == expected
           PY
+      - name: Exercise pull helper from an uninitialized clone
+        shell: bash
+        run: |
+          set -euo pipefail
+          clone="$RUNNER_TEMP/AI-General-Memory-pull-test"
+          git clone --no-recurse-submodules --branch master \
+            "https://github.com/${GITHUB_REPOSITORY}.git" "$clone"
+          "$clone/pull-AI-General-Memory.sh"
+          expected="$(git -C "$clone" rev-parse HEAD:dependencies/AIConversationCore)"
+          actual="$(git -C "$clone/dependencies/AIConversationCore" rev-parse HEAD)"
+          test "$actual" = "$expected"
       - name: Materialize pre-Phase-6 production baseline
         run: git show abcc2f33783e3690b9e1335161c73e7dabaed757:scripts/AI-transcript.py > /tmp/AI-transcript-legacy.py
       - name: Python syntax gate
