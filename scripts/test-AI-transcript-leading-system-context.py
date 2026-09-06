@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression tests for Claude title normalization and transcript start."""
+"""Regression tests for Claude title selection and transcript start."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ SCRIPT = ROOT / "scripts" / "AI-transcript.py"
 FIXTURE = ROOT / "scripts" / "fixtures" / "claude-leading-system-context.jsonl"
 CORE = ROOT / "dependencies" / "AIConversationCore"
 PROMPT = "Can you provide me with simulations of these:"
+TITLE = "Simulate Claude ExitPlanMode and synthetic notices"
 
 
 def _load_script_module():
@@ -29,14 +30,14 @@ def _load_script_module():
   return module
 
 
-def _assert_source_title_is_one_line() -> None:
-  """Assert Claude metadata extraction itself produces the canonical title."""
+def _assert_source_title_prefers_ai_title() -> None:
+  """Assert an explicit Claude ai-title wins over conversational fallbacks."""
   module = _load_script_module()
   title, _ctime, _rc = module._cl_session_meta(str(FIXTURE))
-  if title != PROMPT:
+  if title != TITLE:
     raise AssertionError(
-      "Claude session metadata must derive its title from the first non-empty "
-      f"visible user line; found {title!r}"
+      "Claude session metadata must prefer the explicit ai-title record over "
+      f"the first visible user-message fallback; found {title!r}"
     )
   if "\n" in title or "\r" in title:
     raise AssertionError(f"Claude session title is multiline: {title!r}")
@@ -76,9 +77,9 @@ def _assert_production_output_boundary() -> None:
     raise AssertionError(f"transcript output is unexpectedly short:\n{output}")
   if not nonblank[0].startswith("[claude] "):
     raise AssertionError(f"expected Claude metadata header first:\n{output}")
-  if nonblank[1] != f"(claude-l) {PROMPT}":
+  if nonblank[1] != f"(claude-l) {TITLE}":
     raise AssertionError(
-      "expected exactly one one-line session title after metadata header, "
+      "expected the explicit Claude ai-title as the one-line session title, "
       f"found {nonblank[1]!r}:\n{output}"
     )
   if not re.fullmatch(r"## User \[[^\]]+\]:\s+3:", nonblank[2]):
@@ -97,10 +98,10 @@ def _assert_production_output_boundary() -> None:
 
 
 def main() -> int:
-  """Validate both the title producer and the final production boundary."""
-  _assert_source_title_is_one_line()
+  """Validate Claude title precedence and the final production boundary."""
+  _assert_source_title_prefers_ai_title()
   _assert_production_output_boundary()
-  print("PASS: Claude title is normalized at source and transcript boundary is clean")
+  print("PASS: Claude ai-title wins and transcript boundary is clean")
   return 0
 
 
