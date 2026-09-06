@@ -1,0 +1,3 @@
+[submodule "dependencies/AIConversationCore"]
+  path = dependencies/AIConversationCore
+  url = https://github.com/Ma-XX-oN/AIConversationCore.git
