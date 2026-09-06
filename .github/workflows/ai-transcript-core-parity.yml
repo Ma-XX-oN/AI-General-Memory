@@ -4,6 +4,9 @@ on:
   workflow_dispatch:
   push:
     paths:
+      - .gitmodules
+      - dependencies/AIConversationCore
+      - pull-AI-General-Memory.sh
       - scripts/AI-transcript.py
       - scripts/AI-transcript-core-worker.mjs
       - scripts/AI-transcript-tests.sh
@@ -14,6 +17,9 @@ on:
       - .github/workflows/**
   pull_request:
     paths:
+      - .gitmodules
+      - dependencies/AIConversationCore
+      - pull-AI-General-Memory.sh
       - scripts/AI-transcript.py
       - scripts/AI-transcript-core-worker.mjs
       - scripts/AI-transcript-tests.sh
@@ -27,16 +33,11 @@ jobs:
   parity:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out AI-General-Memory
+      - name: Check out AI-General-Memory and submodules
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Check out pinned AIConversationCore
-        uses: actions/checkout@v4
-        with:
-          repository: Ma-XX-oN/AIConversationCore
-          ref: f34f0dc931d03862e88ca185cdddf8c964a25325
-          path: .phase6-core
+          submodules: recursive
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -45,30 +46,48 @@ jobs:
           python-version: '3.13'
       - name: Install presentation dependencies
         run: python -m pip install colorama regex
+      - name: Verify pinned AIConversationCore submodule
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n pull-AI-General-Memory.sh
+          expected="$(git rev-parse HEAD:dependencies/AIConversationCore)"
+          actual="$(git -C dependencies/AIConversationCore rev-parse HEAD)"
+          test "$actual" = "$expected"
+          response="$(printf '%s\n' '{"operation":"ping"}' | node scripts/AI-transcript-core-worker.mjs)"
+          python - "$expected" "$response" <<'PY'
+          import json
+          import sys
+
+          expected = sys.argv[1]
+          response = json.loads(sys.argv[2])
+          assert response["ok"] is True
+          assert response["core_commit"] == expected
+          PY
       - name: Materialize pre-Phase-6 production baseline
         run: git show abcc2f33783e3690b9e1335161c73e7dabaed757:scripts/AI-transcript.py > /tmp/AI-transcript-legacy.py
       - name: Python syntax gate
         run: python -m py_compile scripts/AI-transcript.py scripts/test-AI-transcript-phase6-parity.py scripts/test-AI-transcript-core-parity.py scripts/test-AI-transcript-turn-id.py
       - name: Historical presentation parity
         env:
-          AI_CONVERSATION_CORE: ${{ github.workspace }}/.phase6-core
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/dependencies/AIConversationCore
           LEGACY_AI_TRANSCRIPT: /tmp/AI-transcript-legacy.py
         run: python scripts/test-AI-transcript-phase6-parity.py
       - name: Canonical production parity
         env:
-          AI_CONVERSATION_CORE: ${{ github.workspace }}/.phase6-core
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/dependencies/AIConversationCore
         run: python scripts/test-AI-transcript-core-parity.py
       - name: Turn-ID and record-number projection
         env:
-          AI_CONVERSATION_CORE: ${{ github.workspace }}/.phase6-core
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/dependencies/AIConversationCore
         run: python scripts/test-AI-transcript-turn-id.py
       - name: Portable AI-transcript regression subset
         env:
-          AI_CONVERSATION_CORE: ${{ github.workspace }}/.phase6-core
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/dependencies/AIConversationCore
           TERM: xterm
         run: bash scripts/AI-transcript-tests.sh $(seq -s ' ' 69 105)
       - name: Core regression suite
-        working-directory: .phase6-core
+        working-directory: dependencies/AIConversationCore
         run: npm test
       - name: Diff hygiene
         run: git diff --check
