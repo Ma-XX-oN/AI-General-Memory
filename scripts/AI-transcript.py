@@ -784,18 +784,21 @@ def _cl_strip_system(text):
 def _cl_session_meta(path):
   """Return ``(title, ctime, rc)`` for the Claude JSONL session at *path*.
 
-  Reads the file once, extracting all three values in a single pass:
+  Reads the file once, extracting all three values in a single pass.  An
+  explicit Claude ``ai-title`` record has precedence over conversational
+  fallbacks regardless of where that record appears in the session.
 
-  * *title* - first real user text (stripped of system tags), falling back
-    to the first non-synthetic assistant text, then ``"(no title)"``.
+  * *title* - explicit ``ai-title`` when present; otherwise first real user
+    text, then first non-synthetic assistant text, then ``"(no title)"``.
   * *ctime* - ``datetime`` from the first record with a *timestamp* field,
     or ``None`` if absent.
   * *rc*    - total number of non-blank lines (= JSON record count).
   """
-  title = "(no title)"
+  explicit_title = None
+  user_fallback = None
+  assistant_fallback = None
   ctime = None
   rc = 0
-  asst_fallback = None
   try:
     with open(path, encoding="utf-8") as f:
       for raw in f:
@@ -814,39 +817,51 @@ def _cl_session_meta(path):
               ctime = datetime.datetime.strptime(ts_clean, "%Y-%m-%dT%H:%M:%S")
             except Exception:
               pass
-        if title == "(no title)":
-          rtype = rec.get("type")
-          if rtype == "user":
-            for block in rec.get("message", {}).get("content", []):
-              if block.get("type") != "text":
-                continue
-              text = _cl_strip_system(block.get("text", ""))
+
+        rtype = rec.get("type")
+        if rtype == "ai-title":
+          if explicit_title is None:
+            resolved = rec.get("aiTitle", "")
+            if isinstance(resolved, str):
               first_line = next(
-                (line.strip() for line in text.splitlines() if line.strip()),
+                (line.strip() for line in resolved.splitlines() if line.strip()),
                 "",
               )
               if first_line:
-                title = first_line[:80]
+                explicit_title = first_line[:80]
+          continue
+
+        if rtype == "user" and user_fallback is None:
+          for block in rec.get("message", {}).get("content", []):
+            if block.get("type") != "text":
+              continue
+            text_block = _cl_strip_system(block.get("text", ""))
+            first_line = next(
+              (line.strip() for line in text_block.splitlines() if line.strip()),
+              "",
+            )
+            if first_line:
+              user_fallback = first_line[:80]
+              break
+        elif rtype == "assistant" and assistant_fallback is None:
+          msg = rec.get("message", {})
+          if msg.get("model") != "<synthetic>":
+            for block in msg.get("content", []):
+              if block.get("type") != "text":
+                continue
+              text_block = block.get("text", "").strip()
+              first_line = next(
+                (line.strip() for line in text_block.splitlines() if line.strip()),
+                "",
+              )
+              if first_line:
+                assistant_fallback = first_line[:80]
                 break
-          elif rtype == "assistant" and asst_fallback is None:
-            msg = rec.get("message", {})
-            if msg.get("model") != "<synthetic>":
-              for block in msg.get("content", []):
-                if block.get("type") == "text":
-                  text = block.get("text", "").strip()
-                  first_line = next(
-                    (line.strip() for line in text.splitlines() if line.strip()),
-                    "",
-                  )
-                  if first_line:
-                    asst_fallback = first_line[:80]
-                    break
   except Exception:
     pass
-  if title == "(no title)" and asst_fallback:
-    title = asst_fallback
-  return title, ctime, rc
 
+  title = explicit_title or user_fallback or assistant_fallback or "(no title)"
+  return title, ctime, rc
 
 def _cl_session_grep(path, *, plain=None, rx=None, before=0, after=0, first_only=False,
            ignore_case=False, rec_filter=None, cross_record=False):
