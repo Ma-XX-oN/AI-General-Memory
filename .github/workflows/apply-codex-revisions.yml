@@ -55,8 +55,16 @@ jobs:
           '''    separate_thoughts=args.separate_thoughts,\n  ))\n''',
           '''    separate_thoughts=args.separate_thoughts,\n    include_rolled_back=args.include_rolled_back,\n  ))\n'''))
 
-          for old, new in replacements:\n            count = text.count(old)\n            if count != 1:\n              raise SystemExit(f'expected exactly one bounded match, found {count}: {old[:80]!r}')\n            text = text.replace(old, new, 1)\n
-          path.write_text(text, encoding='utf-8', newline='\n')\n          PY
+          for old, new in replacements:
+            count = text.count(old)
+            if count != 1:
+              raise SystemExit(
+                f'expected exactly one bounded match, found {count}: {old[:80]!r}'
+              )
+            text = text.replace(old, new, 1)
+
+          path.write_text(text, encoding='utf-8', newline='\n')
+          PY
           python -m py_compile scripts/AI-transcript.py scripts/test-AI-transcript-codex-revisions.py
           git diff --check
           AI_CONVERSATION_CORE="$PWD/dependencies/AIConversationCore" \
