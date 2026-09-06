@@ -14,7 +14,7 @@ through one persistent Node.js worker (`AI-transcript-core-worker.mjs`).
 - `AI_CONVERSATION_CORE` may override the submodule path for development/CI,
   but it must name an AIConversationCore repository root, not a JavaScript file.
 - The checkout must be exactly commit
-  `f34f0dc931d03862e88ca185cdddf8c964a25325`.  The worker verifies the checkout
+  `9ab9e4f5bd5f4e4a02653267ed118c378912617f`.  The worker verifies the checkout
   HEAD before importing the core and refuses to run against a different revision.
 - Run `./pull-AI-General-Memory.sh` to fast-forward AI-General-Memory and
   initialize/synchronize the pinned submodule.
