@@ -9,12 +9,15 @@ through one persistent Node.js worker (`AI-transcript-core-worker.mjs`).
 
 - Node.js must be available as `node`, or through the executable named by the
   `NODE` environment variable.
-- An `AIConversationCore` checkout must be available either as a sibling of this
-  repository or at the repository path named by `AI_CONVERSATION_CORE`.
-- `AI_CONVERSATION_CORE` must name the repository root, not a JavaScript file.
+- `AIConversationCore` is tracked as the Git submodule at
+  `dependencies/AIConversationCore` and must be initialized.
+- `AI_CONVERSATION_CORE` may override the submodule path for development/CI,
+  but it must name an AIConversationCore repository root, not a JavaScript file.
 - The checkout must be exactly commit
-  `3233cba838bbf2d2cea5a2a6f1900ed6014dcfb0`.  The worker verifies the checkout
+  `f34f0dc931d03862e88ca185cdddf8c964a25325`.  The worker verifies the checkout
   HEAD before importing the core and refuses to run against a different revision.
+- Run `./pull-AI-General-Memory.sh` to fast-forward AI-General-Memory and
+  initialize/synchronize the pinned submodule.
 
 ## Bridge behaviour
 
@@ -51,8 +54,10 @@ lines.
 
 ## Verification
 
-Permanent CI compares the production Python entry point against the historical
-pre-Phase-6 implementation except for explicitly recorded canonical decisions,
-compares ChatGPT/Claude/Codex output with canonical goldens, runs the portable
-fixture-based `AI-transcript.py` regression subset, runs the core test suite, and
-checks diff hygiene.
+Permanent CI checks out the pinned AIConversationCore submodule, verifies that
+its HEAD matches the superproject gitlink and the worker-reported core commit,
+compares the production Python entry point against the historical pre-Phase-6
+implementation except for explicitly recorded canonical decisions, compares
+ChatGPT/Claude/Codex output with canonical goldens, runs the portable fixture-based
+`AI-transcript.py` regression subset, runs the core test suite, and checks diff
+hygiene.
