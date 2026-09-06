@@ -1,0 +1,137 @@
+name: Apply Claude ai-title precedence fix
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - .github/workflows/apply-claude-ai-title-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install presentation dependencies
+        run: python -m pip install colorama regex
+      - name: Apply root-cause fix and verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("scripts/AI-transcript.py")
+          text = path.read_text(encoding="utf-8")
+          start = text.index("def _cl_session_meta(path):\n")
+          end = text.index("\ndef _cl_session_grep(", start)
+          replacement = '''def _cl_session_meta(path):
+  """Return ``(title, ctime, rc)`` for the Claude JSONL session at *path*.
+
+  Reads the file once, extracting all three values in a single pass.  An
+  explicit Claude ``ai-title`` record has precedence over conversational
+  fallbacks regardless of where that record appears in the session.
+
+  * *title* - explicit ``ai-title`` when present; otherwise first real user
+    text, then first non-synthetic assistant text, then ``"(no title)"``.
+  * *ctime* - ``datetime`` from the first record with a *timestamp* field,
+    or ``None`` if absent.
+  * *rc*    - total number of non-blank lines (= JSON record count).
+  """
+  explicit_title = None
+  user_fallback = None
+  assistant_fallback = None
+  ctime = None
+  rc = 0
+  try:
+    with open(path, encoding="utf-8") as f:
+      for raw in f:
+        raw = raw.strip()
+        if not raw:
+          continue
+        rc += 1
+        rec = json.loads(raw)
+        if rec.get("isSidechain"):
+          continue
+        if ctime is None:
+          ts = rec.get("timestamp")
+          if ts:
+            try:
+              ts_clean = ts.rstrip("Z").split(".")[0]
+              ctime = datetime.datetime.strptime(ts_clean, "%Y-%m-%dT%H:%M:%S")
+            except Exception:
+              pass
+
+        rtype = rec.get("type")
+        if rtype == "ai-title":
+          if explicit_title is None:
+            resolved = rec.get("aiTitle", "")
+            if isinstance(resolved, str):
+              first_line = next(
+                (line.strip() for line in resolved.splitlines() if line.strip()),
+                "",
+              )
+              if first_line:
+                explicit_title = first_line[:80]
+          continue
+
+        if rtype == "user" and user_fallback is None:
+          for block in rec.get("message", {}).get("content", []):
+            if block.get("type") != "text":
+              continue
+            text_block = _cl_strip_system(block.get("text", ""))
+            first_line = next(
+              (line.strip() for line in text_block.splitlines() if line.strip()),
+              "",
+            )
+            if first_line:
+              user_fallback = first_line[:80]
+              break
+        elif rtype == "assistant" and assistant_fallback is None:
+          msg = rec.get("message", {})
+          if msg.get("model") != "<synthetic>":
+            for block in msg.get("content", []):
+              if block.get("type") != "text":
+                continue
+              text_block = block.get("text", "").strip()
+              first_line = next(
+                (line.strip() for line in text_block.splitlines() if line.strip()),
+                "",
+              )
+              if first_line:
+                assistant_fallback = first_line[:80]
+                break
+  except Exception:
+    pass
+
+  title = explicit_title or user_fallback or assistant_fallback or "(no title)"
+  return title, ctime, rc
+
+'''
+          path.write_text(text[:start] + replacement + text[end + 1:], encoding="utf-8")
+          PY
+          AI_CONVERSATION_CORE="$PWD/dependencies/AIConversationCore" \
+            python scripts/test-AI-transcript-leading-system-context.py
+          python -m py_compile scripts/AI-transcript.py
+          git diff --check
+      - name: Commit fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add scripts/AI-transcript.py
+          git commit -m "fix: prefer Claude ai-title session metadata"
+          git push origin HEAD:master
