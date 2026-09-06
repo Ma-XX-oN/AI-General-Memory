@@ -821,8 +821,12 @@ def _cl_session_meta(path):
               if block.get("type") != "text":
                 continue
               text = _cl_strip_system(block.get("text", ""))
-              if text:
-                title = text[:80]
+              first_line = next(
+                (line.strip() for line in text.splitlines() if line.strip()),
+                "",
+              )
+              if first_line:
+                title = first_line[:80]
                 break
           elif rtype == "assistant" and asst_fallback is None:
             msg = rec.get("message", {})
@@ -830,8 +834,12 @@ def _cl_session_meta(path):
               for block in msg.get("content", []):
                 if block.get("type") == "text":
                   text = block.get("text", "").strip()
-                  if text:
-                    asst_fallback = text[:80]
+                  first_line = next(
+                    (line.strip() for line in text.splitlines() if line.strip()),
+                    "",
+                  )
+                  if first_line:
+                    asst_fallback = first_line[:80]
                     break
   except Exception:
     pass
@@ -3898,11 +3906,10 @@ def _format_session_lines(session):
   )
   rec_part = _ansi(f"records: {session.rc}", _C_RECORDS, active=render_color)
   line1 = f"{ai_part} {date_part}{proj_part} {rec_part}"
-  title = next(
-    (line.strip() for line in session.title.splitlines() if line.strip()),
-    "(no title)",
+  assert "\n" not in session.title and "\r" not in session.title
+  line2 = _ansi(
+    f"({session.id[:8]}) {session.title}", _C_TITLE, active=render_color
   )
-  line2 = _ansi(f"({session.id[:8]}) {title}", _C_TITLE, active=render_color)
   return line1, line2
 
 
