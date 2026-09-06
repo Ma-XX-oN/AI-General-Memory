@@ -119,6 +119,7 @@ class DisplayPolicy:
   debug_record_comment: bool
   display_tz: "datetime.timezone | None"
   separate_thoughts: bool
+  include_rolled_back: bool
 
 
 DISPLAY_POLICY: "DisplayPolicy | None" = None
@@ -193,16 +194,19 @@ class _AIConversationCoreBridge:
       raise RuntimeError(f"AIConversationCore worker error: {response.get('error', 'unknown error')}")
     return response
 
-  def render(self, provider, records, source_indexes, projections):
-    """Render canonical Markdown for one provider record sequence."""
+  def render(self, provider, records, source_indexes, projections, *,
+             options=None, session_index_records=None):
+    """Render canonical Markdown and metadata for one provider record sequence."""
     response = self.request({
       "operation": "render",
       "provider": provider,
       "records": records,
       "source_indexes": source_indexes,
       "projections": projections,
+      "options": options or {},
+      "session_index_records": session_index_records or [],
     })
-    return response["markdown"]
+    return response
 
   def close(self):
     """Terminate the worker process if it is still running."""
@@ -272,6 +276,24 @@ def _core_record_timestamp(source, record):
   return dt.isoformat().replace("+00:00", "Z")
 
 
+def _codex_session_index_records():
+  """Return caller-discovered Codex session-index records when available."""
+  codex_home = os.environ.get("CODEX_HOME")
+  if not codex_home:
+    codex_home = os.path.join(os.path.expanduser("~"), ".codex")
+  index_path = os.path.join(codex_home, "session_index.jsonl")
+  records = []
+  try:
+    with open(index_path, encoding="utf-8") as source:
+      for raw in source:
+        raw = raw.strip()
+        if raw:
+          records.append(json.loads(raw))
+  except (OSError, json.JSONDecodeError):
+    return []
+  return records
+
+
 def _core_transcript(session, rec_filter=None):
   """Render one transcript body through the shared canonical JavaScript core."""
   if _display_policy().show_turn_id and session.source == "codex":
@@ -299,12 +321,29 @@ def _core_transcript(session, rec_filter=None):
         rec_no, ts_str, rec_width=rec_width
       )
 
-  body = _core_bridge().render(
-    session.source, records, source_indexes, projections
+  session_index_records = (
+    _codex_session_index_records() if session.source == "codex" else []
   )
+  response = _core_bridge().render(
+    session.source, records, source_indexes, projections,
+    options={
+      "includeRolledBackTurns": _display_policy().include_rolled_back,
+    },
+    session_index_records=session_index_records,
+  )
+  body = response["markdown"]
   if body.endswith("\n"):
     body = body[:-1]
   line1, line2 = _format_session_lines(session)
+  if session.source == "codex":
+    resolved_title = (response.get("session_metadata") or {}).get("title")
+    if resolved_title:
+      assert "\n" not in resolved_title and "\r" not in resolved_title
+      line2 = _ansi(
+        f"({session.id[:8]}) {resolved_title}",
+        _C_TITLE,
+        active=_display_policy().render_color,
+      )
   return f"{line1}\n{line2}\n\n{body}"
 
 
@@ -4452,6 +4491,14 @@ def main():
     ),
   )
   ap.add_argument(
+    "--include-rolled-back",
+    action="store_true", dest="include_rolled_back",
+    help=(
+      "In Codex transcript mode: include rolled-back User revisions. "
+      "They are hidden by default and labelled original/superseded when shown."
+    ),
+  )
+  ap.add_argument(
     "-N",
     action="store_true", dest="debug_record_comment",
     help=(
@@ -4638,6 +4685,7 @@ def main():
     debug_record_comment=args.debug_record_comment,
     display_tz=_display_tz,
     separate_thoughts=args.separate_thoughts,
+    include_rolled_back=args.include_rolled_back,
   ))
   if id_warn:
     _warn(id_warn)
