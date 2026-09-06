@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const CORE_COMMIT = 'f176dc52fce478aa3aff42881958c058a6e1153a';
+const CORE_COMMIT = 'cbbb9d170d90d70c7e2b046ff94ae6a661463b32';
 
 function coreRootPath() {
   const configured = process.env.AI_CONVERSATION_CORE;
