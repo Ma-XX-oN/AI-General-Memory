@@ -1,3 +1,4 @@
+# Root-fix applier; remove after successful commit.
 name: Apply Claude title root-cause fix
 
 on:
