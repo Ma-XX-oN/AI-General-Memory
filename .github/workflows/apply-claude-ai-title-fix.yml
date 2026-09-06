@@ -28,98 +28,20 @@ jobs:
         run: python -m pip install colorama regex
       - name: Apply root-cause fix and verify
         shell: bash
+        env:
+          REPLACEMENT_B64: ZGVmIF9jbF9zZXNzaW9uX21ldGEocGF0aCk6CiAgIiIiUmV0dXJuIGBgKHRpdGxlLCBjdGltZSwgcmMpYGAgZm9yIHRoZSBDbGF1ZGUgSlNPTkwgc2Vzc2lvbiBhdCAqcGF0aCouCgogIFJlYWRzIHRoZSBmaWxlIG9uY2UsIGV4dHJhY3RpbmcgYWxsIHRocmVlIHZhbHVlcyBpbiBhIHNpbmdsZSBwYXNzLiAgQW4KICBleHBsaWNpdCBDbGF1ZGUgYGBhaS10aXRsZWBgIHJlY29yZCBoYXMgcHJlY2VkZW5jZSBvdmVyIGNvbnZlcnNhdGlvbmFsCiAgZmFsbGJhY2tzIHJlZ2FyZGxlc3Mgb2Ygd2hlcmUgdGhhdCByZWNvcmQgYXBwZWFycyBpbiB0aGUgc2Vzc2lvbi4KCiAgKiAqdGl0bGUqIC0gZXhwbGljaXQgYGBhaS10aXRsZWBgIHdoZW4gcHJlc2VudDsgb3RoZXJ3aXNlIGZpcnN0IHJlYWwgdXNlcgogICAgdGV4dCwgdGhlbiBmaXJzdCBub24tc3ludGhldGljIGFzc2lzdGFudCB0ZXh0LCB0aGVuIGBgIihubyB0aXRsZSkiYGAuCiAgKiAqY3RpbWUqIC0gYGBkYXRldGltZWBgIGZyb20gdGhlIGZpcnN0IHJlY29yZCB3aXRoIGEgKnRpbWVzdGFtcCogZmllbGQsCiAgICBvciBgYE5vbmVgYCBpZiBhYnNlbnQuCiAgKiAqcmMqICAgIC0gdG90YWwgbnVtYmVyIG9mIG5vbi1ibGFuayBsaW5lcyAoPSBKU09OIHJlY29yZCBjb3VudCkuCiAgIiIiCiAgZXhwbGljaXRfdGl0bGUgPSBOb25lCiAgdXNlcl9mYWxsYmFjayA9IE5vbmUKICBhc3Npc3RhbnRfZmFsbGJhY2sgPSBOb25lCiAgY3RpbWUgPSBOb25lCiAgcmMgPSAwCiAgdHJ5OgogICAgd2l0aCBvcGVuKHBhdGgsIGVuY29kaW5nPSJ1dGYtOCIpIGFzIGY6CiAgICAgIGZvciByYXcgaW4gZjoKICAgICAgICByYXcgPSByYXcuc3RyaXAoKQogICAgICAgIGlmIG5vdCByYXc6CiAgICAgICAgICBjb250aW51ZQogICAgICAgIHJjICs9IDEKICAgICAgICByZWMgPSBqc29uLmxvYWRzKHJhdykKICAgICAgICBpZiByZWMuZ2V0KCJpc1NpZGVjaGFpbiIpOgogICAgICAgICAgY29udGludWUKICAgICAgICBpZiBjdGltZSBpcyBOb25lOgogICAgICAgICAgdHMgPSByZWMuZ2V0KCJ0aW1lc3RhbXAiKQogICAgICAgICAgaWYgdHM6CiAgICAgICAgICAgIHRyeToKICAgICAgICAgICAgICB0c19jbGVhbiA9IHRzLnJzdHJpcCgiWiIpLnNwbGl0KCIuIilbMF0KICAgICAgICAgICAgICBjdGltZSA9IGRhdGV0aW1lLmRhdGV0aW1lLnN0cnB0aW1lKHRzX2NsZWFuLCAiJVktJW0tJWRUJUg6JU06JVMiKQogICAgICAgICAgICBleGNlcHQgRXhjZXB0aW9uOgogICAgICAgICAgICAgIHBhc3MKCiAgICAgICAgcnR5cGUgPSByZWMuZ2V0KCJ0eXBlIikKICAgICAgICBpZiBydHlwZSA9PSAiYWktdGl0bGUiOgogICAgICAgICAgaWYgZXhwbGljaXRfdGl0bGUgaXMgTm9uZToKICAgICAgICAgICAgcmVzb2x2ZWQgPSByZWMuZ2V0KCJhaVRpdGxlIiwgIiIpCiAgICAgICAgICAgIGlmIGlzaW5zdGFuY2UocmVzb2x2ZWQsIHN0cik6CiAgICAgICAgICAgICAgZmlyc3RfbGluZSA9IG5leHQoCiAgICAgICAgICAgICAgICAobGluZS5zdHJpcCgpIGZvciBsaW5lIGluIHJlc29sdmVkLnNwbGl0bGluZXMoKSBpZiBsaW5lLnN0cmlwKCkpLAogICAgICAgICAgICAgICAgIiIsCiAgICAgICAgICAgICAgKQogICAgICAgICAgICAgIGlmIGZpcnN0X2xpbmU6CiAgICAgICAgICAgICAgICBleHBsaWNpdF90aXRsZSA9IGZpcnN0X2xpbmVbOjgwXQogICAgICAgICAgY29udGludWUKCiAgICAgICAgaWYgcnR5cGUgPT0gInVzZXIiIGFuZCB1c2VyX2ZhbGxiYWNrIGlzIE5vbmU6CiAgICAgICAgICBmb3IgYmxvY2sgaW4gcmVjLmdldCgibWVzc2FnZSIsIHt9KS5nZXQoImNvbnRlbnQiLCBbXSk6CiAgICAgICAgICAgIGlmIGJsb2NrLmdldCgidHlwZSIpICE9ICJ0ZXh0IjoKICAgICAgICAgICAgICBjb250aW51ZQogICAgICAgICAgICB0ZXh0X2Jsb2NrID0gX2NsX3N0cmlwX3N5c3RlbShibG9jay5nZXQoInRleHQiLCAiIikpCiAgICAgICAgICAgIGZpcnN0X2xpbmUgPSBuZXh0KAogICAgICAgICAgICAgIChsaW5lLnN0cmlwKCkgZm9yIGxpbmUgaW4gdGV4dF9ibG9jay5zcGxpdGxpbmVzKCkgaWYgbGluZS5zdHJpcCgpKSwKICAgICAgICAgICAgICAiIiwKICAgICAgICAgICAgKQogICAgICAgICAgICBpZiBmaXJzdF9saW5lOgogICAgICAgICAgICAgIHVzZXJfZmFsbGJhY2sgPSBmaXJzdF9saW5lWzo4MF0KICAgICAgICAgICAgICBicmVhawogICAgICAgIGVsaWYgcnR5cGUgPT0gImFzc2lzdGFudCIgYW5kIGFzc2lzdGFudF9mYWxsYmFjayBpcyBOb25lOgogICAgICAgICAgbXNnID0gcmVjLmdldCgibWVzc2FnZSIsIHt9KQogICAgICAgICAgaWYgbXNnLmdldCgibW9kZWwiKSAhPSAiPHN5bnRoZXRpYz4iOgogICAgICAgICAgICBmb3IgYmxvY2sgaW4gbXNnLmdldCgiY29udGVudCIsIFtdKToKICAgICAgICAgICAgICBpZiBibG9jay5nZXQoInR5cGUiKSAhPSAidGV4dCI6CiAgICAgICAgICAgICAgICBjb250aW51ZQogICAgICAgICAgICAgIHRleHRfYmxvY2sgPSBibG9jay5nZXQoInRleHQiLCAiIikuc3RyaXAoKQogICAgICAgICAgICAgIGZpcnN0X2xpbmUgPSBuZXh0KAogICAgICAgICAgICAgICAgKGxpbmUuc3RyaXAoKSBmb3IgbGluZSBpbiB0ZXh0X2Jsb2NrLnNwbGl0bGluZXMoKSBpZiBsaW5lLnN0cmlwKCkpLAogICAgICAgICAgICAgICAgIiIsCiAgICAgICAgICAgICAgKQogICAgICAgICAgICAgIGlmIGZpcnN0X2xpbmU6CiAgICAgICAgICAgICAgICBhc3Npc3RhbnRfZmFsbGJhY2sgPSBmaXJzdF9saW5lWzo4MF0KICAgICAgICAgICAgICAgIGJyZWFrCiAgZXhjZXB0IEV4Y2VwdGlvbjoKICAgIHBhc3MKCiAgdGl0bGUgPSBleHBsaWNpdF90aXRsZSBvciB1c2VyX2ZhbGxiYWNrIG9yIGFzc2lzdGFudF9mYWxsYmFjayBvciAiKG5vIHRpdGxlKSIKICByZXR1cm4gdGl0bGUsIGN0aW1lLCByYwoK
         run: |
           set -euo pipefail
           python - <<'PY'
+          import base64
+          import os
           from pathlib import Path
 
           path = Path("scripts/AI-transcript.py")
           text = path.read_text(encoding="utf-8")
           start = text.index("def _cl_session_meta(path):\n")
           end = text.index("\ndef _cl_session_grep(", start)
-          replacement = '''def _cl_session_meta(path):
-  """Return ``(title, ctime, rc)`` for the Claude JSONL session at *path*.
-
-  Reads the file once, extracting all three values in a single pass.  An
-  explicit Claude ``ai-title`` record has precedence over conversational
-  fallbacks regardless of where that record appears in the session.
-
-  * *title* - explicit ``ai-title`` when present; otherwise first real user
-    text, then first non-synthetic assistant text, then ``"(no title)"``.
-  * *ctime* - ``datetime`` from the first record with a *timestamp* field,
-    or ``None`` if absent.
-  * *rc*    - total number of non-blank lines (= JSON record count).
-  """
-  explicit_title = None
-  user_fallback = None
-  assistant_fallback = None
-  ctime = None
-  rc = 0
-  try:
-    with open(path, encoding="utf-8") as f:
-      for raw in f:
-        raw = raw.strip()
-        if not raw:
-          continue
-        rc += 1
-        rec = json.loads(raw)
-        if rec.get("isSidechain"):
-          continue
-        if ctime is None:
-          ts = rec.get("timestamp")
-          if ts:
-            try:
-              ts_clean = ts.rstrip("Z").split(".")[0]
-              ctime = datetime.datetime.strptime(ts_clean, "%Y-%m-%dT%H:%M:%S")
-            except Exception:
-              pass
-
-        rtype = rec.get("type")
-        if rtype == "ai-title":
-          if explicit_title is None:
-            resolved = rec.get("aiTitle", "")
-            if isinstance(resolved, str):
-              first_line = next(
-                (line.strip() for line in resolved.splitlines() if line.strip()),
-                "",
-              )
-              if first_line:
-                explicit_title = first_line[:80]
-          continue
-
-        if rtype == "user" and user_fallback is None:
-          for block in rec.get("message", {}).get("content", []):
-            if block.get("type") != "text":
-              continue
-            text_block = _cl_strip_system(block.get("text", ""))
-            first_line = next(
-              (line.strip() for line in text_block.splitlines() if line.strip()),
-              "",
-            )
-            if first_line:
-              user_fallback = first_line[:80]
-              break
-        elif rtype == "assistant" and assistant_fallback is None:
-          msg = rec.get("message", {})
-          if msg.get("model") != "<synthetic>":
-            for block in msg.get("content", []):
-              if block.get("type") != "text":
-                continue
-              text_block = block.get("text", "").strip()
-              first_line = next(
-                (line.strip() for line in text_block.splitlines() if line.strip()),
-                "",
-              )
-              if first_line:
-                assistant_fallback = first_line[:80]
-                break
-  except Exception:
-    pass
-
-  title = explicit_title or user_fallback or assistant_fallback or "(no title)"
-  return title, ctime, rc
-
-'''
+          replacement = base64.b64decode(os.environ["REPLACEMENT_B64"]).decode("utf-8")
           path.write_text(text[:start] + replacement + text[end + 1:], encoding="utf-8")
           PY
           AI_CONVERSATION_CORE="$PWD/dependencies/AIConversationCore" \
