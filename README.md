@@ -11,6 +11,7 @@ Shared knowledge files for Claude Code and Codex.
   - [AI Data](#ai-data)
   - [Scripts](#scripts)
   - [User Files](#user-files)
+- [Updating](#updating)
 - [Claude Code](#claude-code)
   - [How to Install For Claude Code](#how-to-install-for-claude-code)
     - [Resolve `CLAUDE_DIR`](#resolve-claude_dir)
@@ -63,6 +64,7 @@ Most of these files are used by the AIs. A few are used directly by the user.
 
 | File | User | Purpose |
 | --- | --- | --- |
+| [`pull-AI-General-Memory.sh`](pull-AI-General-Memory.sh) | All | Fast-forward the repository and initialize/synchronize its pinned AIConversationCore submodule |
 | [`scripts/session-pid.sh`](scripts/session-pid.sh) | AIs | Print the stable AI agent session PID (bash entry point — must be sourced) |
 | [`scripts/session-pid.ps1`](scripts/session-pid.ps1) | AIs | Print the stable AI agent session PID (PowerShell implementation, called by `session-pid.sh` and usable directly from Codex) |
 | [`scripts/normalize-eol.ps1`](scripts/normalize-eol.ps1) | All | Normalize file EOL style (`CRLF` or `LF`) — PowerShell |
@@ -70,13 +72,18 @@ Most of these files are used by the AIs. A few are used directly by the user.
 | [`scripts/show-eol.ps1`](scripts/show-eol.ps1) | All | Report file EOL style (`CRLF`, `LF`, `CR`, `Mixed`, `None`) — PowerShell |
 | [`scripts/show-eol.pl`](scripts/show-eol.pl) | All | Report file EOL style (`CRLF`, `LF`, `CR`, `Mixed`, `None`) — Perl |
 | [`scripts/PasteAsMd.ahk`](scripts/PasteAsMd.ahk) | User | User-to-AI communication via markdown-safe paste.<ul><li>Requires [AutoHotkey](https://www.autohotkey.com/) and [pandoc](https://pandoc.org/).</li><li>Maps `Ctrl-Alt-Shift-v` to a menu to paste as Markdown or quoted Markdown.</li></ul> |
-| [`scripts/CopyClip.ahk`](scripts/CopyClip.ahk) | User | Display what clipboard types were copied with keyboard shortcuts.<ul><li>Requires [AutoHotkey](https://www.autohotkey.com()).</li><li>Tracks `Ctrl-c`, `Ctrl-Ins`, `Ctrl-PrtSc` and `Alt-PrtSc`.</li><li>Useful to confirm copy since clipboard fill can lag.</li></ul> |
+| [`scripts/CopyClip.ahk`](scripts/CopyClip.ahk) | User | Display what clipboard types were copied with keyboard shortcuts.<ul><li>Requires [AutoHotkey](https://www.autohotkey.com/).</li><li>Tracks `Ctrl-c`, `Ctrl-Ins`, `Ctrl-PrtSc` and `Alt-PrtSc`.</li><li>Useful to confirm copy since clipboard fill can lag.</li></ul> |
 | [`scripts/AI-transcript.py`](scripts/AI-transcript.py) | All | Unified transcript and session search for both Claude and Codex.<ul><li>Usage: `python scripts/AI-transcript.py [--claude\|--codex\|--both-AIs] [--ls\|--id GLOB_OR_UUID\|--grep TEXT\|--grep-re PATTERN] [output.md]`</li><li>Lists sessions, generates Markdown transcripts, and greps session content across both AIs.</li><li>Supports `--all-projects`, context lines `-A/-B/-C/-x`, `--words-only`, and `--color`.</li></ul> |
 | [`scripts/AI-transcript-arch.md`](scripts/AI-transcript-arch.md) | All | Architecture reference for `AI-transcript.py`: JSONL schema, transcript pipeline, hunk data structure, grep pipeline threading pattern. |
 | [`scripts/cont-claude-prompt.bat`](scripts/cont-claude-prompt.bat) | User | Resume a Claude Code session with a `continue` prompt immediately or deferred to a future date/time via Windows Task Scheduler.  Usage: `cont-claude-prompt.bat [-t hh:mm] [-d date] [--wd dir] [-D] UUID` |
 | [`scripts/prettify-jsonl.py`](scripts/prettify-jsonl.py) | User | Pretty-print selected records from a JSONL file (e.g. Claude/Codex session files).  Usage: `python scripts/prettify-jsonl.py [-s START] [-e END] [file]` |
 | [`scripts/filter-jsonl.py`](scripts/filter-jsonl.py) | All | Extract dot-path fields from JSONL records and emit CSV.  Usage: `cat file.jsonl \| python scripts/filter-jsonl.py --show FIELD [--show FIELD ...]` |
 | [`scripts/fixtures/`](scripts/fixtures/) | All | Minimal JSONL fixture files for `AI-transcript.py` regression tests (used with `--file`).  See `AI-transcript-arch.md` for descriptions. |
+
+`AIConversationCore` is tracked as a Git submodule at
+`dependencies/AIConversationCore`.  The superproject pins the exact core commit
+expected by `AI-transcript.py`; do not independently advance the submodule and
+leave the superproject pin behind.
 
 ### User Files
 
@@ -89,6 +96,20 @@ Most of these files are used by the AIs. A few are used directly by the user.
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | User | Contribution workflow and expectations |
 | [`AUTHORS.md`](AUTHORS.md) | User | Maintainer and contributor attribution list |
 | [`.gitignore`](.gitignore) | User | Deny-all with explicit exceptions for tracked files |
+
+## Updating
+
+Use the repository-level Bash helper from either a Claude or Codex installation:
+
+```bash
+./pull-AI-General-Memory.sh
+```
+
+The script refuses to pull over tracked local changes, fast-forwards `master`,
+synchronizes submodule metadata, initializes the submodule when necessary, and
+checks out the exact AIConversationCore commit pinned by the latest
+AI-General-Memory revision.  It then verifies that the superproject and core
+commit are in sync.
 
 ## Claude Code
 
@@ -127,12 +148,13 @@ git init
 git remote add origin https://github.com/Ma-XX-oN/AI-General-Memory.git
 git fetch origin
 git checkout -b master origin/master
+git submodule update --init --recursive
 ```
 
 #### Fresh machine (no existing `CLAUDE_DIR`)
 
 ```bash
-git clone https://github.com/Ma-XX-oN/AI-General-Memory.git "$CLAUDE_DIR/"
+git clone --recurse-submodules https://github.com/Ma-XX-oN/AI-General-Memory.git "$CLAUDE_DIR/"
 ```
 
 ### How global and project-specific Claude Code memory works
@@ -180,12 +202,13 @@ git init
 git remote add origin https://github.com/Ma-XX-oN/AI-General-Memory.git
 git fetch origin
 git checkout -b master origin/master
+git submodule update --init --recursive
 ```
 
 #### Fresh machine (no existing `CODEX_DIR`)
 
 ```bash
-git clone https://github.com/Ma-XX-oN/AI-General-Memory.git "$CODEX_DIR/"
+git clone --recurse-submodules https://github.com/Ma-XX-oN/AI-General-Memory.git "$CODEX_DIR/"
 ```
 
 ### How global and project-specific Codex memory works
