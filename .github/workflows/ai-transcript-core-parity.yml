@@ -13,6 +13,8 @@ on:
       - scripts/test-AI-transcript-phase6-parity.py
       - scripts/test-AI-transcript-core-parity.py
       - scripts/test-AI-transcript-turn-id.py
+      - scripts/test-AI-transcript-leading-system-context.py
+      - scripts/fixtures/claude-leading-system-context.jsonl
       - scripts/AI-transcript-core.md
       - .github/workflows/**
   pull_request:
@@ -26,6 +28,8 @@ on:
       - scripts/test-AI-transcript-phase6-parity.py
       - scripts/test-AI-transcript-core-parity.py
       - scripts/test-AI-transcript-turn-id.py
+      - scripts/test-AI-transcript-leading-system-context.py
+      - scripts/fixtures/claude-leading-system-context.jsonl
       - scripts/AI-transcript-core.md
       - .github/workflows/**
 
@@ -78,7 +82,7 @@ jobs:
       - name: Materialize pre-Phase-6 production baseline
         run: git show abcc2f33783e3690b9e1335161c73e7dabaed757:scripts/AI-transcript.py > /tmp/AI-transcript-legacy.py
       - name: Python syntax gate
-        run: python -m py_compile scripts/AI-transcript.py scripts/test-AI-transcript-phase6-parity.py scripts/test-AI-transcript-core-parity.py scripts/test-AI-transcript-turn-id.py
+        run: python -m py_compile scripts/AI-transcript.py scripts/test-AI-transcript-phase6-parity.py scripts/test-AI-transcript-core-parity.py scripts/test-AI-transcript-turn-id.py scripts/test-AI-transcript-leading-system-context.py
       - name: Historical presentation parity
         env:
           AI_CONVERSATION_CORE: ${{ github.workspace }}/dependencies/AIConversationCore
@@ -92,6 +96,10 @@ jobs:
         env:
           AI_CONVERSATION_CORE: ${{ github.workspace }}/dependencies/AIConversationCore
         run: python scripts/test-AI-transcript-turn-id.py
+      - name: Leading Claude system-context regression
+        env:
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/dependencies/AIConversationCore
+        run: python scripts/test-AI-transcript-leading-system-context.py
       - name: Portable AI-transcript regression subset
         env:
           AI_CONVERSATION_CORE: ${{ github.workspace }}/dependencies/AIConversationCore
