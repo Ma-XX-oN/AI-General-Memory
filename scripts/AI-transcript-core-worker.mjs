@@ -10,7 +10,7 @@ const CORE_COMMIT = 'f34f0dc931d03862e88ca185cdddf8c964a25325';
 function coreRootPath() {
   const configured = process.env.AI_CONVERSATION_CORE;
   if (configured && !configured.endsWith('.js')) return path.resolve(configured);
-  return path.resolve(import.meta.dirname, '..', '..', 'AIConversationCore');
+  return path.resolve(import.meta.dirname, '..', 'dependencies', 'AIConversationCore');
 }
 
 function coreEntryPath() {
