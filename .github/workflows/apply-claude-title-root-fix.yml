@@ -36,57 +36,63 @@ jobs:
           path = Path("scripts/AI-transcript.py")
           text = path.read_text(encoding="utf-8")
 
-          old_user = '''              text = _cl_strip_system(block.get("text", ""))
-              if text:
-                title = text[:80]
-                break
-'''
-          new_user = '''              text = _cl_strip_system(block.get("text", ""))
-              first_line = next(
-                (line.strip() for line in text.splitlines() if line.strip()),
-                "",
-              )
-              if first_line:
-                title = first_line[:80]
-                break
-'''
+          old_user = (
+            '              text = _cl_strip_system(block.get("text", ""))\n'
+            '              if text:\n'
+            '                title = text[:80]\n'
+            '                break\n'
+          )
+          new_user = (
+            '              text = _cl_strip_system(block.get("text", ""))\n'
+            '              first_line = next(\n'
+            '                (line.strip() for line in text.splitlines() if line.strip()),\n'
+            '                "",\n'
+            '              )\n'
+            '              if first_line:\n'
+            '                title = first_line[:80]\n'
+            '                break\n'
+          )
           if text.count(old_user) != 1:
             raise SystemExit(
               f"expected exactly one Claude user-title producer, found {text.count(old_user)}"
             )
           text = text.replace(old_user, new_user, 1)
 
-          old_fallback = '''                  text = block.get("text", "").strip()
-                  if text:
-                    asst_fallback = text[:80]
-                    break
-'''
-          new_fallback = '''                  text = block.get("text", "").strip()
-                  first_line = next(
-                    (line.strip() for line in text.splitlines() if line.strip()),
-                    "",
-                  )
-                  if first_line:
-                    asst_fallback = first_line[:80]
-                    break
-'''
+          old_fallback = (
+            '                  text = block.get("text", "").strip()\n'
+            '                  if text:\n'
+            '                    asst_fallback = text[:80]\n'
+            '                    break\n'
+          )
+          new_fallback = (
+            '                  text = block.get("text", "").strip()\n'
+            '                  first_line = next(\n'
+            '                    (line.strip() for line in text.splitlines() if line.strip()),\n'
+            '                    "",\n'
+            '                  )\n'
+            '                  if first_line:\n'
+            '                    asst_fallback = first_line[:80]\n'
+            '                    break\n'
+          )
           if text.count(old_fallback) != 1:
             raise SystemExit(
               f"expected exactly one Claude assistant-title fallback, found {text.count(old_fallback)}"
             )
           text = text.replace(old_fallback, new_fallback, 1)
 
-          old_formatter = '''  title = next(
-    (line.strip() for line in session.title.splitlines() if line.strip()),
-    "(no title)",
-  )
-  line2 = _ansi(f"({session.id[:8]}) {title}", _C_TITLE, active=render_color)
-'''
-          new_formatter = '''  assert "\\n" not in session.title and "\\r" not in session.title
-  line2 = _ansi(
-    f"({session.id[:8]}) {session.title}", _C_TITLE, active=render_color
-  )
-'''
+          old_formatter = (
+            '  title = next(\n'
+            '    (line.strip() for line in session.title.splitlines() if line.strip()),\n'
+            '    "(no title)",\n'
+            '  )\n'
+            '  line2 = _ansi(f"({session.id[:8]}) {title}", _C_TITLE, active=render_color)\n'
+          )
+          new_formatter = (
+            '  assert "\\n" not in session.title and "\\r" not in session.title\n'
+            '  line2 = _ansi(\n'
+            '    f"({session.id[:8]}) {session.title}", _C_TITLE, active=render_color\n'
+            '  )\n'
+          )
           if text.count(old_formatter) != 1:
             raise SystemExit(
               f"expected exactly one output-boundary containment block, found {text.count(old_formatter)}"
