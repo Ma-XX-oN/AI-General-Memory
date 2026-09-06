@@ -3898,7 +3898,11 @@ def _format_session_lines(session):
   )
   rec_part = _ansi(f"records: {session.rc}", _C_RECORDS, active=render_color)
   line1 = f"{ai_part} {date_part}{proj_part} {rec_part}"
-  line2 = _ansi(f"({session.id[:8]}) {session.title}", _C_TITLE, active=render_color)
+  title = next(
+    (line.strip() for line in session.title.splitlines() if line.strip()),
+    "(no title)",
+  )
+  line2 = _ansi(f"({session.id[:8]}) {title}", _C_TITLE, active=render_color)
   return line1, line2
 
 
