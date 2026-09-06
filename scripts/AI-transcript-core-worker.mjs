@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const CORE_COMMIT = '3d5396697fb08e2f9f8107f7adb2d21712bde9e4';
+const CORE_COMMIT = '4ee65bab8f6a4c2f9caf55f2ff342d903108f8de';
 
 function coreRootPath() {
   const configured = process.env.AI_CONVERSATION_CORE;
@@ -40,13 +40,6 @@ function verifyCorePin() {
 
 verifyCorePin();
 const core = await import(pathToFileURL(coreEntryPath()).href);
-
-function adapt(provider, records, options) {
-  if (provider === 'chatgpt') return core.adaptChatGPTRecords(records);
-  if (provider === 'claude') return core.adaptClaudeRecords(records);
-  if (provider === 'codex') return core.adaptCodexRecords(records, options);
-  throw new Error(`Unsupported provider: ${provider}`);
-}
 
 function eventProjection(event, projectionByIndex) {
   const inherited = event?.projection ?? {};
@@ -91,10 +84,16 @@ function render(request) {
   const options = {
     includeRolledBackTurns: request?.options?.includeRolledBackTurns === true
   };
+  const loaded = core.loadConversationSources({
+    provider: request.provider,
+    primarySource: { records: request.records },
+    supplementarySources: request.supplementary_sources ?? {},
+    options
+  });
   const projectionByIndex = new Map(
     Object.entries(request.projections ?? {}).map(([index, projection]) => [Number(index), projection])
   );
-  let events = adapt(request.provider, request.records, options).map(event => {
+  let events = loaded.events.map(event => {
     const projection = eventProjection(event, projectionByIndex);
     return Object.keys(projection).length ? { ...event, projection } : event;
   });
@@ -104,17 +103,11 @@ function render(request) {
       event.content_type === 'model_change' || allowed.has(event.source_index));
   }
 
-  const sessionMetadata = request.provider === 'codex'
-    ? core.resolveCodexSessionMetadata(
-        request.records,
-        Array.isArray(request.session_index_records) ? request.session_index_records : []
-      )
-    : null;
   return {
     ok: true,
     core_commit: CORE_COMMIT,
     markdown: core.renderCanonicalMarkdown(events),
-    ...(sessionMetadata ? { session_metadata: sessionMetadata } : {})
+    ...(loaded.session_metadata ? { session_metadata: loaded.session_metadata } : {})
   };
 }
 

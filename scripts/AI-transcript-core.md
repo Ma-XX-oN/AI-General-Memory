@@ -61,3 +61,7 @@ implementation except for explicitly recorded canonical decisions, compares
 ChatGPT/Claude/Codex output with canonical goldens, runs the portable fixture-based
 `AI-transcript.py` regression subset, runs the core test suite, and checks diff
 hygiene.
+
+## Codex supplementary source ownership
+
+For Codex, the Python caller discovers the optional `session_index.jsonl` path and passes that path to AIConversationCore. The caller does not parse or interpret the index. AIConversationCore owns reading JSONL, matching the rollout/session UUID, choosing the last valid matching title, rollback/edit semantics, model-change semantics, and revision filtering. Rolled-back history remains hidden by default; `--include-rolled-back` passes `includeRolledBackTurns=true` to the core. Recorded Codex IDE context is preserved verbatim.

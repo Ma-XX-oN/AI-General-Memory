@@ -195,7 +195,7 @@ class _AIConversationCoreBridge:
     return response
 
   def render(self, provider, records, source_indexes, projections, *,
-             options=None, session_index_records=None):
+             options=None, supplementary_sources=None):
     """Render canonical Markdown and metadata for one provider record sequence."""
     response = self.request({
       "operation": "render",
@@ -204,7 +204,7 @@ class _AIConversationCoreBridge:
       "source_indexes": source_indexes,
       "projections": projections,
       "options": options or {},
-      "session_index_records": session_index_records or [],
+      "supplementary_sources": supplementary_sources or {},
     })
     return response
 
@@ -276,22 +276,13 @@ def _core_record_timestamp(source, record):
   return dt.isoformat().replace("+00:00", "Z")
 
 
-def _codex_session_index_records():
-  """Return caller-discovered Codex session-index records when available."""
+def _codex_session_index_path():
+  """Return the caller-discovered Codex session-index path when available."""
   codex_home = os.environ.get("CODEX_HOME")
   if not codex_home:
     codex_home = os.path.join(os.path.expanduser("~"), ".codex")
   index_path = os.path.join(codex_home, "session_index.jsonl")
-  records = []
-  try:
-    with open(index_path, encoding="utf-8") as source:
-      for raw in source:
-        raw = raw.strip()
-        if raw:
-          records.append(json.loads(raw))
-  except (OSError, json.JSONDecodeError):
-    return []
-  return records
+  return index_path if os.path.isfile(index_path) else None
 
 
 def _core_transcript(session, rec_filter=None):
@@ -321,15 +312,17 @@ def _core_transcript(session, rec_filter=None):
         rec_no, ts_str, rec_width=rec_width
       )
 
-  session_index_records = (
-    _codex_session_index_records() if session.source == "codex" else []
-  )
+  supplementary_sources = {}
+  if session.source == "codex":
+    session_index_path = _codex_session_index_path()
+    if session_index_path:
+      supplementary_sources["codexSessionIndex"] = {"path": session_index_path}
   response = _core_bridge().render(
     session.source, records, source_indexes, projections,
     options={
       "includeRolledBackTurns": _display_policy().include_rolled_back,
     },
-    session_index_records=session_index_records,
+    supplementary_sources=supplementary_sources,
   )
   body = response["markdown"]
   if body.endswith("\n"):
