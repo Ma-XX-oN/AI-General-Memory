@@ -13,6 +13,7 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts" / "AI-transcript.py"
+WORKER = ROOT / "scripts" / "AI-transcript-core-worker.mjs"
 FIXTURE = ROOT / "scripts" / "fixtures" / "codex-revision-history.jsonl"
 SESSION_INDEX = ROOT / "scripts" / "fixtures" / "codex-session-index.jsonl"
 CORE = ROOT / "dependencies" / "AIConversationCore"
@@ -20,11 +21,12 @@ TITLE = "Check Paris time (MODIFIED)"
 IDE_CONTEXT = "# Context from my IDE setup:"
 
 
-def _run(*extra_args: str) -> subprocess.CompletedProcess[str]:
+def _run(*extra_args: str, include_index: bool = True) -> subprocess.CompletedProcess[str]:
   """Run the production transcript entry point with an isolated Codex home."""
   with tempfile.TemporaryDirectory() as temp_dir:
     codex_home = pathlib.Path(temp_dir)
-    shutil.copyfile(SESSION_INDEX, codex_home / "session_index.jsonl")
+    if include_index:
+      shutil.copyfile(SESSION_INDEX, codex_home / "session_index.jsonl")
     env = os.environ.copy()
     env["AI_CONVERSATION_CORE"] = str(CORE)
     env["CODEX_HOME"] = str(codex_home)
@@ -56,6 +58,20 @@ def _require_success(result: subprocess.CompletedProcess[str]) -> str:
       f"AI-transcript.py exited {result.returncode}: {result.stderr.strip()}"
     )
   return result.stdout
+
+
+def _assert_core_owns_session_index_parsing() -> None:
+  """Require Python to discover only the index path and the core to parse it."""
+  script_text = SCRIPT.read_text(encoding="utf-8")
+  worker_text = WORKER.read_text(encoding="utf-8")
+  if "def _codex_session_index_records" in script_text:
+    raise AssertionError("Python still parses Codex session_index.jsonl records")
+  if "def _codex_session_index_path" not in script_text:
+    raise AssertionError("Python must discover the optional Codex session-index path")
+  if "loadConversationSources" not in worker_text:
+    raise AssertionError("Node worker must delegate supplied-source reading/parsing to the core")
+  if "session_index_records" in worker_text:
+    raise AssertionError("worker still accepts pre-parsed Codex session-index records")
 
 
 def _assert_default_hides_history() -> None:
@@ -94,11 +110,22 @@ def _assert_history_switch_exposes_revisions() -> None:
     raise AssertionError(f"IDE context must remain on every recorded User revision:\n{output}")
 
 
+def _assert_missing_index_falls_back_cleanly() -> None:
+  """Require a missing supplementary index to leave transcript rendering usable."""
+  output = _require_success(_run(include_index=False))
+  if "What is a puck?" not in output:
+    raise AssertionError(f"missing session index broke Codex rendering:\n{output}")
+  if TITLE in output:
+    raise AssertionError(f"missing session index unexpectedly supplied indexed title:\n{output}")
+
+
 def main() -> int:
-  """Validate default/current history and the opt-in rolled-back history path."""
+  """Validate architecture, default/current history, and opt-in historical output."""
+  _assert_core_owns_session_index_parsing()
   _assert_default_hides_history()
   _assert_history_switch_exposes_revisions()
-  print("PASS: Codex title, revision history, model change, and IDE context are preserved")
+  _assert_missing_index_falls_back_cleanly()
+  print("PASS: Codex source ownership, title, history, model change, and IDE context are preserved")
   return 0
 
 
