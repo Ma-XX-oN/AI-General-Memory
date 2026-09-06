@@ -6,6 +6,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import pathlib
+import re
 import subprocess
 import sys
 
@@ -80,7 +81,7 @@ def _assert_production_output_boundary() -> None:
       "expected exactly one one-line session title after metadata header, "
       f"found {nonblank[1]!r}:\n{output}"
     )
-  if not nonblank[2].startswith("## User ") or not nonblank[2].endswith(":  3:"):
+  if not re.fullmatch(r"## User \[[^\]]+\]:\s+3:", nonblank[2]):
     raise AssertionError(
       "expected canonical User heading immediately after the two stdout metadata "
       f"lines, found {nonblank[2]!r}:\n{output}"
