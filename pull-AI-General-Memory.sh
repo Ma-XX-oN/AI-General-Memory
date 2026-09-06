@@ -4,7 +4,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 cd "$SCRIPT_DIR"
 
-if [[ "$(git rev-parse --show-toplevel)" != "$SCRIPT_DIR" ]]; then
+repo_root="$(git rev-parse --show-toplevel)"
+repo_root="$(cd -- "$repo_root" && pwd -P)"
+if [[ "$repo_root" != "$SCRIPT_DIR" ]]; then
   printf 'ERROR: %s is not the AI-General-Memory repository root.\n' "$SCRIPT_DIR" >&2
   exit 1
 fi
