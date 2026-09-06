@@ -1,0 +1,16 @@
+{"timestamp":"2026-09-06T19:17:01.000Z","type":"session_meta","payload":{"id":"01a07826-f445-7dd2-a370-3f3c7a3754a6"}}
+{"timestamp":"2026-09-06T19:52:39.000Z","type":"turn_context","payload":{"model":"gpt-5.4"}}
+{"timestamp":"2026-09-06T19:52:40.000Z","type":"event_msg","payload":{"type":"user_message","message":"# Context from my IDE setup:\n\n## Active file: example.txt\n\n## My request for Codex:\nWhat is an apple"}}
+{"timestamp":"2026-09-06T19:52:42.000Z","type":"event_msg","payload":{"type":"turn_aborted"}}
+{"timestamp":"2026-09-06T19:52:43.000Z","type":"event_msg","payload":{"type":"thread_rolled_back","num_turns":1}}
+{"timestamp":"2026-09-06T19:52:45.000Z","type":"turn_context","payload":{"model":"gpt-5.5"}}
+{"timestamp":"2026-09-06T19:52:46.000Z","type":"event_msg","payload":{"type":"user_message","message":"# Context from my IDE setup:\n\n## Active file: example.txt\n\n## My request for Codex:\nWhat is an tree?"}}
+{"timestamp":"2026-09-06T19:52:54.000Z","type":"event_msg","payload":{"type":"agent_message","phase":"final","message":"A tree answer."}}
+{"timestamp":"2026-09-06T19:53:00.000Z","type":"event_msg","payload":{"type":"thread_rolled_back","num_turns":1}}
+{"timestamp":"2026-09-06T19:53:49.000Z","type":"turn_context","payload":{"model":"gpt-5.5"}}
+{"timestamp":"2026-09-06T19:53:50.000Z","type":"event_msg","payload":{"type":"user_message","message":"# Context from my IDE setup:\n\n## Active file: example.txt\n\n## My request for Codex:\nWhat is an pool?"}}
+{"timestamp":"2026-09-06T19:53:58.000Z","type":"event_msg","payload":{"type":"agent_message","phase":"final","message":"A pool answer."}}
+{"timestamp":"2026-09-06T20:00:00.000Z","type":"event_msg","payload":{"type":"thread_rolled_back","num_turns":1}}
+{"timestamp":"2026-09-06T20:00:09.000Z","type":"turn_context","payload":{"model":"gpt-5.5"}}
+{"timestamp":"2026-09-06T20:00:10.000Z","type":"event_msg","payload":{"type":"user_message","message":"# Context from my IDE setup:\n\n## Active file: example.txt\n\n## My request for Codex:\nWhat is a puck?"}}
+{"timestamp":"2026-09-06T20:00:20.000Z","type":"event_msg","payload":{"type":"agent_message","phase":"final","message":"A puck answer."}}
