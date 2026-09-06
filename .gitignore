@@ -3,6 +3,10 @@
 
 # Except knowledge files
 !.gitignore
+!.gitmodules
+!pull-AI-General-Memory.sh
+!dependencies/
+!dependencies/AIConversationCore/
 !USER.md
 !README.md
 !CLAUDE.md
