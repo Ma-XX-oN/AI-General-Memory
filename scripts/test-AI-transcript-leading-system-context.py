@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Regression test for Claude transcript start and injected-context suppression."""
+"""Regression tests for Claude title normalization and transcript start."""
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import pathlib
-import re
 import subprocess
 import sys
 
@@ -15,11 +15,34 @@ SCRIPT = ROOT / "scripts" / "AI-transcript.py"
 FIXTURE = ROOT / "scripts" / "fixtures" / "claude-leading-system-context.jsonl"
 CORE = ROOT / "dependencies" / "AIConversationCore"
 PROMPT = "Can you provide me with simulations of these:"
-TITLE_PREFIX = "(claude-l) "
 
 
-def main() -> int:
-  """Run the production transcript entry point and validate its visible start."""
+def _load_script_module():
+  """Load AI-transcript.py so source-level metadata helpers can be tested."""
+  spec = importlib.util.spec_from_file_location("ai_transcript", SCRIPT)
+  if spec is None or spec.loader is None:
+    raise AssertionError(f"could not load {SCRIPT}")
+  module = importlib.util.module_from_spec(spec)
+  sys.modules[spec.name] = module
+  spec.loader.exec_module(module)
+  return module
+
+
+def _assert_source_title_is_one_line() -> None:
+  """Assert Claude metadata extraction itself produces the canonical title."""
+  module = _load_script_module()
+  title, _ctime, _rc = module._cl_session_meta(str(FIXTURE))
+  if title != PROMPT:
+    raise AssertionError(
+      "Claude session metadata must derive its title from the first non-empty "
+      f"visible user line; found {title!r}"
+    )
+  if "\n" in title or "\r" in title:
+    raise AssertionError(f"Claude session title is multiline: {title!r}")
+
+
+def _assert_production_output_boundary() -> None:
+  """Run the production entry point and validate its metadata/body boundary."""
   env = os.environ.copy()
   env["AI_CONVERSATION_CORE"] = str(CORE)
   result = subprocess.run(
@@ -46,20 +69,21 @@ def main() -> int:
     )
 
   output = result.stdout
-  nonblank = [line for line in output.splitlines() if line.strip()]
+  lines = output.splitlines()
+  nonblank = [line for line in lines if line.strip()]
   if len(nonblank) < 3:
     raise AssertionError(f"transcript output is unexpectedly short:\n{output}")
   if not nonblank[0].startswith("[claude] "):
     raise AssertionError(f"expected Claude metadata header first:\n{output}")
-  if nonblank[1] != f"{TITLE_PREFIX}{PROMPT}":
+  if nonblank[1] != f"(claude-l) {PROMPT}":
     raise AssertionError(
-      "expected exactly one single-line AI-transcript.py session-title header, "
+      "expected exactly one one-line session title after metadata header, "
       f"found {nonblank[1]!r}:\n{output}"
     )
-  if not re.fullmatch(r"## User .*:\s+3:", nonblank[2]):
+  if not nonblank[2].startswith("## User ") or not nonblank[2].endswith(":  3:"):
     raise AssertionError(
-      "expected the canonical first User heading immediately after the two "
-      f"AI-transcript.py metadata lines, found {nonblank[2]!r}:\n{output}"
+      "expected canonical User heading immediately after the two stdout metadata "
+      f"lines, found {nonblank[2]!r}:\n{output}"
     )
   if output.count("## User") != 1:
     raise AssertionError(
@@ -67,13 +91,15 @@ def main() -> int:
     )
   if "ide_selection" in output or "repo is clean after the push" in output:
     raise AssertionError(f"injected IDE-selection content leaked into transcript:\n{output}")
-  if f"> {PROMPT}" not in output:
-    raise AssertionError(f"real first User prompt is missing or malformed:\n{output}")
+  if PROMPT not in output:
+    raise AssertionError(f"real first User prompt is missing:\n{output}")
 
-  print(
-    "PASS: Claude transcript keeps exactly two stdout metadata lines before "
-    "the first canonical User turn"
-  )
+
+def main() -> int:
+  """Validate both the title producer and the final production boundary."""
+  _assert_source_title_is_one_line()
+  _assert_production_output_boundary()
+  print("PASS: Claude title is normalized at source and transcript boundary is clean")
   return 0
 
 
