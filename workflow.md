@@ -7,14 +7,39 @@ progress. These defaults apply to all projects unless a project-specific
 
 ## TTD Rules
 
-1. Before refactor or new development, agree to expected behavior and test scope.
-2. Define stable unit and system/integration test commands before coding.
-3. Keep at least one replayable capture path (fixture/log recording) so
-   unexpected behavior can be turned into direct regression tests.
-4. Run agreed tests at the end of each stage and before commit.
-5. Run test commands separately (parallel is fine when independent).
-6. After tests finish, report concise results and call out failures/regressions.
-7. If expectations or golden outputs need to change, agree to that change first.
+1. Before any substantive bug fix, refactor, or new development, agree to the
+   expected behaviour and test scope.
+2. Before coding, enumerate every affected production entry point and consumer,
+   especially when a changed contract crosses module, process, repository, or
+   application boundaries. Do not assume one component test represents all
+   consumers.
+3. Define the real user-visible production acceptance path and write its
+   acceptance/regression test before implementation. The test must exercise the
+   actual behaviour-producing entry point where feasible, not only a helper or
+   lower-level component that is expected to be equivalent.
+4. Run that acceptance test before the fix and require it to fail for the exact
+   intended defect. If it passes, the test does not prove the bug and must be
+   corrected before implementation begins.
+5. Keep stable unit and system/integration test commands in addition to the
+   production-path acceptance test. Component and unit tests are necessary but
+   do not substitute for production-path acceptance when behaviour crosses a
+   contract boundary.
+6. Keep at least one replayable capture path (fixture/log recording) so
+   unexpected production behaviour can be turned into a direct regression test.
+7. Implement only after the failing acceptance proof exists, then run the same
+   exact acceptance test after the change and require it to pass.
+8. Run the broader agreed unit, integration, build, packaging, and deployment
+   checks at the end of each applicable stage and before commit/completion.
+9. Never mark an issue, checklist item, phase, or task complete, and never close
+   an issue, until every acceptance criterion has direct test or verification
+   evidence and the required tests have passed against the final deliverable.
+10. If a required acceptance test cannot be automated or executed in the current
+    environment, do not claim completion. Obtain explicit user verification; if
+    the work must move to another capable environment/conversation, provide a
+    fenced copyable prompt containing the exact verification task and criteria.
+11. Run test commands separately (parallel is fine when independent).
+12. After tests finish, report concise results and call out failures/regressions.
+13. If expectations or golden outputs need to change, agree to that change first.
 
 ## Approval-Friction Reduction
 
@@ -75,7 +100,7 @@ by the user and reused without triggering a new approval prompt each time.
 Embedding the message inline (e.g. `-m "..."` or a heredoc) makes every commit
 command unique, defeating pre-approval.
 
-1. Use Conventional Commit format for every commit.
+1. Use Conventional Commit format for every git commit message.
 2. Keep commit body bullet lines contiguous (no blank separators between bullets).
 3. Avoid Markdown backticks in `git commit -m` strings in PowerShell.
 4. Use a session-scoped commit message file in `%TEMP%`:
