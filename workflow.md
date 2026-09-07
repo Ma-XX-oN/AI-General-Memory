@@ -64,7 +64,7 @@ progress. These defaults apply to all projects unless a project-specific
 Same motivation as the PowerShell section below: write the message via a
 file so the `git commit -F` command string is stable and approve-once eligible.
 
-1. Use Conventional Commit format for every commit.
+1. Use Conventional Commit format for every git commit message.
 2. Keep commit body bullet lines contiguous (no blank separators between bullets).
 3. **Resolve the session PID once** at the start of any commit sequence
    (must be **sourced**, not executed — executing breaks the process chain):
