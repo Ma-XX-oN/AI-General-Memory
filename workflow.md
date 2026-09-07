@@ -41,6 +41,25 @@ progress. These defaults apply to all projects unless a project-specific
 12. After tests finish, report concise results and call out failures/regressions.
 13. If expectations or golden outputs need to change, agree to that change first.
 
+## AIConversationCore Rendering Boundary
+
+1. AIConversationCore exists to centralize provider-independent semantics.
+2. Once provider data has been normalized into the Core model, semantic
+   rendering is owned by Core and has exactly two canonical output paths:
+   **Markdown** and **HTML**.
+3. Downstream consumers must not reinterpret provider semantics or implement
+   parallel semantic renderers. They may only integrate the canonical Core
+   outputs.
+4. For every Core rendering change, use the same normalized fixture to verify
+   both canonical renderers:
+   - normalized fixture -> canonical Markdown;
+   - normalized fixture -> canonical HTML.
+5. Both renderer tests must pass before the Core change, issue, checklist item,
+   or phase may be considered complete or closed.
+6. Downstream tests are integration-only. They do not substitute for Core
+   Markdown/HTML correctness, and Core correctness must not be established by
+   chasing consumer-specific render paths.
+
 ## Approval-Friction Reduction
 
 1. Prefer smaller independent commands and already-approved prefixes; split
