@@ -1,0 +1,56 @@
+name: AI-transcript Codex user-context acceptance
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - dependencies/AIConversationCore
+      - scripts/AI-transcript.py
+      - scripts/AI-transcript-core-worker.mjs
+      - scripts/test-AI-transcript-codex-user-context-cli.py
+      - .github/workflows/ai-transcript-codex-user-context.yml
+  pull_request:
+    paths:
+      - dependencies/AIConversationCore
+      - scripts/AI-transcript.py
+      - scripts/AI-transcript-core-worker.mjs
+      - scripts/test-AI-transcript-codex-user-context-cli.py
+      - .github/workflows/ai-transcript-codex-user-context.yml
+
+permissions:
+  contents: read
+
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out AI-General-Memory and submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install presentation dependencies
+        run: python -m pip install colorama regex
+      - name: Verify pinned Core and run real CLI acceptance regression
+        env:
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/dependencies/AIConversationCore
+        run: |
+          expected="$(git rev-parse HEAD:dependencies/AIConversationCore)"
+          actual="$(git -C dependencies/AIConversationCore rev-parse HEAD)"
+          test "$actual" = "$expected"
+          response="$(printf '%s\n' '{"operation":"ping"}' | node scripts/AI-transcript-core-worker.mjs)"
+          python - "$expected" "$response" <<'PY'
+          import json
+          import sys
+          expected = sys.argv[1]
+          response = json.loads(sys.argv[2])
+          assert response["ok"] is True
+          assert response["core_commit"] == expected
+          PY
+          python scripts/test-AI-transcript-codex-user-context-cli.py
