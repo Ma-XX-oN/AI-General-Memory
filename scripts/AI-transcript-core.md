@@ -13,7 +13,7 @@ through one persistent Node.js worker (`AI-transcript-core-worker.mjs`).
   repository or at the repository path named by `AI_CONVERSATION_CORE`.
 - `AI_CONVERSATION_CORE` must name the repository root, not a JavaScript file.
 - The checkout must be exactly commit
-  `b7961cb8dab11611a5af8f4304ae783295998cf2`.  The worker verifies the checkout
+  `d6d76b54db3d48baf3f5e3a76099be1732d32785`.  The worker verifies the checkout
   HEAD before importing the core and refuses to run against a different revision.
 
 ## Bridge behaviour
@@ -30,9 +30,10 @@ interpretation, canonical structures, and Markdown rendering remain in Core.
 
 `--turn-id` is a normal transcript presentation option, independent of `-d`,
 `-n`, and `-N`.  ChatGPT headings use the source message `id`; Claude
-headings use the source record `uuid`.  Codex does not expose a suitable
-UUID-like ID for every rendered record, so requesting `--turn-id` for Codex
-emits one warning and no `turn_id` fields.
+headings use the source record `uuid`.  The visible heading component is the bare
+native ID value; Core does not prefix it with `turn_id=`.  Codex does not expose a
+suitable UUID-like ID for every rendered record, so requesting `--turn-id` for
+Codex emits one warning and no Turn ID component.
 
 ## Debug provenance
 
@@ -44,11 +45,11 @@ headings/groupings use canonical source provenance:
 ## ChatGPT <!-- record_id=<native-source-record-id> record_index=<zero-based-index> -->
 ```
 
-When `--turn-id` and `-N` are both requested, visible `turn_id=...` heading metadata
-and the debug provenance comment are emitted independently.  The same provenance
-rule applies to User/provider/sub-agent/question/plan/thought/tool and other
-renderer-generated structural headings/groupings.  Related-source structures use
-their own Core-derived source metadata.
+When `--turn-id` and `-N` are both requested, the bare visible Turn ID heading
+component and the debug provenance comment are emitted independently.  The same
+provenance rule applies to User/provider/sub-agent/question/plan/thought/tool and
+other renderer-generated structural headings/groupings.  Related-source structures
+use their own Core-derived source metadata.
 
 ## Verification
 
