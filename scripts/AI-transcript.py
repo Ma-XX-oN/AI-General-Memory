@@ -193,14 +193,15 @@ class _AIConversationCoreBridge:
       raise RuntimeError(f"AIConversationCore worker error: {response.get('error', 'unknown error')}")
     return response
 
-  def render(self, provider, records, source_indexes, projections):
-    """Render canonical Markdown for one provider record sequence."""
+  def render(self, provider, records, source_indexes, projections, options):
+    """Render canonical Markdown using caller presentation policy only."""
     response = self.request({
       "operation": "render",
       "provider": provider,
       "records": records,
       "source_indexes": source_indexes,
       "projections": projections,
+      "options": options,
     })
     return response["markdown"]
 
@@ -226,16 +227,9 @@ def _core_bridge():
   return _CORE_BRIDGE
 
 
-def _core_projection(rec_no, ts_str, *, rec_width):
-  """Return consumer presentation metadata for one canonical source event."""
+def _core_projection():
+  """Return non-semantic per-event presentation settings for Core."""
   policy = _display_policy()
-  heading_metadata = {}
-  if policy.show_date:
-    heading_metadata["timestamp"] = _parse_ts(ts_str, policy.display_tz)
-  if policy.record_number:
-    heading_metadata["record_number"] = f"{rec_no:{rec_width}}"
-  if policy.show_turn_id and not policy.debug_record_comment:
-    heading_metadata["show_turn_id"] = True
   colors = {}
   if policy.render_color:
     colors = {
@@ -246,14 +240,40 @@ def _core_projection(rec_no, ts_str, *, rec_width):
       "record_number": _C_RECNO,
       "reset": _C_RESET,
     }
-  projection = {
-    "debug_provenance": policy.debug_record_comment,
+  return {
     "separate_thoughts": policy.separate_thoughts,
     "colors": colors,
   }
-  if heading_metadata:
-    projection["heading_metadata"] = heading_metadata
-  return projection
+
+
+def _core_heading_options():
+  """Return Core heading visibility and timezone presentation policy."""
+  policy = _display_policy()
+  heading = {
+    "timestamp": policy.show_date,
+    "recordNumber": policy.record_number,
+    "turnId": policy.show_turn_id,
+    "debugProvenance": policy.debug_record_comment,
+  }
+  tz = policy.display_tz
+  if tz is not None:
+    zone_key = getattr(tz, "key", None)
+    if isinstance(zone_key, str) and zone_key:
+      heading["timeZone"] = zone_key
+    else:
+      offset = tz.utcoffset(None)
+      if offset is None:
+        raise RuntimeError("Core heading timezone has no fixed offset")
+      total_seconds = int(offset.total_seconds())
+      if total_seconds % 60:
+        raise RuntimeError("Core heading timezone offset must use whole minutes")
+      total_minutes = total_seconds // 60
+      sign = "+" if total_minutes >= 0 else "-"
+      total_minutes = abs(total_minutes)
+      heading["timeZone"] = (
+        f"{sign}{total_minutes // 60:02d}:{total_minutes % 60:02d}"
+      )
+  return {"heading": heading}
 
 
 def _core_record_timestamp(source, record):
@@ -282,7 +302,6 @@ def _core_transcript(session, rec_filter=None):
   records = []
   source_indexes = []
   projections = {}
-  rec_width = max(1, len(str(session.rc)))
   with open(session.path, encoding="utf-8") as source:
     for source_index, raw in enumerate(line for line in source if line.strip()):
       record = json.loads(raw)
@@ -295,12 +314,14 @@ def _core_transcript(session, rec_filter=None):
         if not rec_filter.allows_ts(ts_str):
           continue
       source_indexes.append(source_index)
-      projections[str(source_index)] = _core_projection(
-        rec_no, ts_str, rec_width=rec_width
-      )
+      projections[str(source_index)] = _core_projection()
 
   body = _core_bridge().render(
-    session.source, records, source_indexes, projections
+    session.source,
+    records,
+    source_indexes,
+    projections,
+    _core_heading_options(),
   )
   if body.endswith("\n"):
     body = body[:-1]

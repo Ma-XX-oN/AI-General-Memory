@@ -13,17 +13,18 @@ through one persistent Node.js worker (`AI-transcript-core-worker.mjs`).
   repository or at the repository path named by `AI_CONVERSATION_CORE`.
 - `AI_CONVERSATION_CORE` must name the repository root, not a JavaScript file.
 - The checkout must be exactly commit
-  `3233cba838bbf2d2cea5a2a6f1900ed6014dcfb0`.  The worker verifies the checkout
+  `b7961cb8dab11611a5af8f4304ae783295998cf2`.  The worker verifies the checkout
   HEAD before importing the core and refuses to run against a different revision.
 
 ## Bridge behaviour
 
 The Python process starts one line-delimited JSON Node.js worker and reuses it for
 the process lifetime.  It does not spawn a JavaScript process per source record.
-Python reads/filter-selects the source JSONL records and supplies consumer-specific
-projection metadata such as date, record number, optional source turn ID,
-ANSI presentation, separate-thought mode, and debug provenance enablement.  Provider interpretation,
-canonical structures, and Markdown rendering remain in `AIConversationCore`.
+Python reads/filter-selects the source JSONL records and supplies only presentation
+policy: heading visibility, timezone choice, ANSI styling, and separate-thought mode.
+Timestamp, record number, source turn ID, and debug provenance values are derived and
+serialized by `AIConversationCore` from canonical source provenance.  Provider
+interpretation, canonical structures, and Markdown rendering remain in Core.
 
 ## Optional source turn IDs
 
@@ -40,14 +41,14 @@ emits one warning and no `turn_id` fields.
 headings/groupings use canonical source provenance:
 
 ```markdown
-## ChatGPT <!-- turn_id=<source_record_id> record_index=<zero-based-index> -->
+## ChatGPT <!-- record_id=<native-source-record-id> record_index=<zero-based-index> -->
 ```
 
-The same rule applies to User/provider/sub-agent/question/plan/thought/tool and
-other renderer-generated structural headings/groupings.  When one rendered group
-represents multiple source records, the first source is attached to the opening
-line and later source records are emitted on immediately following HTML-comment
-lines.
+When `--turn-id` and `-N` are both requested, visible `turn_id=...` heading metadata
+and the debug provenance comment are emitted independently.  The same provenance
+rule applies to User/provider/sub-agent/question/plan/thought/tool and other
+renderer-generated structural headings/groupings.  Related-source structures use
+their own Core-derived source metadata.
 
 ## Verification
 

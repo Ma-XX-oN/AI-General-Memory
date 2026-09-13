@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import datetime
 import json
 import os
 import re
@@ -54,6 +55,26 @@ def main():
     for record_id in chatgpt_ids
   ), "ChatGPT --turn-id emitted no native source message id"
 
+  default_chatgpt = run_path(chatgpt_path)
+  assert "turn_id=" not in default_chatgpt.stdout, (
+    "ChatGPT emitted turn IDs without --turn-id"
+  )
+  assert "<!-- turn_id=" not in chatgpt.stdout, (
+    "ChatGPT --turn-id used obsolete HTML-comment syntax"
+  )
+
+  debug_turn_id = run_path(chatgpt_path, "--turn-id", "-N")
+  assert "turn_id=" in debug_turn_id.stdout, (
+    "ChatGPT --turn-id disappeared when debug provenance was enabled"
+  )
+  assert re.search(
+    r"<!-- record_id=[^ ]+ record_index=\d+ -->",
+    debug_turn_id.stdout,
+  ), "ChatGPT -N did not emit Core-owned record provenance"
+  assert "<!-- turn_id=" not in debug_turn_id.stdout, (
+    "Debug provenance incorrectly reused the turn_id comment label"
+  )
+
   with tempfile.TemporaryDirectory() as tmp:
     claude_path = Path(tmp) / "claude-turn-id.jsonl"
     claude_path.write_text(
@@ -77,6 +98,19 @@ def main():
     "Codex records do not expose a suitable unique UUID for turn_id; "
     "no turn IDs will be emitted."
   ) in codex.stderr, "Codex --turn-id warning was not emitted"
+
+  first_dated = next(
+    rec for rec in records(chatgpt_path)
+    if rec.get("author", {}).get("role") in ("user", "assistant")
+    and rec.get("create_time") is not None
+  )
+  expected_fixed = datetime.datetime.fromtimestamp(
+    float(first_dated["create_time"]), datetime.timezone.utc
+  ) - datetime.timedelta(hours=4)
+  fixed = run_path(chatgpt_path, "-d", "--tz=-04:00")
+  assert expected_fixed.strftime("[%Y-%m-%d %H:%M:%S]:") in fixed.stdout, (
+    "Core-owned fixed-offset timestamp projection did not preserve --tz=-04:00"
+  )
 
   numbered = run_path(chatgpt_path, "-n")
   first_visible = next(

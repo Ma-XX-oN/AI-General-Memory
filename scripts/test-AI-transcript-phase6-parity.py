@@ -29,9 +29,21 @@ CLAUDE_VARIANTS = (
   ('separate-thoughts-metadata-ansi', ['--color', 'always', '-T', '-d', '-n', '-N']),
 )
 
-_DEBUG_BODY = r'<!-- (?:turn_id=[^ ]+ )?record_index=\d+ -->'
+_DEBUG_BODY = r'<!-- (?:record_id=[^ ]+ )?record_index=\d+ -->'
 _DEBUG_COMMENT_RE = re.compile(r' ?' + _DEBUG_BODY)
 _DEBUG_STANDALONE_RE = re.compile(r'^(?:> )?' + _DEBUG_BODY + r'$')
+_HEADING_RECORD_PADDING_RE = re.compile(
+  r'^(#{2,3} [^\n]*?)[ \t]+(\d+):(?=(?:[ \t]+<!--|[ \t]*$))',
+  re.MULTILINE,
+)
+
+
+def without_heading_record_padding(text):
+  """Normalize only legacy heading-number width padding superseded by D026."""
+  return _HEADING_RECORD_PADDING_RE.sub(
+    lambda match: f'{match.group(1)} {match.group(2)}:',
+    text,
+  )
 
 
 def run(script, fixture, args, env):
@@ -94,8 +106,8 @@ def require_debug_shape(provider, name, output, failures):
   if not comments:
     failures.append(f'{provider}/{name}: debug mode emitted no canonical provenance comments')
     return
-  if provider == 'chatgpt' and 'turn_id=' not in ''.join(comments):
-    failures.append(f'{provider}/{name}: ChatGPT debug provenance lost source turn_id')
+  if provider == 'chatgpt' and 'record_id=' not in ''.join(comments):
+    failures.append(f'{provider}/{name}: ChatGPT debug provenance lost source record_id')
   if 'record_index=' not in ''.join(comments):
     failures.append(f'{provider}/{name}: debug provenance lost record_index')
   if '<!-- record:' in output:
@@ -164,15 +176,20 @@ def main():
       if has_debug:
         continue
 
-      if current_out != legacy_out:
+      comparison_current = current_out
+      comparison_legacy = legacy_out
+      if '-n' in args:
+        comparison_current = without_heading_record_padding(comparison_current)
+        comparison_legacy = without_heading_record_padding(comparison_legacy)
+      if comparison_current != comparison_legacy:
         failures.append(
           f'{provider}/{name}: stdout differs outside approved Phase 6 changes: '
-          f'{first_difference(current_out, legacy_out)}'
+          f'{first_difference(comparison_current, comparison_legacy)}'
         )
 
   if failures:
     raise SystemExit('\n'.join(failures))
-  print('PASS: Phase 6 historical parity, with only D015/D016 approved differences')
+  print('PASS: Phase 6 historical parity, with only D015/D016/D026 approved differences')
 
 
 if __name__ == '__main__':
