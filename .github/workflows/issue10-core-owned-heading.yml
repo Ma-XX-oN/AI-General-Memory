@@ -71,6 +71,7 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git rm .github/workflows/issue10-core-owned-heading.yml scripts/issue10-core-owned-heading.py scripts/issue10-core-dependency-install.py scripts/issue10-parity-d026.py
           git rm .github/workflows/issue-10-turn-id.yml .github/workflows/issue-10-product-commit.yml
-          git add scripts/AI-transcript.py scripts/AI-transcript-core-worker.mjs scripts/AI-transcript-core.md scripts/test-AI-transcript-turn-id.py scripts/test-AI-transcript-phase6-parity.py .github/workflows/ai-transcript-core-parity.yml
+          git add scripts/AI-transcript.py scripts/AI-transcript-core-worker.mjs scripts/AI-transcript-core.md scripts/test-AI-transcript-turn-id.py scripts/test-AI-transcript-phase6-parity.py
+          git add -f .github/workflows/ai-transcript-core-parity.yml
           git commit -m 'transcript: consume Core-owned heading metadata (#10)'
           git push
