@@ -43,6 +43,14 @@ def records(path):
     return [json.loads(line) for line in source if line.strip()]
 
 
+def heading_has_id(output, record_id):
+  return re.search(
+    rf"^##(?:#)? [^\n]*{re.escape(record_id)}(?:\s+<!--|\s*$)",
+    output,
+    re.MULTILINE,
+  ) is not None
+
+
 def main():
   chatgpt_path = fixture("chatgpt", "chatgpt-direct.jsonl")
   chatgpt = run_path(chatgpt_path, "--turn-id")
@@ -51,21 +59,29 @@ def main():
     if isinstance(rec.get("id"), str) and rec.get("id")
   ]
   assert any(
-    f"turn_id={record_id}" in chatgpt.stdout
+    heading_has_id(chatgpt.stdout, record_id)
     for record_id in chatgpt_ids
   ), "ChatGPT --turn-id emitted no native source message id"
+  assert "turn_id=" not in chatgpt.stdout, (
+    "ChatGPT --turn-id still rendered the obsolete visible turn_id= prefix"
+  )
 
   default_chatgpt = run_path(chatgpt_path)
-  assert "turn_id=" not in default_chatgpt.stdout, (
-    "ChatGPT emitted turn IDs without --turn-id"
-  )
+  assert not any(
+    heading_has_id(default_chatgpt.stdout, record_id)
+    for record_id in chatgpt_ids
+  ), "ChatGPT emitted turn IDs without --turn-id"
   assert "<!-- turn_id=" not in chatgpt.stdout, (
     "ChatGPT --turn-id used obsolete HTML-comment syntax"
   )
 
   debug_turn_id = run_path(chatgpt_path, "--turn-id", "-N")
-  assert "turn_id=" in debug_turn_id.stdout, (
-    "ChatGPT --turn-id disappeared when debug provenance was enabled"
+  assert any(
+    heading_has_id(debug_turn_id.stdout, record_id)
+    for record_id in chatgpt_ids
+  ), "ChatGPT --turn-id disappeared when debug provenance was enabled"
+  assert "turn_id=" not in debug_turn_id.stdout, (
+    "ChatGPT visible Turn ID regained the obsolete turn_id= prefix"
   )
   assert re.search(
     r"<!-- record_id=[^ ]+ record_index=\d+ -->",
@@ -83,11 +99,14 @@ def main():
       encoding="utf-8",
     )
     claude = run_path(claude_path, "--turn-id")
-  assert "turn_id=claude-user-uuid" in claude.stdout, (
+  assert heading_has_id(claude.stdout, "claude-user-uuid"), (
     "Claude User --turn-id did not use the native source record uuid"
   )
-  assert "turn_id=claude-assistant-uuid" in claude.stdout, (
+  assert heading_has_id(claude.stdout, "claude-assistant-uuid"), (
     "Claude Assistant --turn-id did not use the native source record uuid"
+  )
+  assert "turn_id=" not in claude.stdout, (
+    "Claude --turn-id still rendered the obsolete visible turn_id= prefix"
   )
 
   codex = run_path(fixture("codex", "codex-rich.jsonl"), "--turn-id")
