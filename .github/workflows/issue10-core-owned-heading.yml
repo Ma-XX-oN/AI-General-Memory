@@ -28,10 +28,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+      - name: Install AIConversationCore dependencies
+        working-directory: .issue10-core
+        run: npm ci
       - name: Install presentation dependencies
         run: python -m pip install colorama regex
       - name: Apply Core-owned heading migration
-        run: python scripts/issue10-core-owned-heading.py
+        run: |
+          python scripts/issue10-core-owned-heading.py
+          python scripts/issue10-core-dependency-install.py
       - name: Python syntax gate
         run: python -m py_compile scripts/AI-transcript.py scripts/test-AI-transcript-phase6-parity.py scripts/test-AI-transcript-core-parity.py scripts/test-AI-transcript-turn-id.py
       - name: Materialize historical baseline
@@ -63,7 +68,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git rm .github/workflows/issue10-core-owned-heading.yml scripts/issue10-core-owned-heading.py
+          git rm .github/workflows/issue10-core-owned-heading.yml scripts/issue10-core-owned-heading.py scripts/issue10-core-dependency-install.py
           git rm .github/workflows/issue-10-turn-id.yml .github/workflows/issue-10-product-commit.yml
           git add scripts/AI-transcript.py scripts/AI-transcript-core-worker.mjs scripts/AI-transcript-core.md scripts/test-AI-transcript-turn-id.py scripts/test-AI-transcript-phase6-parity.py .github/workflows/ai-transcript-core-parity.yml
           git commit -m 'transcript: consume Core-owned heading metadata (#10)'
