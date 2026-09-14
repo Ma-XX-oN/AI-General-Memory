@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const CORE_COMMIT = '54a70c2989de0c02f03b28a2f8d8c6986b974141';
+const CORE_COMMIT = '4b1bebe6fd7d82d8bbb15f4ad5c1a59cfd03132a';
 
 function coreRootPath() {
   const configured = process.env.AI_CONVERSATION_CORE;
@@ -40,6 +40,7 @@ function verifyCorePin() {
 
 verifyCorePin();
 const core = await import(pathToFileURL(coreEntryPath()).href);
+const CORE_VERSION = core.getVersion();
 
 function eventProjection(event, projectionByIndex) {
   const inherited = event?.projection ?? {};
@@ -72,7 +73,7 @@ function eventProjection(event, projectionByIndex) {
 
 function render(request) {
   if (request?.operation === 'ping') {
-    return { ok: true, core_commit: CORE_COMMIT };
+    return { ok: true, core_commit: CORE_COMMIT, core_version: CORE_VERSION };
   }
   if (request?.operation !== 'render') {
     throw new Error(`Unsupported operation: ${request?.operation}`);
@@ -106,6 +107,7 @@ function render(request) {
   return {
     ok: true,
     core_commit: CORE_COMMIT,
+    core_version: CORE_VERSION,
     markdown: core.renderCanonicalMarkdown(events),
     ...(loaded.session_metadata ? { session_metadata: loaded.session_metadata } : {})
   };
