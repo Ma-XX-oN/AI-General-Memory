@@ -46,6 +46,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 
+from AI_transcript_version import VERSION as AI_TRANSCRIPT_VERSION
+
 
 # ── XML tags injected by Claude Code ─────────────────────────────────────────
 
@@ -633,7 +635,7 @@ class SessionStore(ABC):
     """Return all Session objects, sorted newest-first by mtime."""
 
   @abstractmethod
-  def find(self, id_or_glob: str, *, all_projects: bool = False) -> "tuple[Session | None, list[Session]]":
+  def find(self, id_or_glob: str, *, all_projects=False) -> "tuple[Session | None, list[Session]]":
     """Resolve UUID prefix/full UUID/title glob.
 
     *:N suffix is NOT handled here - strip it before calling.*
@@ -4362,6 +4364,12 @@ def main():
       "  Modification time: file mtime (Claude) / updated_at from index (Codex)."
     ),
     formatter_class=argparse.RawDescriptionHelpFormatter,
+  )
+  ap.add_argument(
+    "--version",
+    action="version",
+    version=AI_TRANSCRIPT_VERSION,
+    help="Show AI-transcript version and exit.",
   )
 
   # Source selector (mutually exclusive)
