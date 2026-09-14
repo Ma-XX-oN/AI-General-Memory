@@ -635,7 +635,7 @@ class SessionStore(ABC):
     """Return all Session objects, sorted newest-first by mtime."""
 
   @abstractmethod
-  def find(self, id_or_glob: str, *, all_projects=False) -> "tuple[Session | None, list[Session]]":
+  def find(self, id_or_glob: str, *, all_projects: bool = False) -> "tuple[Session | None, list[Session]]":
     """Resolve UUID prefix/full UUID/title glob.
 
     *:N suffix is NOT handled here - strip it before calling.*
