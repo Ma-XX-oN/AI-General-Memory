@@ -7,6 +7,7 @@ on:
       - dependencies/AIConversationCore
       - scripts/AI-transcript.py
       - scripts/AI-transcript-core-worker.mjs
+      - scripts/AI_transcript_version.py
       - scripts/test-AI-transcript-codex-user-context-cli.py
       - .github/workflows/ai-transcript-codex-user-context.yml
   pull_request:
@@ -14,6 +15,7 @@ on:
       - dependencies/AIConversationCore
       - scripts/AI-transcript.py
       - scripts/AI-transcript-core-worker.mjs
+      - scripts/AI_transcript_version.py
       - scripts/test-AI-transcript-codex-user-context-cli.py
       - .github/workflows/ai-transcript-codex-user-context.yml
 
