@@ -89,26 +89,6 @@
 - Issue each command as its own tool call; do not chain with `&&`, `;`, or `|` unless that exact pipeline was already approved as one command shape.
 - Before running build/test/tool commands, perform an execution-rule preflight: identify applicable project/global `CODEX.md` command prerequisites and include them directly in the command line/environment.
 
-### Testing And Build Workflow
-
-- For refactor or new development, agree expected behavior and the test plan before coding; if expectations change, re-agree before updating tests/fixtures.
-- Tests must reflect semantics, not just code coverage. When a bug reveals that a type, API, boundary, or test shape is semantically wrong, prefer the clean semantic fix over the smallest local patch, even if the patch is quicker.
-- For core semantic modules, freeze a short local contract before refactoring: identity, input-domain meaning, and mapping semantics. If any of the three is unsettled, stop and resolve it first.
-- Before refactoring, cleanup, or optimization in a core semantic module, add or update at least one test that proves the intended semantic behavior, not just implementation self-consistency.
-- For exactness-sensitive code, do not rely only on numerically friendly inputs such as powers of two, symmetric cases, or clean boundary values. Treat friendly cases as smoke tests, not proof, and include adversarial, odd, prime, or otherwise non-dyadic inputs early enough to expose representation and rounding problems.
-- If correctness depends on exact identity, preserve exact provenance until the last possible moment, prefer exact-by-construction implementation paths over recomputation plus comparison, keep exact-identity and approximate-geometric APIs semantically separate, and do not collapse tests that appear textually similar until you confirm they are proving the same semantic claim.
-- IMPORTANT! For global default TTD/testing/approval-friction workflow details (applies to all projects unless overridden locally), follow `~/.codex/workflow.md`.
-- For CMake builds/tests in workspace repos, check `.vscode/settings.json` and `CMakePresets.json`/`CMakeUserPresets.json` first and mirror those settings; use manual command lines only when those sources are absent or the user explicitly overrides them.
-- For CMake workflows, never run configure and build concurrently; run them sequentially (`cmake -S/-B` then `cmake --build`) to avoid regenerate/build race conditions.
-- For build/linker mismatch triage, follow `~/.codex/build_issues.md` before ad-hoc fixes.
-- In C++ tests and examples, prefer declaring variables immediately before first use rather than hoisting declarations to the top of the scope.
-- In multi-stage C++ tests and examples, add short local comments that label setup or intent blocks so readers do not have to scan to the final assertion to understand the scenario.
-- When extending a test area that already has a readable exemplar file, mirror that file's readability conventions for structure, local comments, and declaration placement unless the user asks for a different style.
-- In constexpr-heavy C++ tests, prefer named `constexpr bool` scenario blocks with inline setup/intent comments over bare piles of `static_assert`s so each compile-time proof is readable without reconstructing the scenario from the final predicate.
-- For every new test file, give each `constexpr` scenario block and each `TEST(...)` block a short local comment that states exactly what behavior it is proving before the assertions.
-- Do not rely on helper names, test names, or long setup/helper sections alone to communicate test intent; the reader should not have to reconstruct the purpose from the assertions.
-- When a new test file has substantial helper/setup code, add section comments that separate fixture-building helpers from the actual scenarios under test.
-
 ### Editing And Read Conventions
 
 - For file edits, use approved editing tools and keep one consistent editing method per session/task unless explicitly asked to change.
@@ -231,6 +211,7 @@
 
 - [Build issue triage guide](build_issues.md)
 - [Testing guidelines](testing.md)
+- [Coding practices](coding-practices.md)
 - [Workflow guidance (TTD/tests/approval friction)](workflow.md)
 - [Session PID script (PowerShell)](scripts/session-pid.ps1)
 - [Codex home README (memory file maintenance conventions)](README.md)
@@ -251,4 +232,3 @@
 - Treat documentation and examples as part of correctness, not optional polish.
 - Verify incrementally with build/tests during refactors to preserve behavior.
 - Never run build and tests concurrently; always complete build first, then run tests.
-

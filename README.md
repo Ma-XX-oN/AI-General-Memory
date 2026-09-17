@@ -59,6 +59,7 @@ Most of these files are used by the AIs. A few are used directly by the user.
 | [`testing.md`](testing.md) | AIs | Testing guidelines and discipline |
 | [`workflow.md`](workflow.md) | AIs | TTD/testing/command-workflow guidance to reduce approval friction |
 | [`file-doc-style.md`](file-doc-style.md) | AIs | File header documentation style specification (C++ Doxygen, sections, rules) |
+| [`coding-practices.md`](coding-practices.md) | AIs | Shared coding practice, testing, architecture, documentation, and Robot Framework guidance |
 
 ### Scripts
 
