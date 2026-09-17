@@ -46,6 +46,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 
+from AI_transcript_version import VERSION as AI_TRANSCRIPT_VERSION
+
 
 # ── XML tags injected by Claude Code ─────────────────────────────────────────
 
@@ -4362,6 +4364,12 @@ def main():
       "  Modification time: file mtime (Claude) / updated_at from index (Codex)."
     ),
     formatter_class=argparse.RawDescriptionHelpFormatter,
+  )
+  ap.add_argument(
+    "--version",
+    action="version",
+    version=AI_TRANSCRIPT_VERSION,
+    help="Show AI-transcript version and exit.",
   )
 
   # Source selector (mutually exclusive)
