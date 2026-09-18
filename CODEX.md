@@ -213,6 +213,7 @@
 - [Testing guidelines](testing.md)
 - [Coding practices](coding-practices.md)
 - [Workflow guidance (TTD/tests/approval friction)](workflow.md)
+- [Directed CI feedback loop](ci-feedback-loop.md)
 - [Session PID script (PowerShell)](scripts/session-pid.ps1)
 - [Codex home README (memory file maintenance conventions)](README.md)
 
