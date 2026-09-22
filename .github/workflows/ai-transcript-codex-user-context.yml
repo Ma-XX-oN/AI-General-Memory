@@ -39,6 +39,8 @@ jobs:
           python-version: '3.13'
       - name: Install presentation dependencies
         run: python -m pip install colorama regex
+      - name: Install pinned AIConversationCore dependencies
+        run: npm ci --prefix dependencies/AIConversationCore --no-audit --no-fund
       - name: Verify pinned Core and run real CLI acceptance regression
         env:
           AI_CONVERSATION_CORE: ${{ github.workspace }}/dependencies/AIConversationCore
