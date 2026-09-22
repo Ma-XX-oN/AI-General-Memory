@@ -83,7 +83,10 @@ function render(request) {
   }
 
   const options = {
-    includeRolledBackTurns: request?.options?.includeRolledBackTurns === true
+    includeRolledBackTurns: request?.options?.includeRolledBackTurns === true,
+    ...(request?.options?.heading && typeof request.options.heading === 'object'
+      ? { heading: request.options.heading }
+      : {})
   };
   const loaded = core.loadConversationSources({
     provider: request.provider,
@@ -108,7 +111,7 @@ function render(request) {
     ok: true,
     core_commit: CORE_COMMIT,
     core_version: CORE_VERSION,
-    markdown: core.renderCanonicalMarkdown(events),
+    markdown: core.renderCanonicalMarkdown(events, options),
     ...(loaded.session_metadata ? { session_metadata: loaded.session_metadata } : {})
   };
 }
