@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - '**'
+    paths:
+      - '.ci/run-ci-request'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      tested_sha: ${{ steps.sha.outputs.tested_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify explicit CI request and clean checkout
+        run: python scripts/ci_contract.py preflight
+      - name: Record exact tested commit
+        id: sha
+        shell: bash
+        run: echo "tested_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Load repository test matrix
+        id: matrix
+        shell: bash
+        run: echo "matrix=$(python scripts/ci_contract.py matrix)" >> "$GITHUB_OUTPUT"
+
+  validate:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tested_sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Run repository-owned CI environment
+        id: validation
+        continue-on-error: true
+        run: >-
+          python scripts/ci_contract.py run
+          --environment "${{ matrix.id }}"
+          --result "${{ runner.temp }}/ci-result/result.json"
+      - name: Upload CI environment result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-result-${{ matrix.id }}
+          path: ${{ runner.temp }}/ci-result/result.json
+          if-no-files-found: ignore
+      - name: Propagate environment result
+        if: steps.validation.outcome == 'failure'
+        run: exit 1
+
+  finalize:
+    if: always() && needs.prepare.result == 'success'
+    needs:
+      - prepare
+      - validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tested_sha }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Download CI result records
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ci-result-*
+          path: ${{ runner.temp }}/ci-results
+          merge-multiple: true
+      - name: Configure tag identity
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch --force --tags origin
+      - name: Finalize complete matrix and publish result tag
+        run: >-
+          python scripts/ci_contract.py finalize
+          --results-dir "${{ runner.temp }}/ci-results"
+          --tag --push
