@@ -93,10 +93,24 @@ PASS and `CI-FAIL` tags are immutable landmarks. Once either result tag exists f
 
 `.github/workflows/ci.yml` is orchestration only:
 
-1. verify the explicit request and clean checkout;
-2. load `.ci/test-matrix.json`;
-3. execute every required matrix environment with `fail-fast: false`;
-4. upload machine-readable environment results; and
-5. run one finalizer after all required jobs have reported.
+1. run the repository Actions-policy regression;
+2. determine whether the push contains an explicit CI request;
+3. when requested, verify the explicit request and clean checkout;
+4. load `.ci/test-matrix.json`;
+5. execute every required matrix environment with `fail-fast: false`;
+6. upload machine-readable environment results; and
+7. run one finalizer after all required jobs have reported.
 
 Validation jobs have read-only repository permissions. Only the finalizer has contents-write permission, and only for the immutable result tag. Tests do not depend on GitHub-specific metadata except the thin orchestration/provenance layer.
+
+The repository enforces `docs/GITHUB-ACTIONS-POLICY.md` through
+`scripts/check_actions_policy.py` and `tests/test_actions_policy.py`. Changes to
+workflow definitions or the policy checker/tests run only the lightweight policy
+job unless the same push also changes `.ci/run-ci-request`; policy maintenance
+does not itself request the full validation matrix.
+
+Maintained Actions workflows must remain within the policy allow-list. Do not
+create issue-specific or one-shot workflows that patch, repair, migrate,
+instrument, commit, or push source, tests, documentation, or dependency pins.
+Result-tag publication through `scripts/ci_contract.py finalize ... --tag --push`
+is the only default-line repository-write exception.
