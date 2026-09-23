@@ -6,13 +6,57 @@ on:
       - '**'
     paths:
       - '.ci/run-ci-request'
+      - '.github/workflows/**'
+      - 'scripts/check_actions_policy.py'
+      - 'tests/test_actions_policy.py'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
+  actions-policy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      run_ci: ${{ steps.scope.outputs.run_ci }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Enforce permanent Actions policy
+        run: python tests/test_actions_policy.py
+      - name: Determine whether full CI was explicitly requested
+        id: scope
+        shell: bash
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          import os
+
+          run_ci = os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
+          if not run_ci:
+            with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as handle:
+              event = json.load(handle)
+            for commit in event.get("commits", []):
+              paths = (
+                commit.get("added", [])
+                + commit.get("modified", [])
+                + commit.get("removed", [])
+              )
+              if ".ci/run-ci-request" in paths:
+                run_ci = True
+                break
+          print(f"run_ci={'true' if run_ci else 'false'}")
+          PY
+
   prepare:
+    needs: actions-policy
+    if: needs.actions-policy.outputs.run_ci == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
