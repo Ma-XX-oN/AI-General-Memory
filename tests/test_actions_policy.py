@@ -105,6 +105,15 @@ class ActionsPolicyTests(unittest.TestCase):
     self.assertNotEqual(0, result.returncode)
     self.assertIn("unexpected workflow file", result.stderr)
 
+  def test_rejects_validation_workflow_without_explicit_read_permission(self) -> None:
+    root = self.root({
+      "ci.yml": GOOD_CI,
+      "ai-transcript-core-parity.yml": "name: Parity\njobs: {}\n",
+    })
+    result = run_checker(root)
+    self.assertNotEqual(0, result.returncode)
+    self.assertIn("explicitly declare contents: read", result.stderr)
+
   def test_rejects_repository_write_on_validation_workflow(self) -> None:
     root = self.root({
       "ci.yml": GOOD_CI,

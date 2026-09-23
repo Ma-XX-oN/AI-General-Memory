@@ -78,6 +78,8 @@ def validate_ci(text: str) -> None:
 def validate_read_only(path: str, text: str) -> None:
   if has_contents_write(text):
     fail(f"{path} must remain read-only")
+  if re.search(r"^\s*contents:\s*read\s*$", text, re.MULTILINE) is None:
+    fail(f"{path} must explicitly declare contents: read")
   mutations = direct_repository_mutations(text)
   if mutations:
     fail(f"{path} contains repository mutation commands: {' | '.join(mutations)}")
