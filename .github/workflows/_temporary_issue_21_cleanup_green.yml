@@ -1,0 +1,31 @@
+name: Temporary issue 21 cleanup GREEN
+
+on:
+  push:
+    branches:
+      - tmp-issue-21-cleanup-green
+    paths:
+      - .github/workflows/_temporary_issue_21_cleanup_green.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 5c92dab3858414f821d0d0b440e349de49c63764
+          fetch-depth: 0
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify post-equivalence cleanup contract
+        run: python -m unittest tests/test_repoworkflow_adoption.py
+      - name: Run complete surviving AIGM validation wrapper
+        run: python scripts/repoworkflow_validate.py
