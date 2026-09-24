@@ -1,59 +1,45 @@
 # GitHub Actions Policy
 
-GitHub Actions in AI-General-Memory exist to validate checked-in repository
-state and publish immutable CI result tags.  They are not a remote editor for
-AI-transcript source, tests, documentation, or dependency pins.
+AI-General-Memory uses RepoWorkflow as the shared authority for GitHub Actions repository policy. GitHub Actions exist to validate checked-in repository state and publish immutable workflow results; they are not a remote editor for AI-transcript source, tests, documentation, or dependency pins.
 
 ## Permanent workflow set
 
-Maintained repository lines may contain only these workflow paths:
+The maintained repository workflow is:
 
-- `.github/workflows/ci.yml` — explicit request-gated repository CI and result
-  tag publication.
-- `.github/workflows/ai-transcript-core-parity.yml` — optional read-only
-  AI-transcript/Core integration validation on maintained integration lines.
-- `.github/workflows/ai-transcript-codex-user-context.yml` — optional read-only
-  Codex CLI acceptance validation on maintained integration lines.
+- `.github/workflows/ci.yml` — the byte-identical canonical RepoWorkflow GitHub adapter.
 
-`ci.yml` is required on the default line.  The two AI-transcript validation
-workflows are optional and may remain only where they perform real validation;
-legacy wrappers that merely fail and redirect to `ci.yml` are obsolete.
+Repository policy is enforced by:
 
-Issue-specific, temporary, migration, repair, patch, RED/GREEN application,
-instrumentation, or other one-shot workflows are prohibited.  Development
-changes must be made through a normal checked-out working tree or the GitHub
-repository API/connector, not by an Action that rewrites and commits project
-files.
+```text
+python RepoWorkflow/repo_workflow.py repository-policy
+```
 
-## Repository-write exception
+The canonical adapter invokes that policy automatically before any expensive requested validation. Repository-specific lifecycle forks and undeclared workflow files fail policy rather than relying on convention.
 
-The default-line CI may receive `contents: write` only in its finalization job,
-and only to publish the tested result tag through:
+## Responsibility boundary
 
-`python scripts/ci_contract.py finalize ... --tag --push`
+RepoWorkflow owns common workflow mechanics and invariants, including:
 
-The workflow must not run direct `git add`, `git commit`, or `git push` commands,
-or direct mutating GitHub/cURL API calls.  AI-transcript validation workflows
-must remain read-only and must not mutate repository state.
+- explicit `.ci/run-ci-request` gating;
+- repository and branch policy;
+- exact-candidate and clean-checkout guards;
+- declared capability projection into GitHub runner toolchains;
+- PASS / FAIL / INCOMPLETE aggregation;
+- mutation detection; and
+- immutable terminal result tags.
 
-## Enforcement
+AI-General-Memory owns its repository facts and validation commands in `.ci/repoworkflow.json`, `.ci/github.json`, `.ci/branch-policy.json`, `scripts/workflow_version.py`, `scripts/repoworkflow_validate.py`, and `scripts/ci_environment.py`.
 
-`scripts/check_actions_policy.py` enforces the workflow allow-list and write
-restrictions.  `tests/test_actions_policy.py` supplies positive and negative
-regression coverage, including the actual checked-out workflow set.
+## Repository writes
 
-The permanent CI workflow is triggered by changes under `.github/workflows/**`
-and by changes to the policy checker/tests.  Its lightweight Linux policy job
-always runs for those changes.  The full validation matrix remains explicitly
-request-gated: it proceeds only when `.ci/run-ci-request` changed in the push or
-when CI was manually dispatched.
+Validation commands must remain read-only with respect to the checked-out repository. AIGM declares no committed generated artifacts. The canonical adapter's write-capable phases are restricted to RepoWorkflow's shared generated-artifact/final-result machinery; for AIGM the terminal write is the immutable result tag created only after complete aggregation.
 
-An in-repository check cannot prevent GitHub from registering or scheduling a
-brand-new unauthorized workflow from the same commit before another workflow
-reports the policy failure.  Repository rulesets/review controls are the only
-way to prevent that first scheduling event entirely.  The repository guard
-nevertheless makes accidental violations deterministic and keeps maintained
-write paths behind the policy check.
+Do not add direct `git add`, `git commit`, `git push`, or mutating GitHub/cURL API commands to repository-specific validation. Do not copy shared lifecycle logic into project scripts or workflow YAML.
 
-Historical workflow runs are separate GitHub Actions metadata.  Purging obsolete
-run history does not rewrite Git history or change commit SHAs.
+## Temporary verification workflows
+
+Issue-specific verification workflows are not part of maintained repository state. When a migration requires an isolated hosted harness, keep it on a disposable helper branch and have it check out the immutable candidate SHA under test. The candidate itself must continue to satisfy canonical repository policy without the helper workflow.
+
+## Infrastructure failures
+
+A runner-allocation, network, credential, package-service, required-platform, or required-runtime failure is not a source CI failure. Required prerequisites must return the RepoWorkflow INCOMPLETE classification rather than manufacture a `CI-FAIL` result.

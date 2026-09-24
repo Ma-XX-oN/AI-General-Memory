@@ -41,7 +41,6 @@ def main() -> int:
   failures = 0
   for command in (
     [PYTHON, "-m", "unittest", "tests/test_repoworkflow_adoption.py"],
-    [PYTHON, "-m", "unittest", "tests/test_ci_contract.py"],
     [PYTHON, "scripts/ci_environment.py"],
   ):
     if run(command, env=env) != 0:

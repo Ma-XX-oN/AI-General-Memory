@@ -1,8 +1,0 @@
-{
-  "version": {
-    "kind": "regex",
-    "path": "scripts/AI_transcript_version.py",
-    "pattern": "^VERSION\\s*=\\s*\"([^\"]+)\"\\s*$"
-  },
-  "matrixPath": ".ci/test-matrix.json"
-}
