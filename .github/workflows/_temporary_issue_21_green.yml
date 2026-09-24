@@ -1,0 +1,33 @@
+name: Temporary issue 21 RepoWorkflow GREEN
+
+on:
+  push:
+    branches:
+      - tmp-issue-21-repoworkflow-green
+    paths:
+      - .github/workflows/_temporary_issue_21_green.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 05f80695566c07866c2cd17b060687c779dfa653
+          fetch-depth: 0
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify RepoWorkflow adoption contract
+        run: python -m unittest tests/test_repoworkflow_adoption.py
+      - name: Verify legacy lifecycle comparison contract
+        run: python -m unittest tests/test_ci_contract.py
+      - name: Run complete RepoWorkflow repository validation wrapper
+        run: python scripts/repoworkflow_validate.py
