@@ -1,0 +1,26 @@
+name: Temporary issue 21 RepoWorkflow RED
+
+on:
+  push:
+    branches:
+      - tmp-issue-21-repoworkflow-red
+    paths:
+      - .github/workflows/_temporary_issue_21_red.yml
+
+permissions:
+  contents: read
+
+jobs:
+  red:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 0cbf9d196b18eff019b1b0920f5f7cf95f37ef25
+          fetch-depth: 0
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Execute RepoWorkflow adoption contract as RED
+        run: python -m unittest tests/test_repoworkflow_adoption.py
