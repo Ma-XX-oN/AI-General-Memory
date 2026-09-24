@@ -1,0 +1,38 @@
+name: Temporary #106 AIGM Core compatibility
+
+on:
+  push:
+    branches:
+      - tmp/issue-106-core-compat
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out immutable AIGM repin
+        uses: actions/checkout@v4
+        with:
+          ref: 52c57212d628a4b6112f3f90254645f4fba55604
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Assert exact AIGM and Core candidates
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "52c57212d628a4b6112f3f90254645f4fba55604"
+          test "$(git rev-parse HEAD:dependencies/AIConversationCore)" = "6269168cee1f0b49f8d535d4e71ba0acbd232547"
+          test "$(git -C dependencies/AIConversationCore rev-parse HEAD)" = "6269168cee1f0b49f8d535d4e71ba0acbd232547"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Run authoritative AIGM validation wrapper
+        run: python scripts/repoworkflow_validate.py
