@@ -1,0 +1,32 @@
+name: Temporary issue 21 direct RepoWorkflow verify
+
+on:
+  push:
+    branches:
+      - tmp-issue-21-local-verify
+    paths:
+      - .github/workflows/_temporary_issue_21_local_verify.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify-local-path:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: a2863de85391be2e2909c7dbef32544f48fa4c22
+          fetch-depth: 0
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Put exact candidate on its named issue branch locally
+        shell: bash
+        run: git switch -C issue-21-repoworkflow-adoption a2863de85391be2e2909c7dbef32544f48fa4c22
+      - name: Execute shared local authoritative path
+        run: python RepoWorkflow/repo_workflow.py verify
