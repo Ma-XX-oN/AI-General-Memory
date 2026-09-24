@@ -153,10 +153,16 @@ class CiContractTests(unittest.TestCase):
   def test_workflow_is_request_gated_and_repository_runner_owns_tests(self):
     workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     environment = (ROOT / "scripts" / "ci_environment.py").read_text(encoding="utf-8")
-    self.assertIn(".ci/run-ci-request", workflow)
-    self.assertNotIn("pull_request:", workflow)
+    request_adapter = (
+      ROOT / "RepoWorkflow" / "repo_workflow" / "github_adapter.py"
+    ).read_text(encoding="utf-8")
+    self.assertIn("pull_request:", workflow)
+    self.assertIn("RepoWorkflow/repo_workflow.py github-request", workflow)
+    self.assertIn("needs.policy.outputs.run_ci == 'true'", workflow)
+    self.assertIn(".ci/run-ci-request", request_adapter)
     self.assertIn("strategy:", workflow)
     self.assertIn("fail-fast: false", workflow)
+    self.assertNotIn("scripts/ci_contract.py", workflow)
     for required in (
       "test-AI-transcript-phase6-parity.py",
       "test-AI-transcript-core-parity.py",

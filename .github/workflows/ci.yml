@@ -4,88 +4,120 @@ on:
   push:
     branches:
       - '**'
-    paths:
-      - '.ci/run-ci-request'
-      - '.github/workflows/**'
-      - 'scripts/check_actions_policy.py'
-      - 'tests/test_actions_policy.py'
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  actions-policy:
+  policy:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     outputs:
-      run_ci: ${{ steps.scope.outputs.run_ci }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-      - name: Enforce permanent Actions policy
-        run: python tests/test_actions_policy.py
-      - name: Determine whether full CI was explicitly requested
-        id: scope
-        shell: bash
-        run: |
-          python - <<'PY' >> "$GITHUB_OUTPUT"
-          import json
-          import os
-
-          run_ci = os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
-          if not run_ci:
-            with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as handle:
-              event = json.load(handle)
-            for commit in event.get("commits", []):
-              paths = (
-                commit.get("added", [])
-                + commit.get("modified", [])
-                + commit.get("removed", [])
-              )
-              if ".ci/run-ci-request" in paths:
-                run_ci = True
-                break
-          print(f"run_ci={'true' if run_ci else 'false'}")
-          PY
-
-  prepare:
-    needs: actions-policy
-    if: needs.actions-policy.outputs.run_ci == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    outputs:
+      run_ci: ${{ steps.request.outputs.run_ci }}
       matrix: ${{ steps.matrix.outputs.matrix }}
-      tested_sha: ${{ steps.sha.outputs.tested_sha }}
+      prepare_context: ${{ steps.prepare-context.outputs.context }}
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
+          submodules: recursive
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Verify explicit CI request and clean checkout
-        run: python scripts/ci_contract.py preflight
-      - name: Record exact tested commit
-        id: sha
+      - name: Enforce repository automation policy
+        run: python RepoWorkflow/repo_workflow.py repository-policy
+      - name: Enforce branch policy
+        run: >-
+          python RepoWorkflow/repo_workflow.py branch-policy
+          --branch "${{ github.head_ref || github.ref_name }}"
+          --pr-base "${{ github.base_ref }}"
+      - name: Detect explicit remote CI request
+        id: request
         shell: bash
-        run: echo "tested_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - name: Load repository test matrix
+        run: >-
+          echo "run_ci=$(python RepoWorkflow/repo_workflow.py github-request
+          --event-name '${{ github.event_name }}'
+          --event-path "$GITHUB_EVENT_PATH")" >> "$GITHUB_OUTPUT"
+      - name: Resolve artifact-preparation context
+        id: prepare-context
+        shell: bash
+        run: >-
+          echo "context=$(python RepoWorkflow/repo_workflow.py github-prepare-context)"
+          >> "$GITHUB_OUTPUT"
+      - name: Load GitHub validation matrix
+        if: steps.request.outputs.run_ci == 'true'
         id: matrix
         shell: bash
-        run: echo "matrix=$(python scripts/ci_contract.py matrix)" >> "$GITHUB_OUTPUT"
+        run: >-
+          echo "matrix=$(python RepoWorkflow/repo_workflow.py github-matrix)"
+          >> "$GITHUB_OUTPUT"
+
+  prepare:
+    needs: policy
+    if: needs.policy.outputs.run_ci == 'true'
+    runs-on: ${{ fromJSON(needs.policy.outputs.prepare_context).runner }}
+    permissions:
+      contents: write
+    outputs:
+      tested_sha: ${{ steps.prepare.outputs.tested_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ fromJSON(needs.policy.outputs.prepare_context).pythonVersion }}
+      - uses: actions/setup-node@v4
+        if: fromJSON(needs.policy.outputs.prepare_context).nodeVersion != ''
+        with:
+          node-version: ${{ fromJSON(needs.policy.outputs.prepare_context).nodeVersion }}
+      - name: Verify requested candidate
+        run: >-
+          python RepoWorkflow/repo_workflow.py preflight
+          --expected-sha "${{ github.sha }}"
+      - name: Configure generated-artifact commit identity
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Materialize declared committed artifacts
+        id: prepare
+        shell: bash
+        run: |
+          before="$(git rev-parse HEAD)"
+          mkdir -p "${{ runner.temp }}/repoworkflow-result"
+          set +e
+          python RepoWorkflow/repo_workflow.py materialize-artifacts \
+            --commit \
+            --result "${{ runner.temp }}/repoworkflow-result/artifacts.json"
+          materialize_rc=$?
+          set -e
+          after="$(git rev-parse HEAD)"
+          if [ "$materialize_rc" -eq 0 ] && [ "$after" != "$before" ]; then
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+          echo "tested_sha=$after" >> "$GITHUB_OUTPUT"
+      - name: Upload structured artifact-preparation result
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: repoworkflow-result-artifacts
+          path: ${{ runner.temp }}/repoworkflow-result/artifacts.json
+          if-no-files-found: error
 
   validate:
-    needs: prepare
+    needs:
+      - policy
+      - prepare
+    if: needs.policy.outputs.run_ci == 'true' && needs.prepare.result == 'success'
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+      matrix: ${{ fromJSON(needs.policy.outputs.matrix) }}
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
@@ -94,35 +126,36 @@ jobs:
         with:
           ref: ${{ needs.prepare.outputs.tested_sha }}
           fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
+          submodules: recursive
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
-      - name: Run repository-owned CI environment
+          python-version: ${{ matrix.pythonVersion }}
+      - uses: actions/setup-node@v4
+        if: matrix.nodeVersion != ''
+        with:
+          node-version: ${{ matrix.nodeVersion }}
+      - name: Run repository-owned validation entry point
         id: validation
         continue-on-error: true
         run: >-
-          python scripts/ci_contract.py run
+          python RepoWorkflow/repo_workflow.py run
           --environment "${{ matrix.id }}"
-          --result "${{ runner.temp }}/ci-result/result.json"
-      - name: Upload CI environment result
+          --expected-sha "${{ needs.prepare.outputs.tested_sha }}"
+          --result "${{ runner.temp }}/repoworkflow-result/${{ matrix.id }}.json"
+      - name: Upload structured environment result
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ci-result-${{ matrix.id }}
-          path: ${{ runner.temp }}/ci-result/result.json
-          if-no-files-found: ignore
-      - name: Propagate environment result
-        if: steps.validation.outcome == 'failure'
-        run: exit 1
+          name: repoworkflow-result-${{ matrix.id }}
+          path: ${{ runner.temp }}/repoworkflow-result/${{ matrix.id }}.json
+          if-no-files-found: error
 
   finalize:
-    if: always() && needs.prepare.result == 'success'
     needs:
+      - policy
       - prepare
       - validate
+    if: always() && needs.policy.outputs.run_ci == 'true' && needs.prepare.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -131,24 +164,27 @@ jobs:
         with:
           ref: ${{ needs.prepare.outputs.tested_sha }}
           fetch-depth: 0
+          submodules: recursive
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Download CI result records
+      - name: Prepare result collection directory
+        shell: bash
+        run: mkdir -p "${{ runner.temp }}/repoworkflow-results"
+      - uses: actions/download-artifact@v4
         continue-on-error: true
-        uses: actions/download-artifact@v4
         with:
-          pattern: ci-result-*
-          path: ${{ runner.temp }}/ci-results
+          pattern: repoworkflow-result-*
+          path: ${{ runner.temp }}/repoworkflow-results
           merge-multiple: true
-      - name: Configure tag identity
+      - name: Configure result-tag identity
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch --force --tags origin
-      - name: Finalize complete matrix and publish result tag
+      - name: Finalize authoritative result
         run: >-
-          python scripts/ci_contract.py finalize
-          --results-dir "${{ runner.temp }}/ci-results"
+          python RepoWorkflow/repo_workflow.py finalize
+          --results-dir "${{ runner.temp }}/repoworkflow-results"
+          --expected-sha "${{ needs.prepare.outputs.tested_sha }}"
           --tag --push

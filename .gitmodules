@@ -1,3 +1,6 @@
 [submodule "dependencies/AIConversationCore"]
   path = dependencies/AIConversationCore
   url = https://github.com/Ma-XX-oN/AIConversationCore.git
+[submodule "RepoWorkflow"]
+  path = RepoWorkflow
+  url = https://github.com/Ma-XX-oN/RepoWorkflow.git
