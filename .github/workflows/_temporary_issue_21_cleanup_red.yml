@@ -1,0 +1,26 @@
+name: Temporary issue 21 cleanup RED
+
+on:
+  push:
+    branches:
+      - tmp-issue-21-cleanup-red
+    paths:
+      - .github/workflows/_temporary_issue_21_cleanup_red.yml
+
+permissions:
+  contents: read
+
+jobs:
+  red:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 2dee1b0815f558b1b963c3e53dfea9119e5443ce
+          fetch-depth: 0
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Execute post-equivalence cleanup contract as RED
+        run: python -m unittest tests/test_repoworkflow_adoption.py
