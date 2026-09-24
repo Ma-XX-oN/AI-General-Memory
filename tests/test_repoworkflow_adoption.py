@@ -99,14 +99,37 @@ class RepoWorkflowAdoptionTests(unittest.TestCase):
     self.assertIn("colorama", hook)
     self.assertIn("regex", hook)
     self.assertIn("scripts/ci_environment.py", hook)
-    self.assertIn("tests/test_ci_contract.py", hook)
     self.assertIn("tests/test_repoworkflow_adoption.py", hook)
+    self.assertNotIn("tests/test_ci_contract.py", hook)
 
   def test_github_ci_is_canonical_repoworkflow_adapter(self) -> None:
     self.assertEqual(
       read_text("RepoWorkflow/templates/github/ci.yml"),
       read_text(".github/workflows/ci.yml"),
     )
+
+  def test_superseded_generic_engine_is_absent_after_equivalence(self) -> None:
+    for relative in (
+      ".ci/ci-config.json",
+      ".ci/test-matrix.json",
+      "scripts/ci_contract.py",
+      "tests/test_ci_contract.py",
+      "scripts/check_actions_policy.py",
+      "tests/test_actions_policy.py",
+    ):
+      self.assertFalse((ROOT / relative).exists(), relative)
+
+    ci_doc = read_text("CI.md")
+    self.assertIn("RepoWorkflow/repo_workflow.py verify", ci_doc)
+    self.assertIn(".ci/repoworkflow.json", ci_doc)
+    self.assertNotIn("scripts/ci_contract.py", ci_doc)
+    self.assertNotIn(".ci/test-matrix.json", ci_doc)
+
+    policy_doc = read_text("docs/GITHUB-ACTIONS-POLICY.md")
+    self.assertIn("RepoWorkflow/repo_workflow.py repository-policy", policy_doc)
+    self.assertNotIn("scripts/check_actions_policy.py", policy_doc)
+    self.assertNotIn("tests/test_actions_policy.py", policy_doc)
+    self.assertNotIn("scripts/ci_contract.py", policy_doc)
 
 
 if __name__ == "__main__":
