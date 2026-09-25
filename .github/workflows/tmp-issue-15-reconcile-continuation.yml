@@ -1,9 +1,9 @@
-name: Temporary #15 reconciliation continuation
+name: Temporary #15 reconciliation continuation — Core .106.16
 
 on:
   push:
     branches:
-      - tmp/issue-15-reconcile-artifact
+      - tmp/issue-15-core-106-16
 
 permissions:
   actions: read
@@ -12,7 +12,7 @@ permissions:
 env:
   AIGM_SHA: fa3633e959ef8fdaa7a91c878ac3090924f75b73
   OLD_CORE_SHA: b4a571bf963b49cf2d9b0a7b829005f1bf08ac7e
-  CORE_SHA: c6f1000690a9e988fd903b7d13c5920761184382
+  CORE_SHA: 2b1fbc2d1e292f73b3d7e2c67bc1ae4437304831
   TARGET_BLOB: e4822f935797ea485060eebe105091b899e30eb7
   SOURCE_RUN_ID: '36081580595'
 
