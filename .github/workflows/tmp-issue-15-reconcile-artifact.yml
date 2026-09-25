@@ -11,10 +11,10 @@ permissions:
 env:
   AIGM_SHA: fa3633e959ef8fdaa7a91c878ac3090924f75b73
   OLD_CORE_SHA: b4a571bf963b49cf2d9b0a7b829005f1bf08ac7e
-  CORE_SHA: 6269168cee1f0b49f8d535d4e71ba0acbd232547
-  TARGET_BLOB: 91ec251465e97c31f6af1b8408cd581d13f2e5c9
-  TARGET_SHA256: 8335372b63eee4eda4e3c2fac20f20ffd93364c8ecb442b6d270ff16b64262cb
-  TARGET_SIZE: '165959'
+  CORE_SHA: eee6e6eec05f1b6355938b2dec538e90d053203b
+  TARGET_BLOB: e4822f935797ea485060eebe105091b899e30eb7
+  TARGET_SHA256: 26b56479150a2b5b267363b22e0c3cce86e34a2afa1efcea8498434331f50653
+  TARGET_SIZE: '166081'
 
 jobs:
   validate:
@@ -155,6 +155,46 @@ jobs:
           git apply --check "$patch_file"
           git apply "$patch_file"
 
+      - name: Add Core-owned record-number width policy in runner workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/AI-transcript.py')
+          text = path.read_text()
+          old = '''def _core_heading_options():
+            """Return Core heading visibility and timezone presentation policy."""
+            policy = _display_policy()
+            heading = {
+              "timestamp": policy.show_date,
+              "recordNumber": policy.record_number,
+              "turnId": policy.show_turn_id,
+              "debugProvenance": policy.debug_record_comment,
+            }
+          '''
+          new = '''def _core_heading_options(*, rec_width):
+            """Return Core heading visibility and timezone presentation policy."""
+            policy = _display_policy()
+            heading = {
+              "timestamp": policy.show_date,
+              "recordNumber": policy.record_number,
+              "turnId": policy.show_turn_id,
+              "debugProvenance": policy.debug_record_comment,
+            }
+            if policy.record_number:
+              heading["recordNumberWidth"] = rec_width
+          '''
+          if old not in text:
+            raise SystemExit('Core heading-policy block did not match reviewed reconciliation')
+          text = text.replace(old, new, 1)
+          old_call = '  options = _core_heading_options()\n'
+          new_call = '  options = _core_heading_options(rec_width=max(1, len(str(session.rc))))\n'
+          if old_call not in text:
+            raise SystemExit('Core heading-policy call did not match reviewed reconciliation')
+          path.write_text(text.replace(old_call, new_call, 1))
+          PY
+
       - name: Verify exact recovered source identity
         shell: bash
         run: |
@@ -171,7 +211,7 @@ jobs:
       - name: Upload exact reconciled source artifact
         uses: actions/upload-artifact@v4
         with:
-          name: aigm-issue15-reconciled-source
+          name: aigm-issue15-reconciled-source-width
           path: scripts/AI-transcript.py
           if-no-files-found: error
           retention-days: 7
