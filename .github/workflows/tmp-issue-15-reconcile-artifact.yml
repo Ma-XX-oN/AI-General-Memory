@@ -1,0 +1,289 @@
+name: Temporary #15 reconciliation artifact validation
+
+on:
+  push:
+    branches:
+      - tmp/issue-15-reconcile-artifact
+
+permissions:
+  contents: read
+
+env:
+  AIGM_SHA: fa3633e959ef8fdaa7a91c878ac3090924f75b73
+  OLD_CORE_SHA: b4a571bf963b49cf2d9b0a7b829005f1bf08ac7e
+  CORE_SHA: 6269168cee1f0b49f8d535d4e71ba0acbd232547
+  TARGET_BLOB: 91ec251465e97c31f6af1b8408cd581d13f2e5c9
+  TARGET_SHA256: 8335372b63eee4eda4e3c2fac20f20ffd93364c8ecb442b6d270ff16b64262cb
+  TARGET_SIZE: '165959'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out immutable #15 baseline
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.AIGM_SHA }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Assert immutable #15 baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$AIGM_SHA"
+          test "$(git rev-parse HEAD:dependencies/AIConversationCore)" = "$OLD_CORE_SHA"
+          test "$(git -C dependencies/AIConversationCore rev-parse HEAD)" = "$OLD_CORE_SHA"
+          grep -F 'VERSION = "1.0.0-issue.15.2"' scripts/AI_transcript_version.py
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Apply reviewed #10-to-#15 reconciliation in runner workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          patch_file="$RUNNER_TEMP/issue15-reconciliation.patch"
+          cat > "$patch_file" <<'PATCH'
+          --- a/scripts/AI-transcript.py
+          +++ b/scripts/AI-transcript.py
+          @@ -232,16 +232,9 @@
+             return _CORE_BRIDGE
+           
+           
+          -def _core_projection(rec_no, ts_str, *, rec_width):
+          -  """Return consumer presentation metadata for one canonical source event."""
+          +def _core_projection():
+          +  """Return non-semantic per-event presentation settings for Core."""
+             policy = _display_policy()
+          -  heading_metadata = {}
+          -  if policy.show_date:
+          -    heading_metadata["timestamp"] = _parse_ts(ts_str, policy.display_tz)
+          -  if policy.record_number:
+          -    heading_metadata["record_number"] = f"{rec_no:{rec_width}}"
+          -  if policy.show_turn_id and not policy.debug_record_comment:
+          -    heading_metadata["show_turn_id"] = True
+             colors = {}
+             if policy.render_color:
+               colors = {
+          @@ -252,14 +245,40 @@
+                 "record_number": _C_RECNO,
+                 "reset": _C_RESET,
+               }
+          -  projection = {
+          -    "debug_provenance": policy.debug_record_comment,
+          +  return {
+               "separate_thoughts": policy.separate_thoughts,
+               "colors": colors,
+             }
+          -  if heading_metadata:
+          -    projection["heading_metadata"] = heading_metadata
+          -  return projection
+          +
+          +
+          +def _core_heading_options():
+          +  """Return Core heading visibility and timezone presentation policy."""
+          +  policy = _display_policy()
+          +  heading = {
+          +    "timestamp": policy.show_date,
+          +    "recordNumber": policy.record_number,
+          +    "turnId": policy.show_turn_id,
+          +    "debugProvenance": policy.debug_record_comment,
+          +  }
+          +  tz = policy.display_tz
+          +  if tz is not None:
+          +    zone_key = getattr(tz, "key", None)
+          +    if isinstance(zone_key, str) and zone_key:
+          +      heading["timeZone"] = zone_key
+          +    else:
+          +      offset = tz.utcoffset(None)
+          +      if offset is None:
+          +        raise RuntimeError("Core heading timezone has no fixed offset")
+          +      total_seconds = int(offset.total_seconds())
+          +      if total_seconds % 60:
+          +        raise RuntimeError("Core heading timezone offset must use whole minutes")
+          +      total_minutes = total_seconds // 60
+          +      sign = "+" if total_minutes >= 0 else "-"
+          +      total_minutes = abs(total_minutes)
+          +      heading["timeZone"] = (
+          +        f"{sign}{total_minutes // 60:02d}:{total_minutes % 60:02d}"
+          +      )
+          +  return {"heading": heading}
+           
+           
+           def _core_record_timestamp(source, record):
+          @@ -297,7 +316,6 @@
+             records = []
+             source_indexes = []
+             projections = {}
+          -  rec_width = max(1, len(str(session.rc)))
+             with open(session.path, encoding="utf-8") as source:
+               for source_index, raw in enumerate(line for line in source if line.strip()):
+                 record = json.loads(raw)
+          @@ -310,20 +328,18 @@
+                   if not rec_filter.allows_ts(ts_str):
+                     continue
+                 source_indexes.append(source_index)
+          -      projections[str(source_index)] = _core_projection(
+          -        rec_no, ts_str, rec_width=rec_width
+          -      )
+          +      projections[str(source_index)] = _core_projection()
+           
+             supplementary_sources = {}
+             if session.source == "codex":
+               session_index_path = _codex_session_index_path()
+               if session_index_path:
+                 supplementary_sources["codexSessionIndex"] = {"path": session_index_path}
+          +  options = _core_heading_options()
+          +  options["includeRolledBackTurns"] = _display_policy().include_rolled_back
+             response = _core_bridge().render(
+               session.source, records, source_indexes, projections,
+          -    options={
+          -      "includeRolledBackTurns": _display_policy().include_rolled_back,
+          -    },
+          +    options=options,
+               supplementary_sources=supplementary_sources,
+             )
+             body = response["markdown"]
+          PATCH
+
+          git apply --check "$patch_file"
+          git apply "$patch_file"
+
+      - name: Verify exact recovered source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_size="$(wc -c < scripts/AI-transcript.py | tr -d ' ')"
+          actual_sha256="$(sha256sum scripts/AI-transcript.py | awk '{print $1}')"
+          actual_blob="$(git hash-object scripts/AI-transcript.py)"
+          printf 'size=%s\nsha256=%s\nblob=%s\n' "$actual_size" "$actual_sha256" "$actual_blob"
+          test "$actual_size" = "$TARGET_SIZE"
+          test "$actual_sha256" = "$TARGET_SHA256"
+          test "$actual_blob" = "$TARGET_BLOB"
+          python -m py_compile scripts/AI-transcript.py scripts/AI_transcript_version.py
+
+      - name: Upload exact reconciled source artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aigm-issue15-reconciled-source
+          path: scripts/AI-transcript.py
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Project exact Core candidate in runner workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C dependencies/AIConversationCore fetch origin "$CORE_SHA" --depth=1
+          git -C dependencies/AIConversationCore checkout --detach "$CORE_SHA"
+          test "$(git -C dependencies/AIConversationCore rev-parse HEAD)" = "$CORE_SHA"
+          python - <<'PY'
+          from pathlib import Path
+          import os
+          path = Path('scripts/AI-transcript-core-worker.mjs')
+          text = path.read_text()
+          old = os.environ['OLD_CORE_SHA']
+          new = os.environ['CORE_SHA']
+          if old not in text:
+            raise SystemExit('old Core pin missing from worker')
+          path.write_text(text.replace(old, new))
+          PY
+          grep -F "const CORE_COMMIT = '$CORE_SHA';" scripts/AI-transcript-core-worker.mjs
+
+      - name: Install validation dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install colorama regex
+          npm ci --prefix dependencies/AIConversationCore --no-audit --no-fund
+
+      - name: Verify projected Core identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git -C dependencies/AIConversationCore rev-parse HEAD)"
+          test "$actual" = "$CORE_SHA"
+          response="$(printf '%s\n' '{"operation":"ping"}' | AI_CONVERSATION_CORE="$GITHUB_WORKSPACE/dependencies/AIConversationCore" node scripts/AI-transcript-core-worker.mjs)"
+          python - "$CORE_SHA" "$response" <<'PY'
+          import json
+          import sys
+          expected = sys.argv[1]
+          response = json.loads(sys.argv[2])
+          assert response['ok'] is True
+          assert response['core_commit'] == expected
+          PY
+
+      - name: Verify AI-transcript and Core version identity
+        env:
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/dependencies/AIConversationCore
+        run: python scripts/test-AI-transcript-version.py
+
+      - name: Materialize pre-Phase-6 production baseline
+        run: git show abcc2f33783e3690b9e1335161c73e7dabaed757:scripts/AI-transcript.py > /tmp/AI-transcript-legacy.py
+
+      - name: Python syntax gate
+        run: python -m py_compile scripts/AI-transcript.py scripts/AI_transcript_version.py scripts/test-AI-transcript-version.py scripts/test-AI-transcript-phase6-parity.py scripts/test-AI-transcript-core-parity.py scripts/test-AI-transcript-turn-id.py scripts/test-AI-transcript-leading-system-context.py scripts/test-AI-transcript-codex-revisions.py
+
+      - name: Historical presentation parity
+        env:
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/dependencies/AIConversationCore
+          LEGACY_AI_TRANSCRIPT: /tmp/AI-transcript-legacy.py
+        run: python scripts/test-AI-transcript-phase6-parity.py
+
+      - name: Canonical production parity
+        env:
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/dependencies/AIConversationCore
+        run: python scripts/test-AI-transcript-core-parity.py
+
+      - name: Turn-ID and record-number projection
+        env:
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/dependencies/AIConversationCore
+        run: python scripts/test-AI-transcript-turn-id.py
+
+      - name: Leading Claude system-context regression
+        env:
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/dependencies/AIConversationCore
+        run: python scripts/test-AI-transcript-leading-system-context.py
+
+      - name: Codex revision-history regression
+        env:
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/dependencies/AIConversationCore
+        run: python scripts/test-AI-transcript-codex-revisions.py
+
+      - name: Portable AI-transcript regression subset
+        env:
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/dependencies/AIConversationCore
+          TERM: xterm
+        run: bash scripts/AI-transcript-tests.sh $(seq -s ' ' 69 105)
+
+      - name: Exact Core regression suite
+        working-directory: dependencies/AIConversationCore
+        run: npm test
+
+      - name: Validate projected source hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git status --short
+          python - <<'PY'
+          import subprocess
+          allowed = {
+            'scripts/AI-transcript.py',
+            'scripts/AI-transcript-core-worker.mjs',
+            'dependencies/AIConversationCore',
+          }
+          lines = subprocess.check_output(
+            ['git', 'status', '--porcelain', '--untracked-files=no'], text=True
+          ).splitlines()
+          changed = {line[3:] for line in lines if len(line) >= 4}
+          unexpected = changed - allowed
+          if unexpected:
+            raise SystemExit(f'unexpected projected changes: {sorted(unexpected)}')
+          PY
