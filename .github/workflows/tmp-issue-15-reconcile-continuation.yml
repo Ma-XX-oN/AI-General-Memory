@@ -12,7 +12,7 @@ permissions:
 env:
   AIGM_SHA: fa3633e959ef8fdaa7a91c878ac3090924f75b73
   OLD_CORE_SHA: b4a571bf963b49cf2d9b0a7b829005f1bf08ac7e
-  CORE_SHA: eee6e6eec05f1b6355938b2dec538e90d053203b
+  CORE_SHA: 2a8e0c46053e640729b6c5f7bca9158619b4b2e7
   TARGET_BLOB: e4822f935797ea485060eebe105091b899e30eb7
   SOURCE_RUN_ID: '36081580595'
 
@@ -53,7 +53,7 @@ jobs:
           repository: Ma-XX-oN/AI-General-Memory
           run-id: ${{ env.SOURCE_RUN_ID }}
 
-      - name: Install exact recovered source and accepted #13 test contract
+      - name: Install exact recovered source and accepted consumer test contracts
         shell: bash
         run: |
           set -euo pipefail
@@ -61,10 +61,36 @@ jobs:
           test -n "$recovered"
           cp "$recovered" scripts/AI-transcript.py
           test "$(git hash-object scripts/AI-transcript.py)" = "$TARGET_BLOB"
+
           git show 7d9373af3ce3521957718d135ea97a9cc242a364:scripts/test-AI-transcript-turn-id.py > scripts/test-AI-transcript-turn-id.py
           grep -F 'heading_has_id' scripts/test-AI-transcript-turn-id.py
           grep -F 'assert "turn_id=" not in chatgpt.stdout' scripts/test-AI-transcript-turn-id.py
-          python -m py_compile scripts/AI-transcript.py scripts/test-AI-transcript-turn-id.py
+
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/test-AI-transcript-codex-revisions.py')
+          text = path.read_text()
+          replacements = {
+            '"What is a puck?" not in output or "## User (edited)" not in output':
+              '"What is a puck?" not in output or "## User (edited 3)" not in output',
+            '"## User (original, aborted)",': '"## User (original 0, aborted)",',
+            '"## User (superseded)",\n    "What is an tree?",':
+              '"## User (superseded 1)",\n    "What is an tree?",\n    "## User (superseded 2)",',
+            '"## User (edited)",': '"## User (edited 3)",',
+            'if output.count("## User (superseded)") != 2:\n    raise AssertionError(f"expected exactly two superseded User revisions:\\n{output}")':
+              'if output.count("## User (superseded 1)") != 1 or output.count("## User (superseded 2)") != 1:\n    raise AssertionError(f"expected exactly one depth-1 and one depth-2 superseded User revision:\\n{output}")',
+          }
+          for old, new in replacements.items():
+            if old not in text:
+              raise SystemExit(f'stale Codex revision oracle fragment missing: {old!r}')
+            text = text.replace(old, new, 1)
+          path.write_text(text)
+          PY
+          grep -F '## User (original 0, aborted)' scripts/test-AI-transcript-codex-revisions.py
+          grep -F '## User (superseded 1)' scripts/test-AI-transcript-codex-revisions.py
+          grep -F '## User (superseded 2)' scripts/test-AI-transcript-codex-revisions.py
+          grep -F '## User (edited 3)' scripts/test-AI-transcript-codex-revisions.py
+          python -m py_compile scripts/AI-transcript.py scripts/test-AI-transcript-turn-id.py scripts/test-AI-transcript-codex-revisions.py
 
       - name: Project exact Core candidate in runner workspace
         shell: bash
@@ -140,7 +166,6 @@ jobs:
         run: |
           python - <<'PY'
           import importlib.util
-          import json
           import re
           import tempfile
           from pathlib import Path
@@ -197,7 +222,7 @@ jobs:
           AI_CONVERSATION_CORE: ${{ github.workspace }}/dependencies/AIConversationCore
         run: python scripts/test-AI-transcript-leading-system-context.py
 
-      - name: Codex revision-history regression
+      - name: Codex revision-depth history regression
         env:
           AI_CONVERSATION_CORE: ${{ github.workspace }}/dependencies/AIConversationCore
         run: python scripts/test-AI-transcript-codex-revisions.py
@@ -224,6 +249,7 @@ jobs:
             'scripts/AI-transcript.py',
             'scripts/AI-transcript-core-worker.mjs',
             'scripts/test-AI-transcript-turn-id.py',
+            'scripts/test-AI-transcript-codex-revisions.py',
             'dependencies/AIConversationCore',
           }
           lines = subprocess.check_output(
