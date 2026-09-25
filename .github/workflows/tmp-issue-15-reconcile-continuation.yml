@@ -1,4 +1,4 @@
-name: Temporary #15 reconciliation continuation — Core .106.16
+name: Temporary #15 reconciliation continuation — Core .106.19
 
 on:
   push:
@@ -12,7 +12,7 @@ permissions:
 env:
   AIGM_SHA: fa3633e959ef8fdaa7a91c878ac3090924f75b73
   OLD_CORE_SHA: b4a571bf963b49cf2d9b0a7b829005f1bf08ac7e
-  CORE_SHA: 2b1fbc2d1e292f73b3d7e2c67bc1ae4437304831
+  CORE_SHA: c6d9c53808d504218e51fcc1c7b1e60ae5aa5013
   TARGET_BLOB: e4822f935797ea485060eebe105091b899e30eb7
   SOURCE_RUN_ID: '36081580595'
 
