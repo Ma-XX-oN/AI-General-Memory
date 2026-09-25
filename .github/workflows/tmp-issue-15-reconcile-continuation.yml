@@ -1,0 +1,236 @@
+name: Temporary #15 reconciliation continuation
+
+on:
+  push:
+    branches:
+      - tmp/issue-15-reconcile-artifact
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  AIGM_SHA: fa3633e959ef8fdaa7a91c878ac3090924f75b73
+  OLD_CORE_SHA: b4a571bf963b49cf2d9b0a7b829005f1bf08ac7e
+  CORE_SHA: eee6e6eec05f1b6355938b2dec538e90d053203b
+  TARGET_BLOB: e4822f935797ea485060eebe105091b899e30eb7
+  SOURCE_RUN_ID: '36081580595'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out immutable #15 baseline
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.AIGM_SHA }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Assert immutable #15 baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$AIGM_SHA"
+          test "$(git rev-parse HEAD:dependencies/AIConversationCore)" = "$OLD_CORE_SHA"
+          test "$(git -C dependencies/AIConversationCore rev-parse HEAD)" = "$OLD_CORE_SHA"
+          grep -F 'VERSION = "1.0.0-issue.15.2"' scripts/AI_transcript_version.py
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Recover exact validated #15 product artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: aigm-issue15-reconciled-source-width
+          path: ${{ runner.temp }}/recovered
+          github-token: ${{ github.token }}
+          repository: Ma-XX-oN/AI-General-Memory
+          run-id: ${{ env.SOURCE_RUN_ID }}
+
+      - name: Install exact recovered source and accepted #13 test contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          recovered="$(find "$RUNNER_TEMP/recovered" -type f -name 'AI-transcript.py' -print -quit)"
+          test -n "$recovered"
+          cp "$recovered" scripts/AI-transcript.py
+          test "$(git hash-object scripts/AI-transcript.py)" = "$TARGET_BLOB"
+          git show 7d9373af3ce3521957718d135ea97a9cc242a364:scripts/test-AI-transcript-turn-id.py > scripts/test-AI-transcript-turn-id.py
+          grep -F 'heading_has_id' scripts/test-AI-transcript-turn-id.py
+          grep -F 'assert "turn_id=" not in chatgpt.stdout' scripts/test-AI-transcript-turn-id.py
+          python -m py_compile scripts/AI-transcript.py scripts/test-AI-transcript-turn-id.py
+
+      - name: Project exact Core candidate in runner workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C dependencies/AIConversationCore fetch origin "$CORE_SHA" --depth=1
+          git -C dependencies/AIConversationCore checkout --detach "$CORE_SHA"
+          test "$(git -C dependencies/AIConversationCore rev-parse HEAD)" = "$CORE_SHA"
+          python - <<'PY'
+          from pathlib import Path
+          import os
+          path = Path('scripts/AI-transcript-core-worker.mjs')
+          text = path.read_text()
+          old = os.environ['OLD_CORE_SHA']
+          new = os.environ['CORE_SHA']
+          if old not in text:
+            raise SystemExit('old Core pin missing from worker')
+          path.write_text(text.replace(old, new))
+          PY
+          grep -F "const CORE_COMMIT = '$CORE_SHA';" scripts/AI-transcript-core-worker.mjs
+
+      - name: Install validation dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install colorama regex
+          npm ci --prefix dependencies/AIConversationCore --no-audit --no-fund
+
+      - name: Verify projected Core identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C dependencies/AIConversationCore rev-parse HEAD)" = "$CORE_SHA"
+          response="$(printf '%s\n' '{"operation":"ping"}' | AI_CONVERSATION_CORE="$GITHUB_WORKSPACE/dependencies/AIConversationCore" node scripts/AI-transcript-core-worker.mjs)"
+          python - "$CORE_SHA" "$response" <<'PY'
+          import json
+          import sys
+          response = json.loads(sys.argv[2])
+          assert response['ok'] is True
+          assert response['core_commit'] == sys.argv[1]
+          PY
+
+      - name: Verify AI-transcript and Core version identity
+        env:
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/dependencies/AIConversationCore
+        run: python scripts/test-AI-transcript-version.py
+
+      - name: Materialize pre-Phase-6 production baseline
+        run: git show abcc2f33783e3690b9e1335161c73e7dabaed757:scripts/AI-transcript.py > /tmp/AI-transcript-legacy.py
+
+      - name: Python syntax gate
+        run: python -m py_compile scripts/AI-transcript.py scripts/AI_transcript_version.py scripts/test-AI-transcript-version.py scripts/test-AI-transcript-phase6-parity.py scripts/test-AI-transcript-core-parity.py scripts/test-AI-transcript-turn-id.py scripts/test-AI-transcript-leading-system-context.py scripts/test-AI-transcript-codex-revisions.py
+
+      - name: Historical presentation parity
+        env:
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/dependencies/AIConversationCore
+          LEGACY_AI_TRANSCRIPT: /tmp/AI-transcript-legacy.py
+        run: python scripts/test-AI-transcript-phase6-parity.py
+
+      - name: Canonical production parity
+        env:
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/dependencies/AIConversationCore
+        run: python scripts/test-AI-transcript-core-parity.py
+
+      - name: Accepted bare Turn-ID and record-number contract
+        env:
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/dependencies/AIConversationCore
+        run: python scripts/test-AI-transcript-turn-id.py
+
+      - name: Preserve #15 debug and combined-heading extensions
+        env:
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/dependencies/AIConversationCore
+        run: |
+          python - <<'PY'
+          import importlib.util
+          import json
+          import re
+          import tempfile
+          from pathlib import Path
+
+          path = Path('scripts/test-AI-transcript-turn-id.py')
+          spec = importlib.util.spec_from_file_location('turn_id_test', path)
+          mod = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+
+          chatgpt_path = mod.fixture('chatgpt', 'chatgpt-direct.jsonl')
+          chatgpt_ids = [
+            rec.get('id') for rec in mod.records(chatgpt_path)
+            if isinstance(rec.get('id'), str) and rec.get('id')
+          ]
+          chatgpt_debug = mod.run_path(chatgpt_path, '-N')
+          assert any(f'record_id={record_id}' in chatgpt_debug.stdout for record_id in chatgpt_ids)
+          assert 'turn_id=' not in chatgpt_debug.stdout
+
+          with tempfile.TemporaryDirectory() as tmp:
+            claude_path = Path(tmp) / 'claude-turn-id.jsonl'
+            claude_path.write_text(
+              '{"type":"user","uuid":"claude-user-uuid","timestamp":"2026-01-02T12:00:01.000Z","message":{"role":"user","content":[{"type":"text","text":"Hello"}]}}\n'
+              '{"type":"assistant","uuid":"claude-assistant-uuid","timestamp":"2026-01-02T12:00:02.000Z","message":{"role":"assistant","content":[{"type":"text","text":"Hi"}]}}\n',
+              encoding='utf-8',
+            )
+            claude_debug = mod.run_path(claude_path, '-N')
+          assert 'record_id=claude-user-uuid record_index=0' in claude_debug.stdout
+          assert 'turn_id=' not in claude_debug.stdout
+
+          codex_debug = mod.run_path(mod.fixture('codex', 'codex-rich.jsonl'), '-N')
+          assert 'record_index=' in codex_debug.stdout
+          assert 'record_id=' not in codex_debug.stdout
+          assert 'turn_id=' not in codex_debug.stdout
+
+          records = mod.records(chatgpt_path)
+          first_visible = next(
+            index + 1 for index, rec in enumerate(records)
+            if rec.get('author', {}).get('role') in ('user', 'assistant')
+          )
+          combined = mod.run_path(chatgpt_path, '-d', '-n', '--turn-id')
+          assert any(
+            re.search(
+              rf'^## User \[[^\]]+\]:\s+{first_visible}:\s+{re.escape(record_id)}\s*$',
+              combined.stdout,
+              re.MULTILINE,
+            )
+            for record_id in chatgpt_ids
+          ), 'ChatGPT combined heading metadata order/bare Turn ID is malformed'
+          print('PASS: #15 retained debug and combined-heading extensions')
+          PY
+
+      - name: Leading Claude system-context regression
+        env:
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/dependencies/AIConversationCore
+        run: python scripts/test-AI-transcript-leading-system-context.py
+
+      - name: Codex revision-history regression
+        env:
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/dependencies/AIConversationCore
+        run: python scripts/test-AI-transcript-codex-revisions.py
+
+      - name: Portable AI-transcript regression subset
+        env:
+          AI_CONVERSATION_CORE: ${{ github.workspace }}/dependencies/AIConversationCore
+          TERM: xterm
+        run: bash scripts/AI-transcript-tests.sh $(seq -s ' ' 69 105)
+
+      - name: Exact Core regression suite
+        working-directory: dependencies/AIConversationCore
+        run: npm test
+
+      - name: Validate projected source hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git status --short
+          python - <<'PY'
+          import subprocess
+          allowed = {
+            'scripts/AI-transcript.py',
+            'scripts/AI-transcript-core-worker.mjs',
+            'scripts/test-AI-transcript-turn-id.py',
+            'dependencies/AIConversationCore',
+          }
+          lines = subprocess.check_output(
+            ['git', 'status', '--porcelain', '--untracked-files=no'], text=True
+          ).splitlines()
+          changed = {line[3:] for line in lines if len(line) >= 4}
+          unexpected = changed - allowed
+          if unexpected:
+            raise SystemExit(f'unexpected projected changes: {sorted(unexpected)}')
+          PY
