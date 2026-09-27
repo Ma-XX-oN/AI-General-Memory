@@ -57,6 +57,14 @@ cfGP_sub := "Version:0.9`r`n<html><body>"
 Chk("GP sub-selection: overflow-visible! → chatgpt",
     DetectSource(cfGP_sub) = "chatgpt")
 
+; ChatGPT newer multi-turn copy: search-unit role attributes on wrapper divs.
+cfGP_searchUnit := "Version:0.9`r`n<html><body>"
+    . "<div data-chatgpt-search-unit-key=`"fallback-turn-12:0:user`">user</div>"
+    . "<div data-content-search-unit-key=`"fallback-turn-12:1:assistant`">assistant</div>"
+    . "</body></html>"
+Chk("GP search-unit wrappers: role attributes → chatgpt",
+    DetectSource(cfGP_searchUnit) = "chatgpt")
+
 ; ── 2: Claude Code code block (native pre/code with button wrapper) ───────────
 Log("── 2: Claude Code code block (with button wrapper) ──────")
 
@@ -279,6 +287,20 @@ while (pos := InStr(normGP, "¤POSTER_", , pos)) {
     pos++
 }
 Chk("GP poster: exactly 2 markers (no Codex leakage)", markerCount = 2)
+
+; Newer ChatGPT copy shape uses role-bearing search-unit wrapper divs.
+gpSearchUnitHtml := "<div data-chatgpt-search-unit-key=`"fallback-turn-12:0:user`"><p>Question</p></div>"
+    . "<div data-content-search-unit-key=`"fallback-turn-12:1:assistant`"><p>Answer</p></div>"
+normGPSearchUnit := HtmlNorm._InjectPosterPlaceholders(gpSearchUnitHtml, "chatgpt")
+Chk("GP poster search-unit: user wrapper gets ¤POSTER_User¤", InStr(normGPSearchUnit, "¤POSTER_User¤"))
+Chk("GP poster search-unit: assistant wrapper gets ¤POSTER_AI¤", InStr(normGPSearchUnit, "¤POSTER_AI¤"))
+gpSearchUnitCount := 0
+pos := 1
+while (pos := InStr(normGPSearchUnit, "¤POSTER_", , pos)) {
+    gpSearchUnitCount++
+    pos++
+}
+Chk("GP poster search-unit: exactly 2 markers", gpSearchUnitCount = 2)
 
 ; Conversely, Codex source with Codex-class divs should produce 2 markers
 cxHtml := "<div class=`"group min-w-0 flex-col`"><p>AI reply</p></div>"
