@@ -18,8 +18,9 @@
  * - "claudeweb"   extensionId contains "anthropic" or "claude", no
  *                 content_xGDvVg class (Claude.ai web)
  * - "codex"       extensionId contains "openai.chatgpt" (ChatGPT VS Code ext)
- * - "chatgpt"     no extensionId; HTML fragment contains `data-turn-id=` attribute
- *                 (ChatGPT web — no SourceURL header in its CF_HTML payload)
+ * - "chatgpt"     no extensionId; HTML fragment contains ChatGPT turn/search
+ *                 attributes such as `data-turn-id=` or
+ *                 `data-chatgpt-search-unit-key=`
  * - "unknown"     none of the above
  *
  * @param {string} cfHtml - Full CF_HTML clipboard payload (not just the fragment)
@@ -36,9 +37,15 @@ DetectSource(cfHtml) {
     ; Claude Web (browser): no extensionId in header; detect from HTML content.
     if InStr(cfHtml, "font-claude-response") || InStr(cfHtml, "data-is-streaming") || InStr(cfHtml, "code-block__code")
         return "claudeweb"
-    ; ChatGPT web: no extensionId.  Full-turn copies have data-turn-id on <section> (or legacy
-    ; <article>); sub-selection copies omit the container but keep CodeMirror overflow-visible! <pre>.
-    if InStr(cfHtml, "data-turn-id=") || InStr(cfHtml, "overflow-visible!")
+    ; ChatGPT web: no extensionId.  Full-turn copies may have data-turn-id on
+    ; <section>/<article>, or newer search-unit role attributes on wrapper divs.
+    ; Sub-selection copies omit the container but keep CodeMirror overflow-visible! <pre>.
+    if InStr(cfHtml, "data-turn-id=")
+        || InStr(cfHtml, "data-chatgpt-search-unit-key=")
+        || InStr(cfHtml, "data-content-search-unit-key=")
+        || InStr(cfHtml, "data-user-message-bubble=")
+        || InStr(cfHtml, "data-markdown-text-style=`"assistant-message`"")
+        || InStr(cfHtml, "overflow-visible!")
         return "chatgpt"
     return "unknown"
 }
@@ -260,8 +267,12 @@ class HtmlNorm {
             ; PasteMarkdown collapses consecutive same-type markers, so double injection is harmless.
             html := RegExReplace(html, "i)(<(?:article|section)\b[^>]*\bdata-turn=`"assistant`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
             html := RegExReplace(html, "i)(<(?:article|section)\b[^>]*\bdata-turn-id=`"request-WEB:[^`"]*`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
+            html := RegExReplace(html, "i)(<div\b[^>]*\bdata-(?:chatgpt-search|content-search)-unit-key=`"[^`"]*:assistant`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
+            html := RegExReplace(html, "i)(<div\b[^>]*\bdata-markdown-text-style=`"assistant-message`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
             ; User turn: prefer data-turn="user"; fall back to legacy plain-UUID data-turn-id.
             html := RegExReplace(html, "i)(<(?:article|section)\b[^>]*\bdata-turn=`"user`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
+            html := RegExReplace(html, "i)(<div\b[^>]*\bdata-(?:chatgpt-search|content-search)-unit-key=`"[^`"]*:user`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
+            html := RegExReplace(html, "i)(<div\b[^>]*\bdata-user-message-bubble=`"true`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
         }
         return html
     }

@@ -1,0 +1,40 @@
+{
+  "environments": [
+    {
+      "id": "ubuntu-node22-python313",
+      "runner": "ubuntu-latest",
+      "required": true,
+      "os": "ubuntu",
+      "runtimes": {
+        "node": "22",
+        "python": "3.13"
+      },
+      "probes": [
+        { "name": "node", "command": ["node", "--version"] },
+        { "name": "git", "command": ["git", "--version"] }
+      ],
+      "steps": [
+        {
+          "name": "Initialize pinned submodules",
+          "kind": "prerequisite",
+          "command": ["git", "submodule", "update", "--init", "--recursive"]
+        },
+        {
+          "name": "Install presentation dependencies",
+          "kind": "prerequisite",
+          "command": ["python", "-m", "pip", "install", "colorama", "regex"]
+        },
+        {
+          "name": "Run AI-General-Memory validation",
+          "kind": "validation",
+          "command": ["python", "scripts/ci_environment.py"]
+        },
+        {
+          "name": "Run CI contract regressions",
+          "kind": "validation",
+          "command": ["python", "-m", "unittest", "tests/test_ci_contract.py"]
+        }
+      ]
+    }
+  ]
+}
