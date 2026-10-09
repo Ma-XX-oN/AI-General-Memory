@@ -56,7 +56,7 @@ class PasteMd {
   }
 
   ; Change this if pandoc isn't on PATH.
-  static VERSION := "PasteMd/2026-10-08.2"
+  static VERSION := "PasteMd/2026-10-09.1"
   static PANDOC_EXE := "C:\Users\adria\AppData\Local\Pandoc\pandoc.exe"
 
   static PASTE_SENTINEL_DELAY_MS := 200
@@ -551,8 +551,8 @@ class PasteMd {
         expectedListStart := PasteMd.GetExpectedOrderedListStart(htmlFragRaw, cfHtml, plain)
         PasteMd._BusyUpdate("Preprocessing HTML")
         htmlPrep := PasteMd._PreprocessHtml(htmlFrag, cfHtml, showPoster)
-        htmlPrep := PasteMd.NormalizeIncidentalListIntentHtml(htmlPrep, htmlFrag, plain, expectedListStart)
         htmlPrep := PasteMd.StripTrailingEmptyListItems(htmlPrep)
+        htmlPrep := PasteMd.NormalizeIncidentalListIntentHtml(htmlPrep, htmlFrag, plain, expectedListStart)
 
         if (promptOrderedList) {
           promptResult := PasteMd.MaybePromptOrderedListStart(htmlPrep, plain, htmlFrag, expectedListStart)
@@ -575,6 +575,8 @@ class PasteMd {
             )
           }
           expectedListStart := promptResult["value"]
+          if (promptResult.Has("unordered") && promptResult["unordered"])
+            htmlPrep := PasteMd.ConvertFirstOrderedListToUnordered(htmlPrep)
         }
 
         htmlPrep := PasteMd.ApplyOrderedListStartToHtml(htmlPrep, expectedListStart)
@@ -1173,7 +1175,7 @@ class PasteMd {
    * This method converts the synthetic outer <ol> to <ul> for multi-item bare
    * <li> fragments when ordered intent is not inferred from clipboard context.
    *
-   * @param {string} htmlPrep - Preprocessed HTML sent to pandoc
+   * @param {string} htmlPrep - Preprocessed HTML sent to pandoc after empty-item cleanup
    * @param {string} htmlFrag - Raw StartFragment HTML
    * @param {string} plain - Plain clipboard text
    * @param {number} expected - Inferred ordered-list start from context
@@ -1195,8 +1197,8 @@ class PasteMd {
     if RegExMatch(fragTrim, "is)^<(?:ol|ul)\b")
       return htmlPrep
 
-    ; Single-item fragments remain on ordered-list path (prompt/renumber logic).
-    if (this.CountListItemsInFragment(htmlFrag) < 2)
+    ; Single real items remain on ordered-list path (prompt/renumber logic).
+    if (this.CountListItemsInFragment(htmlPrep) < 2)
       return htmlPrep
 
     ; Explicit numeric markers in plain text indicate ordered intent.
@@ -1296,6 +1298,21 @@ class PasteMd {
   }
 
   /**
+   * Converts the first ordered-list container in HTML to an unordered list.
+   * Used when the ambiguous-list prompt answer is "-".
+   * @param {string} htmlPrep - Preprocessed HTML sent to pandoc
+   * @returns {string} HTML with the first <ol>...</ol> converted to <ul>...</ul>
+   */
+  static ConvertFirstOrderedListToUnordered(htmlPrep) {
+    if (htmlPrep = "")
+      return htmlPrep
+
+    htmlPrep := RegExReplace(htmlPrep, "is)<ol\b[^>]*+>", "<ul>", , 1)
+    htmlPrep := RegExReplace(htmlPrep, "is)</ol>", "</ul>", , 1)
+    return htmlPrep
+  }
+
+  /**
    * Inserts a shell marker into list items that contain only a nested list.
    * This prevents pandoc from collapsing them into malformed mixed list markers.
    * @param {string} html - HTML prior to pandoc conversion
@@ -1336,11 +1353,11 @@ class PasteMd {
    * @param {string} plain - Plain clipboard text
    * @param {string} htmlFrag - StartFragment HTML
    * @param {number} expected - Inferred start index from available context
-   * @returns {Map} {aborted:boolean, value:number}
+   * @returns {Map} {aborted:boolean, value:number, unordered:boolean}
    */
   static MaybePromptOrderedListStart(htmlPrep, plain, htmlFrag, expected) {
     if !this.ShouldPromptOrderedListStart(htmlPrep, htmlFrag, expected)
-      return Map("aborted", false, "value", expected)
+      return Map("aborted", false, "value", expected, "unordered", false)
 
     defaultStart := 2
     if RegExMatch(plain, "m)^[ \t]*+(\d++)[.)](?:[ \t]++|$)", &mPlain) {
@@ -1357,10 +1374,12 @@ class PasteMd {
 
     parsed := PasteMd.ParseOrderedListPromptResponse(rawResponse)
     if (parsed["status"] = "cancel")
-      return Map("aborted", true, "value", expected)
+      return Map("aborted", true, "value", expected, "unordered", false)
+    if (parsed["status"] = "unordered")
+      return Map("aborted", false, "value", 0, "unordered", true)
     if (parsed["status"] != "ok")
       throw Error("Invalid ordered-list prompt response: " rawResponse)
-    return Map("aborted", false, "value", parsed["value"])
+    return Map("aborted", false, "value", parsed["value"], "unordered", false)
   }
 
   /**
@@ -1401,14 +1420,16 @@ class PasteMd {
 
   /**
    * Parses ordered-list prompt responses.
-   * Accepted responses are integer >= 1, or CANCEL.
+   * Accepted responses are integer >= 1, "-", or CANCEL.
    * @param {any} response - Prompt callback return value
-   * @returns {Map} {status:"ok|cancel|invalid", value:number}
+   * @returns {Map} {status:"ok|unordered|cancel|invalid", value:number}
    */
   static ParseOrderedListPromptResponse(response) {
     value := Trim("" response, " `t")
     if (StrUpper(value) = "CANCEL")
       return Map("status", "cancel", "value", 0)
+    if (value = "-")
+      return Map("status", "unordered", "value", 0)
 
     if RegExMatch(value, "^\d++$") {
       n := Integer(value)
@@ -1422,7 +1443,7 @@ class PasteMd {
   /**
    * Runtime ordered-list prompt dialog with inline validation feedback.
    * @param {number} defaultStart - Default list-start value shown in the input
-   * @returns {string|number} Integer >=1, or "CANCEL"
+   * @returns {string|number} Integer >=1, "-", or "CANCEL"
    */
   static _PromptOrderedListStartDialog(defaultStart, expected := 0, plain := "", htmlFrag := "") {
     isDark := PasteMd._IsDarkModeEnabled()
@@ -1444,12 +1465,12 @@ class PasteMd {
 
     dlg.AddText("xm w" msgW
       , "Original ordered-list index is missing from clipboard context."
-      . "`nEnter starting number (>= 1), or Cancel to abort paste.")
+      . "`nEnter starting number (>= 1), '-' for bullet, or Cancel to abort paste.")
     edit := dlg.AddEdit("xm w140", "" defaultStart)
 
     errOpts := "xm w" msgW " Hidden "
     errOpts .= isDark ? "cFF8A8A" : "cCC0000"
-    err := dlg.AddText(errOpts, "Enter a whole number greater than or equal to 1.")
+    err := dlg.AddText(errOpts, "Enter a whole number greater than or equal to 1, or '-' for bullet.")
 
     okBtn := dlg.AddButton("x" btnRowX " y+12 w" btnW " Default", "OK")
     cancelBtn := dlg.AddButton("x+8 w" btnW, "Cancel")
@@ -1470,6 +1491,7 @@ class PasteMd {
     ; Show hidden first so dark-title styling can be applied before first visible paint.
     dlg.Show("Hide AutoSize")
     PasteMd._TrySetDarkTitleBar(dlg.Hwnd, isDark)
+    PasteMd._MoveGuiToMouseMonitorCenter(dlg)
     dlg.Show()
     edit.Focus()
     SendMessage(0x00B1, 0, -1, edit, "ahk_id " dlg.Hwnd)
@@ -1483,6 +1505,13 @@ class PasteMd {
    */
   static _PromptOrderedListSubmit(gui, edit, err, state, *) {
     value := Trim(edit.Text, " `t")
+    if (value = "-") {
+      state.status := "ok"
+      state.value := "-"
+      if WinExist("ahk_id " gui.Hwnd)
+        gui.Destroy()
+      return
+    }
     if !RegExMatch(value, "^\d++$") || Integer(value) < 1 {
       err.Visible := true
       err.Redraw()
@@ -1495,6 +1524,26 @@ class PasteMd {
     state.value := Integer(value)
     if WinExist("ahk_id " gui.Hwnd)
       gui.Destroy()
+  }
+
+  /**
+   * Centers a GUI on the work area of the monitor containing the mouse.
+   * @param {Gui} gui - GUI to move
+   */
+  static _MoveGuiToMouseMonitorCenter(gui) {
+    try {
+      MouseGetPos(&mx, &my)
+      gui.GetPos(, , &gw, &gh)
+      monCount := MonitorGetCount()
+      Loop monCount {
+        MonitorGetWorkArea(A_Index, &left, &top, &right, &bottom)
+        if (mx >= left && mx < right && my >= top && my < bottom) {
+          gui.Move(left + ((right - left - gw) // 2), top + ((bottom - top - gh) // 2))
+          return
+        }
+      }
+    } catch {
+    }
   }
 
   /**

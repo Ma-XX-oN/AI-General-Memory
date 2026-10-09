@@ -88,6 +88,18 @@ bt := Chr(96)
 nbsp := Chr(160)
 inlineTagCode := "- Comments, maybe" nbsp bt "<script>" bt "/" bt "<style>" bt nbsp "if they ever appear."
 Chk("CleanMarkdown preserves tags inside inline code spans", PasteMd.CleanMarkdown(inlineTagCode) = inlineTagCode)
+bareOlItemWithTrailingEmpty := '<li><div><div><p><span>RepoWorkflow can reuse the three valid PASS results instead of running the tests again.</span></p></div></div></li><li><div><div><p></p></div></div></li>'
+bareOlItemPrep := PasteMd._PreprocessHtml(bareOlItemWithTrailingEmpty, "", false)
+bareOlItemPrep := PasteMd.StripTrailingEmptyListItems(bareOlItemPrep)
+bareOlItemPrep := PasteMd.NormalizeIncidentalListIntentHtml(bareOlItemPrep, bareOlItemWithTrailingEmpty, "RepoWorkflow can reuse the three valid PASS results instead of running the tests again.", 0)
+Chk("single bare list item with trailing empty stays ordered", RegExMatch(bareOlItemPrep, "is)^<ol\b") && !RegExMatch(bareOlItemPrep, "is)^<ul\b"))
+Chk("single bare list item with trailing empty prompts for start", PasteMd.ShouldPromptOrderedListStart(bareOlItemPrep, bareOlItemWithTrailingEmpty, 0))
+Chk("ordered-list prompt accepts unordered marker", PasteMd.ParseOrderedListPromptResponse("-")["status"] = "unordered")
+prevBarePromptFn := PasteMd.SetOrderedListPromptProvider((defaultStart, expected, plain, htmlFrag) => "-")
+barePromptResult := PasteMd.MaybePromptOrderedListStart(bareOlItemPrep, "RepoWorkflow can reuse the three valid PASS results instead of running the tests again.", bareOlItemWithTrailingEmpty, 0)
+PasteMd.SetOrderedListPromptProvider(prevBarePromptFn)
+Chk("ordered-list prompt converts to unordered", barePromptResult["unordered"])
+Chk("ordered-list prompt unordered HTML conversion", RegExMatch(PasteMd.ConvertFirstOrderedListToUnordered(bareOlItemPrep), "is)^<ul\b"))
 for fx in fixtures {
   fixtureStartTick := A_TickCount
   path := _ResolveFixturePath(fx)
@@ -428,9 +440,9 @@ ParseFixtureScenarioLine(line, &err := "") {
 
   if pairs.Has("prompt") {
     promptValue := Trim(pairs["prompt"], " `t")
-    if (StrUpper(promptValue) != "CANCEL") {
+    if (StrUpper(promptValue) != "CANCEL" && promptValue != "-") {
       if !RegExMatch(promptValue, "^\d+$") || Integer(promptValue) < 1 {
-        err := "prompt must be CANCEL or integer >= 1"
+        err := "prompt must be CANCEL, -, or integer >= 1"
         return 0
       }
     }

@@ -65,7 +65,7 @@ class HtmlNorm {
      * Version marker emitted by PasteAsMd debug logs for runtime verification.
      * @type {string}
      */
-    static VERSION := "HtmlNorm/2026-10-08.2"
+    static VERSION := "HtmlNorm/2026-10-09.1"
 
     /**
      * Thinking block inner texts; index N corresponds to placeholder ¤THINKING_N¤.
@@ -95,10 +95,11 @@ class HtmlNorm {
      *   10. User message extraction (→ ¤USERMSG_N¤)
      *   11. Claude Web language-label div removal
      *   12. Footnote URL stripping (long URLs → #fragment)
-     *   13. Residual span tag removal
-     *   14. Bare <li> list wrapping in <ol>
-     *   15. <code> element normalization (line-break conversion, pre-wrapping)
-     *   16. Nested container unwrapping
+     *   13. Nested-span bold promotion
+     *   14. Residual span tag removal
+     *   15. Bare <li> list wrapping in <ol>
+     *   16. <code> element normalization (line-break conversion, pre-wrapping)
+     *   17. Nested container unwrapping
      *
      * @param {string} htmlFrag  - HTML fragment from the CF_HTML clipboard
      * @param {string} source    - Source identifier from DetectSource()
@@ -174,19 +175,22 @@ class HtmlNorm {
         ;      This avoids loose-list markdown output (blank lines between items).
         html := HtmlNorm._NormalizeTightListItems(html)
 
-        ; 13. Strip residual <span> tags.
+        ; 13. Promote ChatGPT's current bold selection shape before span stripping.
+        html := HtmlNorm._NormalizeNestedSpanBold(html)
+
+        ; 14. Strip residual <span> tags.
         html := RegExReplace(html, "i)</?+span\b[^>]*+>", "")
 
-        ; 14. Wrap bare top-level <li> siblings in <ol>.
+        ; 15. Wrap bare top-level <li> siblings in <ol>.
         htmlNoTrailingBr := RegExReplace(html, "is)(?:<br\b[^>]*+>\s*+)++$", "")
         trimmed := Trim(htmlNoTrailingBr, " `t`r`n")
         if (trimmed != "" && RegExMatch(trimmed, "is)^(?:<li\b[^>]*+>.*?</li>\s*)+$"))
             html := "<ol>" . trimmed . "</ol>"
 
-        ; 15. Normalize <code> elements.
+        ; 16. Normalize <code> elements.
         html := HtmlNorm._NormalizeCodeElements(html)
 
-        ; 16. Unwrap nested containers that obscure code blocks.
+        ; 17. Unwrap nested containers that obscure code blocks.
         if (source != "chatgpt" || HtmlNorm._HasChatGptCodeContainerShape(html))
             html := HtmlNorm._UnwrapNestedContainers(html)
 
@@ -622,6 +626,38 @@ class HtmlNorm {
             "is)(<li\b[^>]*>)\s*<p\b[^>]*>((?:(?!</p>|<ul\b|<ol\b|<li\b).)++)</p>\s*(</li>)",
             "$1$2$3"
         )
+        return html
+    }
+
+    /**
+     * Promotes the nested-span shape ChatGPT uses for bold inline text.
+     *
+     * Recent ChatGPT clipboard HTML can represent a bold phrase as one plain
+     * outer `<span>` containing two or more plain child `<span>` nodes, with no
+     * `<strong>` tag or `font-weight` style. The residual span stripper would
+     * otherwise flatten that phrase to plain text.
+     *
+     * @param {string} html
+     * @returns {string}
+     */
+    static _NormalizeNestedSpanBold(html) {
+        if (html = "")
+            return html
+
+        pat := "is)<span\b[^>]*>\s*((?:<span\b[^>]*>[^<>]*</span>\s*){2,})</span>"
+        pos := 1
+        while RegExMatch(html, pat, &m, pos) {
+            inner := m[1]
+            if RegExMatch(m[0], "is)<(?:strong|b|em|i|code|a|math|pre)\b") {
+                pos := m.Pos + m.Len
+                continue
+            }
+
+            text := RegExReplace(inner, "is)</?span\b[^>]*>", "")
+            replacement := "<strong>" text "</strong>"
+            html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
+            pos := m.Pos + StrLen(replacement)
+        }
         return html
     }
 

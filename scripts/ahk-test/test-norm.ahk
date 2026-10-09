@@ -227,5 +227,12 @@ Chk("no overflow-visible! class",     !InStr(normGpt, "overflow-visible"))
 Chk("canonical pre/code emitted",     InStr(normGpt, "<pre><code>") || InStr(normGpt, "<pre><code "))
 Chk("def foo preserved",              InStr(normGpt, "def") && InStr(normGpt, "foo"))
 
+; ── 11: ChatGPT nested spans for bold text ────────────────────────────────────
+Log("── 11: ChatGPT nested-span bold ─────────────────────")
+
+gptNestedBold := '<p><span>Previously, </span><span><span>uncommitted </span><span>source </span><span>change</span></span><span>.</span></p>'
+normNestedBold := HtmlNorm.Normalize(gptNestedBold, "unknown", false, false)
+Chk("nested span group becomes strong", InStr(normNestedBold, "<strong>uncommitted source change</strong>"))
+
 ; ── summary ───────────────────────────────────────────────────────────────────
 TestFinish()
