@@ -234,5 +234,16 @@ gptNestedBold := '<p><span>Previously, </span><span><span>uncommitted </span><sp
 normNestedBold := HtmlNorm.Normalize(gptNestedBold, "unknown", false, false)
 Chk("nested span group becomes strong", InStr(normNestedBold, "<strong>uncommitted source change</strong>"))
 
+; ── 12: Large list-item wrapper normalization avoids PCRE runaway ──────────────
+Log("── 12: large list wrapper ─────────────────────")
+
+largeListInner := ""
+Loop 1200
+  largeListInner .= '<span class="katex-html"><span>' A_Index '</span></span>'
+largeListHtml := '<li data-section-id="stress"><div><div><p>' largeListInner '</p></div></div></li>'
+normLargeList := HtmlNorm.Normalize(largeListHtml, "unknown", false, false)
+Chk("large wrapped list item normalizes", InStr(normLargeList, '<li data-section-id="stress">'))
+Chk("large wrapped list item removes div wrappers", !InStr(normLargeList, "<div><div><p>"))
+
 ; ── summary ───────────────────────────────────────────────────────────────────
 TestFinish()

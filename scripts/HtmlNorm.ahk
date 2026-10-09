@@ -591,16 +591,89 @@ class HtmlNorm {
             return html
         if !RegExMatch(html, "i)<div\b")
             return html
+        if !RegExMatch(html, "i)<p\b")
+            return html
+
         pos := 1
-        pat := "is)<li\b([^>]*)>\s*(?:<div\b[^>]*>\s*)+<p\b[^>]*>((?:(?!</p>|<ul\b|<ol\b|<li\b).)*)</p>\s*(?:</div>\s*)+</li>"
-        while RegExMatch(html, pat, &m, pos) {
-            replacement := Trim(m[2], " `t`r`n" . Chr(160)) = ""
-                ? ""
-                : "<li" . m[1] . ">" . m[2] . "</li>"
-            html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
-            pos := m.Pos + StrLen(replacement)
+        while RegExMatch(html, "is)<li\b[^>]*>", &mLi, pos) {
+            liEnd := HtmlNorm._FindMatchingElementEnd(html, mLi.Pos, "li")
+            if !liEnd {
+                pos := mLi.Pos + mLi.Len
+                continue
+            }
+
+            liBlock := SubStr(html, mLi.Pos, liEnd - mLi.Pos + 1)
+            replacement := HtmlNorm._NormalizeListItemBlockWrapper(liBlock)
+            if (replacement = liBlock) {
+                pos := liEnd + 1
+                continue
+            }
+
+            html := SubStr(html, 1, mLi.Pos - 1) . replacement . SubStr(html, liEnd + 1)
+            pos := mLi.Pos + StrLen(replacement)
         }
         return html
+    }
+
+    /**
+     * Unwraps a single list item whose only content is nested `<div>` wrappers
+     * around one leaf `<p>`.
+     * @param {string} liBlock
+     * @returns {string}
+     */
+    static _NormalizeListItemBlockWrapper(liBlock) {
+        if !RegExMatch(liBlock, "is)^<li\b([^>]*)>(.*)</li>$", &mLi)
+            return liBlock
+
+        attrs := mLi[1]
+        inner := HtmlNorm._UnwrapOnlyNestedDivs(mLi[2])
+        if (inner = "")
+            return liBlock
+
+        if !RegExMatch(inner, "is)^\s*<p\b[^>]*>(.*?)</p>\s*$", &mP)
+            return liBlock
+
+        content := mP[1]
+        if RegExMatch(content, "is)<(?:ul|ol|li)\b")
+            return liBlock
+
+        return Trim(content, " `t`r`n" . Chr(160)) = ""
+            ? ""
+            : "<li" . attrs . ">" . content . "</li>"
+    }
+
+    /**
+     * Removes one or more nested `<div>` wrappers when each wrapper is the only
+     * element at its level.
+     * @param {string} html
+     * @returns {string}
+     */
+    static _UnwrapOnlyNestedDivs(html) {
+        unwrapped := false
+        loop {
+            pos := HtmlNorm._SkipHtmlWhitespace(html, 1)
+            if !RegExMatch(html, "is)<div\b[^>]*>", &mDiv, pos)
+                return unwrapped ? html : ""
+            if (mDiv.Pos != pos)
+                return ""
+
+            divEnd := HtmlNorm._FindMatchingElementEnd(html, pos, "div")
+            if !divEnd
+                return ""
+
+            after := HtmlNorm._SkipHtmlWhitespace(html, divEnd + 1)
+            if (after <= StrLen(html))
+                return ""
+
+            closeLen := StrLen("</div>")
+            contentStart := pos + mDiv.Len
+            contentLen := divEnd - closeLen + 1 - contentStart
+            if (contentLen < 0)
+                return ""
+
+            html := SubStr(html, contentStart, contentLen)
+            unwrapped := true
+        }
     }
 
     /**
