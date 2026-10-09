@@ -27,7 +27,7 @@
  * @returns {string} Source identifier string
  */
 DetectSource(cfHtml) {
-    if RegExMatch(cfHtml, "i)extensionId=([^&`r`n]+)", &m) {
+    if RegExMatch(cfHtml, "i)extensionId=([^&`r`n]++)", &m) {
         extId := StrLower(m[1])
         if InStr(extId, "openai.chatgpt")
             return "codex"
@@ -124,15 +124,15 @@ class HtmlNorm {
 
         ; 4. Preserve semantic inline entity buttons, then strip UI buttons.
         html := RegExReplace(html
-            , "is)<button\b(?=[^>]*\bbehavior-btn\b)(?=[^>]*\bentity-underline\b)[^>]*>(.*?)</button>"
+            , "is)<button\b(?=[^>]*\bbehavior-btn\b)(?=[^>]*\bentity-underline\b)[^>]*+>(.*?)</button>"
             , "<u>$1</u>")
         ; Preserve inline link-style buttons (e.g. Codex function references with
         ; text-token-text-link-foreground): keep their text content, strip only the wrapper.
         ; The <span> tags left inside are removed by the residual span stripper in step 13.
         html := RegExReplace(html
-            , "is)<button\b(?=[^>]*\btext-token-text-link-foreground\b)[^>]*>(.*?)</button>"
+            , "is)<button\b(?=[^>]*\btext-token-text-link-foreground\b)[^>]*+>(.*?)</button>"
             , "$1")
-        html := RegExReplace(html, "is)<button\b[^>]*>.*?</button>", "")
+        html := RegExReplace(html, "is)<button\b[^>]*+>.*?</button>", "")
 
         ; 5. ChatGPT: normalize CodeMirror code blocks before any span stripping.
         if (source = "chatgpt")
@@ -148,22 +148,22 @@ class HtmlNorm {
         html := HtmlNorm._ExtractThinkingBlocks(html)
 
         ; 9. Promote inline-code spans.
-        html := RegExReplace(html, "is)<span\b[^>]*\bclass=`"[^`"]*\b(?:inline-markdown|font-mono)\b[^`"]*`"[^>]*>(.*?)</span>", "<code>$1</code>")
+        html := RegExReplace(html, "is)<span\b[^>]*\bclass=`"[^`"]*\b(?:inline-markdown|font-mono)\b[^`"]*`"[^>]*+>(.*?)</span>", "<code>$1</code>")
 
         ; 10. Extract whitespace-sensitive user message text.
         html := HtmlNorm._ExtractUserMessages(html)
 
         ; 11. Strip Claude Web language-label divs (font-small p-3.5 pb-0).
-        html := RegExReplace(html, "is)<div\b[^>]*\bclass=`"[^`"]*\bfont-small\b[^`"]*\bp-3[^`"]*`"[^>]*>.*?</div>", "")
+        html := RegExReplace(html, "is)<div\b[^>]*\bclass=`"[^`"]*\bfont-small\b[^`"]*\bp-3[^`"]*`"[^>]*+>.*?</div>", "")
 
         ; 12. Strip long footnote hrefs, keeping only the #fragment.
-        html := RegExReplace(html, "i)href=`"[^`"]*#(user-content-[^`"]*)`"", "href=`"#$1`"")
+        html := RegExReplace(html, "i)href=`"[^`"]*#(user-content-[^`"]*+)`"", "href=`"#$1`"")
 
         ; 12b. Strip <p> wrapper inside footnote definition <li> elements.
         ;      <li id="user-content-fn-N"><p>text</p></li> → <li id="...">text</li>
         ;      Without this, pandoc renders footnote lists in loose format (number on
         ;      its own line, content indented), instead of tight (number + content inline).
-        html := RegExReplace(html, "is)(<li\b[^>]*\bid=`"user-content-fn-[^`"]*`"[^>]*>)\s*<p\b[^>]*>(.*?)</p>\s*(</li>)", "$1$2$3")
+        html := RegExReplace(html, "is)(<li\b[^>]*\bid=`"user-content-fn-[^`"]*+`"[^>]*+>)\s*+<p\b[^>]*+>(.*?)</p>\s*+(</li>)", "$1$2$3")
 
         ; 12c. Tight-list normalization: unwrap wrapper-only block containers in list items.
         ;      <li><div><div><p>text</p></div></div></li> → <li>text</li>
@@ -219,14 +219,14 @@ class HtmlNorm {
             return html
         ; <img> tags (self-closing).
         pos := 1
-        while RegExMatch(html, "i)<img\b([^>]*?)>", &m, pos) {
+        while RegExMatch(html, "i)<img\b([^>]*+)>", &m, pos) {
             attrs := m[1]
             accessText := ""
-            if (RegExMatch(attrs, "i)\balt\s*=\s*['`"]([^'`"]*)[`"']", &mA) && mA[1] != "")
+            if (RegExMatch(attrs, "i)\balt\s*+=\s*+['`"]([^'`"]*+)[`"']", &mA) && mA[1] != "")
                 accessText := mA[1]
-            else if (RegExMatch(attrs, "i)\btitle\s*=\s*['`"]([^'`"]*)[`"']", &mT) && mT[1] != "")
+            else if (RegExMatch(attrs, "i)\btitle\s*+=\s*+['`"]([^'`"]*+)[`"']", &mT) && mT[1] != "")
                 accessText := mT[1]
-            else if (RegExMatch(attrs, "i)\baria-label\s*=\s*['`"]([^'`"]*)[`"']", &mL) && mL[1] != "")
+            else if (RegExMatch(attrs, "i)\baria-label\s*+=\s*+['`"]([^'`"]*+)[`"']", &mL) && mL[1] != "")
                 accessText := mL[1]
             replacement := (accessText = "") ? "" : "(img: " . accessText . ")"
             html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
@@ -234,15 +234,15 @@ class HtmlNorm {
         }
         ; <svg>…</svg> elements — same rule, checking aria-label, title attr, or <title> child.
         pos := 1
-        while RegExMatch(html, "is)<svg\b([^>]*)>.*?</svg>", &m, pos) {
+        while RegExMatch(html, "is)<svg\b([^>]*+)>.*?</svg>", &m, pos) {
             attrs := m[1]
             full  := m[0]
             accessText := ""
-            if (RegExMatch(attrs, "i)\baria-label\s*=\s*['`"]([^'`"]*)[`"']", &mL) && mL[1] != "")
+            if (RegExMatch(attrs, "i)\baria-label\s*+=\s*+['`"]([^'`"]*+)[`"']", &mL) && mL[1] != "")
                 accessText := mL[1]
-            else if (RegExMatch(attrs, "i)\btitle\s*=\s*['`"]([^'`"]*)[`"']", &mT) && mT[1] != "")
+            else if (RegExMatch(attrs, "i)\btitle\s*+=\s*+['`"]([^'`"]*+)[`"']", &mT) && mT[1] != "")
                 accessText := mT[1]
-            else if (RegExMatch(full, "i)<title\b[^>]*>(.*?)</title>", &mTc) && mTc[1] != "")
+            else if (RegExMatch(full, "i)<title\b[^>]*+>(.*?)</title>", &mTc) && mTc[1] != "")
                 accessText := HtmlNorm._DecodeBasicHtmlEntities(mTc[1])
             replacement := (accessText = "") ? "" : "(img: " . accessText . ")"
             html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
@@ -263,31 +263,31 @@ class HtmlNorm {
     static _InjectPosterPlaceholders(html, source) {
         if (source = "claudecode") {
             ; AI turn
-            html := RegExReplace(html, "i)(<div\b[^>]*\bdata-testid=`"assistant-message`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
+            html := RegExReplace(html, "i)(<div\b[^>]*\bdata-testid=`"assistant-message`"[^>]*+>)", "$1<p>¤POSTER_AI¤</p>")
             ; user turn (class has both message_* and userMessageContainer_*)
-            html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bmessage_\w+\s+[^`"]*\buserMessageContainer_[^>]*>)", "$1<p>¤POSTER_User¤</p>")
+            html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bmessage_\w+\s+[^`"]*\buserMessageContainer_[^>]*+>)", "$1<p>¤POSTER_User¤</p>")
         } else if (source = "codex") {
             ; AI turn (group min-w-0 flex-col)
-            html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bgroup\b[^`"]*\bmin-w-0\b[^`"]*\bflex-col\b[^`"]*`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
+            html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bgroup\b[^`"]*\bmin-w-0\b[^`"]*\bflex-col\b[^`"]*`"[^>]*+>)", "$1<p>¤POSTER_AI¤</p>")
             ; user turn (flex-col items-end)
-            html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bflex-col\b[^`"]*\bitems-end\b[^`"]*`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
+            html := RegExReplace(html, "i)(<div\b[^>]*\bclass=`"[^`"]*\bflex-col\b[^`"]*\bitems-end\b[^`"]*`"[^>]*+>)", "$1<p>¤POSTER_User¤</p>")
         } else if (source = "claudeweb") {
             ; AI turn (data-is-streaming or font-claude-response)
-            html := RegExReplace(html, "i)(<div\b[^>]*(?:\bdata-is-streaming\b|\bclass=`"[^`"]*\bfont-claude-response\b[^`"]*`")[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
+            html := RegExReplace(html, "i)(<div\b[^>]*(?:\bdata-is-streaming\b|\bclass=`"[^`"]*\bfont-claude-response\b[^`"]*`")[^>]*+>)", "$1<p>¤POSTER_AI¤</p>")
             ; user turn (data-testid="user-message")
-            html := RegExReplace(html, "i)(<div\b[^>]*\bdata-testid=`"user-message`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
+            html := RegExReplace(html, "i)(<div\b[^>]*\bdata-testid=`"user-message`"[^>]*+>)", "$1<p>¤POSTER_User¤</p>")
         } else if (source = "chatgpt") {
             ; AI turn: prefer data-turn="assistant"; fall back to legacy data-turn-id="request-WEB:..." prefix.
             ; Both patterns may match the same turn container in older captures — the duplicate dedup in
             ; PasteMarkdown collapses consecutive same-type markers, so double injection is harmless.
-            html := RegExReplace(html, "i)(<(?:article|section)\b[^>]*\bdata-turn=`"assistant`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
-            html := RegExReplace(html, "i)(<(?:article|section)\b[^>]*\bdata-turn-id=`"request-WEB:[^`"]*`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
-            html := RegExReplace(html, "i)(<div\b[^>]*\bdata-(?:chatgpt-search|content-search)-unit-key=`"[^`"]*:assistant`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
-            html := RegExReplace(html, "i)(<div\b[^>]*\bdata-markdown-text-style=`"assistant-message`"[^>]*>)", "$1<p>¤POSTER_AI¤</p>")
+            html := RegExReplace(html, "i)(<(?:article|section)\b[^>]*\bdata-turn=`"assistant`"[^>]*+>)", "$1<p>¤POSTER_AI¤</p>")
+            html := RegExReplace(html, "i)(<(?:article|section)\b[^>]*\bdata-turn-id=`"request-WEB:[^`"]*+`"[^>]*+>)", "$1<p>¤POSTER_AI¤</p>")
+            html := RegExReplace(html, "i)(<div\b[^>]*\bdata-(?:chatgpt-search|content-search)-unit-key=`"[^`"]*:assistant`"[^>]*+>)", "$1<p>¤POSTER_AI¤</p>")
+            html := RegExReplace(html, "i)(<div\b[^>]*\bdata-markdown-text-style=`"assistant-message`"[^>]*+>)", "$1<p>¤POSTER_AI¤</p>")
             ; User turn: prefer data-turn="user"; fall back to legacy plain-UUID data-turn-id.
-            html := RegExReplace(html, "i)(<(?:article|section)\b[^>]*\bdata-turn=`"user`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
-            html := RegExReplace(html, "i)(<div\b[^>]*\bdata-(?:chatgpt-search|content-search)-unit-key=`"[^`"]*:user`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
-            html := RegExReplace(html, "i)(<div\b[^>]*\bdata-user-message-bubble=`"true`"[^>]*>)", "$1<p>¤POSTER_User¤</p>")
+            html := RegExReplace(html, "i)(<(?:article|section)\b[^>]*\bdata-turn=`"user`"[^>]*+>)", "$1<p>¤POSTER_User¤</p>")
+            html := RegExReplace(html, "i)(<div\b[^>]*\bdata-(?:chatgpt-search|content-search)-unit-key=`"[^`"]*:user`"[^>]*+>)", "$1<p>¤POSTER_User¤</p>")
+            html := RegExReplace(html, "i)(<div\b[^>]*\bdata-user-message-bubble=`"true`"[^>]*+>)", "$1<p>¤POSTER_User¤</p>")
         }
         return html
     }
@@ -316,7 +316,7 @@ class HtmlNorm {
      */
     static _NormalizeSimpleDiffBlocks(html) {
         pos := 1
-        while RegExMatch(html, "is)<diffs-container\b[^>]*>(.*?)</diffs-container>", &mDiff, pos) {
+        while RegExMatch(html, "is)<diffs-container\b[^>]*+>(.*?)</diffs-container>", &mDiff, pos) {
             inner := mDiff[1]
             fileName := ""
             ; The editable filename appears in a button before the diff block.
@@ -325,7 +325,7 @@ class HtmlNorm {
             ; button label.
             before := SubStr(html, 1, mDiff.Pos - 1)
             btnPos := 1
-            while RegExMatch(before, "is)<button\b[^>]*>(.*?)</button>", &mBtn, btnPos) {
+            while RegExMatch(before, "is)<button\b[^>]*+>(.*?)</button>", &mBtn, btnPos) {
                 btnText := RegExReplace(mBtn[1], "<[^>]++>", "")
                 btnText := HtmlNorm._DecodeBasicHtmlEntities(btnText)
                 btnText := Trim(btnText, " `t`r`n")
@@ -335,7 +335,7 @@ class HtmlNorm {
             }
             linePos := 1
             diffLines := []
-            while RegExMatch(inner, "is)<div\b[^>]*\bdata-line-type\s*=\s*['`"]([^'`"]+)['`"][^>]*>(.*?)</div>", &mLine, linePos) {
+            while RegExMatch(inner, "is)<div\b[^>]*\bdata-line-type\s*+=\s*+['`"]([^'`"]++)['`"][^>]*+>(.*?)</div>", &mLine, linePos) {
                 lineType := StrLower(mLine[1])
                 lineHtml := mLine[2]
                 lineText := RegExReplace(lineHtml, "<[^>]++>", "")
@@ -398,10 +398,10 @@ class HtmlNorm {
      */
     static _NormalizeChatGptCodeBlocks(html) {
         pos := 1
-        while RegExMatch(html, "is)<pre\b[^>]*\boverflow-visible\b[^>]*>(.*?)</pre>", &m, pos) {
+        while RegExMatch(html, "is)<pre\b[^>]*\boverflow-visible\b[^>]*+>(.*?)</pre>", &m, pos) {
             inner := m[1]
             ; Convert <br> to newlines before stripping all other tags.
-            inner := RegExReplace(inner, "i)<br\b[^>]*>", "`n")
+            inner := RegExReplace(inner, "i)<br\b[^>]*+>", "`n")
             ; Strip all HTML tags — leaves only the plain code text plus structural whitespace.
             codeText := RegExReplace(inner, "<[^>]++>", "")
             codeText := StrReplace(codeText, "`r", "")
@@ -438,7 +438,7 @@ class HtmlNorm {
      */
     static _NormalizeKatexMath(html) {
         pos := 1
-        patKatex := "is)<span\b[^>]*\bclass\s*=\s*['`"][^'`"]*(?<![-\w])katex(?![-\w])[^'`"]*['`"][^>]*>"
+        patKatex := "is)<span\b[^>]*\bclass\s*+=\s*+['`"][^'`"]*(?<![-\w])katex(?![-\w])[^'`"]*['`"][^>]*+>"
         while RegExMatch(html, patKatex, &mKatex, pos) {
             if (mKatex.Pos != pos && mKatex.Pos < pos)
                 break
@@ -466,7 +466,7 @@ class HtmlNorm {
      * @returns {string}
      */
     static _CollapseKatexSpanBlock(katexBlock) {
-        if !RegExMatch(katexBlock, "is)^<span\b[^>]*>", &mOpen)
+        if !RegExMatch(katexBlock, "is)^<span\b[^>]*+>", &mOpen)
             return katexBlock
 
         closeLen := StrLen("</span>")
@@ -476,7 +476,7 @@ class HtmlNorm {
         inner := SubStr(katexBlock, mOpen.Len + 1, innerLen)
 
         pos := HtmlNorm._SkipHtmlWhitespace(inner, 1)
-        if !RegExMatch(inner, "is)<span\b[^>]*\bclass\s*=\s*['`"][^'`"]*(?<![-\w])katex-mathml(?![-\w])[^'`"]*['`"][^>]*>", &mMath, pos)
+        if !RegExMatch(inner, "is)<span\b[^>]*\bclass\s*+=\s*+['`"][^'`"]*(?<![-\w])katex-mathml(?![-\w])[^'`"]*['`"][^>]*+>", &mMath, pos)
             return katexBlock
         if (mMath.Pos != pos)
             return katexBlock
@@ -484,7 +484,7 @@ class HtmlNorm {
         if !mathEnd
             return katexBlock
         mathBlock := SubStr(inner, pos, mathEnd - pos + 1)
-        if !RegExMatch(mathBlock, "is)^<span\b[^>]*>", &mMathOpen)
+        if !RegExMatch(mathBlock, "is)^<span\b[^>]*+>", &mMathOpen)
             return katexBlock
         mathInnerLen := StrLen(mathBlock) - mMathOpen.Len - closeLen
         if (mathInnerLen < 0)
@@ -492,7 +492,7 @@ class HtmlNorm {
         mathInner := SubStr(mathBlock, mMathOpen.Len + 1, mathInnerLen)
 
         pos := HtmlNorm._SkipHtmlWhitespace(inner, mathEnd + 1)
-        if !RegExMatch(inner, "is)<span\b[^>]*\bclass\s*=\s*['`"][^'`"]*(?<![-\w])katex-html(?![-\w])[^'`"]*['`"][^>]*>", &mHtml, pos)
+        if !RegExMatch(inner, "is)<span\b[^>]*\bclass\s*+=\s*+['`"][^'`"]*(?<![-\w])katex-html(?![-\w])[^'`"]*['`"][^>]*+>", &mHtml, pos)
             return katexBlock
         if (mHtml.Pos != pos)
             return katexBlock
@@ -523,7 +523,7 @@ class HtmlNorm {
      */
     static _NormalizeTaskListItems(html) {
         pos := 1
-        while RegExMatch(html, "is)<li\b([^>]*)>(.*?)</li>", &mTask, pos) {
+        while RegExMatch(html, "is)<li\b([^>]*+)>(.*?)</li>", &mTask, pos) {
             liAttrs := mTask[1]
             liInner := mTask[2]
             ; Supported task-list containers:
@@ -536,7 +536,7 @@ class HtmlNorm {
             }
             ; Find <input type="checkbox"> anywhere inside the item
             ; (direct child OR inside a <p> wrapper, as ChatGPT does).
-            if !RegExMatch(liInner, "is)<input\b[^>]*\btype\s*=\s*['`"]checkbox['`"][^>]*>", &mInput) {
+            if !RegExMatch(liInner, "is)<input\b[^>]*\btype\s*+=\s*+['`"]checkbox['`"][^>]*+>", &mInput) {
                 pos := mTask.Pos + mTask.Len
                 continue
             }
@@ -549,7 +549,7 @@ class HtmlNorm {
             }
             ; Capture text that follows the <input> tag.
             text := SubStr(liInner, mInput.Pos + mInput.Len)
-            text := RegExReplace(text, "is)<span\b[^>]*>\s*</span>", "")
+            text := RegExReplace(text, "is)<span\b[^>]*+>\s*+</span>", "")
             text := RegExReplace(text, "<[^>]++>", "")
             text := HtmlNorm._DecodeBasicHtmlEntities(text)
             text := Trim(text, " `t`r`n" . Chr(160))
@@ -712,13 +712,13 @@ class HtmlNorm {
         ; Case 1: list-item lead paragraph followed by nested list.
         html := RegExReplace(
             html,
-            "is)(<li\b[^>]*>)\s*<p\b[^>]*>((?:(?!</p>|<ul\b|<ol\b|<li\b).)++)</p>\s*((?:<ul\b|<ol\b))",
+            "is)(<li\b[^>]*+>)\s*+<p\b[^>]*+>((?:(?!</p>|<ul\b|<ol\b|<li\b).)++)</p>\s*+((?:<ul\b|<ol\b))",
             "$1$2$3"
         )
         ; Case 2: leaf list item with only a paragraph wrapper.
         html := RegExReplace(
             html,
-            "is)(<li\b[^>]*>)\s*<p\b[^>]*>((?:(?!</p>|<ul\b|<ol\b|<li\b).)++)</p>\s*(</li>)",
+            "is)(<li\b[^>]*+>)\s*+<p\b[^>]*+>((?:(?!</p>|<ul\b|<ol\b|<li\b).)++)</p>\s*+(</li>)",
             "$1$2$3"
         )
         return html
@@ -739,7 +739,7 @@ class HtmlNorm {
         if (html = "")
             return html
 
-        pat := "is)<span\b[^>]*>\s*((?:<span\b[^>]*>[^<>]*</span>\s*){2,})</span>"
+        pat := "is)<span\b[^>]*+>\s*+((?:<span\b[^>]*+>[^<>]*+</span>\s*+){2,})</span>"
         pos := 1
         while RegExMatch(html, pat, &m, pos) {
             inner := m[1]
@@ -748,7 +748,7 @@ class HtmlNorm {
                 continue
             }
 
-            text := RegExReplace(inner, "is)</?span\b[^>]*>", "")
+            text := RegExReplace(inner, "is)</?span\b[^>]*+>", "")
             replacement := "<strong>" text "</strong>"
             html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
             pos := m.Pos + StrLen(replacement)
@@ -765,9 +765,9 @@ class HtmlNorm {
      */
     static _ExtractThinkingBlocks(html) {
         pos := 1
-        while RegExMatch(html, "is)<details\b[^>]*\bclass=`"[^`"]*\bthinking\b[^`"]*`"[^>]*>(.*?)</details>", &m, pos) {
+        while RegExMatch(html, "is)<details\b[^>]*\bclass=`"[^`"]*\bthinking\b[^`"]*`"[^>]*+>(.*?)</details>", &m, pos) {
             inner := m[1]
-            inner := RegExReplace(inner, "is)<summary\b[^>]*>.*?</summary>", "")
+            inner := RegExReplace(inner, "is)<summary\b[^>]*+>.*?</summary>", "")
             inner := RegExReplace(inner, "<[^>]++>", "")
             inner := HtmlNorm._DecodeBasicHtmlEntities(inner)
             inner := Trim(inner, " `t`n`r")
@@ -800,10 +800,10 @@ class HtmlNorm {
     static _ExtractUserMessages(html) {
         ; Codex user messages: <div class="text-size-chat whitespace-pre-wrap">
         pos := 1
-        while RegExMatch(html, "is)(<div\b[^>]*\btext-size-chat\b[^>]*\bwhitespace-pre-wrap\b[^>]*>)(.*?)</div>", &m, pos) {
+        while RegExMatch(html, "is)(<div\b[^>]*\btext-size-chat\b[^>]*\bwhitespace-pre-wrap\b[^>]*+>)(.*?)</div>", &m, pos) {
             rawContent := m[2]
-            rawContent := RegExReplace(rawContent, "is)<code\b[^>]*\bfont-mono\b[^>]*>(.*?)</code>", "``$1``")
-            rawContent := RegExReplace(rawContent, "i)</?span\b[^>]*>", "")
+            rawContent := RegExReplace(rawContent, "is)<code\b[^>]*\bfont-mono\b[^>]*+>(.*?)</code>", "``$1``")
+            rawContent := RegExReplace(rawContent, "i)</?span\b[^>]*+>", "")
             rawContent := RegExReplace(rawContent, "<[^>]++>", "")
             rawContent := HtmlNorm._DecodeBasicHtmlEntities(rawContent)
             rawContent := StrReplace(rawContent, "`r", "")
@@ -816,7 +816,7 @@ class HtmlNorm {
         }
         ; Claude Code user messages: <div class="content_xGDvVg"><span>text</span>
         pos := 1
-        while RegExMatch(html, "is)(<div\b[^>]*\bcontent_xGDvVg\b[^>]*>)\s*<span>(.*?)</span>", &m, pos) {
+        while RegExMatch(html, "is)(<div\b[^>]*\bcontent_xGDvVg\b[^>]*+>)\s*+<span>(.*?)</span>", &m, pos) {
             rawText := HtmlNorm._DecodeBasicHtmlEntities(m[2])
             rawText := StrReplace(rawText, "`r", "")
             HtmlNorm._userMsgBlocks.Push(rawText)
@@ -829,9 +829,9 @@ class HtmlNorm {
         ; Replace the entire <p>...</p> with the placeholder (not nested inside the
         ; original <p>, which would produce invalid nested <p> elements).
         pos := 1
-        while RegExMatch(html, "is)(<p\b[^>]*\bclass=`"whitespace-pre-wrap break-words`"[^>]*>)(.*?)</p>", &m, pos) {
+        while RegExMatch(html, "is)(<p\b[^>]*\bclass=`"whitespace-pre-wrap break-words`"[^>]*+>)(.*?)</p>", &m, pos) {
             rawContent := m[2]
-            rawContent := RegExReplace(rawContent, "i)<br\b[^>]*>", "`n")
+            rawContent := RegExReplace(rawContent, "i)<br\b[^>]*+>", "`n")
             rawContent := RegExReplace(rawContent, "<[^>]++>", "")
             rawContent := HtmlNorm._DecodeBasicHtmlEntities(rawContent)
             rawContent := StrReplace(rawContent, "`r", "")
@@ -846,9 +846,9 @@ class HtmlNorm {
         ; outer tag, which still carries the class after Codex extraction above.
         ; Replace the entire <div>...</div> with the placeholder.
         pos := 1
-        while RegExMatch(html, "is)(<div\b[^>]*\bclass=`"whitespace-pre-wrap`"[^>]*>)(.*?)</div>", &m, pos) {
+        while RegExMatch(html, "is)(<div\b[^>]*\bclass=`"whitespace-pre-wrap`"[^>]*+>)(.*?)</div>", &m, pos) {
             rawContent := m[2]
-            rawContent := RegExReplace(rawContent, "i)<br\b[^>]*>", "`n")
+            rawContent := RegExReplace(rawContent, "i)<br\b[^>]*+>", "`n")
             rawContent := RegExReplace(rawContent, "<[^>]++>", "")
             rawContent := HtmlNorm._DecodeBasicHtmlEntities(rawContent)
             rawContent := StrReplace(rawContent, "`r", "")
@@ -871,23 +871,23 @@ class HtmlNorm {
      */
     static _NormalizeCodeElements(html) {
         pos := 1
-        while RegExMatch(html, "is)<code\b([^>]*)>(.*?)</code>", &m, pos) {
+        while RegExMatch(html, "is)<code\b([^>]*+)>(.*?)</code>", &m, pos) {
             content := m[2]
             attrs   := m[1]
             ; Normalize line-break representations inside the code.
-            content := RegExReplace(content, "i)<br\b[^>]*>", "`n")
-            content := RegExReplace(content, "i)</div>\s*<div\b[^>]*>", "`n")
+            content := RegExReplace(content, "i)<br\b[^>]*+>", "`n")
+            content := RegExReplace(content, "i)</div>\s*+<div\b[^>]*+>", "`n")
             content := RegExReplace(content, "<[^>]++>", "")
             content := StrReplace(content, "`r", "")
             if InStr(content, "`n") {
                 content := HtmlNorm._DecodeBasicHtmlEntities(content)
                 ; Extract language identifier; discard pure-CSS classes.
                 langAttr := ""
-                if RegExMatch(attrs, "i)language-(\w+)", &langM)
+                if RegExMatch(attrs, "i)language-(\w++)", &langM)
                     langAttr := ' class="language-' . langM[1] . '"'
                 ; Check whether this <code> is already the direct child of a <pre>.
                 beforeSnippet := SubStr(html, Max(1, m.Pos - 100), Min(100, m.Pos - 1))
-                if RegExMatch(beforeSnippet, "i)<pre\b[^>]*>\s*$")
+                if RegExMatch(beforeSnippet, "i)<pre\b[^>]*+>\s*+$")
                     replacement := "<code" . langAttr . ">" . content . "</code>"
                 else
                     replacement := "<pre><code" . langAttr . ">" . content . "</code></pre>"
@@ -912,27 +912,27 @@ class HtmlNorm {
         while (html != prev) {
             prev := html
             ; Outer <pre class="..."> wrapping an inner <pre><code>.
-            html := RegExReplace(html, "is)<pre\b[^>]+>\s*(<pre\b[^>]*><code\b[^>]*>.*?</code></pre>)\s*</pre>", "$1")
+            html := RegExReplace(html, "is)<pre\b[^>]++>\s*+(<pre\b[^>]*+><code\b[^>]*+>.*?</code></pre>)\s*+</pre>", "$1")
             ; Claude Web: <pre class="code-block__code ..."> directly wrapping <code>.
             ; Strip the outer pre's class so pandoc uses the <code class="language-xxx">
             ; for the language identifier, not the pre's CSS utility class.
-            html := RegExReplace(html, "is)<pre\b[^>]*\bcode-block__code\b[^>]*>\s*(<code\b[^>]*>.*?</code>)\s*</pre>", "<pre>$1</pre>")
+            html := RegExReplace(html, "is)<pre\b[^>]*\bcode-block__code\b[^>]*+>\s*+(<code\b[^>]*+>.*?</code>)\s*+</pre>", "<pre>$1</pre>")
             ; Claude Web copy-button overlay: <div class="sticky ..."><div ...></div></div>
             ; Strip it so the remaining structure is a simple two-div wrap around <pre><code>.
-            html := RegExReplace(html, "is)<div\b[^>]*\bsticky\b[^>]*>.*?</div>\s*</div>", "")
+            html := RegExReplace(html, "is)<div\b[^>]*\bsticky\b[^>]*+>.*?</div>\s*+</div>", "")
             ; Two nested <div>s wrapping <pre><code>.
-            html := RegExReplace(html, "is)<div\b[^>]*>\s*<div\b[^>]*>\s*(<pre><code\b[^>]*>.*?</code></pre>)\s*</div>\s*</div>", "$1")
+            html := RegExReplace(html, "is)<div\b[^>]*+>\s*+<div\b[^>]*+>\s*+(<pre><code\b[^>]*+>.*?</code></pre>)\s*+</div>\s*+</div>", "$1")
             ; Two nested <div>s wrapping an inline <code>.
-            html := RegExReplace(html, "is)<div\b[^>]*>\s*<div\b[^>]*>\s*(<code\b[^>]*>.*?</code>)\s*</div>\s*</div>", "$1")
+            html := RegExReplace(html, "is)<div\b[^>]*+>\s*+<div\b[^>]*+>\s*+(<code\b[^>]*+>.*?</code>)\s*+</div>\s*+</div>", "$1")
         }
         return html
     }
 
     static _HasChatGptCodeContainerShape(html) {
-        return RegExMatch(html, "is)^\s*<pre\b[^>]+>\s*<pre\b[^>]*><code\b")
-            || RegExMatch(html, "is)^\s*<pre\b[^>]*\bcode-block__code\b[^>]*>\s*<code\b")
-            || RegExMatch(html, "is)^\s*<div\b[^>]*>\s*<div\b[^>]*>\s*<pre><code\b")
-            || RegExMatch(html, "is)^\s*<div\b[^>]*>\s*<div\b[^>]*>\s*<code\b")
+        return RegExMatch(html, "is)^\s*+<pre\b[^>]++>\s*+<pre\b[^>]*+><code\b")
+            || RegExMatch(html, "is)^\s*+<pre\b[^>]*\bcode-block__code\b[^>]*+>\s*+<code\b")
+            || RegExMatch(html, "is)^\s*+<div\b[^>]*+>\s*+<div\b[^>]*+>\s*+<pre><code\b")
+            || RegExMatch(html, "is)^\s*+<div\b[^>]*+>\s*+<div\b[^>]*+>\s*+<code\b")
     }
 
     /**
