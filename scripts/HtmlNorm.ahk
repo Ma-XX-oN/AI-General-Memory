@@ -62,6 +62,12 @@ DetectSource(cfHtml) {
  */
 class HtmlNorm {
     /**
+     * Version marker emitted by PasteAsMd debug logs for runtime verification.
+     * @type {string}
+     */
+    static VERSION := "HtmlNorm/2026-10-08.2"
+
+    /**
      * Thinking block inner texts; index N corresponds to placeholder ¤THINKING_N¤.
      * @type {Array}
      */
@@ -569,8 +575,9 @@ class HtmlNorm {
      * after `CleanMarkdown()` removes the tags. This normalization restores the
      * semantic list item before pandoc sees it.
      *
-     * Only wrapper-only leaf items are changed; items that contain nested lists
-     * or sibling content are left for the broader HTML pipeline.
+     * Wrapper-only leaf items with empty paragraph content are removed. Items
+     * that contain nested lists or sibling content are left for the broader
+     * HTML pipeline.
      *
      * @param {string} html
      * @returns {string}
@@ -581,9 +588,11 @@ class HtmlNorm {
         if !RegExMatch(html, "i)<div\b")
             return html
         pos := 1
-        pat := "is)<li\b([^>]*)>\s*(?:<div\b[^>]*>\s*)+<p\b[^>]*>((?:(?!</p>|<ul\b|<ol\b|<li\b).)++)</p>\s*(?:</div>\s*)+</li>"
+        pat := "is)<li\b([^>]*)>\s*(?:<div\b[^>]*>\s*)+<p\b[^>]*>((?:(?!</p>|<ul\b|<ol\b|<li\b).)*)</p>\s*(?:</div>\s*)+</li>"
         while RegExMatch(html, pat, &m, pos) {
-            replacement := "<li" . m[1] . ">" . m[2] . "</li>"
+            replacement := Trim(m[2], " `t`r`n" . Chr(160)) = ""
+                ? ""
+                : "<li" . m[1] . ">" . m[2] . "</li>"
             html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
             pos := m.Pos + StrLen(replacement)
         }

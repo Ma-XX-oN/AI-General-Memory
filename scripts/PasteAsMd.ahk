@@ -56,6 +56,7 @@ class PasteMd {
   }
 
   ; Change this if pandoc isn't on PATH.
+  static VERSION := "PasteMd/2026-10-08.2"
   static PANDOC_EXE := "C:\Users\adria\AppData\Local\Pandoc\pandoc.exe"
 
   static PASTE_SENTINEL_DELAY_MS := 200
@@ -716,6 +717,7 @@ class PasteMd {
       PasteMd._RotateLogFiles()
       dbgF := FileOpen(PasteMd.DEBUG_PASTE_MD_LOG, "w", "UTF-8")
       dbgF.Write("PasteAsMd debug — " FormatTime(, "yyyy-MM-dd HH:mm:ss") PasteMd.LOG_SECTION_SEPARATOR)
+      PasteMd._DbgSection(dbgF, "0v. runtime version", PasteMd.VERSION "`n" HtmlNorm.VERSION)
     }
 
     clipSaved := ClipboardAll()

@@ -158,6 +158,12 @@ normWrappedDivs := HtmlNorm.Normalize(liWrappedDivs, "chatgpt", false, false)
 Chk("wrapper divs removed from li", !InStr(normWrappedDivs, "<div>"))
 Chk("list item content preserved", InStr(normWrappedDivs, "<li><code>.ci/run</code> — request</li>"))
 
+liWrappedEmpty := '<ul><li><div><div><p>RED item</p></div></div></li><li><div><div><p></p></div></div></li></ul>'
+normWrappedEmpty := HtmlNorm.Normalize(liWrappedEmpty, "chatgpt", false, false)
+Chk("empty wrapper list item removed", !InStr(normWrappedEmpty, "<li></li>") && !InStr(normWrappedEmpty, "<p></p>"))
+Chk("non-empty sibling preserved", InStr(normWrappedEmpty, "<li>RED item</li>"))
+Chk("empty wrapper normalized exactly", normWrappedEmpty = "<ul><li>RED item</li></ul>")
+
 ; ── 7: Thinking block extraction ──────────────────────────────────────────────
 Log("── 7: Thinking block extraction ─────────────────────")
 
