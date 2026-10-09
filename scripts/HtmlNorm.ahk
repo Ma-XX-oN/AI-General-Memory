@@ -158,7 +158,12 @@ class HtmlNorm {
         ;      its own line, content indented), instead of tight (number + content inline).
         html := RegExReplace(html, "is)(<li\b[^>]*\bid=`"user-content-fn-[^`"]*`"[^>]*>)\s*<p\b[^>]*>(.*?)</p>\s*(</li>)", "$1$2$3")
 
-        ; 12c. Tight-list normalization: unwrap solitary paragraph wrappers in list items.
+        ; 12c. Tight-list normalization: unwrap wrapper-only block containers in list items.
+        ;      <li><div><div><p>text</p></div></div></li> → <li>text</li>
+        ;      This avoids raw HTML wrapper output from pandoc.
+        html := HtmlNorm._NormalizeListItemBlockWrappers(html)
+
+        ; 12d. Tight-list normalization: unwrap solitary paragraph wrappers in list items.
         ;      <li><p>text</p></li> → <li>text</li>
         ;      This avoids loose-list markdown output (blank lines between items).
         html := HtmlNorm._NormalizeTightListItems(html)
@@ -551,6 +556,36 @@ class HtmlNorm {
             replacement .= "</li>"
             html := SubStr(html, 1, mTask.Pos - 1) . replacement . SubStr(html, mTask.Pos + mTask.Len)
             pos := mTask.Pos + StrLen(replacement)
+        }
+        return html
+    }
+
+    /**
+     * Unwraps block-only containers inside simple list items.
+     *
+     * ChatGPT may emit ordinary bullet items as nested block containers such as
+     * `<li><div><div><p>text</p></div></div></li>`. Pandoc preserves those
+     * `<div>` wrappers as raw HTML in GFM, which produces blank list markers
+     * after `CleanMarkdown()` removes the tags. This normalization restores the
+     * semantic list item before pandoc sees it.
+     *
+     * Only wrapper-only leaf items are changed; items that contain nested lists
+     * or sibling content are left for the broader HTML pipeline.
+     *
+     * @param {string} html
+     * @returns {string}
+     */
+    static _NormalizeListItemBlockWrappers(html) {
+        if !RegExMatch(html, "i)<li\b")
+            return html
+        if !RegExMatch(html, "i)<div\b")
+            return html
+        pos := 1
+        pat := "is)<li\b([^>]*)>\s*(?:<div\b[^>]*>\s*)+<p\b[^>]*>((?:(?!</p>|<ul\b|<ol\b|<li\b).)++)</p>\s*(?:</div>\s*)+</li>"
+        while RegExMatch(html, pat, &m, pos) {
+            replacement := "<li" . m[1] . ">" . m[2] . "</li>"
+            html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
+            pos := m.Pos + StrLen(replacement)
         }
         return html
     }

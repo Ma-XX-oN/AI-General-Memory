@@ -150,6 +150,14 @@ Chk("todoItem no placeholders",
     !InStr(normTodoCompleted, "¤CHK¤") && !InStr(normTodoCompleted, "¤UNCHK¤")
     && !InStr(normTodoPending, "¤CHK¤") && !InStr(normTodoPending, "¤UNCHK¤"))
 
+; ── 6c: List item wrapper divs (ChatGPT bullet shape) ─────────────────────────
+Log("── 6c: List item wrapper divs ───────────────────────")
+
+liWrappedDivs := '<ul><li><div><div><p><code><span>.ci/run</span></code> <span>— </span><span><span>request</span></span></p></div></div></li></ul>'
+normWrappedDivs := HtmlNorm.Normalize(liWrappedDivs, "chatgpt", false, false)
+Chk("wrapper divs removed from li", !InStr(normWrappedDivs, "<div>"))
+Chk("list item content preserved", InStr(normWrappedDivs, "<li><code>.ci/run</code> — request</li>"))
+
 ; ── 7: Thinking block extraction ──────────────────────────────────────────────
 Log("── 7: Thinking block extraction ─────────────────────")
 
