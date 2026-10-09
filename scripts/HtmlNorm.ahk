@@ -595,7 +595,7 @@ class HtmlNorm {
             return html
 
         pos := 1
-        while RegExMatch(html, "is)<li\b[^>]*>", &mLi, pos) {
+        while RegExMatch(html, "is)<li\b[^>]*+>", &mLi, pos) {
             liEnd := HtmlNorm._FindMatchingElementEnd(html, mLi.Pos, "li")
             if !liEnd {
                 pos := mLi.Pos + mLi.Len
@@ -622,18 +622,40 @@ class HtmlNorm {
      * @returns {string}
      */
     static _NormalizeListItemBlockWrapper(liBlock) {
-        if !RegExMatch(liBlock, "is)^<li\b([^>]*)>(.*)</li>$", &mLi)
+        if !RegExMatch(liBlock, "is)^<li\b([^>]*+)>", &mLi)
             return liBlock
 
         attrs := mLi[1]
-        inner := HtmlNorm._UnwrapOnlyNestedDivs(mLi[2])
+        closeLen := StrLen("</li>")
+        innerLen := StrLen(liBlock) - mLi.Len - closeLen
+        if (innerLen < 0 || SubStr(liBlock, -closeLen + 1) != "</li>")
+            return liBlock
+
+        inner := HtmlNorm._UnwrapOnlyNestedDivs(SubStr(liBlock, mLi.Len + 1, innerLen))
         if (inner = "")
             return liBlock
 
-        if !RegExMatch(inner, "is)^\s*<p\b[^>]*>(.*?)</p>\s*$", &mP)
+        pos := HtmlNorm._SkipHtmlWhitespace(inner, 1)
+        if !RegExMatch(inner, "is)<p\b[^>]*+>", &mP, pos)
+            return liBlock
+        if (mP.Pos != pos)
             return liBlock
 
-        content := mP[1]
+        pEnd := HtmlNorm._FindMatchingElementEnd(inner, pos, "p")
+        if !pEnd
+            return liBlock
+
+        after := HtmlNorm._SkipHtmlWhitespace(inner, pEnd + 1)
+        if (after <= StrLen(inner))
+            return liBlock
+
+        closeLen := StrLen("</p>")
+        contentStart := pos + mP.Len
+        contentLen := pEnd - closeLen + 1 - contentStart
+        if (contentLen < 0)
+            return liBlock
+
+        content := SubStr(inner, contentStart, contentLen)
         if RegExMatch(content, "is)<(?:ul|ol|li)\b")
             return liBlock
 
@@ -652,7 +674,7 @@ class HtmlNorm {
         unwrapped := false
         loop {
             pos := HtmlNorm._SkipHtmlWhitespace(html, 1)
-            if !RegExMatch(html, "is)<div\b[^>]*>", &mDiv, pos)
+            if !RegExMatch(html, "is)<div\b[^>]*+>", &mDiv, pos)
                 return unwrapped ? html : ""
             if (mDiv.Pos != pos)
                 return ""
@@ -922,13 +944,13 @@ class HtmlNorm {
      * @returns {integer}
      */
     static _FindMatchingElementEnd(html, openPos, tagName) {
-        openPat := "is)<" . tagName . "\b[^>]*>"
+        openPat := "is)<" . tagName . "\b[^>]*+>"
         if !RegExMatch(html, openPat, &mOpen, openPos)
             return 0
         if (mOpen.Pos != openPos)
             return 0
 
-        tagPat := "is)</?" . tagName . "\b[^>]*>"
+        tagPat := "is)</?" . tagName . "\b[^>]*+>"
         depth := 1
         pos := openPos + mOpen.Len
         while RegExMatch(html, tagPat, &mTag, pos) {
