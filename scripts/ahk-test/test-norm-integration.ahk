@@ -102,6 +102,23 @@ Chk("CX code: return preserved",            InStr(normCX, "return"))
 Chk("CX code: hljs-keyword spans stripped", !InStr(normCX, "hljs-keyword"))
 Chk("CX code: div wrapper removed",         !InStr(normCX, "text-size-chat"))
 
+; ── 3b: Ordered list with nested div wrappers around paragraph items ──────────
+Log("── 3b: Ordered list item block wrappers ─────────────────")
+
+; ChatGPT selection from PasteAsMd_debug_20261013_182104_bullets_have_multiple_lines_between_them.log:
+; <li><div><div><p><span>text</span></p></div></div></li>
+gpWrappedList := '<ol>'
+    . '<li><div><div><p><span>Retrieve </span><span>source </span><span>files </span><span>completely.</span></p></div></div></li>'
+    . '<li><div><div><p><span>Verify </span><span>completeness.</span></p></div></div></li>'
+    . '<li><div><div><p></p></div></div></li>'
+    . '</ol>'
+normGPWrappedList := HtmlNorm.Normalize(gpWrappedList, "chatgpt", false, false)
+Chk("wrapped list: item wrapper divs removed", !InStr(normGPWrappedList, "<div"))
+Chk("wrapped list: span text preserved",
+    InStr(normGPWrappedList, "<li>Retrieve source files completely.</li>"))
+Chk("wrapped list: empty trailing item removed",
+    !RegExMatch(normGPWrappedList, "is)<li>\s*+</li>"))
+
 ; ── 4: Task list — Claude Code (input with disabled/style attrs + span child) ──
 Log("── 4: Task list — Claude Code (real input attrs) ─────────")
 

@@ -628,7 +628,7 @@ class HtmlNorm {
         attrs := mLi[1]
         closeLen := StrLen("</li>")
         innerLen := StrLen(liBlock) - mLi.Len - closeLen
-        if (innerLen < 0 || SubStr(liBlock, -closeLen + 1) != "</li>")
+        if (innerLen < 0 || SubStr(liBlock, StrLen(liBlock) - closeLen + 1) != "</li>")
             return liBlock
 
         inner := HtmlNorm._UnwrapOnlyNestedDivs(SubStr(liBlock, mLi.Len + 1, innerLen))
