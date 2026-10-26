@@ -46,6 +46,7 @@ DetectSource(cfHtml) {
         || InStr(cfHtml, "data-user-message-bubble=")
         || InStr(cfHtml, "data-markdown-text-style=`"assistant-message`"")
         || InStr(cfHtml, "overflow-visible!")
+        || RegExMatch(cfHtml, "i)<div\b[^>]*>\s*#chatgpt-mermaid-[\w-]+\{")
         return "chatgpt"
     return "unknown"
 }
@@ -56,16 +57,73 @@ DetectSource(cfHtml) {
  * Populated arrays after `Normalize()` returns:
  *   - `HtmlNorm._thinkingBlocks` — inner texts of thinking blocks (¤THINKING_N¤)
  *   - `HtmlNorm._userMsgBlocks`  — user message raw text (¤USERMSG_N¤)
+ *   - `HtmlNorm._svgBlocks`      — original diagram SVGs (¤SVG_N¤)
  *
  * These must be copied into `PasteMd._thinkingBlocks` / `_userMsgBlocks` by
  * the caller before invoking `RestoreThinkingBlocks` / `RestoreUserMsgBlocks`.
+ * Copy `_svgBlocks` as well before invoking `RestoreSvgBlocks`.
  */
 class HtmlNorm {
     /**
      * Version marker emitted by PasteAsMd debug logs for runtime verification.
      * @type {string}
      */
-    static VERSION := "HtmlNorm/2026-10-09.1"
+    static VERSION := "HtmlNorm/2026-10-22.3"
+
+    /**
+     * Fallback for ChatGPT Mermaid SVGs whose clipboard serialization omits CSS.
+     *
+     * The shared dark flowchart constants are taken from the saved ChatGPT page
+     * used to verify the SVG rendering. We deliberately assume these defaults
+     * are stable enough to embed: shared/scoped application CSS need not make
+     * each exported image depend on the application or a saved HTML file.
+     * This is an assumption, not a promise about OpenAI's renderer. If a later
+     * theme/renderer changes these defaults, update this single definition from
+     * a complete reference and check the rendered output again.
+     *
+     * Embed only when the recognized ChatGPT SVG has no stylesheet. Keep all
+     * supplied inline styling, geometry, and existing stylesheets. Each SVG is
+     * a separate image, so these generic selectors cannot affect its neighbors.
+     * Explicit diagram classes and themes can differ; the status-class colors
+     * below are fallback assumptions as well, not inferred diagram semantics.
+     * Missing SVG geometry cannot be recovered by supplying CSS.
+     * @type {string}
+     */
+    static CHATGPT_SVG_FALLBACK_CSS := '
+    (
+    svg,.label{font-family:-apple-system-body,ui-sans-serif,-apple-system,system-ui,"Segoe UI",Helvetica,"Apple Color Emoji",Arial,sans-serif,"Segoe UI Emoji","Segoe UI Symbol";font-size:16px;fill:rgb(237,237,237);color:rgb(237,237,237)}
+    .edge-thickness-normal{stroke-width:1px}.edge-thickness-thick{stroke-width:3.5px}
+    .edge-pattern-solid{stroke-dasharray:0}.edge-thickness-invisible{stroke-width:0;fill:none}
+    .edge-pattern-dashed{stroke-dasharray:3}.edge-pattern-dotted{stroke-dasharray:2}
+    .marker{fill:rgb(175,175,175);stroke:rgb(175,175,175)}.marker.cross{stroke:rgb(175,175,175)}
+    p{margin:0}.cluster-label text,.label text,span,.cluster text{fill:rgb(237,237,237);color:rgb(237,237,237)}
+    .cluster-label span,.cluster span{color:rgb(237,237,237)}.cluster-label span p{background-color:transparent}
+    .rough-node .label text,.node .label text,.image-shape .label,.icon-shape .label{text-anchor:middle}
+    .node .katex path{fill:#000;stroke:#000;stroke-width:1px}
+    .rough-node .label,.node .label,.image-shape .label,.icon-shape .label{text-align:center}
+    .root .anchor path{fill:rgb(175,175,175)!important;stroke-width:0;stroke:rgb(175,175,175)}
+    .arrowheadPath{fill:rgb(175,175,175)}.edgePath .path{stroke:rgb(175,175,175);stroke-width:1px}
+    .flowchart-link{stroke:rgb(175,175,175);fill:none}
+    .edgeLabel{background-color:rgb(0,0,0);text-align:center}.edgeLabel p{background-color:rgb(0,0,0)}
+    .edgeLabel rect{opacity:.5;background-color:rgb(0,0,0);fill:rgb(0,0,0)}.labelBkg{background-color:rgba(0,0,0,.5)}
+    .cluster rect{fill:rgb(48,48,48);stroke:rgba(255,255,255,.15);stroke-width:1px}
+    .flowchartTitleText{text-anchor:middle;font-size:18px;fill:rgb(237,237,237)}rect.text{fill:none;stroke-width:0}
+    .icon-shape,.image-shape{background-color:rgb(0,0,0);text-align:center}
+    .icon-shape p,.image-shape p{background-color:rgb(0,0,0);padding:2px}
+    .icon-shape .label rect,.image-shape .label rect{opacity:.5;background-color:rgb(0,0,0);fill:rgb(0,0,0)}
+    .label-icon{display:inline-block;height:1em;overflow:visible;vertical-align:-.125em}
+    .node .label-icon path{fill:currentColor;stroke:revert;stroke-width:revert}
+    .node text{font-size:14px;font-weight:600;letter-spacing:normal;fill:rgb(153,206,255)}
+    .edgeLabels text{font-size:13px;font-weight:600;letter-spacing:-.08px;fill:rgb(153,206,255)}
+    .node tspan[font-weight="normal"],.edgeLabels tspan[font-weight="normal"]{font-weight:600}
+    .edgeLabel .label rect{opacity:1;rx:13px;ry:13px;fill:rgb(0,14,26);stroke:rgb(26,62,95);stroke-width:1px}
+    .node rect,.node circle,.node ellipse,.node polygon,.node path{fill:rgb(0,40,77);stroke:rgba(255,255,255,.1);stroke-width:1px}
+    .node rect{rx:16px;ry:16px}.node.mermaid-decision .label-container{fill:rgb(0,14,26);stroke:rgb(26,62,95);stroke-dasharray:2,2}
+    .edgePaths .flowchart-link{stroke:rgb(175,175,175);stroke-width:1px;stroke-linecap:round;stroke-linejoin:round}
+    .done rect,.done polygon,.done ellipse,.done circle,.done path{fill:rgb(20,83,45)!important;stroke:rgb(34,197,94)!important;color:#fff!important;stroke-width:2px!important}.done tspan{fill:#fff!important}
+    .active rect,.active polygon,.active ellipse,.active circle,.active path{fill:rgb(30,64,175)!important;stroke:rgb(59,130,246)!important;color:#fff!important;stroke-width:2px!important}.active tspan{fill:#fff!important}
+    .blocked rect,.blocked polygon,.blocked ellipse,.blocked circle,.blocked path{fill:rgb(127,29,29)!important;stroke:rgb(239,68,68)!important;color:#fff!important;stroke-width:2px!important}.blocked tspan{fill:#fff!important}
+    )'
 
     /**
      * Thinking block inner texts; index N corresponds to placeholder ¤THINKING_N¤.
@@ -78,6 +136,12 @@ class HtmlNorm {
      * @type {Array}
      */
     static _userMsgBlocks := []
+
+    /**
+     * Original diagram SVGs, indexed by their protected placeholders.
+     * @type {Array}
+     */
+    static _svgBlocks := []
 
     /**
      * Normalizes an HTML fragment for pandoc processing.
@@ -99,7 +163,8 @@ class HtmlNorm {
      *   14. Residual span tag removal
      *   15. Bare <li> list wrapping in <ol>
      *   16. <code> element normalization (line-break conversion, pre-wrapping)
-     *   17. Nested container unwrapping
+     *   17. Empty code/pre removal
+     *   18. Nested container unwrapping
      *
      * @param {string} htmlFrag  - HTML fragment from the CF_HTML clipboard
      * @param {string} source    - Source identifier from DetectSource()
@@ -110,7 +175,13 @@ class HtmlNorm {
     static Normalize(htmlFrag, source, showPoster, showImg) {
         HtmlNorm._thinkingBlocks := []
         HtmlNorm._userMsgBlocks  := []
+        HtmlNorm._svgBlocks := []
         html := htmlFrag
+
+        if (source = "chatgpt") {
+            html := HtmlNorm._RemoveChatGptUi(html)
+            html := HtmlNorm._ExtractChatGptSvg(html)
+        }
 
         ; 1. Handle <img> tags.
         html := HtmlNorm._ProcessImgTags(html, showImg)
@@ -190,7 +261,10 @@ class HtmlNorm {
         ; 16. Normalize <code> elements.
         html := HtmlNorm._NormalizeCodeElements(html)
 
-        ; 17. Unwrap nested containers that obscure code blocks.
+        ; 17. Remove empty code/pre blocks before pandoc emits blank fences.
+        html := HtmlNorm._RemoveEmptyCodeBlocks(html)
+
+        ; 18. Unwrap nested containers that obscure code blocks.
         if (source != "chatgpt" || HtmlNorm._HasChatGptCodeContainerShape(html))
             html := HtmlNorm._UnwrapNestedContainers(html)
 
@@ -200,6 +274,82 @@ class HtmlNorm {
     ; ─────────────────────────────────────────────────────────────────────────
     ; Phase methods
     ; ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Removes ChatGPT action controls and conversation status banners.
+     * Removes whole balanced UI subtrees while retaining message content.
+     * @param {string} html
+     * @returns {string}
+     */
+    static _RemoveChatGptUi(html) {
+        ; Some clipboard providers flatten SVG into a leaf div containing its
+        ; stylesheet and labels. Treat that representation like the SVG image.
+        ; Without SVG bytes, retain the labels and identify the unavailable image.
+        pos := 1
+        while RegExMatch(html, "is)<div\b[^>]*>(\s*#chatgpt-mermaid-[\w-]+\{[^<]*)</div>", &flat, pos) {
+            labels := flat[1]
+            rule := "is)\A\s*(?:#chatgpt-mermaid-[^{}<]*|@keyframes[^{}<]*)(?<block>\{(?:[^{}]++|(?&block))*\})"
+            while RegExMatch(labels, rule, &css)
+                labels := SubStr(labels, css.Len + 1)
+            replacement := "<p><em>Diagram text (image unavailable):</em> " . labels . "</p>"
+            html := SubStr(html, 1, flat.Pos - 1) . replacement . SubStr(html, flat.Pos + flat.Len)
+            pos := flat.Pos + StrLen(replacement)
+        }
+        pos := 1
+        pat := 'is)<(div|aside)\b(?:[^>"' . "'" . ']|"[^"]*"|' . "'[^']*'" . ')*>'
+        while RegExMatch(html, pat, &m, pos) {
+            tag := m[0]
+            isControls := RegExMatch(tag, 'i)\b(?:data-)?markdown-copy="exclude"')
+                || RegExMatch(tag, 'i)\bclass="[^"]*\bturn-action-controls\b')
+            isBanner := (StrLower(m[1]) = "aside" && (InStr(tag, 'role="alert"')
+                || RegExMatch(SubStr(html, m.Pos), "is)^<aside\b[^>]*>(?:(?!</aside>).)*You've reached the maximum length for this conversation")))
+            if (isControls || isBanner) {
+                endPos := HtmlNorm._FindMatchingElementEnd(html, m.Pos, m[1])
+                if endPos {
+                    html := SubStr(html, 1, m.Pos - 1) . SubStr(html, endPos + 1)
+                    pos := m.Pos
+                    continue
+                }
+            }
+            pos := m.Pos + m.Len
+        }
+        ; ChatGPT decorates real links with UI attributes. Keep the destination
+        ; so pandoc parses their bold/code children instead of emitting raw HTML.
+        pos := 1
+        linkPat := 'is)<a\b(?:[^>"' . "'" . ']|"[^"]*"|' . "'[^']*'" . ')*>'
+        while RegExMatch(html, linkPat, &m, pos) {
+            replacement := "<a>"
+            if RegExMatch(m[0], 'is)\bhref\s*=\s*("[^"]*"|' . "'[^']*'" . ')', &href)
+                replacement := "<a href=" . href[1] . ">"
+            html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
+            pos := m.Pos + StrLen(replacement)
+        }
+        return html
+    }
+
+    /**
+     * Protects ChatGPT diagram SVGs from generic image stripping and pandoc.
+     * A containing code widget can later replace its placeholder with Mermaid
+     * source; otherwise the original SVG is restored as an embedded image.
+     * @param {string} html
+     * @returns {string}
+     */
+    static _ExtractChatGptSvg(html) {
+        pos := 1
+        while RegExMatch(html, 'is)<svg\b(?=[^>]*\bid="chatgpt-mermaid-)[^>]*>', &m, pos) {
+            endPos := HtmlNorm._FindMatchingElementEnd(html, m.Pos, "svg")
+            if !endPos
+                throw Error("Unclosed ChatGPT diagram SVG")
+            svg := SubStr(html, m.Pos, endPos - m.Pos + 1)
+            if !RegExMatch(svg, "i)<style\b")
+                svg := SubStr(svg, 1, m.Len) . "<style>" . HtmlNorm.CHATGPT_SVG_FALLBACK_CSS . "</style>" . SubStr(svg, m.Len + 1)
+            HtmlNorm._svgBlocks.Push(svg)
+            replacement := "<p>¤SVG_" . HtmlNorm._svgBlocks.Length . "¤</p>"
+            html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, endPos + 1)
+            pos := m.Pos + StrLen(replacement)
+        }
+        return html
+    }
 
     /**
      * Replaces `<img>` and `<svg>` elements according to the showImg flag.
@@ -277,6 +427,10 @@ class HtmlNorm {
             ; user turn (data-testid="user-message")
             html := RegExReplace(html, "i)(<div\b[^>]*\bdata-testid=`"user-message`"[^>]*+>)", "$1<p>¤POSTER_User¤</p>")
         } else if (source = "chatgpt") {
+            ; Flattened captures retain the application signature but no roles.
+            if RegExMatch(html, "i)<pre\b[^>]*>\s*<code>\s*" . Chr(96) . "{3,}mermaid")
+                && !RegExMatch(html, "i)data-(?:turn|markdown-text-style|user-message-bubble)=")
+                html := "<p>¤POSTER_AI¤</p>" . html
             ; AI turn: prefer data-turn="assistant"; fall back to legacy data-turn-id="request-WEB:..." prefix.
             ; Both patterns may match the same turn container in older captures — the duplicate dedup in
             ; PasteMarkdown collapses consecutive same-type markers, so double injection is harmless.
@@ -397,6 +551,36 @@ class HtmlNorm {
      * @returns {string}
      */
     static _NormalizeChatGptCodeBlocks(html) {
+        ; An unlabelled code container can hold the widget's fenced copy source.
+        ; Explicitly labelled examples (such as language-markdown) stay literal.
+        pos := 1
+        while RegExMatch(html, "is)<pre\b[^>]*>\s*<code>(.*?)</code>\s*</pre>", &m, pos) {
+            replacement := HtmlNorm._MermaidCopyToCodeHtml(HtmlNorm._DecodeBasicHtmlEntities(m[1]))
+            if (replacement != "") {
+                html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
+                pos := m.Pos + StrLen(replacement)
+            } else
+                pos := m.Pos + m.Len
+        }
+        ; Rendered Mermaid widgets carry fenced Markdown in their copy attribute.
+        ; Convert the widget to semantic code, leaving fence emission to pandoc.
+        pos := 1
+        widgetPat := 'is)<div\b(?:[^>"' . "'" . ']|"[^"]*"|' . "'[^']*'" . ')*>'
+        while RegExMatch(html, widgetPat, &m, pos) {
+            if RegExMatch(m[0], 'is)\b(?:data-)?markdown-copy-text="([^"]*)"', &copy) {
+                source := HtmlNorm._DecodeBasicHtmlEntities(copy[1])
+                replacement := HtmlNorm._MermaidCopyToCodeHtml(source)
+                if (replacement != "") {
+                    endPos := HtmlNorm._FindMatchingElementEnd(html, m.Pos, "div")
+                    if endPos {
+                        html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, endPos + 1)
+                        pos := m.Pos + StrLen(replacement)
+                        continue
+                    }
+                }
+            }
+            pos := m.Pos + m.Len
+        }
         pos := 1
         while RegExMatch(html, "is)<pre\b[^>]*\boverflow-visible\b[^>]*+>(.*?)</pre>", &m, pos) {
             inner := m[1]
@@ -421,6 +605,22 @@ class HtmlNorm {
             pos := m.Pos + StrLen(replacement)
         }
         return html
+    }
+
+    /**
+     * Converts fenced Mermaid copy text to canonical HTML, or returns an empty
+     * string when the text is not a complete Mermaid block.
+     * @param {string} source
+     * @returns {string}
+     */
+    static _MermaidCopyToCodeHtml(source) {
+        pat := "is)\A\s*(" . Chr(96) . "{3,})mermaid[^\S\r\n]*\r?\n(.*?)\r?\n\1\s*\z"
+        if !RegExMatch(source, pat, &code)
+            return ""
+        content := StrReplace(code[2], "&", "&amp;")
+        content := StrReplace(content, "<", "&lt;")
+        content := StrReplace(content, ">", "&gt;")
+        return '<pre><code class="language-mermaid">' . content . '</code></pre>'
     }
 
     /**
@@ -897,6 +1097,25 @@ class HtmlNorm {
             }
             html := SubStr(html, 1, m.Pos - 1) . replacement . SubStr(html, m.Pos + m.Len)
             pos := m.Pos + StrLen(replacement)
+        }
+        return html
+    }
+
+    /**
+     * Removes empty `<pre><code>` and `<code>` elements.
+     *
+     * Clipboard fragments can include UI-created empty code blocks after a text
+     * selection.  Pandoc renders those as blank fenced areas, so drop them once
+     * code content has been normalized and before container unwrapping.
+     * @param {string} html
+     * @returns {string}
+     */
+    static _RemoveEmptyCodeBlocks(html) {
+        prev := ""
+        while (html != prev) {
+            prev := html
+            html := RegExReplace(html, "is)<pre\b[^>]*+>\s*+<code\b[^>]*+>(?:\s|&nbsp;|&#160;)*+</code>\s*+</pre>", "")
+            html := RegExReplace(html, "is)<code\b[^>]*+>(?:\s|&nbsp;|&#160;)*+</code>", "")
         }
         return html
     }

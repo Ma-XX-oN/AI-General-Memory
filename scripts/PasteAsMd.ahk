@@ -89,6 +89,12 @@ class PasteMd {
   ; Temporary storage for user message text blocks extracted during preprocessing.
   static _userMsgBlocks := []
 
+  /**
+   * Original diagram SVGs protected during HTML normalization.
+   * @type {Array}
+   */
+  static _svgBlocks := []
+
   static gPasteMenu := Menu()
   static _menuX := 0
   static _menuY := 0
@@ -605,6 +611,7 @@ class PasteMd {
           md := PasteMd.CleanMarkdown(mdRaw)
           md := PasteMd.RestoreThinkingBlocks(md)
           md := PasteMd.RestoreUserMsgBlocks(md)
+          md := PasteMd.RestoreSvgBlocks(md)
           md := PasteMd.RemoveListShellPlaceholders(md)
           hadTrailingBreak := RegExMatch(md, "\n$")
           md := PasteMd.TrimBlankPadding(md)
@@ -824,7 +831,9 @@ class PasteMd {
     f.Close()
 
     ; No wrapping, LF-only.
-    cmd := '"' pandocExe '" -f html -t gfm --wrap=none --eol=lf "' tmpHtml '"'
+    ; Layout divs must not become native Div nodes: GFM preserves their
+    ; attributes as raw HTML, including multiline clipboard UI attributes.
+    cmd := '"' pandocExe '" -f html-native_divs -t gfm --wrap=none --eol=lf "' tmpHtml '"'
     cmd .= ' -o "' tmpMd '"'
 
     PasteMd._BusyUpdate("Converting via pandoc")
@@ -1162,6 +1171,7 @@ class PasteMd {
     html := HtmlNorm.Normalize(htmlFrag, DetectSource(cfHtml), showPoster, PasteMd.SHOW_IMG)
     PasteMd._thinkingBlocks := HtmlNorm._thinkingBlocks
     PasteMd._userMsgBlocks  := HtmlNorm._userMsgBlocks
+    PasteMd._svgBlocks := HtmlNorm._svgBlocks
     return html
   }
 
@@ -1252,6 +1262,31 @@ class PasteMd {
         details := "<details>`n<summary>Thinking</summary>`n`n" content "`n</details>"
       }
       md := StrReplace(md, placeholder, details)
+    }
+    return md
+  }
+
+  /**
+   * Restores diagrams as self-contained Markdown images using their original
+   * UTF-8 SVG bytes. Base64 keeps CSS, URLs, and punctuation out of Markdown.
+   * @param {string} md
+   * @returns {string}
+   */
+  static RestoreSvgBlocks(md) {
+    for i, svg in this._svgBlocks {
+      placeholder := "¤SVG_" . i . "¤"
+      if !InStr(md, placeholder)
+        continue
+      size := StrPut(svg, "UTF-8")
+      bytes := Buffer(size)
+      StrPut(svg, bytes, "UTF-8")
+      chars := 0
+      if !DllCall("Crypt32\CryptBinaryToStringW", "Ptr", bytes.Ptr, "UInt", size - 1, "UInt", 0x40000001, "Ptr", 0, "UInt*", &chars)
+        throw OSError(A_LastError, "SVG base64 sizing failed")
+      encoded := Buffer(chars * 2)
+      if !DllCall("Crypt32\CryptBinaryToStringW", "Ptr", bytes.Ptr, "UInt", size - 1, "UInt", 0x40000001, "Ptr", encoded.Ptr, "UInt*", &chars)
+        throw OSError(A_LastError, "SVG base64 encoding failed")
+      md := StrReplace(md, placeholder, "![Mermaid diagram](data:image/svg+xml;base64," . StrGet(encoded, "UTF-16") . ")")
     }
     return md
   }

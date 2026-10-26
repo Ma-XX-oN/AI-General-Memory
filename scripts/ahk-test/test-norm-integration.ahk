@@ -233,6 +233,20 @@ Chk("GP code: return hi preserved",            InStr(normGPCode, "return") && In
 Chk("GP code: multi-line (newline present)",
     InStr(normGPCode, "def greet(name):" . Chr(10)))
 
+; ── 8b: ChatGPT selected paragraph plus empty trailing code block ─────────────
+Log("── 8b: ChatGPT empty trailing code block ─────────────────")
+
+gpEmptyFenceHtml := '<p><span>For </span><span>example, </span><span>the </span>'
+    . '<span>intended </span><span>operations </span><span>could </span>'
+    . '<span>be:</span></p><div><div><pre dir="ltr"><code></code></pre></div></div>'
+normGPEmptyFence := HtmlNorm.Normalize(gpEmptyFenceHtml, "unknown", false, false)
+Chk("GP empty code: paragraph text preserved",
+    InStr(normGPEmptyFence, "<p>For example, the intended operations could be:</p>"))
+Chk("GP empty code: no empty pre/code remains",
+    !RegExMatch(normGPEmptyFence, "is)<pre\b[^>]*+>\s*+<code\b[^>]*+>\s*+</code>\s*+</pre>"))
+Chk("GP empty code: no inline empty code remains",
+    !RegExMatch(normGPEmptyFence, "is)<code\b[^>]*+>\s*+</code>"))
+
 ; ── 9: Claude Web code block (div wrapper around pre/code) ────────────────────
 Log("── 9: Claude Web code block (div-wrapped pre/code) ────────")
 
