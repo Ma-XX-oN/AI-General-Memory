@@ -118,6 +118,12 @@
 
 ### Troubleshooting And Guardrails
 
+- Reproduce the latest reported failure through the current production path before claiming a fix. When new captures or examples arrive, make them regression cases; passing an older capture does not verify the new one.
+- For conversion, formatting, and generated-artifact work, inspect the complete output against the user's original content and visual references. Check missing, altered, duplicated, or invented content and formatting; selected assertions and source inspection do not establish rendered equivalence. Verify the rendered result when making visual claims.
+- Separate observed differences from their causes. A changed payload does not prove the user changed their input or workflow; trace capture, transformations, and runtime provenance before assigning a cause. Treat screenshots and original artifacts as evidence, and never use assistant-generated output as the authority for original formatting.
+- Correct the stage that produces the defect. Trace the existing path before adding another transformation, and preserve intentional examples and established behavior instead of adding output cleanup that hides an upstream representation error.
+- Treat established product conventions and accepted session requirements as requirements to preserve, without asking the user to reconfirm them. Continue authorized work when verification exposes another failure; report a concrete blocker only when further progress requires missing information or access.
+- Match every completion claim to the actual verification performed. State which inputs and execution paths were tested, distinguish textual correctness from visual correctness, and explicitly identify unresolved behavior rather than reporting broader confidence than the evidence supports.
 - For any question about current file contents, perform a fresh read of the target file in the same turn before answering; do not answer from cached context alone.
 - If a required memory/reference file cannot be resolved or opened, stop and tell the user explicitly; do not silently ignore the missing reference or answer as if it had been loaded.
 - When a script or test resolves output paths relative to its own location or executable location (for example via `A_ScriptDir`), treat logs and generated artifacts as worktree-specific; inspect the matching worktree/script directory instead of assuming the current shell's repo path.
