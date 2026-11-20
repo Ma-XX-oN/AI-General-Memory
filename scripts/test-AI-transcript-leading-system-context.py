@@ -77,7 +77,7 @@ def _assert_production_output_boundary() -> None:
     raise AssertionError(f"transcript output is unexpectedly short:\n{output}")
   if not nonblank[0].startswith("[claude] "):
     raise AssertionError(f"expected Claude metadata header first:\n{output}")
-  if nonblank[1] != f"(claude-l) {TITLE}":
+  if nonblank[1] != TITLE:
     raise AssertionError(
       "expected the explicit Claude ai-title as the one-line session title, "
       f"found {nonblank[1]!r}:\n{output}"

@@ -85,6 +85,38 @@ def first_difference(actual, expected):
   )
 
 
+_ANSI_RE = re.compile(r'\x1b\[[0-9;]*m')
+_DATE_RANGE_RE = re.compile(r'\[\d{4}-\d\d-\d\d \d\d:\d\d\]-\[\d{4}-\d\d-\d\d \d\d:\d\d\]')
+_FILE_ID_PREFIX_RE = re.compile(r'^((?:\x1b\[[0-9;]*m)*)\([^)]*\) ')
+
+
+def split_header(text):
+  """Return ``(header_lines, body)``: the two session-header lines and the rest."""
+  lines = text.split('\n', 2)
+  if len(lines) < 3:
+    return lines, ''
+  return lines[:2], lines[2]
+
+
+def approved_header_difference(provider, current, legacy):
+  """Return None when the header differs from legacy only in approved ways.
+
+  The two header lines belong to AI-transcript, not to the Phase 6 rendering
+  this test guards.  Approved differences (AI-General-Memory issues):
+  - #22: a ``--file`` session's header omits the ``(id)`` prefix, because
+    its ID is a file name that cannot be passed to ``--id``;
+  - #25: Codex dates come from the session's records, not the file time.
+  """
+  (cur1, cur2), (leg1, leg2) = current, legacy
+  leg2 = _FILE_ID_PREFIX_RE.sub(r'\1', leg2, count=1)
+  if provider == 'codex':
+    cur1 = _DATE_RANGE_RE.sub('[DATES]', cur1)
+    leg1 = _DATE_RANGE_RE.sub('[DATES]', leg1)
+  if (cur1, cur2) == (leg1, leg2):
+    return None
+  return f'current={[cur1, cur2]!r}, legacy={[leg1, leg2]!r}'
+
+
 def args_without_debug(args):
   return [arg for arg in args if arg != '-N']
 
@@ -169,15 +201,24 @@ def main():
       if has_debug:
         continue
 
-      if current_out != legacy_out:
+      current_header, current_body = split_header(current_out)
+      legacy_header, legacy_body = split_header(legacy_out)
+      header_problem = approved_header_difference(provider, current_header, legacy_header)
+      if header_problem:
+        failures.append(
+          f'{provider}/{name}: session header differs beyond approved #22/#25 changes: '
+          f'{header_problem}'
+        )
+      if current_body != legacy_body:
         failures.append(
           f'{provider}/{name}: stdout differs outside approved Phase 6 changes: '
-          f'{first_difference(current_out, legacy_out)}'
+          f'{first_difference(current_body, legacy_body)}'
         )
 
   if failures:
     raise SystemExit('\n'.join(failures))
-  print('PASS: Phase 6 historical parity, with only D015/D016 approved differences')
+  print('PASS: Phase 6 historical parity, with only D015/D016 approved differences '
+        '(header: #22/#25)')
 
 
 if __name__ == '__main__':

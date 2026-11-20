@@ -1,0 +1,3 @@
+# Python packages required by scripts/AI-transcript.py.
+# Python 3.14+ reads .jsonl.zst session files with the built-in compression.zstd.
+zstandard; python_version < "3.14"

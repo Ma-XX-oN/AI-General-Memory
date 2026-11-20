@@ -11,6 +11,53 @@
 Commits go to both repos as needed.  After pushing either, `git pull` in the
 other to keep them in sync (per global CLAUDE.md rule).
 
+## Session files and Python requirements
+
+Session files are `*.jsonl` or Zstandard-compressed `*.jsonl.zst` (Codex
+compresses older rollouts).  All discovery goes through `_session_files()` and
+all reading through `_open_session()`, which decompresses transparently.  When
+both `X.jsonl` and `X.jsonl.zst` exist, the plain file is used and an `INFO`
+line says so.  A missing decompressor or corrupt `.zst` data exits with an
+`ERROR` naming the file; it is never skipped silently.
+
+Decompression uses the standard-library `compression.zstd` on Python 3.14+
+and the `zstandard` package below that, as declared in
+`scripts/requirements-AI-transcript.txt`:
+
+```bash
+python -m pip install -r scripts/requirements-AI-transcript.txt
+```
+
+CI (`scripts/ci_environment.py`) and `scripts/AI-transcript-tests.sh` install
+it; the script itself never installs packages.
+
+## Session metadata cache
+
+`SessionMetaCache` stores per-file metadata so `--ls` doesn't reread
+unchanged sessions:
+
+| Source | Cache file | Covers |
+| --- | --- | --- |
+| Claude | `<CLAUDE_CONFIG_DIR or ~/.claude>/ai-transcript.cache` | `projects/` |
+| Codex | `<CODEX_HOME or ~/.codex>/ai-transcript.cache` | `sessions/` |
+
+Each entry (`SessionFileMeta`) holds the scanned size, record count, first and
+last record timestamps, and source-specific state (Claude: title candidates
+and creation time, via `_cl_scan_title_record`).  Get metadata with
+`_session_cache(source).lookup(path)`.
+
+- Same size as cached: the file is not opened.
+- Plain file grew: only the bytes after the cached size are read.  Only
+  complete lines are counted; the cached size stops at the last newline.
+- File shrank, or a `.jsonl.zst` changed size: rescanned from the start.
+- Files outside the covered directory (e.g. `--file` inputs) are scanned but
+  not cached.
+- Missing files are dropped; an unreadable cache is silently rebuilt.  The
+  cache is written atomically at exit.
+
+Codex session files are located through `_cx_session_file_map()`, which scans
+`sessions/` once per run instead of once per session.
+
 ## Key file sections
 
 Find each section by grepping for the function or class name.  Line numbers

@@ -210,6 +210,10 @@ def run_validation() -> int:
   """Run every existing AIGM/Core validation gate with independent failure visibility."""
   env = core_environment()
 
+  run_gate(
+    "Install AI-transcript Python requirements",
+    [PYTHON, "-m", "pip", "install", "-q", "-r", "scripts/requirements-AI-transcript.txt"],
+  )
   run_gate("Pull-helper shell syntax", ["bash", "-n", "pull-AI-General-Memory.sh"])
   verify_core_identity()
   run_gate(
@@ -229,6 +233,11 @@ def run_validation() -> int:
     "scripts/test-AI-transcript-leading-system-context.py",
     "scripts/test-AI-transcript-codex-revisions.py",
     "scripts/test-AI-transcript-codex-user-context-cli.py",
+    "scripts/test-AI-transcript-id-fragment.py",
+    "scripts/test-AI-transcript-zst.py",
+    "scripts/test-AI-transcript-codex-latest.py",
+    "scripts/test-AI-transcript-cache.py",
+    "scripts/test-AI-transcript-codex-ls.py",
   ]
   run_gate("Python syntax", [PYTHON, "-m", "py_compile", *py_compile_files])
 
@@ -266,6 +275,31 @@ def run_validation() -> int:
   run_gate(
     "Codex user-context CLI acceptance",
     [PYTHON, "scripts/test-AI-transcript-codex-user-context-cli.py"],
+    env=env,
+  )
+  run_gate(
+    "Session --id UUID fragment regression",
+    [PYTHON, "scripts/test-AI-transcript-id-fragment.py"],
+    env=env,
+  )
+  run_gate(
+    "Compressed .jsonl.zst session regression",
+    [PYTHON, "scripts/test-AI-transcript-zst.py"],
+    env=env,
+  )
+  run_gate(
+    "Codex --id latest Guardian-review regression",
+    [PYTHON, "scripts/test-AI-transcript-codex-latest.py"],
+    env=env,
+  )
+  run_gate(
+    "Session metadata cache regression",
+    [PYTHON, "scripts/test-AI-transcript-cache.py"],
+    env=env,
+  )
+  run_gate(
+    "Codex --ls from session files regression",
+    [PYTHON, "scripts/test-AI-transcript-codex-ls.py"],
     env=env,
   )
 

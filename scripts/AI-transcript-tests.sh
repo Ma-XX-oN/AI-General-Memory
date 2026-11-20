@@ -186,6 +186,9 @@ if   [[ -f "$VENV/bin/python"     ]]; then PYTHON="$VENV/bin/python"
 elif [[ -f "$VENV/Scripts/python" ]]; then PYTHON="$VENV/Scripts/python"
 else echo "Cannot find Python in venv at $VENV"; exit 1
 fi
+# Required packages (e.g. zstandard for .jsonl.zst sessions on Python < 3.14).
+$PYTHON -m pip install -q -r scripts/requirements-AI-transcript.txt \
+  || { echo "Failed to install scripts/requirements-AI-transcript.txt"; exit 1; }
 SCRIPT="$PYTHON scripts/AI-transcript.py"
 
 echo "=== AI-transcript.py regression tests ==="
@@ -273,7 +276,7 @@ check "AND: impossible combo → 0"     0  "No sessions match"  ""  $SCRIPT --gr
 echo
 echo "-- Bugs #9/#10/#11: structural (output unchanged)"
 check "--ls record count visible"         0  "records:"    ""  $SCRIPT --ls
-check "transcript --id has header"        0  "019cf2fa"    ""  $SCRIPT --id 019cf2fa --ls
+check "transcript --id has header"        0  "\(c2f6baa6\)" ""  $SCRIPT --id 019cf2fa --ls
 check "--ls title shown"                  0  "wall builder" "" $SCRIPT --ls
 
 # ── Per-AI source flags ───────────────────────────────────────────────────────
@@ -286,7 +289,7 @@ check "--claude --all-projects --grep exits 0"      0  ""        ""  $SCRIPT --c
 check "--codex --grep-re exits 0"                   0  "codex"   ""  $SCRIPT --codex --grep-re "lattice" --ls
 check "--claude --all-projects --grep-re exits 0"   0  ""        ""  $SCRIPT --claude --all-projects --grep-re "lattice" --ls
 # --id resolves from both stores
-check "--id resolves codex session"       0  "019cf2fa"  "" $SCRIPT --id 019cf2fa --ls
+check "--id resolves codex session"       0  "\(c2f6baa6\)" "" $SCRIPT --id 019cf2fa --ls
 # transcript works for each store
 check "codex transcript exits 0"          0  "019cf2fa"  "" $SCRIPT --codex --id 019cf2fa
 # --id by first-message text for a session not in session_index.jsonl (bug #23)

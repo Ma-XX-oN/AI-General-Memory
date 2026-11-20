@@ -44,6 +44,12 @@
 !scripts/AI-transcript-plan.md
 !scripts/AI-transcript-tests.sh
 !scripts/test-AI-transcript-leading-system-context.py
+!scripts/test-AI-transcript-id-fragment.py
+!scripts/test-AI-transcript-zst.py
+!scripts/test-AI-transcript-codex-latest.py
+!scripts/test-AI-transcript-cache.py
+!scripts/test-AI-transcript-codex-ls.py
+!scripts/requirements-AI-transcript.txt
 !scripts/AI-transcript-arch.md
 !scripts/cont-claude-prompt.bat
 !scripts/prettify-jsonl.py

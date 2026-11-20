@@ -125,8 +125,13 @@ Each one informs a specific requirement on the new design.
   rollout file returns the snapshot creation time (e.g. 15:30), not the
   session end time (e.g. 19:30 stored in `updated_at`).  The `--ls` row and
   the transcript header therefore showed different mtimes.
-  → `CodexSessionStore` uses `updated_at` from the session index as `mtime`,
-  falling back to file mtime only when the session is not in the index.
+  → ~~`CodexSessionStore` uses `updated_at` from the session index as `mtime`,
+  falling back to file mtime only when the session is not in the index.~~
+  → Superseded (#25): Codex no longer refreshes `updated_at` as a session
+  continues (e.g. a session active on 2026-11-16 still had
+  `updated_at` 2026-11-15).  `mtime` is now the timestamp of the session's
+  last record, read through the metadata cache; file mtime is only a
+  fallback when no record has a timestamp.
 
 - **`_read_session_index` de-duplicates by id.**  The index file is an
   append-only log; the same session may appear multiple times with different
@@ -138,8 +143,10 @@ Each one informs a specific requirement on the new design.
   Rollout files contain the same content as the live session, so results are
   duplicated.  The index-based approach fixes this: only grep files that
   correspond to known session IDs.
-  → `CodexSessionStore.sessions()` derives paths via the index; `grep` only
-  scans those paths.
+  → `CodexSessionStore.sessions()` keeps one file per session ID
+  (`_cx_session_file_map`, preferring a plain `<id>.jsonl` over a rollout
+  snapshot), so `grep` scans each session once.  Sessions missing from the
+  index are included (#25).
 
 - **`--ls --grep` else-branch still used `updated_at[:16]` (raw UTC) for
   `mtime_str`**, and **ambiguous-match display** did the same.  These are
@@ -193,9 +200,13 @@ Each one informs a specific requirement on the new design.
 
   | Context | Line 1 | Line 2 |
   | --- | --- | --- |
-  | `--grep` header | `which_AI [ctime]-[mtime] [proj] records: rc` | `(uuid8) title` |
-  | `--ls` row | `N. which_AI [ctime]-[mtime] [proj] records: rc` (number prefix) | `(uuid8) title` (indented by `len("N. ")`) |
-  | `--id` transcript header | `which_AI [ctime]-[mtime] [proj] records: rc` | `(uuid8) title` |
+  | `--grep` header | `which_AI [ctime]-[mtime] [proj] records: rc` | `(short_id) title` |
+  | `--ls` row | `N. which_AI [ctime]-[mtime] [proj] records: rc` (number prefix) | `(short_id) title` (indented by `len("N. ")`) |
+  | `--id` transcript header | `which_AI [ctime]-[mtime] [proj] records: rc` | `(short_id) title` |
+
+  `short_id` is the last 8 characters of the UUID (`Session.short_id`).  The
+  leading characters are not used because Codex UUIDv7 IDs start with a
+  millisecond timestamp, so sessions created close together share a prefix.
 
   The `N.` number prefix in `--ls` is the only difference.  Codex omits `[proj]`
   (no project concept).  A single `print_session_header` / `print_session_list_row`
@@ -409,7 +420,7 @@ class SessionStore(ABC):
     @abstractmethod
     def find(self, id_or_glob: str, *,
              all_projects: bool = False) -> tuple[Session | None, list[Session]]:
-        """Resolve UUID prefix/full UUID/title glob.
+        """Resolve a leading/trailing UUID fragment, full UUID, or title glob.
         Returns (session, []) on unambiguous match.
         Returns (None, [candidates]) when ambiguous.
         Raises FileNotFoundError when not found.
@@ -445,7 +456,8 @@ Private helpers (all instance methods or module-level private functions):
 
 1. `"latest"` → newest session
 2. Exact UUID match (filename without extension)
-3. UUID prefix match (`re.match(r'^[0-9a-f-]+$', ...)` then `startswith`)
+3. UUID fragment match (`re.match(r'^[0-9a-f-]+$', ...)` then
+   `_id_matches_fragment`: leading or trailing part of the UUID)
 4. Title glob (`fnmatch` with implicit `*term*` wrapping)
 5. `:N` suffix to pick from ambiguous results
 
@@ -465,14 +477,21 @@ Private helpers:
 
 `find` resolution order:
 
-1. `"latest"` → first entry in session index
-2. UUID prefix match via index (`id.startswith(session_id)`)
-3. Direct file lookup fallback (for IDs not in index)
-4. Title glob (`fnmatch` on `thread_name`)
-5. `:N` suffix to pick from ambiguous results
+1. `"latest"` → most recently active session (by last record timestamp)
+   that is not a Guardian review
+   (`session_meta.payload.thread_source == "guardian_review"`, see
+   `_cx_is_guardian_review`)
+2. UUID fragment match (`_id_matches_fragment`: leading or trailing part of
+   the UUID) against the session files themselves (`_cx_session_file_map`),
+   indexed or not; the index supplies titles only, so an index entry whose
+   file is gone cannot hide a real session
+3. Title glob (`fnmatch` on `thread_name`, then on the first user message of
+   sessions not in the index)
+4. `:N` suffix to pick from ambiguous results
 
-`sessions()` derives the path for each index entry via `_find_session_file`
-and only yields sessions where the file exists.
+`sessions()` yields one session per session file (`_cx_session_file_map`),
+including files with no index entry, sorted by last record timestamp.  The
+index supplies titles only.
 
 Constructor: `CodexSessionStore()`
 
@@ -483,7 +502,7 @@ def print_session_header(session: Session) -> None:
     """Print the 2-line header used by --grep and --id transcript."""
 
 def print_session_list_row(i: int, session: Session) -> None:
-    """Print the N. [ctime]-[mtime] [project] / indent (uuid8) title row."""
+    """Print the N. [ctime]-[mtime] [project] / indent (short_id) title row."""
 ```
 
 Both functions format dates as `"%Y-%m-%d %H:%M"` and read
@@ -543,7 +562,7 @@ AI-transcript.py [--claude | --codex | --both-AIs]
 | `--project PATH` | Override CWD for Claude project detection |
 | `--ls` | List sessions — standalone, or modifier for `--grep` / `--id` |
 | `--show-empty` | Include `(no title)` sessions in `--ls` (hidden by default) |
-| `--id GLOB_OR_UUID` | Session by UUID prefix, full UUID, or title glob |
+| `--id GLOB_OR_UUID` | Session by full UUID, leading or trailing part of the UUID, or title glob |
 | `--grep TEXT` | Search content (plain, case-insensitive) |
 | `--grep-re PATTERN` | Search content (regex) |
 | `--words-only` | Match word characters only; ignore punctuation and HTML tags between words |
@@ -989,7 +1008,7 @@ relevant stream is a TTY; plain text otherwise.
 
 - `[claude]` / `[codex]` source label, `[project]` — `_C_PROJECT` (`Fore.GREEN`)
 - `[ctime]-[mtime]` date range — `_C_DATE` (`Fore.CYAN`)
-- `(uuid8) title` — `_C_TITLE` (`Style.BRIGHT`)
+- `(short_id) title` — `_C_TITLE` (`Style.BRIGHT`)
 - `records: N` — `_C_RECORDS` (`Style.DIM`)
 - Match highlights — `_C_MATCH` (`Style.BRIGHT + Fore.RED`)
 

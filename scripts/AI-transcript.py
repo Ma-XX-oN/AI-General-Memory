@@ -8,6 +8,8 @@ Usage:
   python AI-transcript.py --ls --codex                Codex sessions only
   python AI-transcript.py --ls --all-projects         all Claude projects + Codex
   python AI-transcript.py --id <glob_or_uuid>         transcript for one session
+                                                  (full UUID, leading or trailing
+                                                  UUID part, or title glob)
   python AI-transcript.py --id <id> [output]          write transcript to file
   python AI-transcript.py --id <id> --ls              one-row list entry
   python AI-transcript.py --grep TEXT                 search sessions
@@ -23,11 +25,12 @@ Source selector (mutually exclusive):
   --claude | --codex | --chatgpt | --both-AIs (default)
 Session header format:
   [claude] [creation]-[modification] [project] records: N
-  (uuid8) title
+  (short_id) title       short_id = last 8 characters of the UUID
 """
 
 import argparse
 import atexit
+import dataclasses
 import datetime
 import fnmatch
 import glob as glob_mod
@@ -298,7 +301,7 @@ def _core_transcript(session, rec_filter=None):
   source_indexes = []
   projections = {}
   rec_width = max(1, len(str(session.rc)))
-  with open(session.path, encoding="utf-8") as source:
+  with _open_session(session.path) as source:
     for source_index, raw in enumerate(line for line in source if line.strip()):
       record = json.loads(raw)
       records.append(record)
@@ -335,7 +338,7 @@ def _core_transcript(session, rec_filter=None):
     if resolved_title:
       assert "\n" not in resolved_title and "\r" not in resolved_title
       line2 = _ansi(
-        f"({session.id[:8]}) {resolved_title}",
+        dataclasses.replace(session, title=resolved_title).title_line,
         _C_TITLE,
         active=_display_policy().render_color,
       )
@@ -367,15 +370,339 @@ def _error(msg):
   _diag(_C_ERROR, "ERROR:", msg)
 
 
-# ── Shared utilities ──────────────────────────────────────────────────────────
+# ── Session file access (plain and Zstandard-compressed) ─────────────────────
 
-def _count_records(path):
-  """Count lines in a JSONL file (= number of JSON records)."""
+try:
+  from compression import zstd as _zstd  # Python 3.14+ standard library
+except ImportError:
   try:
-    with open(path, encoding="utf-8") as f:
-      return sum(1 for _ in f)
-  except Exception:
-    return 0
+    import zstandard as _zstd  # Python < 3.14: scripts/requirements-AI-transcript.txt
+  except ImportError:
+    _zstd = None  # reported loudly when a .jsonl.zst file is read
+
+_ZST_SUFFIX = ".zst"
+"""Extension Codex adds when it compresses an older session file."""
+
+_SESSION_SUFFIXES = (".jsonl.zst", ".jsonl")
+"""Session file extensions, longest first so stripping removes both parts."""
+
+_REPORTED_DUPLICATES = set()
+"""Compressed paths already reported as shadowed by a plain copy (one INFO each)."""
+
+
+def _session_stem(path):
+  """Return the file name of *path* without its session extension(s).
+
+  ``X.jsonl`` and ``X.jsonl.zst`` both give ``X``; other names lose only their
+  last extension.
+  """
+  name = os.path.basename(str(path))
+  for suffix in _SESSION_SUFFIXES:
+    if name.endswith(suffix):
+      return name[:-len(suffix)]
+  return os.path.splitext(name)[0]
+
+
+def _session_files(directory, *, name="*", recursive=False):
+  """Return session files named *name* + ``.jsonl`` or ``.jsonl.zst``.
+
+  When both ``X.jsonl`` and ``X.jsonl.zst`` exist, only the plain file is
+  returned (Codex may still be appending to it) and an INFO line says so.
+  """
+  base = os.path.join(directory, "**", name) if recursive else os.path.join(directory, name)
+  paths = set(glob_mod.glob(base + ".jsonl", recursive=recursive))
+  paths |= set(glob_mod.glob(base + ".jsonl" + _ZST_SUFFIX, recursive=recursive))
+  result = []
+  for path in sorted(paths):
+    plain = path[:-len(_ZST_SUFFIX)] if path.endswith(_ZST_SUFFIX) else None
+    if plain in paths:
+      if path not in _REPORTED_DUPLICATES:
+        _REPORTED_DUPLICATES.add(path)
+        _info(f"Using {plain}; ignoring its compressed copy {os.path.basename(path)}")
+      continue
+    result.append(path)
+  return result
+
+
+class _SessionLines:
+  """Context manager iterating the text lines of a session file.
+
+  ``.jsonl.zst`` files are decompressed transparently.  A missing
+  decompressor or corrupt compressed data stops the program with an error
+  naming the file.  ``SystemExit`` is used so that callers' broad
+  ``except Exception`` handlers cannot hide the failure.
+  """
+
+  def __init__(self, path):
+    self._path = str(path)
+    self._compressed = self._path.endswith(_ZST_SUFFIX)
+    self._fh = None  # open text stream; None until __enter__
+
+  def __enter__(self):
+    if not self._compressed:
+      self._fh = open(self._path, encoding="utf-8")
+      return self
+    if _zstd is None:
+      _error(
+        f"cannot read compressed session file {self._path}: no Zstandard "
+        "decompressor.  Install it with: pip install zstandard "
+        "(or use Python 3.14+)"
+      )
+      sys.exit(1)
+    try:
+      self._fh = _zstd.open(self._path, "rt", encoding="utf-8")
+    except _zstd.ZstdError as exc:
+      self._fail(exc)
+    return self
+
+  def __iter__(self):
+    if not self._compressed:
+      yield from self._fh
+      return
+    try:
+      yield from self._fh
+    except (_zstd.ZstdError, EOFError) as exc:
+      self._fail(exc)
+
+  def __exit__(self, *exc_info):
+    if self._fh is not None:
+      self._fh.close()
+    return False
+
+  def _fail(self, exc):
+    """Report undecodable compressed data for this file and exit."""
+    _error(f"cannot decompress session file {self._path}: {exc}")
+    sys.exit(1)
+
+
+def _open_session(path):
+  """Open a ``.jsonl`` or ``.jsonl.zst`` session file for line iteration."""
+  return _SessionLines(path)
+
+
+# ── Session metadata cache ────────────────────────────────────────────────────
+
+_CACHE_FILE_NAME = "ai-transcript.cache"
+"""Cache file name, stored in the Claude config dir and in the Codex home."""
+
+_CACHE_VERSION = 2
+"""Cache format version; a cache file with any other version is rebuilt.
+
+2: Codex entries record ``first_user_message`` state.
+"""
+
+_LINE_TIMESTAMP_RE = re.compile(r'^\{"timestamp":"([^"]+)"')
+"""Fast path for records that start with their timestamp (Codex rollouts)."""
+
+
+@dataclass
+class SessionFileMeta:
+  """Metadata of one session file, as stored in the cache.
+
+  *size* is the number of bytes already scanned: the whole file for
+  compressed files, and up to the last complete line for plain files.
+  """
+  size:     int = 0
+  records:  int = 0                # complete non-blank lines
+  first_ts: "str | None" = None    # raw timestamp of the first timestamped record
+  last_ts:  "str | None" = None    # raw timestamp of the last timestamped record
+  state:    dict = dataclasses.field(default_factory=dict)  # source-specific scan state
+
+
+class _MetaScanner:
+  """Updates a :class:`SessionFileMeta` from complete JSONL lines."""
+
+  def feed(self, meta, line):
+    """Account for one complete line; blank lines are not records."""
+    if not line.strip():
+      return
+    meta.records += 1
+    self._feed_record(meta, line)
+
+  @staticmethod
+  def _note_ts(meta, ts):
+    """Record *ts* as the first (if unset) and latest timestamp."""
+    if isinstance(ts, str) and ts:
+      if meta.first_ts is None:
+        meta.first_ts = ts
+      meta.last_ts = ts
+
+  def _feed_record(self, meta, line):
+    """Track the record's timestamp, avoiding a JSON parse when possible."""
+    match = _LINE_TIMESTAMP_RE.match(line)
+    if match:
+      self._note_ts(meta, match.group(1))
+      return
+    try:
+      rec = json.loads(line)
+    except ValueError:
+      return
+    if isinstance(rec, dict):
+      self._note_ts(meta, rec.get("timestamp"))
+
+
+class _CodexMetaScanner(_MetaScanner):
+  """Also records the first user message (fallback title) in ``meta.state``."""
+
+  def _feed_record(self, meta, line):
+    """Track the timestamp, and the first ``user_message`` until one is found."""
+    super()._feed_record(meta, line)
+    if "first_user_message" in meta.state or '"user_message"' not in line:
+      return
+    try:
+      rec = json.loads(line)
+    except ValueError:
+      return
+    payload = rec.get("payload") if isinstance(rec, dict) else None
+    if (rec.get("type") == "event_msg" and isinstance(payload, dict)
+        and payload.get("type") == "user_message"):
+      title = _cx_user_message_title(payload.get("message", ""))
+      if title:
+        meta.state["first_user_message"] = title
+
+
+class _ClaudeMetaScanner(_MetaScanner):
+  """Also tracks Claude title candidates and creation time in ``meta.state``."""
+
+  def _feed_record(self, meta, line):
+    """Parse the record, then update timestamps and title state."""
+    try:
+      rec = json.loads(line)
+    except ValueError:
+      return
+    if not isinstance(rec, dict):
+      return
+    self._note_ts(meta, rec.get("timestamp"))
+    try:
+      _cl_scan_title_record(meta.state, rec)
+    except (AttributeError, TypeError):
+      pass  # malformed record: no title contribution
+
+
+class SessionMetaCache:
+  """Per-file metadata cache for the session files under one directory.
+
+  Session files only grow, so a file whose size equals the cached size is not
+  reopened, a plain file that grew is read only from the cached size, and a
+  file that shrank (or a compressed file that changed) is rescanned.  The
+  cache is written at exit; an unreadable cache file is silently rebuilt.
+  """
+
+  def __init__(self, cache_path, sessions_root, scanner):
+    self._cache_path = cache_path
+    self._root = os.path.normcase(os.path.abspath(sessions_root)) + os.sep
+    self._scanner = scanner
+    self._entries = None  # {absolute path: SessionFileMeta}; loaded lazily
+    self._dirty = False   # True when the cache file needs rewriting
+
+  def lookup(self, path):
+    """Return up-to-date metadata for the session file at *path*.
+
+    Files outside the sessions directory (e.g. ``--file`` inputs) are
+    scanned but not cached.
+    """
+    path = os.path.abspath(str(path))
+    try:
+      size = os.path.getsize(path)
+    except OSError:
+      return SessionFileMeta()
+    if not os.path.normcase(path).startswith(self._root):
+      return self._scan(path, None)
+    self._load()
+    cached = self._entries.get(path)
+    if cached is not None and cached.size == size:
+      return cached
+    incremental = (
+      cached is not None and cached.size < size and not path.endswith(_ZST_SUFFIX)
+    )
+    fresh = self._scan(path, cached if incremental else None)
+    self._entries[path] = fresh
+    self._dirty = True
+    return fresh
+
+  def _scan(self, path, base):
+    """Return metadata for *path*, continuing from *base* when given."""
+    if path.endswith(_ZST_SUFFIX):
+      meta = SessionFileMeta()
+      with _open_session(path) as f:
+        for line in f:
+          self._scanner.feed(meta, line)
+      meta.size = os.path.getsize(path)
+      return meta
+    meta = (
+      dataclasses.replace(base, state=dict(base.state)) if base else SessionFileMeta()
+    )
+    with open(path, "rb") as fh:
+      fh.seek(meta.size)
+      tail = fh.read()
+    end = tail.rfind(b"\n")  # only complete lines are consumed
+    if end >= 0:
+      for raw in tail[:end].split(b"\n"):
+        self._scanner.feed(meta, raw.decode("utf-8", errors="replace"))
+      meta.size += end + 1
+    return meta
+
+  def _load(self):
+    """Load the cache file once, dropping entries for files that are gone."""
+    if self._entries is not None:
+      return
+    atexit.register(self.save)
+    try:
+      with open(self._cache_path, encoding="utf-8") as fh:
+        data = json.load(fh)
+      if data.get("version") != _CACHE_VERSION:
+        raise ValueError("unknown cache version")
+      self._entries = {
+        path: SessionFileMeta(**fields) for path, fields in data["files"].items()
+      }
+    except (OSError, ValueError, TypeError, KeyError, AttributeError):
+      self._entries = {}
+      self._dirty = os.path.exists(self._cache_path)  # rewrite a corrupt file
+    for path in [p for p in self._entries if not os.path.exists(p)]:
+      del self._entries[path]
+      self._dirty = True
+
+  def save(self):
+    """Write the cache file if it changed.  Failures are ignored."""
+    if not self._dirty or self._entries is None:
+      return
+    data = {
+      "version": _CACHE_VERSION,
+      "files": {p: dataclasses.asdict(m) for p, m in sorted(self._entries.items())},
+    }
+    tmp_path = self._cache_path + ".tmp"
+    try:
+      with open(tmp_path, "w", encoding="utf-8") as fh:
+        json.dump(data, fh)
+      os.replace(tmp_path, self._cache_path)
+      self._dirty = False
+    except OSError:
+      pass  # the cache is optional
+
+
+_SESSION_CACHES = {}
+"""Process-wide :class:`SessionMetaCache` per source and home directory."""
+
+
+def _session_cache(source):
+  """Return the metadata cache for ``"claude"`` or ``"codex"`` sessions.
+
+  Claude: ``<config dir>/ai-transcript.cache`` covering ``<config dir>/projects``.
+  Codex: ``<Codex home>/ai-transcript.cache`` covering ``<Codex home>/sessions``.
+  """
+  if source == "claude":
+    home, sub, scanner = _cl_dir(), "projects", _ClaudeMetaScanner()
+  else:
+    home, sub, scanner = _cx_home(), "sessions", _CodexMetaScanner()
+  key = (source, os.path.abspath(home))
+  if key not in _SESSION_CACHES:
+    _SESSION_CACHES[key] = SessionMetaCache(
+      os.path.join(home, _CACHE_FILE_NAME), os.path.join(home, sub), scanner
+    )
+  return _SESSION_CACHES[key]
+
+
+# ── Shared utilities ──────────────────────────────────────────────────────────
 
 
 def _ansi(s, color, *, active):
@@ -573,6 +900,36 @@ class Session:
   mtime:   datetime.datetime  # last-modified time - local naive datetime
   project: "str | None"       # short project label (claude) or None (codex/chatgpt)
   rc:      int                # number of JSON records in the .jsonl file
+  from_file: bool = False     # loaded via --file: id is a file name, not selectable by --id
+
+  @property
+  def short_id(self) -> str:
+    """Return the displayed short ID: the last 8 characters of the UUID.
+
+    The tail is used because Codex UUIDv7 IDs start with a millisecond
+    timestamp, so sessions created close together share a leading prefix.
+    """
+    return self.id[-8:]
+
+  @property
+  def title_line(self) -> str:
+    """Return header line 2: ``(short_id) title``, or just the title for --file.
+
+    A --file session is selected by path, so its file-name ID is omitted.
+    """
+    return self.title if self.from_file else f"({self.short_id}) {self.title}"
+
+
+def _id_matches_fragment(session_id: str, fragment: str) -> bool:
+  """Return True when *fragment* is a leading or trailing part of *session_id*.
+
+  Matching is case-insensitive.  An empty fragment never matches.
+  """
+  if not fragment:
+    return False
+  sid = session_id.lower()
+  frag = fragment.lower()
+  return sid.startswith(frag) or sid.endswith(frag)
 
 
 @dataclass
@@ -636,7 +993,7 @@ class SessionStore(ABC):
 
   @abstractmethod
   def find(self, id_or_glob: str, *, all_projects: bool = False) -> "tuple[Session | None, list[Session]]":
-    """Resolve UUID prefix/full UUID/title glob.
+    """Resolve a leading/trailing UUID fragment, full UUID, or title glob.
 
     *:N suffix is NOT handled here - strip it before calling.*
 
@@ -803,8 +1160,11 @@ def _cl_project_label(proj_dir):
 
 
 def _cl_session_files(proj_dir):
-  """Return [(mtime_float, path), ...] for all session JSONL files, newest first."""
-  paths = glob_mod.glob(os.path.join(proj_dir, "*.jsonl"))
+  """Return [(mtime_float, path), ...] for all session JSONL files, newest first.
+
+  Includes ``.jsonl.zst`` files; see :func:`_session_files`.
+  """
+  paths = _session_files(proj_dir)
   result = [(os.path.getmtime(p), p) for p in paths]
   result.sort(reverse=True)
   return result
@@ -827,75 +1187,82 @@ def _cl_session_meta(path):
   * *ctime* - ``datetime`` from the first record with a *timestamp* field,
     or ``None`` if absent.
   * *rc*    - total number of non-blank lines (= JSON record count).
+
+  This scans the whole file; session listings use the cached equivalent,
+  :func:`_cl_meta_result` on :meth:`SessionMetaCache.lookup`.
   """
-  explicit_title = None
-  user_fallback = None
-  assistant_fallback = None
-  ctime = None
-  rc = 0
+  meta = SessionFileMeta()
+  scanner = _ClaudeMetaScanner()
   try:
-    with open(path, encoding="utf-8") as f:
+    with _open_session(path) as f:
       for raw in f:
-        raw = raw.strip()
-        if not raw:
-          continue
-        rc += 1
-        rec = json.loads(raw)
-        if rec.get("isSidechain"):
-          continue
-        if ctime is None:
-          ts = rec.get("timestamp")
-          if ts:
-            try:
-              ts_clean = ts.rstrip("Z").split(".")[0]
-              ctime = datetime.datetime.strptime(ts_clean, "%Y-%m-%dT%H:%M:%S")
-            except Exception:
-              pass
-
-        rtype = rec.get("type")
-        if rtype == "ai-title":
-          if explicit_title is None:
-            resolved = rec.get("aiTitle", "")
-            if isinstance(resolved, str):
-              first_line = next(
-                (line.strip() for line in resolved.splitlines() if line.strip()),
-                "",
-              )
-              if first_line:
-                explicit_title = first_line[:80]
-          continue
-
-        if rtype == "user" and user_fallback is None:
-          for block in rec.get("message", {}).get("content", []):
-            if block.get("type") != "text":
-              continue
-            text_block = _cl_strip_system(block.get("text", ""))
-            first_line = next(
-              (line.strip() for line in text_block.splitlines() if line.strip()),
-              "",
-            )
-            if first_line:
-              user_fallback = first_line[:80]
-              break
-        elif rtype == "assistant" and assistant_fallback is None:
-          msg = rec.get("message", {})
-          if msg.get("model") != "<synthetic>":
-            for block in msg.get("content", []):
-              if block.get("type") != "text":
-                continue
-              text_block = block.get("text", "").strip()
-              first_line = next(
-                (line.strip() for line in text_block.splitlines() if line.strip()),
-                "",
-              )
-              if first_line:
-                assistant_fallback = first_line[:80]
-                break
+        scanner.feed(meta, raw)
   except Exception:
     pass
+  return _cl_meta_result(meta)
 
-  title = explicit_title or user_fallback or assistant_fallback or "(no title)"
-  return title, ctime, rc
+
+def _cl_first_text_line(text):
+  """Return the first non-blank line of *text*, stripped and cut to 80 chars."""
+  first_line = next((line.strip() for line in text.splitlines() if line.strip()), "")
+  return first_line[:80]
+
+
+def _cl_scan_title_record(state, rec):
+  """Update Claude title/creation-time *state* from one parsed record.
+
+  *state* keys: ``ctime_ts`` (first timestamp of a non-sidechain record),
+  ``explicit_title`` (first ``ai-title``), ``user_fallback`` (first real user
+  text), ``assistant_fallback`` (first non-synthetic assistant text).
+  """
+  if rec.get("isSidechain"):
+    return
+  if state.get("ctime_ts") is None and rec.get("timestamp"):
+    state["ctime_ts"] = rec["timestamp"]
+
+  rtype = rec.get("type")
+  if rtype == "ai-title":
+    resolved = rec.get("aiTitle", "")
+    if state.get("explicit_title") is None and isinstance(resolved, str):
+      state["explicit_title"] = _cl_first_text_line(resolved) or None
+    return
+
+  if rtype == "user" and state.get("user_fallback") is None:
+    for block in rec.get("message", {}).get("content", []):
+      if block.get("type") != "text":
+        continue
+      first_line = _cl_first_text_line(_cl_strip_system(block.get("text", "")))
+      if first_line:
+        state["user_fallback"] = first_line
+        break
+  elif rtype == "assistant" and state.get("assistant_fallback") is None:
+    msg = rec.get("message", {})
+    if msg.get("model") != "<synthetic>":
+      for block in msg.get("content", []):
+        if block.get("type") != "text":
+          continue
+        first_line = _cl_first_text_line(block.get("text", ""))
+        if first_line:
+          state["assistant_fallback"] = first_line
+          break
+
+
+def _cl_meta_result(meta):
+  """Return ``(title, ctime, rc)`` from Claude :class:`SessionFileMeta`."""
+  state = meta.state
+  title = (
+    state.get("explicit_title") or state.get("user_fallback")
+    or state.get("assistant_fallback") or "(no title)"
+  )
+  ctime = None
+  ts = state.get("ctime_ts")
+  if isinstance(ts, str):
+    try:
+      ts_clean = ts.rstrip("Z").split(".")[0]
+      ctime = datetime.datetime.strptime(ts_clean, "%Y-%m-%dT%H:%M:%S")
+    except ValueError:
+      pass
+  return title, ctime, meta.records
 
 def _cl_session_grep(path, *, plain=None, rx=None, before=0, after=0, first_only=False,
            ignore_case=False, rec_filter=None, cross_record=False):
@@ -916,7 +1283,7 @@ def _cl_session_grep(path, *, plain=None, rx=None, before=0, after=0, first_only
   rec_no = 0
   tagged = [] if (cross_record and not first_only) else None
   try:
-    with open(path, encoding="utf-8") as f:
+    with _open_session(path) as f:
       for raw in f:
         raw = raw.strip()
         if not raw:
@@ -1707,8 +2074,8 @@ class ClaudeSessionStore(SessionStore):
   def _make_session(self, path, mtime_float, proj_dir):
     """Build a Session from a Claude JSONL file path and known mtime."""
     path = str(path)
-    sid = os.path.splitext(os.path.basename(path))[0]
-    title, ctime, rc = _cl_session_meta(path)
+    sid = _session_stem(path)
+    title, ctime, rc = _cl_meta_result(_session_cache("claude").lookup(path))
     mtime = datetime.datetime.fromtimestamp(mtime_float)
     return Session(
       source="claude",
@@ -1751,22 +2118,23 @@ class ClaudeSessionStore(SessionStore):
 
       # Exact UUID match (filename stem == pattern)
       for mtime_f, path in files:
-        stem = os.path.splitext(os.path.basename(path))[0]
+        stem = _session_stem(path)
         if stem == id_or_glob:
           return self._make_session(path, mtime_f, pd), []
 
-      # UUID prefix match - valid hex+dash string, allows 8-char short prefix.
-      # Only skip title glob when prefix actually matched something; otherwise
-      # fall through so e.g. "FEA" (all hex digits) still does a title search.
+      # UUID fragment match - valid hex+dash string matching the start or end
+      # of the UUID (e.g. the 8-char short ID).  Only skip title glob when a
+      # fragment actually matched something; otherwise fall through so e.g.
+      # "FEA" (all hex digits) still does a title search.
       if re.match(r"^[0-9a-f-]+$", id_or_glob, re.IGNORECASE):
-        prefix_found = []
+        fragment_found = []
         for mtime_f, path in files:
-          stem = os.path.splitext(os.path.basename(path))[0]
-          if stem.startswith(id_or_glob):
-            prefix_found.append(self._make_session(path, mtime_f, pd))
-        if prefix_found:
-          all_matches.extend(prefix_found)
-          continue  # skip title glob - UUID prefix took priority
+          stem = _session_stem(path)
+          if _id_matches_fragment(stem, id_or_glob):
+            fragment_found.append(self._make_session(path, mtime_f, pd))
+        if fragment_found:
+          all_matches.extend(fragment_found)
+          continue  # skip title glob - UUID fragment took priority
 
       # Title glob (bare words get implicit wildcard wrapping)
       glob_pat = (
@@ -1774,7 +2142,7 @@ class ClaudeSessionStore(SessionStore):
         else f"*{id_or_glob}*"
       )
       for mtime_f, path in files:
-        title, _, _ = _cl_session_meta(path)
+        title, _, _ = _cl_meta_result(_session_cache("claude").lookup(path))
         if fnmatch.fnmatch(title.lower(), glob_pat.lower()):
           all_matches.append(self._make_session(path, mtime_f, pd))
 
@@ -1807,8 +2175,9 @@ def _cx_home():
 
 
 def _cx_updated_at_local(updated_at):
-  """Convert a session-index *updated_at* ISO string to a local naive datetime.
+  """Convert a Codex ISO UTC timestamp string to a local naive datetime.
 
+  Used for session-index ``updated_at`` values and record timestamps.
   Handles the Windows Codex format ``YYYY-MM-DDThh:mm:ss.fffffffZ`` by
   truncating fractional seconds to 6 digits before parsing.
   Returns ``None`` if *updated_at* is empty or unparseable.
@@ -1820,7 +2189,7 @@ def _cx_updated_at_local(updated_at):
     if "." in ua:
       dot = ua.index(".")
       plus = ua.index("+", dot)
-      ua = ua[:dot + 7] + ua[plus:]  # keep at most 6 fractional digits
+      ua = ua[:min(dot + 7, plus)] + ua[plus:]  # keep at most 6 fractional digits
     return datetime.datetime.fromisoformat(ua).astimezone().replace(tzinfo=None)
   except Exception:
     return None
@@ -1830,9 +2199,9 @@ def _cx_session_id_from_path(path):
   """Extract the canonical session UUID from a session file path.
 
   Handles plain UUID files (``<uuid>.jsonl``) and rollout snapshots
-  (``rollout-YYYY-MM-DDThh-mm-ss-<uuid>.jsonl``).
+  (``rollout-YYYY-MM-DDThh-mm-ss-<uuid>.jsonl``), compressed or not.
   """
-  stem = os.path.splitext(os.path.basename(path))[0]
+  stem = _session_stem(path)
   if stem.startswith("rollout-"):
     # Format: rollout-YYYY-MM-DDThh-mm-ss-{uuid-parts...}
     # Split: ["rollout", "YYYY", "MM", "DDThh", "mm", "ss", <uuid>...]
@@ -1842,6 +2211,56 @@ def _cx_session_id_from_path(path):
   return stem
 
 
+def _cx_session_files():
+  """Return the paths of all Codex session files (plain and compressed)."""
+  return _session_files(os.path.join(_cx_home(), "sessions"), recursive=True)
+
+
+def _cx_is_guardian_review(path):
+  """Return True when the session at *path* is a Codex Guardian review.
+
+  Codex creates these background sessions to review approval requests; their
+  first record is a ``session_meta`` whose payload has
+  ``thread_source: guardian_review``.  Only that first record is read.
+  """
+  try:
+    with _open_session(path) as f:
+      for raw in f:
+        raw = raw.strip()
+        if not raw:
+          continue
+        rec = json.loads(raw)
+        payload = rec.get("payload") or {}
+        return (
+          rec.get("type") == "session_meta"
+          and payload.get("thread_source") == "guardian_review"
+        )
+  except (OSError, json.JSONDecodeError):
+    return False
+  return False
+
+
+_CX_SESSION_FILE_MAP = {}
+"""Per-run ``{Codex home: {session id: path}}``, built by one directory scan."""
+
+
+def _cx_session_file_map():
+  """Return ``{session id: path}`` for all Codex session files (scanned once).
+
+  One file per session: a plain ``<id>.jsonl`` is preferred over a
+  ``rollout-…-<id>.jsonl`` snapshot of the same session.
+  """
+  home = _cx_home()
+  if home not in _CX_SESSION_FILE_MAP:
+    by_id = {}
+    for path in _cx_session_files():
+      sid = _cx_session_id_from_path(path)
+      if sid not in by_id or _session_stem(path) == sid:
+        by_id[sid] = path
+    _CX_SESSION_FILE_MAP[home] = by_id
+  return _CX_SESSION_FILE_MAP[home]
+
+
 def _cx_find_session_file(session_id):
   """Find the JSONL session file for the given session ID.
 
@@ -1849,19 +2268,17 @@ def _cx_find_session_file(session_id):
   merely contain the ID as a substring (e.g. rollout snapshots).
   """
   sessions_dir = os.path.join(_cx_home(), "sessions")
-  # Try exact match first
-  exact = os.path.join(sessions_dir, f"{session_id}.jsonl")
-  if os.path.isfile(exact):
-    return exact
-  # Substring glob fallback (handles rollout filenames)
-  pattern = os.path.join(sessions_dir, "**", f"*{session_id}*.jsonl")
-  matches = glob_mod.glob(pattern, recursive=True)
-  exact_matches = [
-    m for m in matches
-    if os.path.splitext(os.path.basename(m))[0] == session_id
-  ]
-  if exact_matches:
-    return exact_matches[0]
+  # Try exact match first (plain before compressed)
+  for suffix in (".jsonl", ".jsonl" + _ZST_SUFFIX):
+    exact = os.path.join(sessions_dir, f"{session_id}{suffix}")
+    if os.path.isfile(exact):
+      return exact
+  # Rollout filenames: look the ID up in the per-run map of session files
+  by_id = _cx_session_file_map()
+  if session_id in by_id:
+    return by_id[session_id]
+  # Substring fallback over file names
+  matches = [p for p in by_id.values() if session_id in os.path.basename(p)]
   if not matches:
     raise FileNotFoundError(
       f"No session file found for ID: {session_id}\n"
@@ -1874,37 +2291,29 @@ def _cx_find_session_file(session_id):
   return matches[0]
 
 
-def _cx_first_user_message(path, *, max_chars=100):
-  """Return the first user-message text from a Codex JSONL file, or None.
+def _cx_user_message_title(text, *, max_chars=100):
+  """Return a synthetic session title from user-message *text*, or None.
 
-  Scans records until it finds the first ``event_msg`` with payload type
-  ``user_message``.  The text is stripped and truncated to *max_chars*
-  characters so it can serve as a synthetic session title.
+  Drops the IDE context preamble, keeps the first non-empty line, and cuts
+  it to *max_chars* characters.
   """
-  try:
-    with open(path, encoding="utf-8") as f:
-      for line in f:
-        try:
-          rec = json.loads(line)
-        except json.JSONDecodeError:
-          continue
-        if rec.get("type") == "event_msg":
-          payload = rec.get("payload", {})
-          if payload.get("type") == "user_message":
-            text = payload.get("message", "").strip()
-            # Strip IDE context preamble if present (same logic as transcript renderer)
-            m = re.search(r"## My request for Codex:\n(.+)", text, re.DOTALL)
-            if m:
-              text = m.group(1).strip()
-            if text:
-              # Use only the first non-empty line to avoid multi-line titles
-              first_line = next(
-                (l for l in text.splitlines() if l.strip()), text
-              ).strip()
-              return first_line[:max_chars]
-  except Exception:
-    pass
-  return None
+  text = (text or "").strip()
+  # Strip IDE context preamble if present (same logic as transcript renderer)
+  m = re.search(r"## My request for Codex:\n(.+)", text, re.DOTALL)
+  if m:
+    text = m.group(1).strip()
+  if not text:
+    return None
+  first_line = next((l for l in text.splitlines() if l.strip()), text).strip()
+  return first_line[:max_chars]
+
+
+def _cx_first_user_message(path):
+  """Return the first user-message title of a Codex session, or None.
+
+  Comes from the session metadata cache (``first_user_message`` state).
+  """
+  return _session_cache("codex").lookup(path).state.get("first_user_message")
 
 
 def _cx_read_session_index():
@@ -1965,7 +2374,7 @@ def _cx_session_grep(path, *, plain=None, rx=None, before=0, after=0, first_only
   rec_no = 0
   tagged = [] if (cross_record and not first_only) else None
   try:
-    with open(path, encoding="utf-8") as f:
+    with _open_session(path) as f:
       for raw in f:
         raw = raw.strip()
         if not raw:
@@ -2096,55 +2505,31 @@ class CodexSessionStore(SessionStore):
   def is_available(self):
     return os.path.isdir(os.path.join(_cx_home(), "sessions"))
 
-  def _make_session(self, entry):
-    """Build a Session from a session index entry dict.  Returns None on error."""
-    sid = entry.get("id", "")
-    if not sid:
-      return None
-    try:
-      path = Path(_cx_find_session_file(sid))
-    except FileNotFoundError:
-      return None
-    title = entry.get("thread_name", "") or "(no title)"
-    ctime = _cx_uuid7_ctime(sid)
-    updated_at = entry.get("updated_at", "")
-    mtime = _cx_updated_at_local(updated_at)
-    if mtime is None:
-      try:
-        mtime = datetime.datetime.fromtimestamp(os.path.getmtime(str(path)))
-      except Exception:
-        mtime = ctime or datetime.datetime.now()
-    if ctime is None:
-      ctime = mtime
-    rc = _count_records(str(path))
-    return Session(
-      source="codex",
-      id=sid,
-      path=path,
-      title=title,
-      ctime=ctime,
-      mtime=mtime,
-      project=None,
-      rc=rc,
-    )
+  def _session_for(self, path, entry):
+    """Build a Session for the session file at *path*.
 
-  def _make_session_from_path(self, path, entries):
-    """Build a Session from a file path, looking up the index for metadata."""
+    *entry* is the session's index entry, or None when it has none.  The
+    title comes from the index, else the first user message.  Times come from
+    the file (via the metadata cache): creation from the UUIDv7 ID (else the
+    first record), last activity from the last record's timestamp (else the
+    file's modification time).  The index ``updated_at`` is not used: Codex
+    does not refresh it as a session continues.
+    """
     path = str(path)
     sid = _cx_session_id_from_path(path)
-    entry = next((e for e in entries if e.get("id", "") == sid), None)
-    if entry:
-      return self._make_session(entry)
-    # Not in index: use file metadata only
-    ctime = _cx_uuid7_ctime(sid)
-    try:
-      mtime = datetime.datetime.fromtimestamp(os.path.getmtime(path))
-    except Exception:
-      mtime = ctime or datetime.datetime.now()
-    if ctime is None:
-      ctime = mtime
-    rc = _count_records(path)
-    title = _cx_first_user_message(path) or "(no title)"
+    meta = _session_cache("codex").lookup(path)
+    title = (
+      (entry or {}).get("thread_name")
+      or meta.state.get("first_user_message")
+      or "(no title)"
+    )
+    mtime = _cx_updated_at_local(meta.last_ts)
+    if mtime is None:
+      try:
+        mtime = datetime.datetime.fromtimestamp(os.path.getmtime(path))
+      except OSError:
+        mtime = datetime.datetime.now()
+    ctime = _cx_uuid7_ctime(sid) or _cx_updated_at_local(meta.first_ts) or mtime
     return Session(
       source="codex",
       id=sid,
@@ -2153,22 +2538,39 @@ class CodexSessionStore(SessionStore):
       ctime=ctime,
       mtime=mtime,
       project=None,
-      rc=rc,
+      rc=meta.records,
     )
 
-  def sessions(self, *, all_projects=False):
-    """Return all Codex sessions, sorted newest-first.
+  def _make_session(self, entry):
+    """Build a Session from a session index entry dict.  Returns None on error."""
+    sid = entry.get("id", "")
+    if not sid:
+      return None
+    try:
+      path = _cx_find_session_file(sid)
+    except FileNotFoundError:
+      return None
+    return self._session_for(path, entry)
 
-    *all_projects* is accepted for API compatibility but is a no-op - Codex
-    has no project partitioning, so all sessions are always returned.
+  def _make_session_from_path(self, path, entries):
+    """Build a Session from a file path, looking up the index for its title."""
+    sid = _cx_session_id_from_path(str(path))
+    entry = next((e for e in entries if e.get("id", "") == sid), None)
+    return self._session_for(path, entry)
+
+  def sessions(self, *, all_projects=False):
+    """Return a Session for every Codex session file, most recently active first.
+
+    Sessions without an index entry are included.  *all_projects* is
+    accepted for API compatibility but is a no-op - Codex has no project
+    partitioning.
     """
-    entries = _cx_read_session_index()
-    result = []
-    for e in entries:
-      sess = self._make_session(e)
-      if sess is not None:
-        result.append(sess)
-    # Index is already sorted newest-first by updated_at
+    by_id = {e.get("id"): e for e in _cx_read_session_index()}
+    result = [
+      self._session_for(path, by_id.get(sid))
+      for sid, path in _cx_session_file_map().items()
+    ]
+    result.sort(key=lambda s: s.mtime, reverse=True)
     return result
 
   def find(self, id_or_glob, *, all_projects=False):
@@ -2184,35 +2586,28 @@ class CodexSessionStore(SessionStore):
     indexed_ids = {e.get("id") for e in entries}
 
     if id_or_glob == "latest":
-      if not entries:
-        raise FileNotFoundError("Codex session_index.jsonl is empty or not found")
-      sess = self._make_session(entries[0])
-      if sess is None:
-        raise FileNotFoundError("Latest Codex session file not found")
-      return sess, []
+      # Most recently active session that is not a background Guardian review.
+      for sess in self.sessions():
+        if not _cx_is_guardian_review(sess.path):
+          return sess, []
+      raise FileNotFoundError(
+        "No Codex session found for 'latest' (none, or only Guardian reviews)"
+      )
 
     is_uuid_search = "*" not in id_or_glob and "?" not in id_or_glob
     all_matches = []
 
     if is_uuid_search:
-      # UUID prefix via index
-      prefix_matches = [e for e in entries if e.get("id", "").startswith(id_or_glob)]
-      if len(prefix_matches) == 1:
-        sess = self._make_session(prefix_matches[0])
-        if sess:
-          return sess, []
-      elif len(prefix_matches) > 1:
-        all_matches = [s for s in map(self._make_session, prefix_matches) if s]
-        # Fall through to resolution below
-      else:
-        # No index match - try direct file lookup (full UUID not yet indexed)
-        try:
-          path = _cx_find_session_file(id_or_glob)
-          sess = self._make_session_from_path(path, entries)
-          if sess:
-            return sess, []
-        except FileNotFoundError:
-          pass
+      # UUID fragment (leading or trailing part), matched against the session
+      # files themselves (one per ID, as in --ls); the index supplies titles
+      # only, so an index entry whose file is gone cannot hide a real session.
+      by_id = {e.get("id"): e for e in entries}
+      all_matches = [
+        self._session_for(path, by_id.get(sid))
+        for sid, path in _cx_session_file_map().items()
+        if _id_matches_fragment(sid, id_or_glob)
+      ]
+      if not all_matches:
         is_uuid_search = False  # allow title glob fallback
 
     if not is_uuid_search and not all_matches:
@@ -2231,10 +2626,7 @@ class CodexSessionStore(SessionStore):
       # sessions whose index entry hasn't been written yet).  Use the first
       # user message as a synthetic title for matching.
       if not all_matches:
-        sessions_dir = os.path.join(_cx_home(), "sessions")
-        for fpath in glob_mod.glob(
-            os.path.join(sessions_dir, "**", "*.jsonl"), recursive=True
-        ):
+        for fpath in _cx_session_files():
           sid = _cx_session_id_from_path(fpath)
           if sid in indexed_ids:
             continue
@@ -2315,7 +2707,7 @@ def _cg_conversation_metadata(rec):
 def _cg_conversation_id_from_path(path):
   """Return the exported ChatGPT conversation ID, or ``""`` when absent."""
   try:
-    with open(path, encoding="utf-8") as f:
+    with _open_session(path) as f:
       for raw in f:
         raw = raw.strip()
         if not raw:
@@ -2329,7 +2721,7 @@ def _cg_conversation_id_from_path(path):
 def _cg_message_records(path):
   """Return ChatGPT message records, excluding the synthetic metadata record."""
   records = []
-  with open(path, encoding="utf-8") as f:
+  with _open_session(path) as f:
     for raw in f:
       raw = raw.strip()
       if not raw:
@@ -3798,7 +4190,7 @@ def _cg_session_meta(path):
   asst_fallback = None
 
   try:
-    with open(path, encoding="utf-8") as f:
+    with _open_session(path) as f:
       for raw in f:
         raw = raw.strip()
         if not raw:
@@ -3842,7 +4234,7 @@ def _cg_session_grep(path, *, plain=None, rx=None, before=0, after=0, first_only
   tagged = [] if (cross_record and not first_only) else None
   file_ref_index = {}
   try:
-    with open(path, encoding="utf-8") as f:
+    with _open_session(path) as f:
       for raw in f:
         raw = raw.strip()
         if not raw:
@@ -3902,7 +4294,7 @@ class ChatGPTSessionStore(SessionStore):
     path = str(path)
     if not CHATGPT_CONVERSATION_ID:
       CHATGPT_CONVERSATION_ID = _cg_conversation_id_from_path(path) or None
-    stem = os.path.splitext(os.path.basename(path))[0]
+    stem = _session_stem(path)
     title, ctime, mtime, rc = _cg_session_meta(path)
     try:
       file_mtime = datetime.datetime.fromtimestamp(os.path.getmtime(path))
@@ -3942,7 +4334,7 @@ def _format_session_lines(session):
   """Return ``(line1, line2)`` strings for a session header.
 
   Line 1: ``[source] [ctime]-[mtime] [project] records: N``
-  Line 2: ``(uuid8) title``
+  Line 2: ``(short_id) title`` where short_id is the last 8 UUID characters
   """
   render_color = _display_policy().render_color
   ctime_str = session.ctime.strftime("%Y-%m-%d %H:%M")
@@ -3957,7 +4349,7 @@ def _format_session_lines(session):
   line1 = f"{ai_part} {date_part}{proj_part} {rec_part}"
   assert "\n" not in session.title and "\r" not in session.title
   line2 = _ansi(
-    f"({session.id[:8]}) {session.title}", _C_TITLE, active=render_color
+    session.title_line, _C_TITLE, active=render_color
   )
   return line1, line2
 
@@ -4302,7 +4694,7 @@ def _resolve_single_session(stores, id_val, all_projects):
   for i, sess in enumerate(all_matches, 1):
     proj = f" [{sess.project}]" if sess.project else ""
     print(
-      f"  {i:3}. {sess.title:<55}  ({sess.id[:8]}...) [{sess.source}{proj}]",
+      f"  {i:3}. {sess.title:<55}  ({sess.short_id}) [{sess.source}{proj}]",
       file=sys.stderr,
     )
   print(f"\nUse --id '{base_id}:<N>' to select one.", file=sys.stderr)
@@ -4312,7 +4704,7 @@ def _resolve_single_session(stores, id_val, all_projects):
 def _detect_file_source(path):
   """Return the JSONL source type for *path*, or ``None`` when unknown."""
   try:
-    with open(path, encoding="utf-8") as f:
+    with _open_session(path) as f:
       for raw in f:
         raw = raw.strip()
         if not raw:
@@ -4347,7 +4739,8 @@ def main():
       "  %(prog)s --ls                            list all sessions (both AIs)\n"
       "  %(prog)s --ls --claude                   Claude sessions only\n"
       "  %(prog)s --ls --all-projects             all Claude projects + Codex\n"
-      "  %(prog)s --id f4b19167                   Claude transcript by UUID prefix\n"
+      "  %(prog)s --id f4b19167                   transcript by leading UUID part\n"
+      "  %(prog)s --id c7eee942                   transcript by short ID (trailing UUID part)\n"
       "  %(prog)s --id latest --codex             latest Codex transcript\n"
       "  %(prog)s --id f4b19167 out.md            write transcript to file\n"
       "  %(prog)s --file export.jsonl            auto-detect direct JSONL source\n"
@@ -4359,9 +4752,9 @@ def main():
       "\n"
       "Session header format:\n"
       "  [claude] [creation]-[modification] [project] records: N\n"
-      "  (uuid8) title\n"
+      "  (short_id) title       short_id = last 8 characters of the UUID\n"
       "  Creation time: first JSONL timestamp (Claude) / UUID v7 decode (Codex).\n"
-      "  Modification time: file mtime (Claude) / updated_at from index (Codex)."
+      "  Modification time: file mtime (Claude) / last record timestamp (Codex)."
     ),
     formatter_class=argparse.RawDescriptionHelpFormatter,
   )
@@ -4397,7 +4790,10 @@ def main():
     metavar="GLOB_OR_UUID",
     action="append",
     help=(
-      "Select session by title glob, UUID (or prefix), or 'latest'. "
+      "Select session by title glob, full UUID, any leading or trailing "
+      "part of the UUID (e.g. the 8-character short ID shown in --ls), "
+      "or 'latest' (newest session; Codex Guardian reviews are skipped).  "
+      "A value containing * or ? is always a title glob. "
       "Append :<N> to pick the Nth result when ambiguous. "
       "Repeating --id warns and uses the last value."
     ),
@@ -4777,6 +5173,7 @@ def main():
     else:
       _file_session = chatgpt_store._make_session_from_path(_fpath)
       _file_store = chatgpt_store
+    _file_session.from_file = True
     _info(f"Session: {_file_session.path}")
     transcript_text = _file_store.transcript(
       _file_session,
@@ -4849,6 +5246,7 @@ def main():
           sys.exit(1)
       else:
         _file_session = chatgpt_store._make_session_from_path(_fpath)
+      _file_session.from_file = True
       candidates = [_file_session]
     elif id_val:
       # --id scopes search to a single session
