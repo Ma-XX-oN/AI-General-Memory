@@ -558,6 +558,27 @@ If the agent is producing wrong results because it can't see the local files,
 **stop it immediately** — do not let it finish, as it is burning tokens on
 stale data.
 
+### Shared libraries: all work goes to `main`, tested against every consumer
+
+A shared library (e.g. AIConversationCore) exists so every consumer runs one
+implementation.  Never let it split into per-consumer lines:
+
+- **Target `main`.** Library work branches from `main` and merges back into
+  `main`.  An issue is done only when merged into `main`; never close it on a
+  side branch or a consumer-specific "line".
+- **Pin only `main`.** A consumer pins only a library commit on `main` (or a
+  release tag on `main`).  Never pin an issue branch or side line, not even
+  temporarily for testing.
+- **Test every consumer.** Every PR to the library's `main` and every push to
+  it runs all consumers' test suites against that exact commit.
+- **Missing library feature?** Open a library issue, land it on `main`, then
+  repin.  Never work around it with a consumer-specific library branch.
+
+**Why:** AIConversationCore drifted into separate lines for AI-transcript,
+AgentPanelSpeaker and DownloadConversation.  Issues were closed on those
+lines, #106 had to rebuild the work in `main`, and on 2026-11-20 two of the
+three consumers still pinned commits that were not on `main`.
+
 ## API Explanations
 
 When explaining APIs or writing API documentation, follow this structure and rules.
